@@ -1,0 +1,12 @@
+{
+  "name": "wps-rfq-addin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WPS招标清单询价插件",
+  "addonType": "et",
+  "scripts": {
+    "test": "node --test test/*.test.cjs",
+    "dev": "node dev/server.cjs"
+  },
+  "engines": { "node": ">=22" }
+}

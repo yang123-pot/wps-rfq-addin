@@ -2,7 +2,7 @@
 
 将整个项目的招标清单分类、核对，生成面向供应商的独立询价文件。
 
-**当前阶段：设计初稿，尚未开发或安装WPS插件。**
+**当前阶段：正式开发，已完成工作簿读取适配，正在验证WPS实机接入。**
 
 流程：WPS打开清单 → 用户选择是否合并多个工作簿 → 自动备注材料类别 → 全部人工确认 → 单独填写品牌和供应商 → 带入询价抬头生成工作表 → 一键拆分为“分类_供应商名称.xlsx”。
 
@@ -13,6 +13,7 @@
 - [handoff.md](handoff.md)：核心设计、实际进度、下一步，每次接续任务先读。
 - [AGENTS.md](AGENTS.md)：项目续作与GitHub备份规则。
 - [详细设计初稿](docs/wps-addin-phase1-design-v2.md)：完整业务流程和待定交互。
+- [接入实施计划](docs/wps-foundation-plan.md)：首个开发阶段的任务与验证进度。
 - [分类核对示意图](docs/mockups/classification-review.png)、[一键拆分示意图](docs/mockups/split-inquiry-files.png)：设计效果，非运行截图。
 
 ## 备份约定
