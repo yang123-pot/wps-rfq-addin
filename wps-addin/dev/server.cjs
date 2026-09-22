@@ -1,0 +1,105 @@
+const http = require('node:http');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const crypto = require('node:crypto');
+
+const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.css', '/src/host.js',
+  '/src/taskpane.js', '/assets/inquiry.svg']);
+const TYPES = {'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
+  '.html':'text/html; charset=utf-8','.xml':'application/xml; charset=utf-8','.svg':'image/svg+xml'};
+
+function createServer({root, probeConfig = null, reportPath = null}) {
+  const reports = [];
+  let writes = Promise.resolve();
+  const server = http.createServer(async (req, res) => {
+    const origin = 'http://127.0.0.1:' + server.address().port;
+    function reply(status, body, type = 'text/plain; charset=utf-8') {
+      res.writeHead(status, {'content-type':type,'cache-control':'no-store','x-content-type-options':'nosniff'});
+      res.end(req.method === 'HEAD' ? undefined : body);
+    }
+    if (req.headers.host !== '127.0.0.1:' + server.address().port ||
+        (req.headers.origin && req.headers.origin !== origin)) return reply(403, 'Local origin required');
+    let url;
+    try { url = new URL(req.url, origin); } catch (_) { return reply(400, 'Invalid URL'); }
+    if (url.pathname === '/__probe/report') {
+      if (!probeConfig || !reportPath) return reply(404, 'Not found');
+      if (req.method !== 'POST') return reply(405, 'POST required');
+      if (req.headers['x-rfq-probe-token'] !== probeConfig.token) return reply(403, 'Invalid probe token');
+      let size = 0;
+      const chunks = [];
+      try {
+        for await (const chunk of req) {
+          size += chunk.length;
+          if (size <= 65536) chunks.push(chunk);
+        }
+        if (size > 65536) return reply(413, 'Report too large');
+        let report;
+        try { report = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch (_) { return reply(400, 'Invalid JSON'); }
+        if (!report || typeof report.stage !== 'string' || report.stage.length > 80 || Array.isArray(report)) return reply(400, 'Invalid report');
+        reports.push({...report, receivedAt: new Date().toISOString()});
+        if (reports.length > 100) reports.shift();
+        const data = JSON.stringify({reports}, null, 2);
+        writes = writes.catch(() => {}).then(() => fs.writeFile(reportPath, data, 'utf8'));
+        await writes;
+        return reply(200, '{"ok":true}', 'application/json');
+      } catch (_) { return reply(500, 'Could not save probe report'); }
+    }
+    if (req.method !== 'GET' && req.method !== 'HEAD') return reply(405, 'GET required');
+    if (url.pathname === '/health') return reply(200, JSON.stringify({service:'wps-rfq-addin',version:'0.1.0',
+      mode:probeConfig ? 'probe' : 'development'}), 'application/json');
+    if (url.pathname === '/' || url.pathname === '/index.html') {
+      // WPS owns index.html. Supply its bootstrap in memory, not as a product file.
+      const probe = probeConfig ? '<script>window.__RFQ_PROBE__=' +
+        JSON.stringify(probeConfig).replace(/</g, '\\u003c') + ';</script><script src="/dev/host-probe.js"></script>' : '';
+      return reply(200, '<!doctype html><html><head><meta charset="utf-8"></head><body>' +
+        '<script src="/main.js"></script>' + probe + '</body></html>', TYPES['.html']);
+    }
+    const isProbeScript = probeConfig && url.pathname === '/dev/host-probe.js';
+    if (!ASSETS.has(url.pathname) && !isProbeScript) return reply(404, 'Not found');
+    try {
+      let content = await fs.readFile(path.join(root, url.pathname.slice(1)));
+      if (probeConfig && url.pathname === '/taskpane.html') {
+        const token = JSON.stringify(probeConfig.token);
+        content = content.toString('utf8').replace('</body>', '<script>window.addEventListener("load",function(){fetch("/__probe/report",{method:"POST",headers:{"content-type":"application/json","x-rfq-probe-token":' + token + '},body:JSON.stringify({stage:"taskpane-rendered",passed:!!window.Application&&!document.getElementById("read-workbook").disabled})});});</script></body>');
+      }
+      return reply(200, content, TYPES[path.extname(url.pathname)] || 'application/octet-stream');
+    } catch (_) { return reply(404, 'Not found'); }
+  });
+  return server;
+}
+
+async function prepareProbeSources(sourcePaths, outputDirectory) {
+  if (!sourcePaths.length) return [];
+  const directory = await fs.mkdtemp(path.join(outputDirectory, 'probe-inputs-'));
+  const manifest = [];
+  for (let index = 0; index < sourcePaths.length; index++) {
+    const original = path.resolve(sourcePaths[index]);
+    const extension = path.extname(original).toLowerCase();
+    if (!['.xls','.xlsx'].includes(extension)) throw new Error('Probe source must be xls or xlsx');
+    const copied = path.join(directory, 'source-' + (index + 1) + extension);
+    const bytes = await fs.readFile(original);
+    await fs.writeFile(copied, bytes, {flag:'wx'});
+    manifest.push({original,copied,sha256:crypto.createHash('sha256').update(bytes).digest('hex')});
+  }
+  await fs.writeFile(path.join(directory, 'manifest.json'), JSON.stringify(manifest,null,2), {flag:'wx'});
+  return manifest.map(item => item.copied);
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  function arg(name, fallback) { const i = args.indexOf(name); return i < 0 ? fallback : args[i + 1]; }
+  const port = Number(arg('--port', '38891'));
+  const reportPath = arg('--report', null);
+  const outputPath = arg('--probe-output', null);
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid port');
+  if ((reportPath && !outputPath) || (!reportPath && outputPath)) throw new Error('Probe requires --report and --probe-output');
+  const inputPaths = args.reduce((out, value, i) => value === '--source' ? out.concat(path.resolve(args[i + 1])) : out, []);
+  if (inputPaths.length && !outputPath) throw new Error('--source requires probe mode');
+  const sourcePaths = outputPath ? await prepareProbeSources(inputPaths, path.dirname(path.resolve(outputPath))) : [];
+  const probeConfig = outputPath ? {token:crypto.randomBytes(24).toString('hex'), outputPath:path.resolve(outputPath),sourcePaths} : null;
+  const server = createServer({root:path.resolve(__dirname,'..'),probeConfig,reportPath:reportPath && path.resolve(reportPath)});
+  server.on('error', error => { console.error(error.message); process.exitCode = 1; });
+  server.listen(port, '127.0.0.1', () => console.log('WPS add-in ready: http://127.0.0.1:' + port + (probeConfig ? ' (probe enabled)' : '')));
+}
+if (require.main === module) main().catch(error => {console.error(error.message);process.exitCode=1;});
+module.exports = {createServer,prepareProbeSources};

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>项目询价</title><link rel="stylesheet" href="styles.css"></head>
+<body>
+  <header><img src="assets/inquiry.svg" alt=""><div><h1>项目询价</h1><p>从招标清单，到供应商询价文件</p></div></header>
+  <main>
+    <div id="connection" class="connection" role="status">正在连接WPS表格…</div>
+    <section class="intro"><span class="eyebrow">第一步 · 读取清单</span><h2>从当前工作簿开始</h2><p>打开项目招标清单后，读取所有工作表。读取过程保留原始内容，不修改清单。</p></section>
+    <section class="card" aria-label="当前工作簿"><div class="card-label">当前工作簿</div><strong id="workbook-name">尚未读取</strong><p id="workbook-detail">准备好后，点击下方按钮。</p><button id="read-workbook" type="button" disabled>读取全部工作表</button></section>
+    <div id="message" role="status" aria-live="polite"></div>
+    <section id="sheets-section" class="card" hidden><div class="section-title"><h2>工作表读取结果</h2><span id="sheet-count"></span></div><ul id="sheets"></ul><p class="note">这里显示工作表的使用范围，材料条目数将在清单识别后确定。</p></section>
+    <section class="next"><h2>接下来的整理流程</h2><ol><li>可选合并清单，备注来源</li><li>自动分类，全部人工核对</li><li>填写品牌、供应商和询价抬头</li><li>生成询价表，一键拆分文件</li></ol></section>
+  </main>
+  <footer>接入验证版 0.1 · 后续整理功能正在开发</footer>
+  <script src="src/host.js"></script><script src="src/taskpane.js"></script>
+</body></html>
