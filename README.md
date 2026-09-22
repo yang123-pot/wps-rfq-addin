@@ -16,6 +16,7 @@
 - [接入实施计划](docs/wps-foundation-plan.md)：首个开发阶段的任务与验证进度。
 - [运行说明与验证记录](docs/wps-foundation-verification.md)：开发版启动、已验证范围、原件保护及当前限制。
 - [清单识别验证](docs/wps-parser-verification.md)：7587条候选、专业依据、特征续行及侧栏检查。
+- [精确合并核心验证](docs/wps-exact-merge-verification.md)：可选合并计算及来源、数量保护；合并界面与另存尚未接入。
 - [分类核对示意图](docs/mockups/classification-review.png)、[一键拆分示意图](docs/mockups/split-inquiry-files.png)：设计效果，非运行截图。
 
 ## 备份约定
