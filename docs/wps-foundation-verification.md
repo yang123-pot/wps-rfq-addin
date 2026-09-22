@@ -37,10 +37,10 @@ node wps-addin/dev/server.cjs
 powershell -NoProfile -File .\wps-addin\dev\register.ps1 -Action Register
 ```
 
-保持第一条命令运行，在WPS表格内通过“项目询价 → 打开询价助手 → 读取全部工作表”使用。普通浏览器打开页面会提示进入WPS；不会模拟读取成功。若WPS已缓存旧加载项，先自行保存正在编辑的文件，再重新打开WPS。
+保持第一条命令运行，在WPS表格内通过“项目询价 → 打开询价助手 → 读取并识别清单”使用。普通浏览器打开页面会提示进入WPS；不会模拟读取成功。若WPS已缓存旧加载项，先自行保存正在编辑的文件，再重新打开WPS。
 
 若系统未单独安装Node，本机Codex提供的可执行文件位于`%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe`。卸载开发注册使用同一脚本的`-Action Unregister`，只移除本插件，保留其他加载项与配置备份。
 
-此版是本机开发接入，不是可交付的离线安装包。自动启动辅助脚本未纳入本次交付，启动方式以以上命令为准。读取结果尚未进行材料分类、品牌填写或询价文件生成。
+此版是本机开发接入，不是可交付的离线安装包。自动启动辅助脚本未纳入本次交付，启动方式以以上命令为准。新增的清单识别与来源预览见[独立验证记录](wps-parser-verification.md)，尚未进行材料分类、品牌填写或询价文件生成。
 
 技术依据：[WPS加载项开发说明](https://open.wps.cn/documents/app-integration-dev/wps365/client/wpsoffice/wps-integration-mode/wps-addin-development/wps-addin-development-instructions)、[任务窗格说明](https://open.wps.cn/documents/app-integration-dev/wps365/client/wpsoffice/jsapi/addin-api/TaskPane/task-pane-overview)。使用publish开发注册，不修改WPS安装目录的oem.ini。

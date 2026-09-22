@@ -4,7 +4,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.css', '/src/host.js',
-  '/src/taskpane.js', '/assets/inquiry.svg']);
+  '/src/taskpane.js', '/src/parser.js', '/assets/inquiry.svg']);
 const TYPES = {'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
   '.html':'text/html; charset=utf-8','.xml':'application/xml; charset=utf-8','.svg':'image/svg+xml'};
 

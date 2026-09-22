@@ -65,5 +65,16 @@
     return result;
   }
 
-  return { inspectWorkbook: inspectWorkbook, readWorkbook: readWorkbook };
+  function locateSource(application, source) {
+    var book = activeBook(application);
+    function identity(path) { return String(path || '').replace(/[\\/]+/g, '/').toLowerCase(); }
+    if ((source.path && identity(book.FullName) !== identity(source.path)) ||
+        (!source.path && String(book.Name) !== source.file)) throw new Error('当前已切换工作簿，请先回到读取时的原工作簿，再定位或重新读取。');
+    if (!Number.isSafeInteger(source.row) || source.row < 1 || !Number.isSafeInteger(source.column) || source.column < 1) throw new Error('来源行列无效，请重新读取清单。');
+    var sheet = book.Worksheets.Item(source.sheet);
+    if (!sheet) throw new Error('原工作表不存在，请重新读取清单。');
+    sheet.Activate();
+    sheet.Cells.Item(source.row, source.column).Select();
+  }
+  return { inspectWorkbook: inspectWorkbook, readWorkbook: readWorkbook, locateSource: locateSource };
 }));

@@ -2,7 +2,7 @@
 
 将整个项目的招标清单分类、核对，生成面向供应商的独立询价文件。
 
-**当前阶段：正式开发，WPS功能区、侧栏、工作簿读取和另存已实机验证，业务分类与文件拆分尚未实现。**
+**当前阶段：WPS接入已实机验证，清单识别与来源预览已实现；分类、合并及文件拆分仍在开发。**
 
 流程：WPS打开清单 → 用户选择是否合并多个工作簿 → 自动备注材料类别 → 全部人工确认 → 单独填写品牌和供应商 → 带入询价抬头生成工作表 → 一键拆分为“分类_供应商名称.xlsx”。
 
@@ -15,6 +15,7 @@
 - [详细设计初稿](docs/wps-addin-phase1-design-v2.md)：完整业务流程和待定交互。
 - [接入实施计划](docs/wps-foundation-plan.md)：首个开发阶段的任务与验证进度。
 - [运行说明与验证记录](docs/wps-foundation-verification.md)：开发版启动、已验证范围、原件保护及当前限制。
+- [清单识别验证](docs/wps-parser-verification.md)：7587条候选、专业依据、特征续行及侧栏检查。
 - [分类核对示意图](docs/mockups/classification-review.png)、[一键拆分示意图](docs/mockups/split-inquiry-files.png)：设计效果，非运行截图。
 
 ## 备份约定

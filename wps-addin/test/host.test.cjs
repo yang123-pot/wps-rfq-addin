@@ -76,3 +76,16 @@ test('invalid sheet metadata is rejected instead of silently dropping rows', () 
   s.UsedRange.Row = 0;
   assert.throws(() => host.readWorkbook(app([s])), /无效范围/);
 });
+test('source location refuses a different workbook before accessing any sheet', () => {
+  const application = app([sheet('给排水', [['名称']])]);
+  application.ActiveWorkbook.Worksheets.Item=()=>assert.fail('wrong workbook accessed');
+  assert.throws(()=>host.locateSource(application,{path:'C:\\其他.xlsx',file:'其他.xlsx',sheet:'给排水',row:5,column:3}),/原工作簿|切换/);
+});
+test('source location selects only a valid coordinate in the matching workbook', () => {
+  const s=sheet('给排水',[['名称']]);let selected;
+  s.Activate=()=>{};s.Cells={Item:(row,column)=>({Select:()=>{selected=[row,column];}})};
+  const application=app([s]);application.ActiveWorkbook.Worksheets.Item=()=>s;
+  host.locateSource(application,{path:'c:/样本/测试清单.xlsx',file:'测试清单.xlsx',sheet:'给排水',row:5,column:3});
+  assert.deepEqual(selected,[5,3]);
+  assert.throws(()=>host.locateSource(application,{path:'c:/样本/测试清单.xlsx',file:'测试清单.xlsx',sheet:'给排水',row:0,column:3}),/行列/);
+});
