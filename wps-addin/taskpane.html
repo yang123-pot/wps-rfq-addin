@@ -4,15 +4,19 @@
 <body>
   <header><img src="assets/inquiry.svg" alt=""><div><h1>项目询价</h1><p>从招标清单，到供应商询价文件</p></div></header>
   <main>
+    <fieldset id="task-controls">
     <div id="connection" class="connection" role="status">正在连接WPS表格…</div>
     <section class="intro"><span class="eyebrow">第一步 · 识别与核对</span><h2>先看清材料与来源</h2><p>读取全部工作表，核对材料、工程与专业来源。修正记录单独保存在本机，原表保持不变。</p></section>
-    <section class="card" aria-label="当前工作簿"><div class="card-label">当前工作簿</div><strong id="workbook-name">尚未读取</strong><p id="workbook-detail">准备好后，点击下方按钮。</p><button id="read-workbook" type="button" disabled>读取并识别清单</button></section>
+    <section id="import-section" class="card"><h2>项目清单文件</h2><p class="note">先在WPS保存待导入文件，再选择xls/xlsx（每批最多20份）。插件复制后读取，不打开原件。</p><button id="import-files" type="button" disabled>选择多个清单文件</button><p id="import-message" role="status"></p><ul id="imported-books"></ul><p class="note">关闭侧栏后可重新导入同一原件，再恢复各文件已保存的核对。</p></section>
+    <section class="card" aria-label="当前工作簿"><div class="card-label" id="workbook-context">当前工作簿（单独读取）</div><strong id="workbook-name">尚未读取</strong><p id="workbook-detail">准备好后，点击下方按钮。</p><button id="read-workbook" type="button" disabled>读取并识别清单</button><p class="note">此按钮读取当前活动工作簿，不自动加入上方导入列表。两种读取方式的核对记录分别保存，请用原方式恢复。</p></section>
     <div id="message" role="status" aria-live="polite"></div>
     <section id="sheets-section" class="card" hidden><div class="metrics"><div><strong id="material-count">0</strong><span>清单候选项</span></div><div><strong id="issue-count">0</strong><span>待核对问题</span></div></div><details><summary>各工作表识别结果 <span id="sheet-count"></span></summary><ul id="sheets"></ul></details><p class="note">候选项包含施工和措施项目，是否“无需询价”将在分类时确认。</p></section>
     <section id="review-section" class="card" hidden><h2>核对记录</h2><p id="review-status" role="status"></p><p id="processing-status" class="note"></p><div class="review-actions"><button id="save-review" type="button">保存到本机</button><button id="restore-review" type="button">恢复已保存核对</button></div><p class="note">只适用于此工作簿。清单内容变化后须重新核对；本机记录不会上传，清理侧栏存储会删除记录。修改后请保存再关闭。</p></section>
     <section id="preview-section" class="card" hidden><div class="section-title"><h2>识别预览</h2><span>原表保持不变</span></div><label class="filter" for="preview-mode">查看范围<select id="preview-mode"><option value="all">全部候选项</option><option value="reviews">有问题的候选项</option><option value="issues">全部待核对问题</option><option value="decisions">已核对记录 / 撤销</option></select></label><ul id="preview-list"></ul><div class="pagination"><button id="previous-page" type="button">上一页</button><span id="page-summary"></span><button id="next-page" type="button">下一页</button></div><p class="note">展开条目可核对来源和材料字段。区段歧义请在“全部待核对问题”处理，特征续行须逐行确认。分类与询价输出仍在开发。</p></section>
-    <section class="next"><h2>接下来的整理流程</h2><ol><li>可选合并清单，备注来源</li><li>自动分类，全部人工核对</li><li>填写品牌、供应商和询价抬头</li><li>生成询价表，一键拆分文件</li></ol></section>
+    <section id="merge-section" class="card" hidden><h2>合并预览</h2><label class="merge-option"><input id="merge-identical" type="checkbox">合并名称、特征、单位完全相同的项目</label><p class="note">默认分别保留每条来源。勾选后只预览精确合并，原表和核对记录保留。</p><strong id="merge-summary"></strong><p id="merge-status" role="status"></p><ul id="merge-list"></ul><div class="pagination"><button id="merge-prev" type="button">上一页</button><span id="merge-pages"></span><button id="merge-next" type="button">下一页</button></div><p class="note">当前为预览，合并清单另存将在下一步接入。</p></section>
+    <section class="next"><h2>接下来的整理流程</h2><ol><li>确认合并预览，另存清单</li><li>自动分类，全部人工核对</li><li>填写品牌、供应商和询价抬头</li><li>生成询价表，一键拆分文件</li></ol></section>
+    </fieldset>
   </main>
   <footer>来源核对开发版 · 分类与询价输出正在开发</footer>
-  <script src="src/host.js"></script><script src="src/parser.js"></script><script src="src/merge.js"></script><script src="src/review.js"></script><script src="src/review-ui.js"></script><script src="src/taskpane.js"></script>
+  <script src="src/host.js"></script><script src="src/parser.js"></script><script src="src/merge.js"></script><script src="src/review.js"></script><script src="src/review-ui.js"></script><script src="src/import-host.js"></script><script src="src/collection.js"></script><script src="src/import-ui.js"></script><script src="src/taskpane.js"></script>
 </body></html>

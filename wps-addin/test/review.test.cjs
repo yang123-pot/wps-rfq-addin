@@ -77,6 +77,15 @@ test('save and restore exact workbook only, rejecting changed values, paths, bro
   assert.throws(()=>review.save({setItem(){throw Error('QuotaExceededError');}},s,r),/保存失败/);
   const unsaved={...s,path:'清单.xlsx'};assert.throws(()=>review.save(db,unsaved,review.create(unsaved)),/先.*保存/);
 });
+test('imported and active-book reviews at the same path never overwrite each other',()=>{
+  const active=snapshot(), imported={...active,fingerprint:'a'.repeat(64)},db=storage();
+  const a=review.setDecision(active,review.create(active),decision(3,{quantity:'2'}));
+  const b=review.setDecision(imported,review.create(imported),decision(3,{quantity:'3'}));
+  review.save(db,imported,b);review.save(db,active,a);
+  assert.deepEqual(review.load(db,imported),b);assert.deepEqual(review.load(db,active),a);
+  review.save(db,imported,review.create(imported));assert.deepEqual(review.load(db,active),a);
+  assert.throws(()=>review.load(db,{...imported,fingerprint:'b'.repeat(64)}),/变化|不一致/);
+});
 test('invalid, duplicate or unknown decisions fail atomically and never erase unrelated issues',()=>{
   const s=snapshot(), r=review.create(s);
   assert.throws(()=>review.setDecision(s,r,{...decision(),sheet:'其他'}),/核对|工作表/);

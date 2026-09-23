@@ -2,15 +2,20 @@ const http = require('node:http');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const os = require('node:os');
+const {prepareFiles} = require('./import-files.cjs');
 
 const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.css', '/src/host.js',
-  '/src/taskpane.js', '/src/parser.js', '/src/merge.js', '/src/review.js', '/src/review-ui.js', '/assets/inquiry.svg']);
+  '/src/taskpane.js', '/src/parser.js', '/src/merge.js', '/src/review.js', '/src/review-ui.js',
+  '/src/import-host.js', '/src/collection.js', '/src/import-ui.js', '/assets/inquiry.svg']);
 const TYPES = {'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
   '.html':'text/html; charset=utf-8','.xml':'application/xml; charset=utf-8','.svg':'image/svg+xml'};
 
-function createServer({root, probeConfig = null, reportPath = null}) {
+function createServer({root, probeConfig = null, reportPath = null, importDirectory = null}) {
   const reports = [];
   let writes = Promise.resolve();
+  const importToken = crypto.randomBytes(32).toString('hex');
+  let importing = false;
   const server = http.createServer(async (req, res) => {
     const origin = 'http://127.0.0.1:' + server.address().port;
     function reply(status, body, type = 'text/plain; charset=utf-8') {
@@ -21,6 +26,25 @@ function createServer({root, probeConfig = null, reportPath = null}) {
         (req.headers.origin && req.headers.origin !== origin)) return reply(403, 'Local origin required');
     let url;
     try { url = new URL(req.url, origin); } catch (_) { return reply(400, 'Invalid URL'); }
+    if (url.pathname === '/api/import/prepare') {
+      const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');
+      if (!importDirectory) return json(404,{error:'当前服务未启用文件导入，请启动最新开发服务。'});
+      if (req.method !== 'POST') return json(405,{error:'POST required'});
+      if (req.headers['x-rfq-import-token'] !== importToken ||
+          !/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) return json(403,{error:'导入会话失效，请重新打开侧栏。'});
+      if (importing) return json(409,{error:'已有文件正在准备，请稍后重试。'});
+      importing = true;
+      try {
+        let size=0; const chunks=[];
+        for await (const chunk of req) { size+=chunk.length; if(size<=65536)chunks.push(chunk); }
+        if(size>65536)return json(413,{error:'导入请求过大，请分批选择。'});
+        let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'导入请求无效。'});}
+        if(!data||Array.isArray(data))return json(400,{error:'导入请求无效。'});
+        const files=await prepareFiles(data.paths,{directory:importDirectory,existing:data.existing});
+        return json(200,{files});
+      } catch(error) {return json(400,{error:error.message});}
+      finally {importing=false;}
+    }
     if (url.pathname === '/__probe/report') {
       if (!probeConfig || !reportPath) return reply(404, 'Not found');
       if (req.method !== 'POST') return reply(405, 'POST required');
@@ -58,6 +82,9 @@ function createServer({root, probeConfig = null, reportPath = null}) {
     if (!ASSETS.has(url.pathname) && !isProbeScript) return reply(404, 'Not found');
     try {
       let content = await fs.readFile(path.join(root, url.pathname.slice(1)));
+      if (importDirectory && url.pathname === '/taskpane.html') {
+        content = content.toString('utf8').replace('<head>', '<head><script>window.__RFQ_IMPORT__=' + JSON.stringify({token:importToken}) + ';</script>');
+      }
       if (probeConfig && url.pathname === '/taskpane.html') {
         const token = JSON.stringify(probeConfig.token);
         content = content.toString('utf8').replace('</body>', '<script>window.addEventListener("load",function(){fetch("/__probe/report",{method:"POST",headers:{"content-type":"application/json","x-rfq-probe-token":' + token + '},body:JSON.stringify({stage:"taskpane-rendered",passed:!!window.Application&&!document.getElementById("read-workbook").disabled})});});</script></body>');
@@ -97,7 +124,8 @@ async function main() {
   if (inputPaths.length && !outputPath) throw new Error('--source requires probe mode');
   const sourcePaths = outputPath ? await prepareProbeSources(inputPaths, path.dirname(path.resolve(outputPath))) : [];
   const probeConfig = outputPath ? {token:crypto.randomBytes(24).toString('hex'), outputPath:path.resolve(outputPath),sourcePaths} : null;
-  const server = createServer({root:path.resolve(__dirname,'..'),probeConfig,reportPath:reportPath && path.resolve(reportPath)});
+  const importDirectory=path.resolve(arg('--import-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','imports')));
+  const server = createServer({root:path.resolve(__dirname,'..'),probeConfig,reportPath:reportPath && path.resolve(reportPath),importDirectory});
   server.on('error', error => { console.error(error.message); process.exitCode = 1; });
   server.listen(port, '127.0.0.1', () => console.log('WPS add-in ready: http://127.0.0.1:' + port + (probeConfig ? ' (probe enabled)' : '')));
 }

@@ -5,6 +5,7 @@
   var message = document.getElementById('message');
   var application = window.Application;
   var parsed = null, snapshot = null, record = null, dirty = false, page = 0, pageSize = 20;
+  var imported = null, imports = null;
   var mode = document.getElementById('preview-mode');
   var labels = { 'code-missing': '缺少编码', 'code-display-unverified': '核对编码格式', 'name-missing': '缺少名称',
     'unit-missing': '缺少单位', 'quantity-invalid': '工程量异常', 'source-unresolved': '来源待核对',
@@ -24,7 +25,8 @@
     node.type = 'button';
     node.addEventListener('click', function () {
       try {
-        WpsHost.locateSource(application, source);
+        if (imported) RfqImportHost.locateCopy(application, imported.metadata, source);
+        else WpsHost.locateSource(application, source);
         message.className = '';
         message.textContent = '已定位到“' + source.sheet + '”第 ' + source.row + ' 行。';
       } catch (error) { message.className = 'error'; message.textContent = error.message; }
@@ -33,6 +35,7 @@
   }
   function report(error) { message.className = 'error'; message.textContent = error.message; }
   function assertCurrent(contents) {
+    if (imported) return; // Imported snapshots belong to the selected file, independently of the active WPS book.
     var current = contents ? WpsHost.readWorkbook(application) : WpsHost.inspectWorkbook(application);
     if (current.path !== snapshot.path || current.name !== snapshot.name) throw new Error('当前已切换工作簿，请返回原工作簿或重新读取。');
     if (contents && JSON.stringify(current) !== JSON.stringify(snapshot)) throw new Error('工作簿内容已变化，请重新读取后核对；旧记录未覆盖。');
@@ -56,6 +59,7 @@
   }
   function changeRecord(next) {
     var nextParsed = RfqReview.apply(snapshot, next);
+    if (imported) { nextParsed.fingerprint = snapshot.fingerprint; imports.update(imported.id, next, true); }
     record = next; parsed = nextParsed; dirty = true; refresh();
     message.className = ''; message.textContent = '核对已应用，请保存到本机。原始工作簿未修改。';
   }
@@ -70,6 +74,7 @@
   document.getElementById('save-review').addEventListener('click', function () {
     try {
       assertCurrent(true); RfqReview.save(window.localStorage, snapshot, record); dirty = false;
+      if (imported) imports.update(imported.id, record, false);
       refresh(); document.getElementById('review-status').textContent = record.decisions.length + ' 项核对记录 · 已保存到本机';
       message.className = ''; message.textContent = '核对记录已保存到本机，重新打开后读取同一清单，再点击恢复。';
     } catch (error) { report(error); }
@@ -81,13 +86,14 @@
       if (!saved) throw new Error('此工作簿没有已保存的核对记录。');
       if (dirty && !window.confirm('恢复已保存记录将替换本页尚未保存的核对修改，是否继续？')) return;
       var restored = RfqReview.apply(snapshot, saved);
+      if (imported) { restored.fingerprint = snapshot.fingerprint; imports.update(imported.id, saved, false); }
       record = saved; parsed = restored; dirty = false; refresh();
       document.getElementById('review-status').textContent = record.decisions.length + ' 项核对记录 · 已恢复本机保存';
       message.className = ''; message.textContent = '已恢复核对记录。原始工作簿未修改。';
     } catch (error) { report(error); }
   });
   window.addEventListener('beforeunload', function (event) {
-    if (dirty) { event.preventDefault(); event.returnValue = ''; }
+    if (dirty || (imports && imports.hasUnsaved())) { event.preventDefault(); event.returnValue = ''; }
   });
   function renderPreview() {
     if (!parsed) return;
@@ -138,6 +144,31 @@
   mode.addEventListener('change', function () { page = 0; renderPreview(); });
   document.getElementById('previous-page').addEventListener('click', function () { page--; renderPreview(); });
   document.getElementById('next-page').addEventListener('click', function () { page++; renderPreview(); });
+  imports = RfqImportUI.create({
+    application: application,
+    onBusy: function (busy) { document.getElementById('task-controls').disabled = busy; },
+    onSelect: function (entry) {
+      if (!imported && dirty && !window.confirm('切换到导入文件会清除当前单独读取的未保存核对，是否继续？')) return false;
+      imported = entry; snapshot = entry.snapshot; record = entry.record; parsed = entry.parsed; dirty = entry.dirty;
+      page = 0; mode.value = 'all'; showBook(parsed);
+      document.getElementById('workbook-context').textContent = '正在核对导入文件（复制时的清单）';
+      document.getElementById('sheet-count').textContent = parsed.sheets.length + ' 张';
+      document.getElementById('sheets-section').hidden = false;
+      document.getElementById('review-section').hidden = false;
+      document.getElementById('preview-section').hidden = false;
+      refresh(); message.className = ''; message.textContent = '正在核对“' + parsed.name + '”。修正将同步到下方合并预览。';
+      return true;
+    },
+    onRemove: function (id) {
+      if (!imported || imported.id !== id) return;
+      imported = null; parsed = null; snapshot = null; record = null; dirty = false;
+      document.getElementById('workbook-context').textContent = '当前工作簿（单独读取）';
+      document.getElementById('workbook-name').textContent = '尚未读取';
+      document.getElementById('workbook-detail').textContent = '请选择导入文件，或单独读取当前工作簿。';
+      ['sheets-section', 'review-section', 'preview-section'].forEach(function (id) { document.getElementById(id).hidden = true; });
+      message.className = ''; message.textContent = '';
+    }
+  });
   if (!application) {
     connection.textContent = '请从WPS表格的“项目询价”功能区打开';
     message.textContent = '此页面需要连接WPS中的工作簿。请在WPS内启动插件后读取清单。';
@@ -146,7 +177,10 @@
   connection.textContent = '已连接WPS表格'; connection.classList.add('ready'); button.disabled = false;
   try { showBook(WpsHost.inspectWorkbook(application)); } catch (error) { message.textContent = error.message; }
   button.addEventListener('click', function () {
-    if (dirty && !window.confirm('重新读取会清除本页未保存的核对修改，是否继续？')) return;
+    if (!imported && dirty && !window.confirm('重新读取会清除本页未保存的核对修改，是否继续？')) return;
+    imported = null; imports.clearSelection();
+    document.getElementById('workbook-context').textContent = '当前工作簿（单独读取）';
+    document.getElementById('task-controls').disabled = true;
     button.disabled = true; parsed = null; page = 0;
     snapshot = null; record = null; dirty = false;
     message.className = ''; message.textContent = '正在读取并识别全部工作表…';
@@ -174,7 +208,7 @@
         document.getElementById('preview-section').hidden = true;
         document.getElementById('review-section').hidden = true;
         message.className = 'error'; message.textContent = error.message;
-      } finally { button.disabled = false; }
+      } finally { button.disabled = false; document.getElementById('task-controls').disabled = false; }
     }, 30);
   });
 }());

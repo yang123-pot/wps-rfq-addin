@@ -152,7 +152,8 @@
   }
   function storageKey(snapshot) {
     if (!/^(?:[a-z]:[\\/]|\\\\)/i.test(snapshot.path || '')) throw new Error('请先在WPS中保存工作簿，再保存核对记录。');
-    return 'rfq-source-review-v1:' + snapshot.path.replace(/[\\/]+/g, '/').toLowerCase();
+    var prefix = snapshot.fingerprint == null ? 'rfq-source-review-v1:' : 'rfq-import-review-v1:';
+    return prefix + snapshot.path.replace(/[\\/]+/g, '/').toLowerCase();
   }
   function save(storage, snapshot, record) {
     apply(snapshot, record);
