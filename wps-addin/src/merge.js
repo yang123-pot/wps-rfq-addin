@@ -95,6 +95,7 @@
           engineering: source.engineering || '', profession: source.profession || '', professionBasis: source.professionBasis || 'unresolved',
           section: source.section || '', issueCodes: item.issueCodes.slice(),
           featureParts: (item.featureParts || [{row:source.row,text:item.feature}]).map(function (part) { return {row:part.row,text:part.text}; }) };
+        if (item.review) record.review = JSON.parse(JSON.stringify(item.review));
         var label = (record.engineering.trim() ? record.engineering : '工程待核对') + '—' +
           (record.profession.trim() ? record.profession : '专业待核对');
         if (!group) {
