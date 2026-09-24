@@ -10,6 +10,8 @@
       mergeIdentical:function(){return merge.checked;},onBusy:function(value){busy=value;options.onBusy(value);}});
     var projects=RfqProjectUI.create({getCollection:function(){return collection;},mergeIdentical:function(){return merge.checked;},
       restore:function(project){return restoreProject(project);},onBusy:function(value){busy=value;options.onBusy(value);}});
+    var classifier=RfqClassificationUI.create({application:options.application,getCollection:function(){return collection;},
+      onBusy:function(value){busy=value;options.onBusy(value);}});
     function tell(text,error){message.textContent=text;message.className=error?'error':'';}
     function restoreProject(project){
       var inputs=(project.sources||[]).map(function(source){
@@ -71,9 +73,10 @@
       });
       document.getElementById('merge-section').hidden=!collection.entries.length;
       projects.refresh();
-      if(!collection.entries.length){exporter.refresh({canFinalize:false});return;}
+      if(!collection.entries.length){exporter.refresh({canFinalize:false});classifier.refresh({groups:[]});return;}
       var result=RfqCollection.preview(collection,merge.checked),pages=Math.max(1,Math.ceil(result.groups.length/20));page=Math.min(page,pages-1);
       exporter.refresh(result);
+      classifier.refresh(result);
       document.getElementById('merge-summary').textContent='原始 '+result.inputCount+' 项 → 预览 '+result.outputCount+' 项 · '+(merge.checked?'已选择精确合并':'按来源分别保留');
       document.getElementById('merge-status').textContent=result.canFinalize?'本次校验通过，预览尚未另存。':
         result.issues.length+' 个待核对问题仍阻断后续处理；请在上方选择文件逐项核对。';

@@ -31,7 +31,7 @@
   if(!check.ok)throw Error('分类确认记录不完整：'+check.errors.join('；'));
   return classification;
  }
- function rowKey(row){return String(row&&(row.scopeId||row.rowId)||'');}
+ function rowKey(row){return String(row&&(row.rowId||row.id||row.scopeId)||'');}
  function decisionFor(classification,rowId){
   var list=(classification&&classification.decisions||[]).filter(function(item){return item.rowId===rowId;});
   return list.length?list[0]:null;
