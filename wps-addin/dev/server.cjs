@@ -10,7 +10,8 @@ const {createProjectStore} = require('./project-store.cjs');
 const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.css', '/src/host.js',
   '/src/taskpane.js', '/src/parser.js', '/src/merge.js', '/src/review.js', '/src/review-ui.js',
   '/src/import-host.js', '/src/collection.js', '/src/import-ui.js', '/src/export-model.js',
-  '/src/export-host.js', '/src/export-ui.js', '/src/project.js', '/src/project-ui.js', '/assets/inquiry.svg']);
+  '/src/export-host.js', '/src/export-ui.js', '/src/project.js', '/src/project-ui.js',
+  '/src/project-host.js', '/assets/inquiry.svg']);
 const TYPES = {'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
   '.html':'text/html; charset=utf-8','.xml':'application/xml; charset=utf-8','.svg':'image/svg+xml'};
 
