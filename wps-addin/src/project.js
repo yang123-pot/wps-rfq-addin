@@ -12,17 +12,20 @@
  function newId(){return 'p-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);}
  function copy(value){return JSON.parse(JSON.stringify(value));}
  function stageIndex(stage){var index=STAGES.indexOf(stage);if(index<0)throw Error('无法识别的项目阶段：'+stage);return index;}
+ function sourcesOf(collection){
+  return ((collection&&collection.entries)||[]).map(function(entry){
+   var meta=entry.metadata||{},snapshot=entry.snapshot||{};
+   return {id:entry.id,originalPath:meta.originalPath,originalName:meta.originalName,copyPath:meta.copyPath,fingerprint:meta.fingerprint,
+    sheetCount:(snapshot.sheets||[]).length,materialCount:(snapshot.materials||[]).length,issueCount:(snapshot.issues||[]).length,snapshot:snapshot};
+  });
+ }
  function create(input,mergeIdentical){
   var entries=input&&input.entries||[],stages={};
   STAGES.forEach(function(stage,index){stages[stage]={state:index===0?'ready':'missing',revision:index===0?1:null,updatedAt:index===0?now():null,detail:null};});
   return {schemaVersion:SCHEMA_VERSION,projectId:newId(),
    name:entries.length?String(entries[0].metadata.originalName).replace(/\.[^.]+$/,''):'未命名项目',
    createdAt:now(),updatedAt:now(),revision:1,mergeIdentical:!!mergeIdentical,stages:stages,
-   sources:entries.map(function(entry){
-    var meta=entry.metadata||{},snapshot=entry.snapshot||{};
-    return {id:entry.id,originalPath:meta.originalPath,originalName:meta.originalName,copyPath:meta.copyPath,fingerprint:meta.fingerprint,
-     sheetCount:(snapshot.sheets||[]).length,materialCount:(snapshot.materials||[]).length,issueCount:(snapshot.issues||[]).length,snapshot:snapshot};
-   }),
+   sources:sourcesOf(input),
    review:null,classification:null,assignments:null,header:null,generation:null,split:null,history:[]};
  }
  function validate(project){
@@ -83,6 +86,18 @@
   Object.keys(current).forEach(function(key){if(!seen[key])added.push(key);});
   return {added:added,changed:changed,removed:removed};
  }
+ function refresh(project,collection,mergeIdentical){
+  var next=copy(project),comparison=compareSources(project,collection);
+  next.sources=sourcesOf(collection);
+  if(comparison.added.length||comparison.removed.length||comparison.changed.length)
+   next=invalidate(next,{kind:'source',detail:'来源变化：新增'+comparison.added.length+'、变更'+comparison.changed.length+'、移除'+comparison.removed.length});
+  if(!!mergeIdentical!==!!project.mergeIdentical){
+   next.mergeIdentical=!!mergeIdentical;
+   next=invalidate(next,{kind:'merge',detail:mergeIdentical?'改为精确合并':'改为分别保留'});
+  }
+  next.updatedAt=now();
+  return next;
+ }
  return {SCHEMA_VERSION:SCHEMA_VERSION,STAGES:STAGES.slice(),STAGE_LABELS:STAGE_LABELS,create:create,validate:validate,
-  assertValid:assertValid,stageState:stageState,confirm:confirm,invalidate:invalidate,compareSources:compareSources};
+  assertValid:assertValid,stageState:stageState,confirm:confirm,invalidate:invalidate,compareSources:compareSources,refresh:refresh};
 }));

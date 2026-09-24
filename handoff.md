@@ -234,7 +234,7 @@ assert.equal(merged.sheets[0].values.find(row => row[2] === '水管')[5], '0.3')
 - [ ] 未合并项目在独立工作副本的对应表/行末追加分类列，保留原内容和行序；已显式合并项目在确认的合并表追加。内部扁平另存不能替代未合并原表结构。
 - [ ] 侧栏提供保存/打开项目和恢复结果；副本缺失需定位时，只有原件SHA仍一致才重建副本，不凭同名路径套用旧记录。重启WPS及服务后核对列表、模式、核对和阶段，通过后更新存储说明、提交推送。
 
-**任务8进度（2026-09-24）：** 第一片是模型与本地项目库——`src/project.js`（create/validate/assertValid/stageState/confirm/invalidate/compareSources）、`dev/project-store.cjs`（save/load/list，原子替换+读回校验）及`test/project.test.cjs`、`test/project-store.test.cjs`（8项）。第二片把项目库接入本机服务：`/api/project/save|load|list`，沿用随机会话令牌、Host/Origin限制与64MB请求上限，记录只落在`--import-directory`同级的应用数据目录（测试用显式`projectDirectory`），`test/project-server.test.cjs`覆盖越权、越目录、缺记录与版本拒绝。**下一片：侧栏“保存/打开项目”、工作副本分类列写入与缺失副本按原件SHA重建。**
+**任务8进度（2026-09-24）：** 第一片是模型与本地项目库——`src/project.js`（create/validate/assertValid/stageState/confirm/invalidate/compareSources/refresh）、`dev/project-store.cjs`（save/load/list，原子替换+读回校验）及`test/project.test.cjs`、`test/project-store.test.cjs`。第二片把项目库接入本机服务：`/api/project/save|load|list`，沿用随机会话令牌、Host/Origin限制与64MB请求上限，记录只落在应用数据目录，`test/project-server.test.cjs`覆盖越权、越目录、缺记录与版本拒绝。第三片是侧栏接入：新增`src/project-ui.js`与“项目状态”卡片（保存项目/打开项目/刷新列表、显示项目编号与七个阶段状态），`import-ui.js`负责从项目来源快照恢复集合与合并选择，`test/ui-project-check.cjs`验证“导入→保存→刷新页面→打开→恢复来源与合并选择”。过程中遇到并已修掉一个集成问题：本机服务的静态资源白名单没放行`src/project.js`、`src/project-ui.js`，侧栏加载脚本被判为`text/plain`而中断（表现为导入按钮保持禁用）。**下一片：工作副本行末分类列写入、副本缺失时按原件SHA一致才重建、打开项目后与原件比对的失效提示。**
 
 ## 任务9A：分类库及可解释匹配
 

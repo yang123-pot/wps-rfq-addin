@@ -54,3 +54,18 @@ test('compares stored sources against the current collection',()=>{
  const added=collection.add(collection.create(),[input('a.xlsx','a'.repeat(64),'0.1'),input('b.xlsx','b'.repeat(64),'0.2'),input('c.xlsx','c'.repeat(64),'1')]);
  assert.deepEqual(project.compareSources(stored,added).added,['C:\\samples\\c.xlsx']);
 });
+test('refresh keeps the project id and invalidates affected stages when sources or the merge choice change',()=>{
+ const base=project.confirm(project.create(fixture(),false),'review');
+ const unchanged=project.refresh(base,fixture(),false);
+ assert.equal(unchanged.projectId,base.projectId);assert.equal(unchanged.revision,base.revision);
+ assert.equal(project.stageState(unchanged,'review'),'ready');
+ const changed=project.refresh(base,collection.add(collection.create(),[input('a.xlsx','c'.repeat(64),'0.1'),input('b.xlsx','b'.repeat(64),'0.2')]),false);
+ assert.equal(changed.projectId,base.projectId);assert.equal(changed.revision,base.revision+1);
+ assert.equal(project.stageState(changed,'import'),'missing');
+ assert.equal(project.stageState(changed,'review'),'stale','来源变了，已确认的来源核对置为过期');
+ assert.match(changed.history[0].detail,/来源变化/);
+ assert.equal(changed.sources[0].fingerprint,'c'.repeat(64));
+ const merged=project.refresh(base,fixture(),true);
+ assert.equal(merged.mergeIdentical,true);assert.equal(project.stageState(merged,'review'),'ready','只改合并选择不影响来源核对');
+ assert.equal(project.stageState(merged,'merge'),'missing');assert.match(merged.history[0].detail,/精确合并/);
+});

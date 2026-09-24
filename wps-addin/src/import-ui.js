@@ -8,7 +8,20 @@
     var merge=document.getElementById('merge-identical');merge.checked=false;
     var exporter=RfqExportUI.create({application:options.application,getCollection:function(){return collection;},
       mergeIdentical:function(){return merge.checked;},onBusy:function(value){busy=value;options.onBusy(value);}});
+    var projects=RfqProjectUI.create({getCollection:function(){return collection;},mergeIdentical:function(){return merge.checked;},
+      restore:function(project){return restoreProject(project);},onBusy:function(value){busy=value;options.onBusy(value);}});
     function tell(text,error){message.textContent=text;message.className=error?'error':'';}
+    function restoreProject(project){
+      var inputs=(project.sources||[]).map(function(source){
+        return {metadata:{originalPath:source.originalPath,originalName:source.originalName,copyPath:source.copyPath,fingerprint:source.fingerprint},snapshot:source.snapshot};
+      });
+      if(!inputs.length)throw Error('项目记录里没有来源清单，无法恢复。');
+      collection=RfqCollection.add(RfqCollection.create(),inputs);
+      selected=null;page=0;merge.checked=project.mergeIdentical===true;
+      render();
+      if(collection.entries.length)activate(collection.entries[0].id);
+      return true;
+    }
     function activate(id){
       var entry=collection.entries.find(function(e){return e.id===id;});
       if(entry&&options.onSelect(entry)!==false){selected=id;render();}
@@ -57,6 +70,7 @@
         }));list.appendChild(li);
       });
       document.getElementById('merge-section').hidden=!collection.entries.length;
+      projects.refresh();
       if(!collection.entries.length){exporter.refresh({canFinalize:false});return;}
       var result=RfqCollection.preview(collection,merge.checked),pages=Math.max(1,Math.ceil(result.groups.length/20));page=Math.min(page,pages-1);
       exporter.refresh(result);
