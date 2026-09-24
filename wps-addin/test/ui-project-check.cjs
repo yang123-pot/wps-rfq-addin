@@ -54,15 +54,26 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   assert.equal(stored.mergeIdentical,true);assert.equal(stored.sources.length,2);
   assert.equal(await page.evaluate(()=>window.RfqProjectUI===undefined),false);
 
+  await fs.rm(path.join(root,'copies'),{recursive:true,force:true});
   await page.reload();
   await page.locator('#open-project').click();
   await page.waitForFunction(()=>document.querySelectorAll('#project-list > li button').length>=1);
   await page.locator('#project-list > li button').first().click();
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已恢复项目'));
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
+  assert.match(await page.locator('#project-message').innerText(),/重建2份工作副本/,'副本缺失时应按原件SHA重建');
   assert.equal(await page.locator('#merge-identical').isChecked(),true,'合并选择应随项目恢复');
   assert.match(await page.locator('#merge-summary').innerText(),/2.*1/);
   assert.ok((await page.locator('#project-status').innerText()).includes(stored.projectId),'状态应显示已恢复的项目编号');
+  await fs.writeFile(files[0],'changed original bytes');
+  await fs.rm(path.join(root,'copies'),{recursive:true,force:true});
+  await page.reload();
+  await page.locator('#open-project').click();
+  await page.waitForFunction(()=>document.querySelectorAll('#project-list > li button').length>=1);
+  await page.locator('#project-list > li button').first().click();
+  await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('旧进度不能沿用'));
+  assert.equal(await page.locator('#imported-books > li').count(),0,'原件变化时不得沿用旧记录');
+  assert.equal(await page.locator('#project-status').innerText().then(text=>text.includes('尚未保存项目记录')),true);
   assert.deepEqual(errors,[]);
   console.log('PASS: 侧栏保存项目写入本机项目库，刷新后可从列表恢复来源、合并选择与阶段状态。');
  }finally{await browser.close();await new Promise(r=>server.close(r));await fs.rm(root,{recursive:true,force:true});}

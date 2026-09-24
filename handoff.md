@@ -145,6 +145,7 @@ wps-addin/test/project-server.test.cjs
 | P4 | 首次导入偶发“无结果” | 2026-09-23、2026-09-24各出现一次；诊断版重载后成功，未定位根因 | 与P1合并排查；在能观测侧栏状态前不得写成“已修复” | 同P1 |
 | P5 | 尚未在真实WPS验证的边界 | 合并另存（3→2）、另存确认/位置取消、目标已存在、写入/提交失败提示、数值编码显示格式`000000`失效关系、核对保存/关闭/恢复、输出视觉检查 | 集中修复后一次性跑完并写入`docs/wps-merge-save-verification.md`；自动化结论不得冒充实机结论 | 任务7整体验收、任务13交付 |
 | P6 | 仓库根目录残留`%SystemDrive%/` | 本机OCR/WinRT工具误写的Windows缓存副本，未跟踪、不属于插件；自动化策略拒绝我递归删除 | 人工确认后删除，禁止提交 | 仓库整洁（非功能缺陷） |
+| P7 | 新脚本未加入本机服务静态资源白名单 | 增加`src/project.js`、`src/project-ui.js`后侧栏把它们当成`text/plain`拒绝执行，表现为导入按钮一直禁用；**本轮已修复并加回归**（白名单放行） | 已闭环；集中修复时只需确认新脚本都登记进白名单 | 无（已解决） |
 
 说明：本轮新增的自动化回归（99项Node、4组浏览器）已覆盖P5中的取消/失败/不覆盖等逻辑边界，但按上表仍需实机复核。
 
@@ -234,7 +235,7 @@ assert.equal(merged.sheets[0].values.find(row => row[2] === '水管')[5], '0.3')
 - [ ] 未合并项目在独立工作副本的对应表/行末追加分类列，保留原内容和行序；已显式合并项目在确认的合并表追加。内部扁平另存不能替代未合并原表结构。
 - [ ] 侧栏提供保存/打开项目和恢复结果；副本缺失需定位时，只有原件SHA仍一致才重建副本，不凭同名路径套用旧记录。重启WPS及服务后核对列表、模式、核对和阶段，通过后更新存储说明、提交推送。
 
-**任务8进度（2026-09-24）：** 第一片是模型与本地项目库——`src/project.js`（create/validate/assertValid/stageState/confirm/invalidate/compareSources/refresh）、`dev/project-store.cjs`（save/load/list，原子替换+读回校验）及`test/project.test.cjs`、`test/project-store.test.cjs`。第二片把项目库接入本机服务：`/api/project/save|load|list`，沿用随机会话令牌、Host/Origin限制与64MB请求上限，记录只落在应用数据目录，`test/project-server.test.cjs`覆盖越权、越目录、缺记录与版本拒绝。第三片是侧栏接入：新增`src/project-ui.js`与“项目状态”卡片（保存项目/打开项目/刷新列表、显示项目编号与七个阶段状态），`import-ui.js`负责从项目来源快照恢复集合与合并选择，`test/ui-project-check.cjs`验证“导入→保存→刷新页面→打开→恢复来源与合并选择”。过程中遇到并已修掉一个集成问题：本机服务的静态资源白名单没放行`src/project.js`、`src/project-ui.js`，侧栏加载脚本被判为`text/plain`而中断（表现为导入按钮保持禁用）。**下一片：工作副本行末分类列写入、副本缺失时按原件SHA一致才重建、打开项目后与原件比对的失效提示。**
+**任务8进度（2026-09-24）：** 第一片是模型与本地项目库——`src/project.js`（create/validate/assertValid/stageState/confirm/invalidate/compareSources/refresh）、`dev/project-store.cjs`（save/load/list，原子替换+读回校验）及`test/project.test.cjs`、`test/project-store.test.cjs`。第二片把项目库接入本机服务：`/api/project/save|load|list`，沿用随机会话令牌、Host/Origin限制与64MB请求上限，记录只落在应用数据目录，`test/project-server.test.cjs`覆盖越权、越目录、缺记录与版本拒绝。第三片是侧栏接入：新增`src/project-ui.js`与“项目状态”卡片（保存项目/打开项目/刷新列表、显示项目编号与七个阶段状态），`import-ui.js`负责从项目来源快照恢复集合与合并选择。第四片是副本恢复：`restoreCopy`（`dev/import-files.cjs`）与`/api/project/restore-copy`在副本缺失时读原件算SHA256，只有与保存时的指纹一致才重建，否则拒绝打开项目、不沿用旧进度；打开项目时逐条校验，成功提示“重建N份工作副本”。`test/project-restore.test.cjs`覆盖指纹变化/原件缺失/副本已存在/越权；`test/ui-project-check.cjs`覆盖“删掉副本→重建并恢复”“改原件→拒绝打开且列表为空”。过程中遇到并已修掉一个集成问题（见P7）。**下一片：未合并项目在独立工作副本对应表行末追加分类列，保留原内容和行序。**
 
 ## 任务9A：分类库及可解释匹配
 

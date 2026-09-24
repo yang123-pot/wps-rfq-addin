@@ -64,9 +64,19 @@
       var result=await request('load',{projectId:projectId});
       if(!result.project)throw Error('项目记录不存在或已被移除。');
       RfqProject.assertValid(result.project);
+      var sources=result.project.sources||[],rebuilt=0,failed=[];
+      for(var index=0;index<sources.length;index++){
+        try{
+          var copy=await request('restore-copy',{source:sources[index]});
+          if(!copy||typeof copy.copyPath!=='string')throw Error('未返回工作副本路径。');
+          if(copy.rebuilt)rebuilt++;
+          sources[index].copyPath=copy.copyPath;
+        }catch(error){failed.push((sources[index].originalName||sources[index].originalPath)+'：'+error.message);}
+      }
+      if(failed.length)throw Error('原件已变化或不可读取，旧进度不能沿用，请重新导入：'+failed.join('；'));
       if(!options.restore||options.restore(result.project)===false)throw Error('项目内容无法恢复到侧栏。');
       current=result.project;renderStatus();
-      tell('已恢复项目'+result.projectId+'（版本 '+result.project.revision+'）。清单内容来自保存时的快照；副本缺失时请重新导入原件核对。');
+      tell('已恢复项目'+result.projectId+'（版本 '+result.project.revision+'）。'+(rebuilt?'已按原件SHA校验重建'+rebuilt+'份工作副本。':'工作副本完整。')+'原件不变，快照可用于继续核对。');
       return true;
     }catch(error){tell('项目未打开。'+error.message,true);return false;}
     finally{busy=false;if(options.onBusy)options.onBusy(false);}

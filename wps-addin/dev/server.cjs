@@ -3,7 +3,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const os = require('node:os');
-const {prepareFiles} = require('./import-files.cjs');
+const {prepareFiles,restoreCopy} = require('./import-files.cjs');
 const {createExportStore} = require('./export-files.cjs');
 const {createProjectStore} = require('./project-store.cjs');
 
@@ -52,7 +52,7 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
       } catch(error) {return json(400,{error:error.message});}
       finally {importing=false;}
     }
-    if (['/api/project/save','/api/project/load','/api/project/list'].includes(url.pathname)) {
+    if (['/api/project/save','/api/project/load','/api/project/list','/api/project/restore-copy'].includes(url.pathname)) {
       const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');
       if (req.method !== 'POST') return json(405,{error:'POST required'});
       if (req.headers['x-rfq-import-token'] !== importToken ||
@@ -65,6 +65,10 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         if(!data||Array.isArray(data))return json(400,{error:'项目请求无效。'});
         if(url.pathname==='/api/project/save')return json(200,await projects.save(data.project));
         if(url.pathname==='/api/project/load')return json(200,{project:await projects.load(data.projectId)});
+        if(url.pathname==='/api/project/restore-copy'){
+          if(!importDirectory)return json(404,{error:'当前服务未启用工作副本，请启动最新开发服务。'});
+          return json(200,await restoreCopy(data.source,{directory:importDirectory}));
+        }
         return json(200,{projects:await projects.list()});
       } catch(error) {return json(400,{error:error.message});}
     }
