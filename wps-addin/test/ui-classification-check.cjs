@@ -64,6 +64,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
   await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 3'));
+  assert.equal(await page.locator('#write-classification').innerText(),'写入工作副本');
   assert.match(await page.locator('#classification-list').innerText(),/水龙头/);
   assert.match(await page.locator('#classification-list').innerText(),/无可靠匹配/,'无命中行必须显示无可靠匹配');
   assert.match(await page.locator('#classification-list').innerText(),/水阀门/,'水龙头行应给出水阀门建议与依据');
@@ -117,10 +118,12 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   assert.equal(await page.locator('#write-classification').isDisabled(),false);
   await page.locator('#merge-identical').check();
   await page.waitForFunction(()=>document.querySelector('#merge-summary').textContent.includes('预览 2 项'));
+  assert.equal(await page.locator('#write-classification').innerText(),'写入合并清单','合并模式应明确真实写入目标');
   await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 0'));
   await page.evaluate(()=>{window.__written.length=0;});
   await page.locator('#write-classification').click();
   await page.waitForFunction(()=>document.querySelector('#classification-message').textContent.includes('请先在“另存内部清单”按合并模式另存'));
+  assert.match(await page.locator('#classification-message').innerText(),/^未写入合并清单。/);
   assert.equal(await page.evaluate(()=>window.__written.length),0,'没有合并表时不得写入');
   const mergedTarget=path.join(root,'合并分类.xlsx');
   await page.evaluate(target=>{
@@ -140,6 +143,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.locator('#write-classification').click();
   await started;
   await page.locator('#merge-identical').uncheck();
+  assert.equal(await page.locator('#write-classification').innerText(),'写入工作副本');
   releaseVerify();
   await page.waitForFunction(()=>document.querySelector('#classification-message').textContent.includes('已变化'));
   assert.equal(await page.evaluate(()=>window.__written.length),0,'校验期间改动合并选择不得写入旧计划');

@@ -81,6 +81,7 @@
     list.appendChild(li);
    });
    if(!rows.length)list.appendChild(node('li','先在上方导入清单，再核对分类。','empty'));
+   write.textContent='写入'+(options.mergeIdentical&&options.mergeIdentical()===true?'合并清单':'工作副本');
    write.disabled=busy||!options.application||!summary.canGenerateBrandTable;
   }
   function batchConfirm(){
@@ -103,9 +104,10 @@
   }
   async function writeCopy(){
    if(busy)return;
+   var useMergedTable=options.mergeIdentical&&options.mergeIdentical()===true;
    try{
     var collection=options.getCollection();
-    var planOptions={requireAll:true},useMergedTable=options.mergeIdentical&&options.mergeIdentical()===true;
+    var planOptions={requireAll:true};
     if(useMergedTable){
      var model=RfqExportModel.build(collection,true);
      planOptions.merged=true;planOptions.sheet=model.sheets[0].name;planOptions.headerRow=1;
@@ -146,7 +148,7 @@
      written+=item.rows.length;
     });
     tell('已把'+written+'行分类写入'+tables+'张工作表'+(mergeTarget?('（合并表：'+mergeTarget+'）'):'（独立工作副本）')+'，原表和行序未改变。');
-   }catch(error){tell('未写入工作副本。'+error.message,true);}
+   }catch(error){tell('未写入'+(useMergedTable?'合并清单':'工作副本')+'。'+error.message,true);}
    finally{busy=false;render();}
   }
   filter.addEventListener('change',render);
