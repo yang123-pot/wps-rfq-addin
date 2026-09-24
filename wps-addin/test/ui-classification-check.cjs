@@ -94,7 +94,21 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.locator('#classification-list > li').first().locator('button').nth(1).click();
   await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 1'));
   assert.equal(await page.locator('#write-classification').isDisabled(),true,'撤销后重新阻断');
+  await page.locator('#classification-list > li').first().locator('select').selectOption('no-inquiry');
+  await page.locator('#classification-list > li').first().locator('button').first().click();
+  await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 0'));
+  await page.locator('#save-project').click();
+  await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
+  await page.reload();
+  await page.locator('#open-project').click();
+  await page.waitForFunction(()=>document.querySelectorAll('#project-list > li button').length>=1);
+  await page.locator('#project-list > li button').first().click();
+  await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已恢复项目'));
+  await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
+  await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 0'));
+  assert.match(await page.locator('#classification-progress').innerText(),/已确认 3/,'分类确认应随项目一起恢复');
+  assert.equal(await page.locator('#write-classification').isDisabled(),false);
   assert.deepEqual(errors,[]);
-  console.log('PASS: 分类建议含依据、未全确认阻断写入、逐行确认/撤销、按原行号写入工作副本表末列且不改原值。');
+  console.log('PASS: 分类建议含依据、未全确认阻断写入、逐行确认/撤销、按原行号写入工作副本表末列且不改原值、确认随项目保存恢复。');
  }finally{await browser.close();await new Promise(r=>server.close(r));await fs.rm(root,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

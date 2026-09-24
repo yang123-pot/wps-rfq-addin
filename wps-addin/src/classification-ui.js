@@ -122,7 +122,12 @@
   write.addEventListener('click',writeCopy);
   loadLibrary().then(render);
   return {refresh:function(result){groups=(result&&result.groups)||[];selected={};render();},
-   classification:function(){return state;}};
+   classification:function(){return state;},
+   snapshot:function(){return state;},
+   restore:function(value){
+    state=value&&value.schemaVersion===RfqClassification.SCHEMA_VERSION?value:RfqClassification.create();
+    selected={};render();
+   }};
  }
  window.RfqClassificationUI={create:create};
 }());

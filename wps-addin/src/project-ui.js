@@ -48,6 +48,7 @@
     try{
       tell('正在保存项目记录…');
       var next=current?RfqProject.refresh(current,collection,options.mergeIdentical()):RfqProject.create(collection,options.mergeIdentical());
+      if(options.getClassification)next.classification=options.getClassification();
       RfqProject.assertValid(next);
       var receipt=await request('save',{project:next});
       current=next;renderStatus();await listProjects();
@@ -75,6 +76,7 @@
       }
       if(failed.length)throw Error('原件已变化或不可读取，旧进度不能沿用，请重新导入：'+failed.join('；'));
       if(!options.restore||options.restore(result.project)===false)throw Error('项目内容无法恢复到侧栏。');
+      if(options.restoreClassification)options.restoreClassification(result.project.classification);
       current=result.project;renderStatus();
       tell('已恢复项目'+result.projectId+'（版本 '+result.project.revision+'）。'+(rebuilt?'已按原件SHA校验重建'+rebuilt+'份工作副本。':'工作副本完整。')+'原件不变，快照可用于继续核对。');
       return true;

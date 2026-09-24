@@ -9,7 +9,8 @@
     var exporter=RfqExportUI.create({application:options.application,getCollection:function(){return collection;},
       mergeIdentical:function(){return merge.checked;},onBusy:function(value){busy=value;options.onBusy(value);}});
     var projects=RfqProjectUI.create({getCollection:function(){return collection;},mergeIdentical:function(){return merge.checked;},
-      restore:function(project){return restoreProject(project);},onBusy:function(value){busy=value;options.onBusy(value);}});
+      restore:function(project){return restoreProject(project);},getClassification:function(){return classifier.snapshot();},
+      restoreClassification:function(value){classifier.restore(value);},onBusy:function(value){busy=value;options.onBusy(value);}});
     var classifier=RfqClassificationUI.create({application:options.application,getCollection:function(){return collection;},
       onBusy:function(value){busy=value;options.onBusy(value);}});
     function tell(text,error){message.textContent=text;message.className=error?'error':'';}
