@@ -11,7 +11,8 @@ const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.cs
   '/src/taskpane.js', '/src/parser.js', '/src/merge.js', '/src/review.js', '/src/review-ui.js',
   '/src/import-host.js', '/src/collection.js', '/src/import-ui.js', '/src/export-model.js',
   '/src/export-host.js', '/src/export-ui.js', '/src/project.js', '/src/project-ui.js',
-  '/src/project-host.js', '/src/category-library.js', '/src/classify.js', '/rules/defaults.json', '/assets/inquiry.svg']);
+  '/src/project-host.js', '/src/category-library.js', '/src/classify.js', '/src/classification.js',
+  '/rules/defaults.json', '/assets/inquiry.svg']);
 const TYPES = {'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
   '.html':'text/html; charset=utf-8','.xml':'application/xml; charset=utf-8','.svg':'image/svg+xml',
   '.json':'application/json; charset=utf-8'};
