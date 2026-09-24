@@ -4,10 +4,12 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const os = require('node:os');
 const {prepareFiles} = require('./import-files.cjs');
+const {createExportStore} = require('./export-files.cjs');
 
 const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.css', '/src/host.js',
   '/src/taskpane.js', '/src/parser.js', '/src/merge.js', '/src/review.js', '/src/review-ui.js',
-  '/src/import-host.js', '/src/collection.js', '/src/import-ui.js', '/assets/inquiry.svg']);
+  '/src/import-host.js', '/src/collection.js', '/src/import-ui.js', '/src/export-model.js',
+  '/src/export-host.js', '/src/export-ui.js', '/assets/inquiry.svg']);
 const TYPES = {'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
   '.html':'text/html; charset=utf-8','.xml':'application/xml; charset=utf-8','.svg':'image/svg+xml'};
 
@@ -15,6 +17,7 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
   const reports = [];
   let writes = Promise.resolve();
   const importToken = crypto.randomBytes(32).toString('hex');
+  const exports = importDirectory ? createExportStore({directory:path.join(importDirectory,'exports')}) : null;
   let importing = false;
   const server = http.createServer(async (req, res) => {
     const origin = 'http://127.0.0.1:' + server.address().port;
@@ -26,7 +29,7 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         (req.headers.origin && req.headers.origin !== origin)) return reply(403, 'Local origin required');
     let url;
     try { url = new URL(req.url, origin); } catch (_) { return reply(400, 'Invalid URL'); }
-    if (url.pathname === '/api/import/prepare') {
+    if (['/api/import/prepare','/api/export/prepare','/api/export/commit'].includes(url.pathname)) {
       const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');
       if (!importDirectory) return json(404,{error:'当前服务未启用文件导入，请启动最新开发服务。'});
       if (req.method !== 'POST') return json(405,{error:'POST required'});
@@ -40,6 +43,8 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         if(size>65536)return json(413,{error:'导入请求过大，请分批选择。'});
         let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'导入请求无效。'});}
         if(!data||Array.isArray(data))return json(400,{error:'导入请求无效。'});
+        if(url.pathname==='/api/export/prepare')return json(200,await exports.prepare(data.target));
+        if(url.pathname==='/api/export/commit')return json(200,await exports.commit(data.ticket));
         const files=await prepareFiles(data.paths,{directory:importDirectory,existing:data.existing});
         return json(200,{files});
       } catch(error) {return json(400,{error:error.message});}

@@ -23,6 +23,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
    }}};
    window.Application=app;window.__files=files;window.__opened=[];window.__closed=[];
   },{files});
+  await page.exposeFunction('__writeExportFixture',async file=>{await fs.writeFile(file,Buffer.from([0x50,0x4b,3,4,1,2]));});
   await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html');
   const malformed=route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({files:[]})});
   await page.route('**/api/import/prepare',malformed);
@@ -38,6 +39,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   assert.equal(await page.evaluate(()=>window.__closed.length),2);
   assert.equal(await page.evaluate(()=>window.Application.ActiveWorkbook.Name),'用户文件.xlsx');
   assert.match(await page.locator('#processing-status').innerText(),/阻断/);
+  assert.equal(await page.locator('#export-workbook').isDisabled(),true);
   await page.locator('#preview-list .review-editor > summary').click();
   await page.getByLabel('项目编码',{exact:true}).fill('009');
   await page.getByLabel('工程量',{exact:true}).fill('0.1');await page.getByRole('button',{name:'确认本行核对'}).click();
@@ -58,7 +60,21 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.locator('#merge-identical').check();
   assert.match(await page.locator('#merge-summary').innerText(),/2.*1/);
   assert.match(await page.locator('#merge-list').innerText(),/0.3/);
+  await page.evaluate(()=>{window.Application.GetSaveAsFilename=()=>false;});
+  await page.locator('#export-workbook').click();assert.match(await page.locator('#export-message').innerText(),/取消/);
+  const exportTarget=path.join(root,'合并清单.xlsx');
+  await page.evaluate(target=>{
+   window.Application.GetSaveAsFilename=()=>target;
+   window.RfqExportHost.write=async(app,model,stage)=>{window.__exportedModel=model;await window.__writeExportFixture(stage);};
+  },exportTarget);
+  await page.locator('#export-workbook').click();await page.waitForFunction(()=>document.querySelector('#export-message').textContent.includes('另存成功'));
+  assert.equal((await fs.readFile(exportTarget))[0],0x50);
+  assert.equal(await page.evaluate(()=>window.__exportedModel.outputCount),1);
+  assert.equal(await page.evaluate(()=>window.__exportedModel.sheets[0].values[1][5]),'0.3');
+  await page.locator('#export-workbook').click();await page.waitForFunction(()=>document.querySelector('#export-message').textContent.includes('已存在'));
+  assert.equal(await page.locator('#imported-books > li').count(),2);
   await page.locator('#merge-list summary').filter({hasText:'查看全部'}).first().click();
+  await page.waitForFunction(()=>document.querySelector('#merge-list').textContent.includes('原工程量'));
   assert.match(await page.locator('#merge-list').innerText(),/原工程量.*待定/);
   assert.match(await page.locator('#merge-list').innerText(),/原编码 001 · 核对编码 009/);
   assert.match(await page.locator('#merge-list').innerText(),/二号.xls/);
