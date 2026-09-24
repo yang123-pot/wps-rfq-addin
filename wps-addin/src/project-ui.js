@@ -17,6 +17,25 @@
     if(!current){status.textContent='尚未保存项目记录。导入清单后可保存，重启WPS后再打开恢复。';return;}
     status.textContent='项目 '+current.projectId+' · 版本 '+current.revision+' · '+(current.mergeIdentical?'精确合并':'分别保留')+'\n'+stageText(current);
   }
+  function alignClassification(project,collection,mergeIdentical,classification){
+    if(!classification)return project;
+    var preview=RfqCollection.preview(collection,mergeIdentical),rows=preview.groups.map(function(group){
+      return {rowId:group.id||group.scopeId,name:group.name};
+    });
+    var progress=RfqClassification.summary(classification,rows),changed=JSON.stringify(project.classification)!==JSON.stringify(classification);
+    var next=project,state=RfqProject.stageState(next,'classification');
+    if(changed&&state==='ready'){
+      next=RfqProject.invalidate(next,{kind:'classification',detail:'分类确认已变化'});
+      state=RfqProject.stageState(next,'classification');
+    }
+    next.classification=classification;
+    if(!preview.canFinalize||!progress.canGenerateBrandTable){
+      if(state==='ready')next=RfqProject.invalidate(next,{kind:'classification',detail:'分类尚未全部确认'});
+    }else if(RfqProject.stageState(next,'import')==='ready'&&(state==='missing'||(state==='stale'&&changed))){
+      next=RfqProject.confirm(next,'classification',{confirmed:progress.confirmed,total:progress.total});
+    }
+    return next;
+  }
   async function request(action,data){
     var response=await fetch('/api/project/'+action,{method:'POST',
       headers:{'content-type':'application/json','x-rfq-import-token':window.__RFQ_IMPORT__.token},body:JSON.stringify(data)});
@@ -48,7 +67,7 @@
     try{
       tell('正在保存项目记录…');
       var next=current?RfqProject.refresh(current,collection,options.mergeIdentical()):RfqProject.create(collection,options.mergeIdentical());
-      if(options.getClassification)next.classification=options.getClassification();
+      if(options.getClassification)next=alignClassification(next,collection,options.mergeIdentical(),options.getClassification());
       RfqProject.assertValid(next);
       var receipt=await request('save',{project:next});
       current=next;renderStatus();await listProjects();
@@ -77,8 +96,9 @@
       if(failed.length)throw Error('原件已变化或不可读取，旧进度不能沿用，请重新导入：'+failed.join('；'));
       if(!options.restore||options.restore(result.project)===false)throw Error('项目内容无法恢复到侧栏。');
       if(options.restoreClassification)options.restoreClassification(result.project.classification);
-      current=result.project;renderStatus();
-      tell('已恢复项目'+result.projectId+'（版本 '+result.project.revision+'）。'+(rebuilt?'已按原件SHA校验重建'+rebuilt+'份工作副本。':'工作副本完整。')+'原件不变，快照可用于继续核对。');
+      current=options.getClassification?alignClassification(result.project,options.getCollection(),options.mergeIdentical(),options.getClassification()):result.project;
+      renderStatus();
+      tell('已恢复项目'+result.project.projectId+'（版本 '+result.project.revision+'）。'+(rebuilt?'已按原件SHA校验重建'+rebuilt+'份工作副本。':'工作副本完整。')+'原件不变，快照可用于继续核对。');
       return true;
     }catch(error){tell('项目未打开。'+error.message,true);return false;}
     finally{busy=false;if(options.onBusy)options.onBusy(false);}

@@ -60,6 +60,8 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.waitForFunction(()=>document.querySelectorAll('#project-list > li button').length>=1);
   await page.locator('#project-list > li button').first().click();
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已恢复项目'));
+  assert.match(await page.locator('#project-message').innerText(),new RegExp('已恢复项目'+stored.projectId),
+   '恢复提示应显示实际项目编号');
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
   assert.match(await page.locator('#project-message').innerText(),/重建2份工作副本/,'副本缺失时应按原件SHA重建');
   assert.equal(await page.locator('#merge-identical').isChecked(),true,'合并选择应随项目恢复');

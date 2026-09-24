@@ -125,6 +125,17 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 0'));
   await page.locator('#save-project').click();
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
+  assert.match(await page.locator('#project-status').innerText(),/分类确认：已确认/,
+   '全部材料已人工确认后，项目阶段不能仍显示未完成');
+  await page.locator('#classification-list > li').first().locator('button').nth(1).click();
+  await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 1'));
+  await page.locator('#save-project').click();
+  await page.waitForFunction(()=>document.querySelector('#project-status').textContent.includes('分类确认：未完成'));
+  await page.locator('#classification-list > li').first().locator('select').selectOption('no-inquiry');
+  await page.locator('#classification-list > li').first().locator('button').first().click();
+  await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 0'));
+  await page.locator('#save-project').click();
+  await page.waitForFunction(()=>document.querySelector('#project-status').textContent.includes('分类确认：已确认'));
   await page.reload();
   await page.locator('#open-project').click();
   await page.waitForFunction(()=>document.querySelectorAll('#project-list > li button').length>=1);
@@ -133,6 +144,8 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
   await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 0'));
   assert.match(await page.locator('#classification-progress').innerText(),/已确认 3/,'分类确认应随项目一起恢复');
+  assert.match(await page.locator('#project-status').innerText(),/分类确认：已确认/,
+   '恢复项目后分类阶段应与已恢复的确认数一致');
   assert.equal(await page.locator('#write-classification').isDisabled(),false);
   await page.locator('#merge-identical').check();
   await page.waitForFunction(()=>document.querySelector('#merge-summary').textContent.includes('预览 2 项'));
