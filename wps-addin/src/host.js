@@ -1,9 +1,9 @@
 (function (root, factory) {
   'use strict';
-  var api = factory();
+  var api = factory(typeof module === 'object' && module.exports ? require('./parser.js') : root.RfqParser);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.WpsHost = api;
-}(typeof window === 'object' ? window : globalThis, function () {
+}(typeof window === 'object' ? window : globalThis, function (parser) {
   'use strict';
   var MAX_SHEET_CELLS = 1000000;
   var MAX_BOOK_CELLS = 3000000;
@@ -60,6 +60,19 @@
         sheet.values = values.map(function (row) { return row.slice(); });
       } catch (error) {
         throw new Error('“' + sheet.name + '”读取失败：' + error.message);
+      }
+    });
+    var numericCodes = parser.parseWorkbook(result).issues.filter(function (issue) {
+      return issue.code === 'code-display-unverified';
+    });
+    if (numericCodes.length) result.numericCodeFormats = numericCodes.map(function (issue) {
+      try {
+        var index = result.sheets.findIndex(function (sheet) { return sheet.name === issue.sheet; });
+        var format = book.Worksheets.Item(index + 1).Cells.Item(issue.row, issue.column).NumberFormat;
+        if (typeof format !== 'string' || !format.trim()) throw new Error('编码显示格式不可用');
+        return {sheet:issue.sheet,row:issue.row,column:issue.column,numberFormat:format};
+      } catch (error) {
+        throw new Error('“' + issue.sheet + '”第' + issue.row + '行编码格式读取失败：' + error.message);
       }
     });
     return result;

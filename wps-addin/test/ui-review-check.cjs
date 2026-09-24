@@ -14,7 +14,8 @@ const {createServer} = require('../dev/server.cjs');
       const values=[['工程名称：测试楼','','','','',''],['序号','项目编码','项目名称','项目特征描述','单位','工程量'],
         [1,1,'水龙头','铜制','个','0.1'],['','','','含配件','',''],[2,'002','水龙头','钢制','个','0.2'],
         ['','','通风机','','',''],[3,'003','阀门','DN50','个','1'],['编制说明','','','','','']];
-      const sheet={Name:'清单',UsedRange:{Row:1,Column:1,Rows:{Count:8},Columns:{Count:6},Value2:values},Activate(){},Cells:{Item(){return {Select(){}};}}};
+      window.__codeFormat='General';
+      const sheet={Name:'清单',UsedRange:{Row:1,Column:1,Rows:{Count:8},Columns:{Count:6},Value2:values},Activate(){},Cells:{Item(){return {get NumberFormat(){return window.__codeFormat;},Select(){}};}}};
       window.Application={ActiveWorkbook:{Name:'核对测试.xlsx',FullName:'C:\\核对测试.xlsx',Worksheets:{Count:1,Item(){return sheet;}}}};
     });
     await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html');
@@ -58,6 +59,11 @@ const {createServer} = require('../dev/server.cjs');
     await unknown.getByRole('button',{name:'确认行类型'}).click();
     assert.doesNotMatch(await page.locator('#preview-list').innerText(),/此非空行未识别/);
     assert.equal(await page.evaluate(()=>JSON.stringify(window.Application.ActiveWorkbook.Worksheets.Item(1).UsedRange.Value2)),original);
+    await page.evaluate(()=>{window.__codeFormat='000000';});
+    await page.locator('#save-review').click();
+    assert.match(await page.locator('#message').innerText(),/工作簿内容已变化/,'仅修改数值编码显示格式也应阻断旧核对记录');
+    assert.match(await page.locator('#review-status').innerText(),/未保存/);
+    await page.evaluate(()=>{window.__codeFormat='General';});
     // Failing storage must keep unsaved data and never show a success state.
     await page.evaluate(()=>{Storage.prototype.setItem=function(){throw Error('QuotaExceededError');};});
     await page.locator('#save-review').click();

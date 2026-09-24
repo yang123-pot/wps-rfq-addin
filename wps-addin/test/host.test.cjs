@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const host = require('../src/host.js');
+const review = require('../src/review.js');
 
 function sheet(name, values, row = 1, column = 1) {
   const matrix = Array.isArray(values) ? values : [[values]];
@@ -70,6 +71,27 @@ test('snapshot has no mutable reference to the host matrix', () => {
   const result = host.readWorkbook(app([s]));
   result.sheets[0].values[0][0] = '修改副本';
   assert.equal(s.UsedRange.Value2[0][0], '原始值');
+});
+test('changing only a numeric code display format invalidates an old review snapshot', () => {
+  const s = sheet('给排水', [
+    ['工程名称：测试楼','','','','',''],
+    ['序号','项目编码','项目名称','项目特征描述','单位','工程量'],
+    [1,123,'水龙头','铜制','个',2]
+  ]);
+  let format = 'General';
+  s.Cells = {Item(row,column) {
+    assert.deepEqual([row,column],[3,2]);
+    return {get NumberFormat() {return format;}};
+  }};
+  const application = app([s]);
+  const before = host.readWorkbook(application);
+  assert.deepEqual(before.numericCodeFormats,[{sheet:'给排水',row:3,column:2,numberFormat:'General'}]);
+  const record = review.create(before);
+  format = '000000';
+  const after = host.readWorkbook(application);
+  assert.deepEqual(after.sheets[0].values,before.sheets[0].values,'cell values are unchanged');
+  assert.deepEqual(after.numericCodeFormats,[{sheet:'给排水',row:3,column:2,numberFormat:'000000'}]);
+  assert.throws(()=>review.apply(after,record),/变化|不一致/);
 });
 test('invalid sheet metadata is rejected instead of silently dropping rows', () => {
   const s = sheet('无效范围', [['a']]);
