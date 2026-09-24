@@ -23,15 +23,29 @@ async function until(reportPath,predicate){
   const origin='http://127.0.0.1:'+server.address().port;
   await page.goto(origin+'/taskpane.html');
   await page.locator('header').click();
+  await page.mouse.wheel(0,400);
   const reports=await until(reportPath,items=>items.some(item=>item.stage==='pane-ready')&&
-   items.some(item=>item.stage==='pane-event'&&item.event==='click'));
+   items.some(item=>item.stage==='pane-event'&&item.event==='click')&&
+   items.some(item=>item.stage==='pane-event'&&item.event==='wheel'));
   const ready=reports.find(item=>item.stage==='pane-ready');
   const click=reports.find(item=>item.stage==='pane-event'&&item.event==='click');
+  const wheel=reports.find(item=>item.stage==='pane-event'&&item.event==='wheel');
   assert.equal(ready.readyState,'complete');
+  assert.match(ready.paneSession,/^[a-f0-9]{16}$/);
+  assert.equal(click.paneSession,ready.paneSession);
+  assert.equal(click.eventTarget,'HEADER');
   assert.equal(typeof click.importCount,'number');
   assert.equal(typeof click.scrollHeight,'number');
   assert.equal(typeof click.headerTop,'number');
+  assert.equal(click.mergeChecked,false);
+  assert.equal(click.mergePreviewCount,null);
   assert.equal(click.event,'click');
+  assert.equal(wheel.paneSession,ready.paneSession);
+  const before=reports.filter(item=>item.stage==='pane-event'&&item.event==='wheel').length;
+  await page.evaluate(()=>{for(let i=0;i<30;i++)window.dispatchEvent(new WheelEvent('wheel',{bubbles:true}));});
+  await page.waitForTimeout(500);
+  const after=JSON.parse(await fs.readFile(reportPath,'utf8')).reports.filter(item=>item.stage==='pane-event'&&item.event==='wheel').length;
+  assert.ok(after-before<=1,'一批滚轮事件最多新增一次探针请求');
   assert.equal((await(await fetch(origin+'/dev/pane-diagnostics.js')).status),200);
   console.log('PASS: 探针模式记录侧栏 DOM 几何、导入数量和输入事件。');
  }finally{await browser.close();await new Promise(resolve=>server.close(resolve));await fs.rm(folder,{recursive:true,force:true});}

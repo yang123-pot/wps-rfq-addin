@@ -5,6 +5,7 @@
       <tab id="rfqProjectTab" label="项目询价">
         <group id="rfqWorkspace" label="招标清单整理">
           <button id="rfqOpenPane" label="打开询价助手" size="large" onAction="OnOpenRfqPane" getImage="GetRfqImage"/>
+          <button id="rfqReloadPane" label="侧栏卡住时重载" onAction="OnReloadRfqPane"/>
         </group>
       </tab>
     </tabs>

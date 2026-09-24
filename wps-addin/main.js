@@ -28,4 +28,25 @@ function OnOpenRfqPane() {
   }
 }
 
+function OnReloadRfqPane() {
+  var application = window.Application;
+  try {
+    var id = application.PluginStorage.getItem('rfq.taskpane.id');
+    var pane = null;
+    if (id) {
+      try { pane = application.GetTaskPane(id); } catch (_) { pane = null; }
+    }
+    if (!pane) return OnOpenRfqPane();
+    if (!confirm('重载侧栏会清除尚未保存的页面修改。请先保存核对记录；确定继续吗？')) return false;
+    var base = window.location.href.split('?')[0];
+    base = base.slice(0, base.lastIndexOf('/') + 1);
+    pane.Visible = true;
+    pane.Navigate(base + 'taskpane.html');
+    return true;
+  } catch (error) {
+    alert('无法重载项目询价侧栏：' + error.message);
+    return false;
+  }
+}
+
 function GetRfqImage() { return 'assets/inquiry.svg'; }
