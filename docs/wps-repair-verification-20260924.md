@@ -21,6 +21,7 @@
 - 为旧窗格增加用户主动触发的功能区“侧栏卡住时重载”，使用 WPS 官方 `TaskPane.Navigate` 重载相同 URL；若旧窗格不存在则正常新建。重载前提示未保存页面修改会丢失，取消时不触碰窗格；单测 5/5 通过。用户重启 WPS 加载新版后，再次遇到卡住并点击此按钮，**实机确认画面恢复**。随后重新导入 2 份合成文件；新页面探针会话 `7005fe7afc70f6a1` 的动画帧持续增长。重载会重置未保存的页面内存，须从项目记录或再次导入恢复。
 - 重载后的实机合并勾选已到达新页面：探针记录 `mergeChecked=true`，预览计数从 3 变为 2，心跳与动画帧继续；用户截图确认画面也是3→2。随后真实 WPS 合并另存成功，独立读回水管 `0.3`、两条来源、长小数文本与零公式；详情见 `docs/wps-merge-save-verification.md`。
 - 之后在同一探针环境依次实测两种另存取消、选择已存在目标拒绝覆盖，以及重载后重新导入并保存排版复测文件。探针新页面会话持续有心跳、输入事件和动画帧增长，用户能完成这些操作；当前可证明主动重载路径可用，尚不能推断首次导入停滞的根因或概率。
+- 续测核对本机 `outputs/wps-pane-diagnostic-live2-20260924.json`：仅有同一会话最后100条心跳（2026-09-24 16:05–16:10，帧数136→235），更早的页面就绪和输入事件已被旧的100条滚动上限挤掉；这段数据只能证明当时动画帧持续，不能判断首次导入为何卡住。探针服务现优先淘汰旧心跳，保留页面就绪/输入/错误事件在100条上限内；新增用例先复现105次心跳后事件消失，再验证修复。142项Node测试及浏览器探针检查通过，真实WPS需在服务恢复后重新取证。
 - 计划把 38891 本机服务从探针模式切换到正式模式做对照。已核实监听进程 PID 21416 的命令行确为本项目 `server.cjs --report ... --probe-output ...`；但停止并重启服务的命令被自动审批以 `blocked by policy` 拒绝，未执行，也未改用其他命令绕过。再次读取 `/health` 仍为 `mode:probe`。正式模式对照待在允许的环境中操作。
 - 当前判断：恢复 WPS 进程可暂时解除停滞，原因仍未锁定；P1 不标“已彻底修复”，P4 的触发条件仍待验证。
 - 机器另有 `12.1.0.28043` 安装目录，但未进行版本切换。WPS 社区的[用户报告](https://bbs.wps.cn/topic/95654)描述的是 Writer 的 `CreateTaskPane`/功能区无响应，并非本插件在表格 `12.1.0.29161` 的官方结论；P3 仍为待验证假设。
@@ -43,10 +44,10 @@
 
 ## 整体自动化回归
 
-在项目根目录运行，所有命令退出码均为 0：
+此前完整回归141项单测及七组浏览器检查均通过。本次探针修复后在项目根目录重新运行142项单测，以及 `ui-export-check.cjs`、`ui-classification-check.cjs`、`ui-pane-diagnostics-check.cjs` 三组相关浏览器检查，退出码均为0：
 
 ```powershell
-node --test wps-addin/test/*.test.cjs       # 141/141 通过
+node --test wps-addin/test/*.test.cjs       # 142/142 通过
 $env:NODE_PATH='C:\Users\刘杨\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\node_modules'
 node wps-addin/test/ui-check.cjs
 node wps-addin/test/ui-review-check.cjs
@@ -57,5 +58,5 @@ node wps-addin/test/ui-classification-check.cjs
 node wps-addin/test/ui-pane-diagnostics-check.cjs
 ```
 
-七组浏览器检查均通过。浏览器中合成的 WPS 对象不等同真实 WPS 验收，P1/P4/P5 不据此关闭。
+上述七组命令上次完整运行通过；本次只重跑与变更和待测边界相关的三组。浏览器中合成的 WPS 对象不等同真实 WPS 验收，P1/P4/P5 不据此关闭。
 `ribbon.xml` 已由 XML 解析器校验，`main.js` 与探针脚本通过 `node --check`；本次复测前后两份合成源文件 SHA256 不变。

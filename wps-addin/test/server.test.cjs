@@ -75,3 +75,19 @@ test('probe accepts only authenticated bounded JSON reports and persists evidenc
   assert.equal(evidence.reports[0].sheetCount, 2);
   assert.equal((await request('/__probe/report', {method:'POST',headers,body:'x'.repeat(65537)})).status, 413);
 });
+test('probe keeps pane events when heartbeat reports exceed the evidence limit', async t => {
+  const {request,reportPath} = await setup(t, true);
+  const headers = {'content-type':'application/json','x-rfq-probe-token':'unit-test-token'};
+  async function send(stage,event) {
+    const body = JSON.stringify({stage,event,paneSession:'first-pane'});
+    assert.equal((await request('/__probe/report', {method:'POST',headers,body})).status, 200);
+  }
+  await send('pane-ready','');
+  await send('pane-event','click');
+  for (let index=0; index<105; index++) await send('pane-heartbeat','');
+  const reports = JSON.parse(await fs.readFile(reportPath,'utf8')).reports;
+  assert.equal(reports.length,100);
+  assert.equal(reports.filter(item=>item.stage==='pane-heartbeat').length,98);
+  assert.equal(reports.some(item=>item.stage==='pane-ready'),true);
+  assert.equal(reports.some(item=>item.stage==='pane-event'&&item.event==='click'),true);
+});

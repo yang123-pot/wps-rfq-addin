@@ -92,7 +92,10 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         try { report = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch (_) { return reply(400, 'Invalid JSON'); }
         if (!report || typeof report.stage !== 'string' || report.stage.length > 80 || Array.isArray(report)) return reply(400, 'Invalid report');
         reports.push({...report, receivedAt: new Date().toISOString()});
-        if (reports.length > 100) reports.shift();
+        if (reports.length > 100) {
+          const heartbeat = reports.findIndex(item => item.stage === 'pane-heartbeat');
+          reports.splice(heartbeat < 0 ? 0 : heartbeat, 1);
+        }
         const data = JSON.stringify({reports}, null, 2);
         writes = writes.catch(() => {}).then(() => fs.writeFile(reportPath, data, 'utf8'));
         await writes;
