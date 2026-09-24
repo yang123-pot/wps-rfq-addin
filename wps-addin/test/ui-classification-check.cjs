@@ -101,6 +101,21 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
    .map(item=>item.sheet+':'+item.row+':'+item.column).sort());
   assert.deepEqual(rowsWritten,['给排水:3:6','给排水:3:6','给排水:4:6'],'按原行号写入表末列');
   assert.equal(await page.evaluate(()=>window.__books[window.__copies[0].copyPath]['给排水'].values[2][4]),'0.1','原有单元格不得被改写');
+  const firstWriteCount=await page.evaluate(()=>window.__written.length);
+  await page.locator('#write-classification').click();
+  await page.waitForFunction(()=>document.querySelector('#classification-message').textContent.includes('未写入工作副本'));
+  assert.match(await page.locator('#classification-message').innerText(),/已有内容/);
+  assert.equal(await page.evaluate(()=>window.__written.length),firstWriteCount,'重复写入不得覆盖或部分写入');
+  await page.evaluate(()=>{
+   window.__copies.forEach(copy=>{window.__books[copy.copyPath]['给排水'].cells={};});
+   window.__books[window.__copies[1].copyPath]['给排水'].cells['3:6']='用户已有分类';
+   window.__written.length=0;
+  });
+  await page.locator('#write-classification').click();
+  await page.waitForFunction(()=>document.querySelector('#classification-message').textContent.includes('用户已有分类')||
+   document.querySelector('#classification-message').textContent.includes('已有内容'));
+  assert.match(await page.locator('#classification-message').innerText(),/已完成1行.*其余未完成/,'多份副本发生部分写入时必须报告实际进度');
+  assert.equal(await page.evaluate(()=>window.__written.length),2,'第一份副本已实际写入标题和一行分类');
 
   await page.locator('#classification-list > li').first().locator('button').nth(1).click();
   await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 1'));

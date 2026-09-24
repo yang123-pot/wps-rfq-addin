@@ -42,10 +42,17 @@
    var sheet=owned.Worksheets.Item(plan.sheet);
    if(!sheet)throw Error('工作副本中找不到工作表：'+plan.sheet);
    var header=sheet.Cells.Item(plan.headerRow,plan.column),current=header.Value2;
-   if(current!=null&&String(current).trim()!==''&&String(current)!==plan.header)throw Error('“'+plan.sheet+'”第'+plan.column+'列已有内容，未覆盖。');
+   if(header.HasFormula||(current!=null&&String(current).trim()!==''&&String(current)!==plan.header))
+    throw Error('“'+plan.sheet+'”第'+plan.column+'列已有内容，未覆盖。');
+   var cells=plan.rows.map(function(item){
+    var cell=sheet.Cells.Item(item.row,plan.column),existing=cell.Value2;
+    if(cell.HasFormula||(existing!=null&&String(existing).trim()!==''))
+     throw Error('“'+plan.sheet+'”第'+item.row+'行分类列已有内容，未覆盖。');
+    return cell;
+   });
    header.NumberFormat='@';header.Value2=plan.header;
-   plan.rows.forEach(function(item){
-    var cell=sheet.Cells.Item(item.row,plan.column);
+   plan.rows.forEach(function(item,index){
+    var cell=cells[index];
     cell.NumberFormat='@';cell.Value2=item.text;wrote++;
    });
    owned.Save();owned.Close(false);owned=null;

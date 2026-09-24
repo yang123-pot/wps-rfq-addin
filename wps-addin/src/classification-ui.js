@@ -148,7 +148,10 @@
      written+=item.rows.length;
     });
     tell('已把'+written+'行分类写入'+tables+'张工作表'+(mergeTarget?('（合并表：'+mergeTarget+'）'):'（独立工作副本）')+'，原表和行序未改变。');
-   }catch(error){tell('未写入'+(useMergedTable?'合并清单':'工作副本')+'。'+error.message,true);}
+   }catch(error){
+    if(written>0)tell('分类写入未全部完成：已完成'+written+'行，其余未完成。请检查已写入的工作副本。'+error.message,true);
+    else tell('未写入'+(useMergedTable?'合并清单':'工作副本')+'。'+error.message,true);
+   }
    finally{busy=false;render();}
   }
   filter.addEventListener('change',render);

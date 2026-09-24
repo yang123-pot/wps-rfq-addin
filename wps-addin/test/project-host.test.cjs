@@ -50,6 +50,17 @@ test('refuses the original file, invalid plans and existing different content',(
  assert.throws(()=>host.appendColumn(occupied.app,meta,plan),/已有内容，未覆盖/);
  assert.deepEqual(h.opened,[]);
 });
+test('an occupied material cell blocks the whole column before any write or save',()=>{
+ const h=fixture();
+ h.sheet.sheetValues[2][5]='用户原有分类';
+ assert.throws(()=>host.appendColumn(h.app,meta,plan),/第3行.*已有内容|已有内容.*第3行/);
+ assert.equal(h.sheet.sheetValues[1][5],'','标题不得抢先写入');
+ assert.equal(h.sheet.sheetValues[2][5],'用户原有分类','已有分类不得被覆盖');
+ assert.equal(h.sheet.sheetValues[3][5],'','其他材料行也不得部分写入');
+ assert.deepEqual(h.saved,[]);
+ assert.equal(h.app.ActiveWorkbook,h.previous);
+ assert.equal(h.app.AutomationSecurity,1);
+});
 test('write or save failures report no success and keep the user workbook open',()=>{
  for(const [options,pattern] of [[{writeFails:true},/write failed/],[{saveFails:true},/save failed/]]){
   const h=fixture(options);
