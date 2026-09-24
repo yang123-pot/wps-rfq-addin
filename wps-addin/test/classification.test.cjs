@@ -58,9 +58,10 @@ test('validation rejects unsupported records and incomplete decisions',()=>{
 });
 function planFixture(){
  const entryA={id:'entry-a',metadata:{originalPath:'C:\\samples\\a.xlsx'},
-  snapshot:{sheets:[{name:'给排水',columnCount:5},{name:'暖通',columnCount:4}]}};
+  snapshot:{sheets:[{name:'给排水',columnCount:5},{name:'暖通',columnCount:4}]},
+  parsed:{sheets:[{name:'给排水',headers:[{row:2}]},{name:'暖通',headers:[{row:5}]}]}};
  const entryB={id:'entry-b',metadata:{originalPath:'C:\\samples\\b.xlsx'},
-  snapshot:{sheets:[{name:'给排水',columnCount:5}]}};
+  snapshot:{sheets:[{name:'给排水',columnCount:5}]},parsed:{sheets:[{name:'给排水',headers:[{row:3}]}]}};
  const groups=[{scopeId:'scope-1',name:'水管',sources:[{path:'C:\\samples\\a.xlsx',sheet:'给排水',row:3,rows:[3]}]},
   {scopeId:'scope-2',name:'风口',sources:[{path:'C:\\samples\\b.xlsx',sheet:'给排水',row:4,rows:[4,5]}]}];
  return {entries:[entryA,entryB],groups:groups};
@@ -71,16 +72,22 @@ test('planColumn writes at the end of each sheet, keeps original row numbers and
  assert.throws(()=>classification.planColumn(current,groups,entries,{requireAll:true}),/还有1行未确认/);
  const partial=classification.planColumn(current,groups,entries,{});
  assert.equal(partial.mode,'separate');assert.equal(partial.plans.length,1);
- assert.deepEqual(partial.plans[0],{entryId:'entry-a',sheet:'给排水',headerRow:1,column:6,
+ assert.deepEqual(partial.plans[0],{entryId:'entry-a',sheet:'给排水',headerRow:2,column:6,
   header:'分类备注｜匹配度｜核对状态',rows:[{row:3,text:'水阀门｜完全匹配｜已确认'}]});
  current=decide(current,'scope-2',{categoryId:'air-outlet-damper',categoryName:'风口、风阀',matchLevel:'partial'});
- const full=classification.planColumn(current,groups,entries,{headerRows:{给排水:2},requireAll:true});
+ const full=classification.planColumn(current,groups,entries,{requireAll:true});
  assert.equal(full.plans.length,2);
  const second=full.plans[1];
  assert.deepEqual({entryId:second.entryId,sheet:second.sheet,headerRow:second.headerRow,column:second.column},
-  {entryId:'entry-b',sheet:'给排水',headerRow:2,column:6});
+  {entryId:'entry-b',sheet:'给排水',headerRow:3,column:6});
  assert.deepEqual(second.rows,[{row:4,text:'风口、风阀｜相近匹配｜已确认'},{row:5,text:'风口、风阀｜相近匹配｜已确认'}],
   '特征续行按归集范围一起标注');
+});
+test('separate plans refuse a source without a recognized header row',()=>{
+ const {entries,groups}=planFixture();
+ entries[0].parsed.sheets[0].headers=[];
+ const current=decide(classification.create(),'scope-1');
+ assert.throws(()=>classification.planColumn(current,groups,entries,{requireAll:false}),/表头行号/);
 });
 test('merged projects plan a single flat table instead of touching original sheets',()=>{
  let current=decide(classification.create(),'scope-1');

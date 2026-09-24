@@ -80,10 +80,18 @@
   var found=((entry&&entry.snapshot&&entry.snapshot.sheets)||[]).filter(function(item){return item.name===sheet;})[0];
   return found?Number(found.columnCount)+1:null;
  }
+ function headerRowOf(entry,sheet){
+  var found=((entry&&entry.parsed&&entry.parsed.sheets)||[]).filter(function(item){return item.name===sheet;})[0];
+  var header=found&&Array.isArray(found.headers)?found.headers.filter(function(item){
+   return item&&Number.isSafeInteger(item.row)&&item.row>0;
+  })[0]:null;
+  if(!header)throw Error('工作副本缺少有效表头行号：'+sheet+'，未写入。');
+  return header.row;
+ }
  function planColumn(classification,groups,entries,options){
   assertValid(classification);
   options=options||{};
-  var header=options.header||HEADER,headerRows=options.headerRows||{},list=groups||[],library=entries||[];
+  var header=options.header||HEADER,list=groups||[],library=entries||[];
   var pending=list.filter(function(group){return !decisionFor(classification,rowKey(group));});
   if(options.requireAll&&pending.length)throw Error('还有'+pending.length+'行未确认分类，不能写入工作副本。');
   if(options.merged){
@@ -108,7 +116,7 @@
      if(column==null)throw Error('工作副本缺少工作表记录：'+sheet);
      var key=entry.id+'|'+sheet;
      if(!byPlan[key]){
-      byPlan[key]={entryId:entry.id,sheet:sheet,headerRow:headerRows[sheet]||1,column:column,header:header,rows:[]};
+      byPlan[key]={entryId:entry.id,sheet:sheet,headerRow:headerRowOf(entry,sheet),column:column,header:header,rows:[]};
       plans.push(byPlan[key]);
      }
      if(!shelves[key])shelves[key]={};

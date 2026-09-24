@@ -94,6 +94,9 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   assert.equal(written.filter(value=>value==='水阀门｜完全匹配｜已确认').length,1);
   assert.equal(written.filter(value=>value==='无需询价｜无可靠匹配｜已确认').length,2);
   assert.equal(written.filter(value=>value==='分类备注｜匹配度｜核对状态').length,2,'每张工作表写一次列标题');
+  const headersWritten=await page.evaluate(()=>window.__written.filter(item=>item.value==='分类备注｜匹配度｜核对状态')
+   .map(item=>item.sheet+':'+item.row+':'+item.column).sort());
+  assert.deepEqual(headersWritten,['给排水:2:6','给排水:2:6'],'列标题必须落在识别出的表头行');
   const rowsWritten=await page.evaluate(()=>window.__written.filter(item=>item.value!=='分类备注｜匹配度｜核对状态')
    .map(item=>item.sheet+':'+item.row+':'+item.column).sort());
   assert.deepEqual(rowsWritten,['给排水:3:6','给排水:3:6','给排水:4:6'],'按原行号写入表末列');
