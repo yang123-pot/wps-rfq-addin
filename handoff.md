@@ -123,6 +123,10 @@ wps-addin/src/project.js
 wps-addin/dev/project-store.cjs
 wps-addin/test/project.test.cjs
 wps-addin/test/project-store.test.cjs
+
+任务8第二片（应已提交）：
+wps-addin/dev/server.cjs（新增/api/project/*）
+wps-addin/test/project-server.test.cjs
 ```
 
 目录`%SystemDrive%/`是2026-09-24本机OCR/WinRT工具误写的Windows缓存副本（未跟踪，不属于插件），自动化策略不允许我递归删除，请人工确认后手动删除；不要把它提交进仓库。
@@ -230,7 +234,7 @@ assert.equal(merged.sheets[0].values.find(row => row[2] === '水管')[5], '0.3')
 - [ ] 未合并项目在独立工作副本的对应表/行末追加分类列，保留原内容和行序；已显式合并项目在确认的合并表追加。内部扁平另存不能替代未合并原表结构。
 - [ ] 侧栏提供保存/打开项目和恢复结果；副本缺失需定位时，只有原件SHA仍一致才重建副本，不凭同名路径套用旧记录。重启WPS及服务后核对列表、模式、核对和阶段，通过后更新存储说明、提交推送。
 
-**任务8进度（2026-09-24）：** 已完成模型与本地项目库第一片——`src/project.js`（create/validate/assertValid/stageState/confirm/invalidate/compareSources）、`dev/project-store.cjs`（save/load/list，原子替换+读回校验）及`test/project.test.cjs`、`test/project-store.test.cjs`（8项）。下一片：server令牌接口、侧栏“保存/打开项目”、工作副本分类列写入与缺失副本重建。
+**任务8进度（2026-09-24）：** 第一片是模型与本地项目库——`src/project.js`（create/validate/assertValid/stageState/confirm/invalidate/compareSources）、`dev/project-store.cjs`（save/load/list，原子替换+读回校验）及`test/project.test.cjs`、`test/project-store.test.cjs`（8项）。第二片把项目库接入本机服务：`/api/project/save|load|list`，沿用随机会话令牌、Host/Origin限制与64MB请求上限，记录只落在`--import-directory`同级的应用数据目录（测试用显式`projectDirectory`），`test/project-server.test.cjs`覆盖越权、越目录、缺记录与版本拒绝。**下一片：侧栏“保存/打开项目”、工作副本分类列写入与缺失副本按原件SHA重建。**
 
 ## 任务9A：分类库及可解释匹配
 
