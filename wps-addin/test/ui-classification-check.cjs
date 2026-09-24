@@ -132,6 +132,25 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.locator('#export-workbook').click();
   await page.waitForFunction(()=>document.querySelector('#export-message').textContent.includes('另存成功'));
   await page.evaluate(()=>{window.__written.length=0;});
+  let releaseVerify,verifyStarted;
+  const started=new Promise(resolve=>{verifyStarted=resolve;});
+  await page.route('**/api/export/verify',async route=>{
+   verifyStarted();await new Promise(resolve=>{releaseVerify=resolve;});await route.continue();
+  });
+  await page.locator('#write-classification').click();
+  await started;
+  await page.locator('#merge-identical').uncheck();
+  releaseVerify();
+  await page.waitForFunction(()=>document.querySelector('#classification-message').textContent.includes('已变化'));
+  assert.equal(await page.evaluate(()=>window.__written.length),0,'校验期间改动合并选择不得写入旧计划');
+  await page.unroute('**/api/export/verify');
+  await page.locator('#merge-identical').check();
+  await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 0'));
+  await fs.writeFile(mergedTarget,'changed after export');
+  await page.locator('#write-classification').click();
+  await page.waitForFunction(()=>document.querySelector('#classification-message').textContent.includes('发生变化'));
+  assert.equal(await page.evaluate(()=>window.__written.length),0,'合并表被外部修改时必须在打开前阻断');
+  await fs.writeFile(mergedTarget,Buffer.from([0x50,0x4b,3,4,1,2]));
   await page.locator('#write-classification').click();
   await page.waitForFunction(()=>document.querySelector('#classification-message').textContent.includes('合并表'));
   const mergedWrites=await page.evaluate(()=>window.__written.slice());

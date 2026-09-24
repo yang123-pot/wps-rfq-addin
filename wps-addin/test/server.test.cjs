@@ -30,6 +30,7 @@ test('serves plugin assets but not arbitrary workspace files', async t => {
   const {request} = await setup(t);
   assert.equal((await request('/main.js')).body, 'window.example = true;');
   assert.equal((await request('/secret.txt')).status, 404);
+  assert.equal((await request('/dev/pane-diagnostics.js')).status, 404);
   assert.equal((await request('/%2e%2e/handoff.md')).status, 404);
   assert.equal((await request('/.git/config')).status, 404);
   const index = await request('/index.html');

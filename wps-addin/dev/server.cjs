@@ -34,7 +34,7 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         (req.headers.origin && req.headers.origin !== origin)) return reply(403, 'Local origin required');
     let url;
     try { url = new URL(req.url, origin); } catch (_) { return reply(400, 'Invalid URL'); }
-    if (['/api/import/prepare','/api/export/prepare','/api/export/commit'].includes(url.pathname)) {
+    if (['/api/import/prepare','/api/export/prepare','/api/export/commit','/api/export/verify'].includes(url.pathname)) {
       const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');
       if (!importDirectory) return json(404,{error:'当前服务未启用文件导入，请启动最新开发服务。'});
       if (req.method !== 'POST') return json(405,{error:'POST required'});
@@ -50,6 +50,7 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         if(!data||Array.isArray(data))return json(400,{error:'导入请求无效。'});
         if(url.pathname==='/api/export/prepare')return json(200,await exports.prepare(data.target));
         if(url.pathname==='/api/export/commit')return json(200,await exports.commit(data.ticket));
+        if(url.pathname==='/api/export/verify')return json(200,await exports.verify(data.ticket,data.target,data.sha256));
         const files=await prepareFiles(data.paths,{directory:importDirectory,existing:data.existing});
         return json(200,{files});
       } catch(error) {return json(400,{error:error.message});}
@@ -108,7 +109,7 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
       return reply(200, '<!doctype html><html><head><meta charset="utf-8"></head><body>' +
         '<script src="/main.js"></script>' + probe + '</body></html>', TYPES['.html']);
     }
-    const isProbeScript = probeConfig && url.pathname === '/dev/host-probe.js';
+    const isProbeScript = probeConfig && ['/dev/host-probe.js','/dev/pane-diagnostics.js'].includes(url.pathname);
     if (!ASSETS.has(url.pathname) && !isProbeScript) return reply(404, 'Not found');
     try {
       let content = await fs.readFile(path.join(root, url.pathname.slice(1)));
@@ -117,7 +118,7 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
       }
       if (probeConfig && url.pathname === '/taskpane.html') {
         const token = JSON.stringify(probeConfig.token);
-        content = content.toString('utf8').replace('</body>', '<script>window.addEventListener("load",function(){fetch("/__probe/report",{method:"POST",headers:{"content-type":"application/json","x-rfq-probe-token":' + token + '},body:JSON.stringify({stage:"taskpane-rendered",passed:!!window.Application&&!document.getElementById("read-workbook").disabled})});});</script></body>');
+        content = content.toString('utf8').replace('</body>', '<script>window.__RFQ_PANE_PROBE__={token:' + token + '};</script><script src="/dev/pane-diagnostics.js"></script></body>');
       }
       return reply(200, content, TYPES[path.extname(url.pathname)] || 'application/octet-stream');
     } catch (_) { return reply(404, 'Not found'); }

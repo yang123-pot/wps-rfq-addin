@@ -37,6 +37,14 @@ function createExportStore({directory}){
    entry.result={target:entry.target,sha256,bytes:bytes.length};return entry.result;
   }finally{entry.busy=false;}
  }
- return {prepare,commit};
+ async function verify(ticket,target,sha256){
+  const entry=tickets.get(ticket);
+  if(!entry||Date.now()-entry.created>3600000||!entry.result)throw Error('另存会话已失效，请重新另存内部清单。');
+  if(target!==entry.target)throw Error('另存目标与回执不一致，未写入。');
+  if(sha256!==entry.result.sha256)throw Error('另存回执不一致，未写入。');
+  if(digest(await fs.readFile(entry.target))!==sha256)throw Error('已另存文件发生变化，未写入分类列。');
+  return {target:entry.target,sha256:entry.result.sha256};
+ }
+ return {prepare,commit,verify};
 }
 module.exports={createExportStore};

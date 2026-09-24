@@ -12,6 +12,11 @@ test('export endpoints require the local session and publish only server-issued 
  const response=await request('prepare',{target:path.join(folder,'result.xlsx')});assert.equal(response.status,200);const p=await response.json();
  await fs.writeFile(p.stagePath,Buffer.from([0x50,0x4b,3,4,1,2]));
  const committed=await request('commit',{ticket:p.ticket});assert.equal(committed.status,200);const result=await committed.json();assert.equal(result.target,p.target);
+ assert.equal((await request('verify',{ticket:p.ticket,target:p.target,sha256:result.sha256},{})).status,403);
+ assert.equal((await request('verify',{ticket:p.ticket,target:p.target,sha256:result.sha256})).status,200);
+ await fs.writeFile(p.target,'changed after export');
+ assert.equal((await request('verify',{ticket:p.ticket,target:p.target,sha256:result.sha256})).status,400);
+ await fs.writeFile(p.target,Buffer.from([0x50,0x4b,3,4,1,2]));
  assert.equal((await request('commit',{ticket:p.ticket})).status,200);
  assert.equal((await request('prepare',{target:p.target})).status,400);
  assert.equal((await request('commit',{ticket:'bad',stagePath:p.target})).status,400);

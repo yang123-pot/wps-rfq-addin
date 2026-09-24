@@ -81,7 +81,7 @@
     list.appendChild(li);
    });
    if(!rows.length)list.appendChild(node('li','先在上方导入清单，再核对分类。','empty'));
-   write.disabled=!options.application||!summary.canGenerateBrandTable;
+   write.disabled=busy||!options.application||!summary.canGenerateBrandTable;
   }
   function batchConfirm(){
    var applied=0,skipped=[];
@@ -101,7 +101,8 @@
      :('没有可批量确认的行。'+(skipped.length?'需人工选择：'+skipped.join('、'):'请先勾选明确的单候选行。')),!applied);
    render();
   }
-  function writeCopy(){
+  async function writeCopy(){
+   if(busy)return;
    try{
     var collection=options.getCollection();
     var planOptions={requireAll:true},useMergedTable=options.mergeIdentical&&options.mergeIdentical()===true;
@@ -112,11 +113,27 @@
     }
     var plan=RfqClassification.planColumn(state,groups,collection.entries,planOptions);
     var written=0,tables=plan.plans.length,mergeTarget=null;
+    var plannedState=state,plannedGroups=groups;
+    var merged=null;
+    if(useMergedTable){
+     merged=options.getMergedTarget&&options.getMergedTarget();
+     if(!merged||merged.mode!=='merge-identical'||typeof merged.target!=='string'||
+        !/^[a-f\d]{64}$/i.test(merged.sha256||'')||typeof merged.ticket!=='string')
+      throw Error('请先在“另存内部清单”按合并模式另存，再写入分类列。');
+    }
+    busy=true;render();
+    if(merged){
+     var response=await fetch('/api/export/verify',{method:'POST',headers:{'content-type':'application/json',
+      'x-rfq-import-token':window.__RFQ_IMPORT__.token},body:JSON.stringify({ticket:merged.ticket,target:merged.target,sha256:merged.sha256})});
+     var checked=await response.json();
+     if(!response.ok)throw Error(checked.error||'合并表校验失败，未写入。');
+     if(checked.target!==merged.target||checked.sha256!==merged.sha256)throw Error('合并表校验回执不一致，未写入。');
+    }
+    if(state!==plannedState||groups!==plannedGroups||options.getCollection()!==collection||
+       (options.mergeIdentical&&options.mergeIdentical()===true)!==useMergedTable)
+     throw Error('核对内容或合并选择已变化，请重新检查后写入。');
     plan.plans.forEach(function(item){
      if(item.entryId==null){
-      var merged=options.getMergedTarget&&options.getMergedTarget();
-      if(!merged||merged.mode!=='merge-identical'||typeof merged.target!=='string'||!/^[a-f\d]{64}$/i.test(merged.sha256||''))
-       throw Error('请先在“另存内部清单”按合并模式另存，再写入分类列。');
       RfqProjectHost.appendColumn(options.application,{copyPath:merged.target,fingerprint:merged.sha256},item);
       written+=item.rows.length;
       mergeTarget=merged.target;
@@ -130,6 +147,7 @@
     });
     tell('已把'+written+'行分类写入'+tables+'张工作表'+(mergeTarget?('（合并表：'+mergeTarget+'）'):'（独立工作副本）')+'，原表和行序未改变。');
    }catch(error){tell('未写入工作副本。'+error.message,true);}
+   finally{busy=false;render();}
   }
   filter.addEventListener('change',render);
   batch.addEventListener('click',batchConfirm);

@@ -3,11 +3,16 @@ const {createExportStore}=require('../dev/export-files.cjs');
 async function fixture(t){const root=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-export-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));return {root,store:createExportStore({directory:path.join(root,'staging')}),target:path.join(root,'清单.xlsx')};}
 const zip=Buffer.from([0x50,0x4b,0x03,0x04,1,2,3,4]);
 test('prepares a new target, publishes exact bytes and supports idempotent result checks',async t=>{
- const {store,target}=await fixture(t),p=await store.prepare(target);assert.notEqual(p.stagePath,target);
+ const {store,target,root}=await fixture(t),p=await store.prepare(target);assert.notEqual(p.stagePath,target);
  await fs.writeFile(p.stagePath,zip);const result=await store.commit(p.ticket);
  assert.deepEqual(await fs.readFile(target),zip);assert.equal(result.bytes,zip.length);assert.match(result.sha256,/^[a-f0-9]{64}$/);
  assert.deepEqual(await store.commit(p.ticket),result);
+ assert.deepEqual(await store.verify(p.ticket,target,result.sha256),{target,sha256:result.sha256});
+ await assert.rejects(store.verify('unknown',target,result.sha256),/会话/);
+ await assert.rejects(store.verify(p.ticket,path.join(root,'other.xlsx'),result.sha256),/目标/);
+ await assert.rejects(store.verify(p.ticket,target,'0'.repeat(64)),/回执/);
  await fs.writeFile(target,'user changed');await assert.rejects(store.commit(p.ticket),/变化/);
+ await assert.rejects(store.verify(p.ticket,target,result.sha256),/变化/);
 });
 test('rejects existing target including a race after preparation and never overwrites it',async t=>{
  const {store,target}=await fixture(t),p=await store.prepare(target);await fs.writeFile(p.stagePath,zip);await fs.writeFile(target,'existing');
