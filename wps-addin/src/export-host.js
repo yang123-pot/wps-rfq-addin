@@ -40,6 +40,13 @@
         var used=sheet.Range('A1:'+column(s.values[0].length)+s.values.length);
         used.Font.Size=10;used.WrapText=true;used.ColumnWidth=18;
         sheet.Range('A1:'+column(s.values[0].length)+'1').Font.Bold=true;
+        if(s.name==='来源明细'&&s.values.length>1){
+          ['原路径','文件SHA256','来源标识','核对追溯JSON'].forEach(function(header){
+            var index=s.values[0].indexOf(header);
+            if(index>=0)sheet.Range(column(index+1)+'2:'+column(index+1)+s.values.length).WrapText=false;
+          });
+          used.Rows.AutoFit();
+        }
       });
       verify(created,model);
       created.SaveAs(stagePath,51);created.Close(false);created=null;
