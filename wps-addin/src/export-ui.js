@@ -2,6 +2,7 @@
   'use strict';
   function create(options){
     var button=document.getElementById('export-workbook'),message=document.getElementById('export-message'),busy=false;
+    var last=null;
     function tell(text,error){message.textContent=text;message.className=error?'error':'';}
     async function request(action,data){
       var response=await fetch('/api/export/'+action,{method:'POST',headers:{'content-type':'application/json','x-rfq-import-token':window.__RFQ_IMPORT__.token},body:JSON.stringify(data)});
@@ -26,11 +27,13 @@
         try{result=await request('commit',{ticket:prepared.ticket});}
         catch(error){if(error.status&&error.status<500)throw error;result=await request('commit',{ticket:prepared.ticket});}
         if(!result||result.target!==prepared.target||!/^[a-f\d]{64}$/i.test(result.sha256))throw Error('未取得有效保存回执，请检查目标文件。');
+        last={target:result.target,sha256:result.sha256,bytes:result.bytes,mode:model.mode,outputCount:model.outputCount,at:new Date().toISOString()};
         tell('上次另存成功（'+model.outputCount+' 条，'+(model.mode==='merge-identical'?'已合并':'分别保留')+'）：'+result.target+'。原清单和核对记录保留。');
       }catch(error){tell('另存未确认成功。'+error.message+(prepared?' 请检查目标位置：'+prepared.target:''),true);}
       finally{busy=false;options.onBusy(false);}
     });
-    return {refresh:function(result){button.disabled=!options.application||!window.__RFQ_IMPORT__||!result.canFinalize;}};
+    return {refresh:function(result){button.disabled=!options.application||!window.__RFQ_IMPORT__||!result.canFinalize;},
+      last:function(){return last;}};
   }
   window.RfqExportUI={create:create};
 }());

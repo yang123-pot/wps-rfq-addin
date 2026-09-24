@@ -104,17 +104,31 @@
   function writeCopy(){
    try{
     var collection=options.getCollection();
-    var plan=RfqClassification.planColumn(state,groups,collection.entries,{requireAll:true});
-    var written=0,tables=plan.plans.length;
+    var planOptions={requireAll:true},useMergedTable=options.mergeIdentical&&options.mergeIdentical()===true;
+    if(useMergedTable){
+     var model=RfqExportModel.build(collection,true);
+     planOptions.merged=true;planOptions.sheet=model.sheets[0].name;planOptions.headerRow=1;
+     planOptions.column=model.sheets[0].values[0].length+1;
+    }
+    var plan=RfqClassification.planColumn(state,groups,collection.entries,planOptions);
+    var written=0,tables=plan.plans.length,mergeTarget=null;
     plan.plans.forEach(function(item){
-     if(item.entryId==null)throw Error('已合并项目请先在“另存内部清单”生成合并表，再写入分类列。');
+     if(item.entryId==null){
+      var merged=options.getMergedTarget&&options.getMergedTarget();
+      if(!merged||merged.mode!=='merge-identical'||typeof merged.target!=='string'||!/^[a-f\d]{64}$/i.test(merged.sha256||''))
+       throw Error('请先在“另存内部清单”按合并模式另存，再写入分类列。');
+      RfqProjectHost.appendColumn(options.application,{copyPath:merged.target,fingerprint:merged.sha256},item);
+      written+=item.rows.length;
+      mergeTarget=merged.target;
+      return;
+     }
      var entry=collection.entries.filter(function(candidate){return candidate.id===item.entryId;})[0];
      if(!entry)throw Error('找不到对应工作副本，未写入。');
      RfqProjectHost.appendColumn(options.application,entry.metadata,
       {sheet:item.sheet,headerRow:item.headerRow,column:item.column,header:item.header,rows:item.rows});
      written+=item.rows.length;
     });
-    tell('已把'+written+'行分类写入'+tables+'张工作表（独立工作副本），原表和行序未改变。');
+    tell('已把'+written+'行分类写入'+tables+'张工作表'+(mergeTarget?('（合并表：'+mergeTarget+'）'):'（独立工作副本）')+'，原表和行序未改变。');
    }catch(error){tell('未写入工作副本。'+error.message,true);}
   }
   filter.addEventListener('change',render);
