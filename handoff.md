@@ -239,15 +239,18 @@ assert.equal(merged.sheets[0].values.find(row => row[2] === '水管')[5], '0.3')
 
 ## 任务9A：分类库及可解释匹配
 
+**任务9A进度（2026-09-24）：** 第一片已完成——`rules/defaults.json`（四类四规则，带依据）、`src/category-library.js`（validate/categories/category/categoryName/rules，识别未知引用、重复编号、非法字段与停用状态）、`src/classify.js`（suggest返回candidates/matchLevel/reasons/conflicts/libraryVersion/requiresConfirmation），`test/category-library.test.cjs`与`test/classify.test.cjs`共7项覆盖四条口径的正反例、冲突不自动选择、停用规则不生效、未知库不抛错。脚本与JSON已登记进服务白名单，避免重复P7。**下一片：把分类建议显示到侧栏（清单末尾“分类备注｜匹配度｜核对状态”而非写回原表），再做9B的逐条确认与全量阻断。**
+
 **拟文件：** `src/category-library.js`、`src/classify.js`、`dev/library-store.cjs`及对应测试；可发布非敏感初始规则放`wps-addin/rules/defaults.json`，用户项目案例留应用数据目录，不强行加入被忽略的数据目录。本节以后`src/dev/test`均相对`wps-addin/`。
 
 **拟接口：** `RfqCategoryLibrary.validate(library)`；`RfqClassify.suggest(item,library,context)`返回`{candidates,matchLevel,reasons,conflicts,libraryVersion}`，建议不能直接成为最终确认。
 
-- [ ] 对照本地人工确认表加修正覆盖表，提取类别/别名/包含和排除条件，剔除旧预测、报价及个人资料。
-- [ ] 类别和规则使用稳定ID、版本、适用项目、启停状态及依据；匹配条件可用名称、特征、单位和必要专业上下文。
-- [ ] 先建立四条确认口径的正例及相近关键词反例：钢索无需询价、充电桩配电箱、所有水龙头、风口风阀别名归一；排除条件必须生效。
-- [ ] 实现确定性匹配：完整案例/明确规则给出依据，条件不足显示候选，多结论冲突不强选，未知显示无可靠匹配；不把相似度伪装成正确概率。
-- [ ] 新增/修改/停用校验类别引用，停用后历史结果仍可查看；库变化不回写项目已确认结果。
+- [x] 初始规则只收录已确认口径并注明依据：`rules/defaults.json`含无需询价、水阀门、风口风阀、汽车充电桩四类，不含旧预测、报价或个人资料。
+- [x] 类别和规则使用稳定ID、版本、启停状态与依据；匹配条件支持名称、特征、单位与“名称＋特征”组合，`category-library.js`校验引用与停用状态。
+- [x] 四条确认口径的正例与相近词反例已建：钢索→无需询价、水龙头→水阀门、风口/风阀→风口、风阀、充电桩配套配电箱→汽车充电桩；`风管/水表/钢带/照明配电箱`必须判为无可靠匹配。
+- [x] 确定性匹配：命中即给规则编号与依据，名称完全等于关键词记`exact`、否则`partial`，多条规则给出不同类别时`conflicts`列出全部候选且不自动选择，未知为`none`；结果固定`requiresConfirmation:true`，不输出相似度分数。
+- [ ] 排除条件（exclude）与“适用项目/scope”字段尚未实现，等有真实冲突样本时补。
+- [ ] 新增/修改/停用校验类别引用，停用后历史结果仍可查看；库变化不回写项目已确认结果（校验已具备，维护界面留待9C）。
 - [ ] 跑模型测试和四项目只读建议回归，检查未知/冲突及来源覆盖，提交推送。
 
 ## 任务9B：分类备注与全部人工确认
