@@ -122,6 +122,7 @@
      if(!merged||merged.mode!=='merge-identical'||typeof merged.target!=='string'||
         !/^[a-f\d]{64}$/i.test(merged.sha256||'')||typeof merged.ticket!=='string')
       throw Error('请先在“另存内部清单”按合并模式另存，再写入分类列。');
+     if(merged.sourceCollection!==collection)throw Error('清单来源或核对已变化，请重新另存合并清单后写入。');
     }
     busy=true;render();
     if(merged){

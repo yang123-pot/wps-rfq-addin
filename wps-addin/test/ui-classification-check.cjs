@@ -143,7 +143,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.waitForFunction(()=>document.querySelector('#classification-message').textContent.includes('请先在“另存内部清单”按合并模式另存'));
   assert.match(await page.locator('#classification-message').innerText(),/^未写入合并清单。/);
   assert.equal(await page.evaluate(()=>window.__written.length),0,'没有合并表时不得写入');
-  const mergedTarget=path.join(root,'合并分类.xlsx');
+  let mergedTarget=path.join(root,'合并分类.xlsx');
   await page.evaluate(target=>{
    window.__mergedTarget=target;
    window.Application.GetSaveAsFilename=()=>target;
@@ -152,6 +152,21 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   },mergedTarget);
   await page.locator('#export-workbook').click();
   await page.waitForFunction(()=>document.querySelector('#export-message').textContent.includes('另存成功'));
+  await page.locator('#imported-books > li').nth(1).getByRole('button',{name:'移除此文件'}).click();
+  await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===1);
+  await page.evaluate(()=>{window.__written.length=0;});
+  await page.locator('#write-classification').click();
+  await page.waitForFunction(()=>/来源.*变化|已把/.test(document.querySelector('#classification-message').textContent));
+  assert.match(await page.locator('#classification-message').innerText(),/来源.*变化.*重新另存/,'旧合并表不得接受新来源集合的分类');
+  assert.equal(await page.evaluate(()=>window.__written.length),0,'来源改变后必须在打开旧合并表前阻断');
+  await page.evaluate(file=>{window.__files=[file];},files[1]);
+  await page.locator('#import-files').click();
+  await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
+  await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 0'));
+  mergedTarget=path.join(root,'合并分类-重新另存.xlsx');
+  await page.evaluate(target=>{window.Application.GetSaveAsFilename=()=>target;},mergedTarget);
+  await page.locator('#export-workbook').click();
+  await page.waitForFunction(()=>document.querySelector('#export-message').textContent.includes('合并分类-重新另存.xlsx'));
   await page.evaluate(()=>{window.__written.length=0;});
   let releaseVerify,verifyStarted;
   const started=new Promise(resolve=>{verifyStarted=resolve;});

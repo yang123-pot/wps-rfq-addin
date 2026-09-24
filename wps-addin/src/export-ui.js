@@ -13,7 +13,8 @@
     button.addEventListener('click',async function(){
       if(busy)return;var target=null,prepared=null;
       try{
-        var model=RfqExportModel.build(options.getCollection(),options.mergeIdentical());
+        var sourceCollection=options.getCollection();
+        var model=RfqExportModel.build(sourceCollection,options.mergeIdentical());
         if(!window.confirm('确认按当前预览另存？\n'+(model.mode==='merge-identical'?'精确合并':'逐条保留来源')+'：'+model.inputCount+' 条 → '+model.outputCount+' 条。\n包含内部来源明细；编码和工程量按文本保留精度。')){tell('已取消确认，核对记录保留。');return;}
         target=RfqExportHost.selectTarget(options.application,model.mode==='merge-identical'?'项目_合并清单.xlsx':'项目_分离清单.xlsx');
         if(!target){tell('已取消选择保存位置，核对记录保留。');return;}
@@ -27,7 +28,7 @@
         try{result=await request('commit',{ticket:prepared.ticket});}
         catch(error){if(error.status&&error.status<500)throw error;result=await request('commit',{ticket:prepared.ticket});}
         if(!result||result.target!==prepared.target||!/^[a-f\d]{64}$/i.test(result.sha256))throw Error('未取得有效保存回执，请检查目标文件。');
-        last={ticket:prepared.ticket,target:result.target,sha256:result.sha256,bytes:result.bytes,mode:model.mode,outputCount:model.outputCount,at:new Date().toISOString()};
+        last={ticket:prepared.ticket,target:result.target,sha256:result.sha256,bytes:result.bytes,mode:model.mode,outputCount:model.outputCount,sourceCollection:sourceCollection,at:new Date().toISOString()};
         tell('上次另存成功（'+model.outputCount+' 条，'+(model.mode==='merge-identical'?'已合并':'分别保留')+'）：'+result.target+'。原清单和核对记录保留。');
       }catch(error){tell('另存未确认成功。'+error.message+(prepared?' 请检查目标位置：'+prepared.target:''),true);}
       finally{busy=false;options.onBusy(false);}
