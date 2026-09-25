@@ -12,9 +12,9 @@
 ## 0. 接手时先看这里
 
 1. **遗留问题没有全部修复。** P1/P4侧栏偶发停滞仍未定位根因，重载仅是已验证的恢复路径；P3兼容性尚无结论；P5还有实机异常流程待测。
-2. 2026-09-26累计结果为 **179项Node测试、9组浏览器检查通过**（见§10备份记录；B阶段结束时为166/9，C1、C2新增13项Node测试）；浏览器模拟宿主仍不能代替真实WPS验收。
+2. 2026-09-26累计结果为 **191项Node测试、10组浏览器检查通过**（见§10备份记录；B阶段结束时为166/9，C1、C2后为179/9，C3后为191/10）；浏览器模拟宿主仍不能代替真实WPS验收。
 3. **A1～A3需要真实WPS交互会话**（取截图、连点、观察冻结）。当前执行环境没有WPS图形界面控制能力，这三包未做，仍按未完成处理，已列入集中调测项；稳定性验收未过，不把13标记完成。
-4. 9C（B1～B4）与C1、C2已实现并自测通过；下一步C3（分类品牌表生成、手填与读回），B5仍等Q8口径。
+4. 9C（B1～B4）、C1、C2、C3已实现并自测通过；**品牌表已按用户要求改为人工填写的汇总表**，品牌与询价表联动。下一步C4/C5或D1，B5仍等Q8口径，拆分口径见Q9。
 5. 只有任务本身依赖缺失业务信息时才集中询问用户。已有开发、本机验证和持续Git备份授权，不重复询问是否开始；已通过的人工测试不再重复要求用户操作。
 6. 本文件给出完整剩余路线；具体截图、逐值结果和历史时间线放在独立证据文档，入口见§11。
 
@@ -39,7 +39,7 @@
 | 项目状态与副本管理（任务8）＋C1阶段判定 | 已实现，Node与浏览器模拟宿主通过，**真实WPS未验** | 项目编号、来源恢复、分类进度/阶段恢复已通过；C1新增contentKey业务快照键、按真实条件逐级判定import/review/merge/classification、合并预览明确确认（不强迫另存合并表）、下游过期传播、未来字段与mergeKey持久化、未知内部版本拒绝恢复；**余下**：真实WPS确认阶段显示与恢复提示 |
 | 分类库与分类确认（9A/9B） | 已实现、主要写列路径实机通过 | 四条确认口径、建议依据、逐行/批量/撤销、未全确认阻断、分别写副本或合并表、回执防过期 |
 | 习惯记忆与分类库维护（9C＝B1～B4） | 已实现，Node与浏览器模拟宿主通过，**真实WPS未验** | 建议接线（规则与记忆候选并存、冲突不自动覆盖）、库与记忆单包原子保存与409冲突、确认来源学习与按来源撤销、别名与排除条件、维护界面（类别/规则/记忆）；**余下**：真实WPS保存后重载与重启服务恢复、B5资料迁入 |
-| 分类品牌表模型（10之C2） | 已实现，Node测试通过 | `brand-table.js`：按类别汇总、排除无需询价、保留行与来源追溯、品牌与供应商不串列、漏配/重复/空值/未确认范围均阻断、全部无需询价允许空结果；**余下**：C3生成与读回、C4品牌参考、C5抬头，及Q1～Q3业务口径 |
+| 分类品牌表（10之C2＋C3） | 已实现，Node与浏览器模拟宿主通过，**真实WPS未验** | 按用户口径改为**人工填品牌**：分类确认后插件按类别生成“分类品牌表”汇总表，品牌列留空由人工填写；读回按稳定分配标识匹配、固定列改动指出行号、先预览再确认；品牌是询价表与拆分文件的唯一来源（`brandMap/requireBrands`）；品牌阶段只要求品牌，严格校验（供应商＋范围确认）留给询价拆分；**余下**：C4品牌参考、C5抬头、Q1～Q3与Q9口径 |
 | 总询价工作簿（11） | **未实现** | D1～D2；现有内部清单输出不是供应商询价表 |
 | 拆分（12） | **未实现** | E1～E2 |
 | 安装包、四项目完整验收、操作说明（13） | **未实现** | F1～F3 |
@@ -120,6 +120,7 @@
 | Q6 | 输出模板及抬头细节 | 只读对照本机项目一、项目二材料分类样式，展示脱敏样稿；确认地址/电话等必填项与打印布局 | 使用设计已列字段形成预览，不填真实联系人默认值；必填未确认不完成抬头 | C5/D2 |
 | Q7 | 支持的WPS版本与交付环境 | 当前29161为已测试环境；28043能否在隔离环境启动、是否离线安装、权限范围 | 不动现有安装，不把开发注册冒充生产兼容结论 | A2/F1 |
 | Q8 | 历史已确认的32个类别名是否成为分类库正式类别 | 用`核对填写`表已确认行展示32个类别名及行数（配电箱737、电线电缆695、电线管305、钢管283、抗震支架239、风机221、桥架164、智能化162、火灾报警140…，共6111行中仅1190行落在现有4类），由用户决定"扩成正式类别"还是"归纳到少数类别" | 未定前只迁入能明确映射的部分，其余进待核对报告；不自动新建类别、不自动合并相似名 | B5、C2、D1 |
+| Q9 | 拆分粒度与品牌汇总表的行粒度 | 用户已定“分类完成后拆分成一个一个工作簿，再由工作簿生成汇总表、人工填品牌”。需确认：拆分是否**按类别**一个工作簿；汇总表是**一个类别一行**（当前实现，人工填品牌最省事）还是**一个材料一行** | 当前按类别一行，汇总表直接从分类后的清单生成（与按类别拆分的文件内容一致）；品牌列留空待人工填写，品牌只从汇总表读回 | E1/E2、C3、D1 |
 
 ## 6. 统一数据约定与重点检查
 
@@ -132,6 +133,7 @@
 - 项目保留现有顶层schemaVersion 1；扩展`assignments/header/generation/split`的内部schema。旧值为null时迁移到缺失状态，未来未知版本拒绝且不写回旧文件。
 - 分类品牌数据：`{schemaVersion:1,inputKey,coverageMode,rows,assignments}`。coverageMode初始为pending，Q1确认后保存alternative-quotes（各品牌询同一需求）或material-subsets（按材料子集）；不自行选择。rows保存`rowId/categoryId/scopeId/codes/name/feature/unit/quantity/sourceIds/sourceLabels/sources`，sources为已核对来源的内部快照，供生成编码和追溯使用；assignments保存`assignmentId/categoryId/rowIds/brand/supplier/note/coverageConfirmed/confirmedAt`。按类别展示，内部按行追溯；Q1～Q3未定时`coverageConfirmed:false`。
   - **已实现（2026-09-26，C2）：** `src/brand-table.js`按上述结构实现`build/validate/categories/rowsOf/assignmentsFor/createAssignment/setCoverageMode/requiredRowIds`；`validate(data, requiredRowIds)`的第二个参数用`requiredRowIds(groups,classification)`计算，明确“必须被覆盖的行”。同类多品牌用多条assignment；`alternative-quotes`允许两个品牌覆盖同一组行，`material-subsets`要求各行分别覆盖。
+  - **已实现（2026-09-26，C3，按用户口径改人工填写）：** `build`改为按类别自动一行（品牌留空待人工填写）；`validate`增加`options`分级：`STRUCTURE`／`BRAND_STAGE`(=`validateBrands`，只要品牌)／`STRICT`（要供应商与范围确认）。新增`binding:{schemaVersion,path,sheet,headerRow,firstRow,inputKey,rowMap}`随项目保存，`rowMap`按分配标识记录类别、覆盖行与条目数。新增`brandMap/brandForRow/requireBrands`强制“品牌只来自汇总表”。汇总表由`src/brand-model.js`生成、`src/brand-host.js`读写、`src/brand-ui.js`接线。
 - `RfqBrandTable.build(groups, classification, inputKey)`返回上列空品牌数据；`RfqBrandTable.validate(data, rows)`返回`{ok, errors}`，不自动补品牌/供应商；同类多品牌用多条assignment，数量来源仍引用rows。
 - `RfqBrandHost.read(application, binding)`读取分类品牌表并返回`{assignments}`；binding含`path/sheet/schemaVersion/rowMap`，rowMap绑定稳定assignmentId及允许编辑的列。测试通过真实或模拟单元格内容制造重复ID，不往正式接口塞测试开关。
 - `RfqInquiryModel.build({brandTable,header,mergeIdentical,inputKey})`返回`{inputKey,sheets,trace}`；每sheet含`sheetId/name/assignmentId/kind:'inquiry'/values/layout`，trace仅内部。公开values全字符串，报价/金额为空。
@@ -370,6 +372,16 @@ assert.equal(RfqBrandTable.validate(blankBrandTable,blankBrandTable.rows).ok,fal
 
 ### C3｜WPS分类品牌表生成、手填、读回与恢复（8–12小时）
 
+**本轮状态（2026-09-26）：已按用户新口径实现（品牌表＝人工填写的汇总表）。** 用户明确：材料分类完成并拆分成一个一个工作簿后，由工作簿生成一张汇总表，人工只需填入对应品牌。据此：
+
+- `RfqBrandTable.build`不再要求先手工建立分配行，改为**按类别自动一行**（品牌、供应商、备注留空）；同类多品牌时用“新增品牌行”拆行并勾选各自覆盖的材料。`validate(data, requiredRowIds, options)`支持`STRUCTURE`（生成待填写表：只查结构）、`BRAND_STAGE`＝`validateBrands`（只要求品牌）、`STRICT`（要求供应商与范围确认，留给询价拆分）；`validateBrands`是品牌阶段就绪判定。
+- `src/brand-model.js`生成汇总表：`分类品牌表`（分配标识/类别/材料条目数/品牌/供应商/备注/材料行标识）＋`材料明细`（逐条材料）＋`填写说明`（含“品牌联动：这里填写的品牌是询价表与拆分文件品牌列的唯一来源，不允许在询价表里另行填写或改写”）。读回`parseSheet`按**分配标识**匹配，用户在WPS里排序仍然正确；重复标识、删行、未知标识、改动固定列（类别/条目数/材料行标识/表头）都指出具体行并拒绝。品牌汇总表不再被Q1的覆盖口径阻断，生成只校验结构。
+- `src/brand-host.js`：读取优先复用WPS里已打开的品牌表（不关闭用户的工作簿），未打开则以只读方式打开、读后关闭；写入沿用内部清单的独占发布路径（prepare→写入→禁宏重开逐值校验→commit，不覆盖已有文件）。
+- `src/brand-ui.js`＋`taskpane.html`新增“品牌与供应商”面板：生成、读取并核对、逐项预览、明确确认后才写入项目；读取失败不改动项目里的品牌。品牌与项目绑定`binding`（path/sheet/headerRow/firstRow/inputKey/rowMap）记在项目`assignments.binding`，来源或分类变化后旧品牌表标记过期。
+- **品牌联动：**`RfqBrandTable.brandMap/brandForRow/requireBrands`给出“每个材料行只能取汇总表填写的品牌”，`requireBrands`在没有品牌或没有对应分配时直接报错。D1生成询价表、E1/E2拆分文件都必须用它取值，不允许另行填写或改写。
+
+验证：`test/brand-model.test.cjs`、`test/brand-host.test.cjs`、`test/brand-table.test.cjs`、`test/ui-brand-check.cjs`（含“品牌列留空待人工填写”“读回先预览再确认”“固定列改动被拒”“恢复项目后品牌与路径一致”“保存项目后品牌阶段已确认”）。真实WPS未验。
+
 **新增：** `src/brand-host.js`、`src/brand-ui.js`、`test/brand-host.test.cjs`、`test/ui-brand-check.cjs`；修改页面、白名单、项目接线。
 
 - [ ] 生成独立分类品牌表工作簿或明确的插件自有工作表，禁止改原清单；保存时继续使用不覆盖的新文件路径。
@@ -583,9 +595,10 @@ node wps-addin/test/ui-classification-check.cjs
 node wps-addin/test/ui-pane-diagnostics-check.cjs
 node wps-addin/test/ui-memory-check.cjs
 node wps-addin/test/ui-library-check.cjs
+node wps-addin/test/ui-brand-check.cjs
 ```
 
-`NODE_PATH`仅为本机已验证位置；换机器先查询环境。2026-09-26实际输出为**179项Node测试、9组浏览器检查通过**；144/7是2026-09-25历史基线，166/9是B阶段结束时的计数。新增测试后按实际输出更新计数；代码未变的纯文档整理只做文档/路径/差异检查，不无故重复运行整套WPS测试。
+`NODE_PATH`仅为本机已验证位置；换机器先查询环境。2026-09-26实际输出为**191项Node测试、10组浏览器检查通过**（浏览器检查清单需加上`node wps-addin/test/ui-brand-check.cjs`）；144/7是2026-09-25历史基线，166/9是B阶段结束时的计数。新增测试后按实际输出更新计数；代码未变的纯文档整理只做文档/路径/差异检查，不无故重复运行整套WPS测试。
 
 ## 10. 每包提交和交接要求
 
@@ -604,7 +617,7 @@ git rev-parse HEAD
 git ls-remote origin refs/heads/feat/wps-phase1
 ```
 
-**2026-09-26备份记录：** 本轮从`53b9d8e`继续，依次提交B1`6149b99`、B2`d6ec9b3`、B3`7438c20`、B4模型`7f92b3b`、B4界面`7664f9a`、B5只读核对`f66a876`与`d03f290`、C1＋C2`486a612`，每包只暂存明确路径并通过`git diff --cached --check`。**C1与C2合成一次提交**：两者共用`taskpane.html`与`dev/server.cjs`（合并确认按钮与新脚本登记），拆开会留下加载404的中间提交。B5与C1/C2提交统一推送后核对远程；最终远程SHA在任务回复中记录。
+**2026-09-26备份记录：** 本轮从`53b9d8e`继续，依次提交B1`6149b99`、B2`d6ec9b3`、B3`7438c20`、B4模型`7f92b3b`、B4界面`7664f9a`、B5只读核对`f66a876`与`d03f290`、C1＋C2`486a612`、C3按用户口径改人工填写`8fc2d8c`，每包只暂存明确路径并通过`git diff --cached --check`。**C1与C2合成一次提交**：两者共用`taskpane.html`与`dev/server.cjs`（合并确认按钮与新脚本登记），拆开会留下加载404的中间提交。C3提交同时修复`ui-pane-diagnostics-check`在系统随机分配到Chromium拦截端口（如6667）时的偶发失败（显式放行本次实际端口）。各提交推送后核对远程；最终远程SHA在任务回复中记录。
 
 ## 11. 现场、样本和证据索引
 
