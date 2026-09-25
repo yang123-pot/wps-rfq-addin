@@ -2,20 +2,32 @@
 
 > 执行者：按 `superpowers:executing-plans` 逐个工作包实施；复现缺陷后采用最小修复，每包完成验证、记录与Git备份。以下未勾选项均未完成，不代表已经实现。
 
-**更新日期：2026-09-25。** 本次按用户要求重新整理计划，只修改交接文档。
+**更新日期：2026-09-26。** 本次接续实施9C（B1～B4）：分类习惯接入建议、库与记忆原子持久化、确认来源学习与撤销、维护界面。
 **目标：** 先关闭已知稳定性问题与实机验收缺口，再完成分类习惯、品牌供应商、询价生成、拆分和安装交付。
 **实现方式：** 延用现有WPS表格加载项、纯JavaScript模型、WPS宿主适配和本机Node服务；修补与接线优先，不整体重写。内部清单另存与对外询价文件保持各自的数据模型，共用已经验证的文本写入、校验和禁止覆盖能力。
 **技术栈：** Windows、WPS表格JS加载项；`wps-addin/package.json`要求Node `>=22`；Node原生测试、Playwright/Edge浏览器回归。浏览器模拟宿主不能代替真实WPS验收。
 **设计依据：** `docs/wps-addin-phase1-design-v2.md`；用户最新要求和本文件的当前状态优先于历史计划。
-**仓库：** `F:\材料软件开发`；分支 `feat/wps-phase1`；私有远程 `yang123-pot/wps-rfq-addin`。本次整理前本地与远程均为 `82de08e42f78b7b02718e4777a3b4379a29951f3`，工作区干净；功能尚未合入`main`。
+**仓库：** `F:\材料软件开发`；分支 `feat/wps-phase1`；私有远程 `yang123-pot/wps-rfq-addin`。本轮开始基线为 `53b9d8e`（本地与远程一致），本轮提交与远程核对结果见§10；功能尚未合入`main`。
 
 ## 0. 接手时先看这里
 
 1. **遗留问题没有全部修复。** P1/P4侧栏偶发停滞仍未定位根因，重载仅是已验证的恢复路径；P3兼容性尚无结论；P5还有实机异常流程待测。
-2. 已有代码的最近整体结果为 **144项Node测试、7组浏览器检查通过**，来自2026-09-25上一轮验证。本次文档整理不重新宣称运行了这些测试。
-3. 下一次实际开发从 **A1侧栏对照取证** 开始，然后A2根因修复、A3异常流程；稳定性验收未过，不把9C～13标记开始或完成。
-4. 只有任务本身依赖缺失业务信息时才集中询问用户。已有开发、本机验证和持续Git备份授权，不重复询问是否开始；已通过的人工测试不再重复要求用户操作。
-5. 本文件给出完整剩余路线；具体截图、逐值结果和历史时间线放在独立证据文档，入口见§11。
+2. 2026-09-26本轮结果为 **166项Node测试、9组浏览器检查通过**（见§10备份记录）；浏览器模拟宿主仍不能代替真实WPS验收。
+3. **A1～A3需要真实WPS交互会话**（取截图、连点、观察冻结）。当前执行环境没有WPS图形界面控制能力，这三包未做，仍按未完成处理，已列入集中调测项；稳定性验收未过，不把13标记完成。
+4. 9C（B1～B4）已实现并自测通过；下一步从 **B5资料迁入** 开始，再进入C1/C2。
+5. 只有任务本身依赖缺失业务信息时才集中询问用户。已有开发、本机验证和持续Git备份授权，不重复询问是否开始；已通过的人工测试不再重复要求用户操作。
+6. 本文件给出完整剩余路线；具体截图、逐值结果和历史时间线放在独立证据文档，入口见§11。
+
+## 0.1 集中调测项（2026-09-26记录，问题不解决就挂在这里）
+
+以下问题本轮无法在不占用用户WPS会话的情况下解决，已按用户要求先记录、后集中调测；不得因为它们把功能开发长期停住，也不得在未取证时写成已修复。
+
+| 编号 | 未解决内容 | 为什么本轮做不了 | 下一步（需要谁配合） |
+| --- | --- | --- | --- |
+| T1 | P1/P4侧栏偶发停滞未定位根因，重载仍是唯一已验证恢复路径 | A1要求真实WPS里取即时截图、按坐标连点、观察冻结；本执行环境没有WPS图形界面控制能力 | 用户在场时按A1步骤做无探针/探针对照，产出`docs/wps-pane-root-cause-verification.md` |
+| T2 | A2按证据修复与A3的P5异常矩阵（写中失败、发布失败、多副本） | 依赖T1证据或真实WPS宿主写入失败 | T1完成后立即做；A3可先设计合成目录与哨兵文件方案 |
+| T3 | P3支持版本结论（29161/28043） | 需要在隔离环境启动另一版本WPS，不能动用户当前安装 | 用户提供隔离环境后对照 |
+| T4 | 9C/B1～B4的真实WPS确认（保存后重载、重启服务恢复、380px窄侧栏实机查看） | 同上，需要真实侧栏 | 与T1同一场会话顺手完成 |
 
 ## 1. 已完成能力和准确边界
 
@@ -26,7 +38,7 @@
 | 内部清单另存（任务7） | 功能实现，异常验收未闭环 | 三表输出、文本精度、重开校验、取消和禁止覆盖已通过；余下见A3 |
 | 项目状态与副本管理（任务8） | 已有模型与保存恢复 | 项目编号、来源恢复、分类进度/阶段恢复已通过；未来品牌/生成/拆分持久化及全阶段衔接见C1 |
 | 分类库与分类确认（9A/9B） | 已实现、主要写列路径实机通过 | 四条确认口径、建议依据、逐行/批量/撤销、未全确认阻断、分别写副本或合并表、回执防过期 |
-| 习惯记忆（9C） | **只有模型完成** | `category-memory.js`已有学习/查询/撤销；建议接线、本机持久化、维护界面未做 |
+| 习惯记忆与分类库维护（9C＝B1～B4） | 已实现，Node与浏览器模拟宿主通过，**真实WPS未验** | 建议接线（规则与记忆候选并存、冲突不自动覆盖）、库与记忆单包原子保存与409冲突、确认来源学习与按来源撤销、别名与排除条件、维护界面（类别/规则/记忆）；**余下**：真实WPS保存后重载与重启服务恢复、B5资料迁入 |
 | 分类品牌表、品牌参考、供应商、抬头（10） | **未实现** | C1～C5 |
 | 总询价工作簿（11） | **未实现** | D1～D2；现有内部清单输出不是供应商询价表 |
 | 拆分（12） | **未实现** | E1～E2 |
@@ -206,6 +218,8 @@ assert.equal(receipt, null); // 失败不能产生成功回执
 
 ### B1｜记忆加入分类建议（6–10小时）
 
+**本轮状态（2026-09-26）：** 已实现。`suggest(item,library,{memory,projectId})`保留两参兼容，候选带`source/ruleId/memoryId`，相近记忆统一为`partial`，不同类别形成冲突而不覆盖；停用类别的规则与记忆都不再成为新候选。验证：`test/classify-memory.test.cjs`。真实WPS实机复核未做。
+
 **修改：** `src/classify.js`、`src/category-library.js`；**新增测试：** `test/classify-memory.test.cjs`；沿用`category-memory.test.cjs`。
 
 - [ ] 写规则与记忆同类/异类、无记忆、撤销、不同项目、类别停用的失败用例；两参旧调用必须兼容。
@@ -229,6 +243,8 @@ assert.equal(result.accepted,null);
 
 ### B2｜分类库与记忆原子持久化（6–8小时）
 
+**本轮状态（2026-09-26）：** 已实现。`dev/library-store.cjs`单包`library-state.json`、临时文件写入后读回校验再原子替换、`expectedRevision`冲突拒绝(409)、损坏/未来schema保持原文件；服务新增`/api/library/load|save`。验证：`test/library-store.test.cjs`、`test/library-server.test.cjs`。服务重启恢复的实机查看未做。
+
 **新增：** `dev/library-store.cjs`、`test/library-store.test.cjs`、`test/library-server.test.cjs`；**修改：** `dev/server.cjs`。
 
 - [ ] 为§6库包实现`createLibraryStore({directory}).load()`和`.save({expectedRevision,library,memory})`；初始目录不存在时使用默认规则及空记忆，不写入项目仓库。
@@ -246,6 +262,8 @@ assert.equal((await store.load()).revision,saved.revision);
 **出口：** 重启服务后库/记忆一致，过期写入与故障不会覆盖上一版。
 
 ### B3｜人工确认、撤销与学习协调（6–10小时）
+
+**本轮状态（2026-09-26）：** 已实现。确认成功才学习，选下拉/渲染建议/恢复旧项目都不学习；未保存项目复用稳定`projectId`（保存时沿用同一编号）；记忆按确认来源列表记录，撤销或改选只失效本次来源，最后一个来源释放才失效，旧历史记忆不被猜删；保存失败留在本页并显示"习惯未保存，可重试"（重试按钮名`保存习惯重试`），不回滚分类确认。验证：`test/ui-memory-check.cjs`、`test/category-memory.test.cjs`。
 
 **修改：** `src/category-memory.js`、`src/classification.js`、`src/classification-ui.js`、`src/project-ui.js`；**新增：** `test/ui-memory-check.cjs`，补模型测试。
 
@@ -265,6 +283,8 @@ assert.equal((await store.load()).memory.memories.length,1);
 
 ### B4｜分类库与记忆维护界面（10–16小时）
 
+**本轮状态（2026-09-26）：** 已实现。`src/library-ui.js`提供类别新增/改名/停用（`no-inquiry`不可停用）、规则类别与匹配条件、别名、排除条件、依据编辑，记忆列表含材料/类别/范围/确认来源/时间并可撤销；草稿校验后原子保存，409冲突与保存失败都保留草稿并给可操作提示，加载失败只显示重试；保存后未确认行建议即时刷新、已确认行保留原决策与库版本。验证：`test/ui-library-check.cjs`。真实WPS保存后重载与重启服务的实机确认未做。
+
 **新增：** `src/library-ui.js`、`test/ui-library-check.cjs`；**修改：** `taskpane.html`、`styles.css`、`src/category-library.js`、`src/classify.js`、`src/classification-ui.js`、`dev/server.cjs`。
 
 - [ ] 列表/编辑提供类别新增、改名、停用；规则关键词、别名、条件、依据新增修改；稳定ID不随名称改变。
@@ -282,6 +302,8 @@ assert.equal(Classify.suggest({name:'水管',feature:'临时安装',unit:'m'},ex
 ```
 
 ### B5｜已确认分类资料整理与迁入（6–12小时，不含重新人工分类）
+
+**本轮状态（2026-09-26）：** 未开始。两个入口文件本轮已确认存在：`outputs/rule-return-20260920/分类人工核对_第十三批确认.xlsx`（1203622字节）与`outputs/rule-fix-20260921/answer-overrides.json`（3462字节）；尚未只读核对字段与"确认"标记的实际含义，仍不得据文件名推断每行均已确认。
 
 **拟新增：** `wps-addin/dev/migrate-confirmed-library.cjs`、`wps-addin/test/migrate-confirmed-library.test.cjs`；迁入报告与数据只留`outputs/`和本机库目录。
 
@@ -548,9 +570,11 @@ node wps-addin/test/ui-export-check.cjs
 node wps-addin/test/ui-project-check.cjs
 node wps-addin/test/ui-classification-check.cjs
 node wps-addin/test/ui-pane-diagnostics-check.cjs
+node wps-addin/test/ui-memory-check.cjs
+node wps-addin/test/ui-library-check.cjs
 ```
 
-`NODE_PATH`仅为本机已验证位置；换机器先查询环境。当前144是历史基线，新增测试后按实际输出更新计数；代码未变的纯文档整理只做文档/路径/差异检查，不无故重复运行整套WPS测试。
+`NODE_PATH`仅为本机已验证位置；换机器先查询环境。2026-09-26实际输出为**166项Node测试、9组浏览器检查通过**；144/7是2026-09-25历史基线。新增测试后按实际输出更新计数；代码未变的纯文档整理只做文档/路径/差异检查，不无故重复运行整套WPS测试。
 
 ## 10. 每包提交和交接要求
 
@@ -569,7 +593,7 @@ git rev-parse HEAD
 git ls-remote origin refs/heads/feat/wps-phase1
 ```
 
-**本次计划整理的备份基线：** 代码修复`045b0f7`及状态补录`82de08e`已推送并核对。此次仅修改`handoff.md`，文档检查后以包含本文件的新提交推送；提交号和远程核对结果在任务最终回复中记录，本段不预写未发生的成功。
+**2026-09-26备份记录：** 本轮从`53b9d8e`继续，依次提交B1`6149b99`、B2`d6ec9b3`、B3`7438c20`、B4模型`7f92b3b`、B4界面`7664f9a`，每包只暂存明确路径并通过`git diff --cached --check`；前四个已推送并用`git ls-remote`核对一致，最后一个随本次文档提交一起推送，最终核对结果在任务回复中记录。
 
 ## 11. 现场、样本和证据索引
 
@@ -597,6 +621,7 @@ git ls-remote origin refs/heads/feat/wps-phase1
 
 - 近期缺陷、分类写列、数值输出：`docs/wps-repair-verification-20260924.md`。
 - 最近侧栏取证、格式失效、关闭重开恢复和144项回归：`docs/wps-pane-review-verification-20260925.md`。
+- 9C/B1～B4分类习惯与库维护：本轮证据即测试本身，`wps-addin/test/classify-memory.test.cjs`（建议接线）、`wps-addin/test/library-store.test.cjs`与`wps-addin/test/library-server.test.cjs`（原子持久化与409）、`wps-addin/test/ui-memory-check.cjs`（学习/撤销/重试）、`wps-addin/test/ui-library-check.cjs`（维护界面）；结果166项Node测试、9组浏览器检查通过，真实WPS复核见0.1的T4。本轮未新建独立markdown证据文件。
 - 内部另存：`docs/wps-merge-save-verification.md`。
 - 接入、识别、核对、导入、合并：`docs/wps-foundation-verification.md`、`docs/wps-parser-verification.md`、`docs/wps-source-review-verification.md`、`docs/wps-multi-import-verification.md`、`docs/wps-exact-merge-verification.md`。
 - 设计：`docs/wps-addin-phase1-design-v2.md`；历史分片计划在`docs/superpowers/plans/`，当前待办以本文件为准。
