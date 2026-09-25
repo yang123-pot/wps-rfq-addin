@@ -259,6 +259,8 @@
    classification:function(){return state;},
    snapshot:function(){return state;},
    memory:function(){return memoryState;},
+   rows:function(){return groups.map(function(group){return {rowId:group.id||group.scopeId};});},
+   groups:function(){return groups;},
    adopt:function(value){
     if(!value||!value.library||!value.memory)return false;
     var check=RfqCategoryLibrary.validate(value.library);

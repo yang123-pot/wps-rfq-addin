@@ -4,13 +4,20 @@
   function button(text,action){var e=node('button',text,'locate');e.type='button';e.addEventListener('click',action);return e;}
   function create(options){
     var collection=RfqCollection.create(),selected=null,page=0,busy=false;
+    var mergeConfirmedKey=null;
     var picker=document.getElementById('import-files'),message=document.getElementById('import-message');
     var merge=document.getElementById('merge-identical');merge.checked=false;
+    var confirmMerge=document.getElementById('confirm-merge');
     var exporter=RfqExportUI.create({application:options.application,getCollection:function(){return collection;},
       mergeIdentical:function(){return merge.checked;},onBusy:function(value){busy=value;options.onBusy(value);}});
     var projects=RfqProjectUI.create({getCollection:function(){return collection;},mergeIdentical:function(){return merge.checked;},
       restore:function(project){return restoreProject(project);},getClassification:function(){return classifier.snapshot();},
-      restoreClassification:function(value){classifier.restore(value);},onBusy:function(value){busy=value;options.onBusy(value);}});
+      getClassificationRows:function(){return classifier.rows();},
+      restoreClassification:function(value){classifier.restore(value);},
+      getPreview:function(){return collection.entries.length?RfqCollection.preview(collection,merge.checked):null;},
+      getMergeConfirmation:function(){return mergeConfirmedKey;},
+      restoreMergeConfirmation:function(key){mergeConfirmedKey=typeof key==='string'&&key?key:null;},
+      onBusy:function(value){busy=value;options.onBusy(value);}});
     var libraryPanel=null;
     var classifier=RfqClassificationUI.create({application:options.application,getCollection:function(){return collection;},
       mergeIdentical:function(){return merge.checked;},getMergedTarget:function(){return exporter.last();},
@@ -84,8 +91,12 @@
       exporter.refresh(result);
       classifier.refresh(result);
       document.getElementById('merge-summary').textContent='原始 '+result.inputCount+' 项 → 预览 '+result.outputCount+' 项 · '+(merge.checked?'已选择精确合并':'按来源分别保留');
-      document.getElementById('merge-status').textContent=result.canFinalize?'本次校验通过，预览尚未另存。':
-        result.issues.length+' 个待核对问题仍阻断后续处理；请在上方选择文件逐项核对。';
+      var mergeConfirmed=mergeConfirmedKey===RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true});
+      confirmMerge.disabled=busy||!result.canFinalize;
+      confirmMerge.textContent=mergeConfirmed?'已确认本次预览（可重新确认）':'确认本次合并预览';
+      document.getElementById('merge-status').textContent=(result.canFinalize?'本次校验通过，预览尚未另存。':
+        result.issues.length+' 个待核对问题仍阻断后续处理；请在上方选择文件逐项核对。')+
+        (mergeConfirmed?' 本次预览已确认，可继续分类、品牌与生成。':' 预览确认后才能继续分类、品牌与生成。');
       var groups=document.getElementById('merge-list');groups.textContent='';
       result.groups.slice(page*20,(page+1)*20).forEach(function(g){
         var li=node('li');li.appendChild(node('strong',g.name||'名称待补'));
@@ -98,6 +109,14 @@
       document.getElementById('merge-prev').disabled=page===0;document.getElementById('merge-next').disabled=page+1>=pages;
     }
     merge.addEventListener('change',function(){page=0;render();});
+    confirmMerge.addEventListener('click',function(){
+      if(busy)return;
+      var result=collection.entries.length?RfqCollection.preview(collection,merge.checked):null;
+      if(!result||!result.canFinalize){tell('还有待核对问题，请先处理来源问题再确认预览。',true);return;}
+      mergeConfirmedKey=RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true});
+      render();
+      tell('已确认本次'+(merge.checked?'精确合并':'分别保留')+'预览；来源或合并方式变化后需要重新确认。');
+    });
     document.getElementById('merge-prev').addEventListener('click',function(){page--;render();});
     document.getElementById('merge-next').addEventListener('click',function(){page++;render();});
     picker.disabled=!options.application||!window.__RFQ_IMPORT__;
@@ -125,7 +144,8 @@
         if(!selected)activate(collection.entries[0].id);
         tell('已导入 '+entries.length+' 份清单。原件未打开；是否合并由下方选项决定。');
       }catch(error){tell((added?'文件已加入，但界面更新失败，请重新选择文件核对。':'本批未加入，已有列表保留。')+error.message,true);}
-      finally{busy=false;options.onBusy(false);}
+      // 导入结束后必须再渲染一次：导入过程中的渲染发生在busy=true时，控件会保持禁用。
+      finally{busy=false;options.onBusy(false);render();}
     });
     render();
     return {

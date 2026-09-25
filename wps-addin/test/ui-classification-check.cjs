@@ -125,8 +125,11 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.locator('#classification-list > li').first().locator('select').selectOption('no-inquiry');
   await page.locator('#classification-list > li').first().locator('button').first().click();
   await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 0'));
+  await page.locator('#confirm-merge').click();
+  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次预览已确认'));
   await page.locator('#save-project').click();
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
+  assert.match(await page.locator('#project-status').innerText(),/合并确认：已确认/,'明确确认预览后合并阶段必须置为已确认');
   assert.match(await page.locator('#project-status').innerText(),/分类确认：已确认/,
    '全部材料已人工确认后，项目阶段不能仍显示未完成');
   await page.locator('#classification-list > li').first().locator('button').nth(1).click();

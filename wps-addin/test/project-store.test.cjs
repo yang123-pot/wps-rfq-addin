@@ -48,3 +48,12 @@ test('project records stay inside the configured directory',async t=>{
  const entries=await fs.readdir(root);
  assert.deepEqual(entries,['projects']);
 });
+test('a project with an unknown internal brand version is refused and kept on disk',async t=>{
+ const {store}=await fixture(t),saved=sample(),file=path.join(store.directory,saved.projectId+'.json');
+ await store.save(saved);
+ const future=Object.assign({},saved,{assignments:{schemaVersion:2,rows:[],coverageMode:'pending'}});
+ await fs.writeFile(file,JSON.stringify(future,null,2));
+ await assert.rejects(store.load(saved.projectId),/内部版本不支持/);
+ assert.ok(await fs.stat(file),'拒绝恢复时不得删除旧项目文件');
+ assert.match(await fs.readFile(file,'utf8'),/"schemaVersion":\s*2/);
+});

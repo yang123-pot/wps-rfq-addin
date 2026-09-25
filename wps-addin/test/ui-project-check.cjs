@@ -44,6 +44,8 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
   await page.locator('#merge-identical').check();
+  await page.locator('#confirm-merge').click();
+  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次预览已确认'));
   await page.locator('#save-project').click();
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
   const saved=await fs.readdir(path.join(root,'projects'));
@@ -52,6 +54,15 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   assert.equal(await page.locator('#project-list > li').count(),1,'保存后列表应出现该项目');
   const stored=JSON.parse(await fs.readFile(path.join(root,'projects',saved[0]),'utf8'));
   assert.equal(stored.mergeIdentical,true);assert.equal(stored.sources.length,2);
+  assert.match(String(stored.mergeKey),/^ck1-[0-9a-f]{16}$/,'项目记录必须保存本次确认的合并预览键');
+  assert.match(await page.locator('#project-status').innerText(),/合并确认：已确认（已确认精确合并预览）/,
+   '明确确认预览后合并阶段必须按真实确认置为已确认');
+  const statusText=await page.locator('#project-status').innerText();
+  const stageLabels={import:'导入清单',review:'来源核对',merge:'合并确认',classification:'分类确认',brand:'品牌与抬头'};
+  Object.keys(stageLabels).forEach(stage=>{
+   const state=stored.stages[stage].state,text=state==='ready'?'已确认':state==='stale'?'已过期':'未完成';
+   assert.ok(statusText.includes(stageLabels[stage]+'：'+text),'侧栏进度必须与项目记录一致：'+stageLabels[stage]);
+  });
   assert.equal(await page.evaluate(()=>window.RfqProjectUI===undefined),false);
 
   await fs.rm(path.join(root,'copies'),{recursive:true,force:true});
