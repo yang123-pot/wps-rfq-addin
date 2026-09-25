@@ -1,248 +1,545 @@
-# WPS招标清单询价插件 · 交接文档与下一步方案
+# WPS询价插件一期剩余开发计划与交接文档
 
-更新：**2026-09-25（侧栏与来源核对续测）**｜目录：`F:\材料软件开发`｜分支：`feat/wps-phase1`｜本次基线：`387cac7`
-远程：私有仓库 `yang123-pot/wps-rfq-addin`；默认分支`main`尚未合入这些开发代码。
+> 执行者：按 `superpowers:executing-plans` 逐个工作包实施；复现缺陷后采用最小修复，每包完成验证、记录与Git备份。以下未勾选项均未完成，不代表已经实现。
 
-## 0. 一分钟结论
+**更新日期：2026-09-25。** 本次按用户要求重新整理计划，只修改交接文档。
+**目标：** 先关闭已知稳定性问题与实机验收缺口，再完成分类习惯、品牌供应商、询价生成、拆分和安装交付。
+**实现方式：** 延用现有WPS表格加载项、纯JavaScript模型、WPS宿主适配和本机Node服务；修补与接线优先，不整体重写。内部清单另存与对外询价文件保持各自的数据模型，共用已经验证的文本写入、校验和禁止覆盖能力。
+**技术栈：** Windows、WPS表格JS加载项；`wps-addin/package.json`要求Node `>=22`；Node原生测试、Playwright/Edge浏览器回归。浏览器模拟宿主不能代替真实WPS验收。
+**设计依据：** `docs/wps-addin-phase1-design-v2.md`；用户最新要求和本文件的当前状态优先于历史计划。
+**仓库：** `F:\材料软件开发`；分支 `feat/wps-phase1`；私有远程 `yang123-pot/wps-rfq-addin`。本次整理前本地与远程均为 `82de08e42f78b7b02718e4777a3b4379a29951f3`，工作区干净；功能尚未合入`main`。
 
-- 一期目标：把整份招标清单整理成可发给供应商的独立询价文件，形态是**嵌入WPS表格的插件**。本期只整理文件；微信/邮件发送、报价回收与比价不做。
-- 已完成并备份：WPS接入、清单识别、来源核对、多文件导入、精确合并预览、内部清单另存（**分离与精确合并模式均已实机另存和独立读回**）、任务8项目状态与工作副本管理（五片）、任务9A分类库与可解释匹配、任务9B分类确认（模型+侧栏+写入工作副本/合并表+随项目恢复）、任务9C习惯记忆模型。
-- 本轮已修P8：合并表写分类列前重新核对本机文件SHA256，并阻断校验期间变化的旧计划。P7/P9此前已闭环。真实WPS探针确认旧窗格DOM导入成功但画面停滞；新增的主动重载入口在实机恢复画面。重载后合并预览3→2、另存、独立读回、两种取消、已存在目标拒绝及关键数值显示均通过；来源明细行高修复经新输出独立读回与用户WPS视觉确认。P1/P4触发原因及P5其他边界未收口。
-- 尚未开始：9C接线与维护界面、品牌/供应商/抬头（10）、询价表生成（11）、一键拆分（12）、安装包与一期验收（13）。
-- 最新完成：来源核对保存→关闭重开→新侧栏读取→恢复在真实WPS通过；仅改变编码显示格式后旧核对被拒、原记录仍能恢复。保存/恢复错误已就近显示在按钮旁，切换工作簿实机验证通过；探针改为最多一个待执行动画回调，增加停滞/恢复事件，**尚未解决P1/P4根因**。
-- 自动化现状：`node --test wps-addin/test/*.test.cjs` **144项通过**；最终代码的7组浏览器检查全部通过。详证见`docs/wps-pane-review-verification-20260925.md`；P5剩写入/发布失败、多副本部分成功与异常后的宿主状态恢复实机边界。
+## 0. 接手时先看这里
 
-## 1. 每次接续必读
+1. **遗留问题没有全部修复。** P1/P4侧栏偶发停滞仍未定位根因，重载仅是已验证的恢复路径；P3兼容性尚无结论；P5还有实机异常流程待测。
+2. 已有代码的最近整体结果为 **144项Node测试、7组浏览器检查通过**，来自2026-09-25上一轮验证。本次文档整理不重新宣称运行了这些测试。
+3. 下一次实际开发从 **A1侧栏对照取证** 开始，然后A2根因修复、A3异常流程；稳定性验收未过，不把9C～13标记开始或完成。
+4. 只有任务本身依赖缺失业务信息时才集中询问用户。已有开发、本机验证和持续Git备份授权，不重复询问是否开始；已通过的人工测试不再重复要求用户操作。
+5. 本文件给出完整剩余路线；具体截图、逐值结果和历史时间线放在独立证据文档，入口见§11。
 
-1. 先完整读本文件，再看用户最新要求、`git status`、38891端口身份与本机WPS状态，从第一项未完成且已获授权的工作继续。
-2. 用户2026-09-22已明确“任务开始正式推进”，开发授权持续有效。用户本轮最新要求优先：**先处理§7问题并整体测试，再把剩余工作详细计划写回本文件**。P1/P4尚无可定位的宿主根因，按§8继续取证，不能把自动化通过当真实WPS已修复。
-3. 每完成一个开发任务：跑相应验证 → 更新本文件 → 按明确清单暂存并检查 → 提交 → 推送 → 核对远程SHA。推送失败保留本地提交并如实说明，不强制覆盖远程。
-4. 原件保护：自动导入与实机测试一律先复制原件；不改原件；不批量关闭用户工作簿；失败不得虚报成功。
-5. 只按明确文件清单暂存。原始招标清单、报价、个人联系方式、凭据、本机配置、运行数据和历史网页资料不进仓库。
-6. 新增任何`src/*.js`或`rules/*.json`时，同步登记`dev/server.cjs`的静态白名单与MIME类型（P7教训）。
+## 1. 已完成能力和准确边界
 
-## 2. 目标与一期范围
-
-第一期只做清单整理、分类核对、品牌与供应商填写、询价表生成和文件拆分。微信/邮件发送放到下期，由材料员自行发送。不做报价回收、比价、采购审批。
-
-## 3. 已确定的主流程（7步）
-
-1. **打开清单**：WPS打开完整招标清单，支持xls/xlsx及多工作表；项目有多个工作簿时由用户选择是否先合并。
-2. **分类备注**：按分类备注库自动识别，在清单末尾追加分类建议；保留原内容和行序，此阶段不整理成询价表。
-3. **全部核对**：用户调整并确认全部有效材料行，每行明确类别或“无需询价”，完成后再生成单独的“分类品牌表”。
-4. **填写品牌/供应商**：插件内导入、查看项目品牌表供参考；用户在分类品牌表手填品牌和供应商，两者独立字段。
-5. **填写询价抬头**：公司名称、地址、工程名称、材料员及联系方式等手填，可保存复用，输出时带入。
-6. **生成询价表**：按“材料类别＋品牌”生成工作簿内的询价工作表，同类别多品牌分别成表。
-7. **一键拆分**：信息确认后把各询价表另存为独立xlsx，命名`分类_供应商名称.xlsx`；保留项目总工作簿，由用户自行发送。
-
-## 4. 核心处理规则
-
-- **可选合并**：分类前，仅“项目名称＋项目特征描述＋单位”三字段完全相同的材料行才合并并累加工程量；不模糊合并、不换算单位、不按编码强合并。默认不合并。
-- **来源备注**：合并后列出全部“工程名称＋专业”；专业优先取表头/区段小标题，缺小标题时按清单“项目名称”识别并标注依据；内部保留原文件、工作表、行号、编码与原始数量。
-- **分类备注库**：用户可维护类别、别名、匹配条件与已确认案例；只学习用户最终确认结果，不把旧系统预测当人工答案。
-- **匹配度建议**：显示“完全匹配/相近匹配/无可靠匹配”及推荐依据，表达与历史资料的匹配程度，不冒充准确率；任何建议都必须人工确认。
-- **整理与保存**：输出时仅类别、名称、特征、单位、品牌要求均相同的材料可汇总；只拆询价表，不外发原清单或内部核对表；原工作簿保留，输出另存。
-- **重名待定**：同类别同供应商多品牌可能文件重名，初稿建议预览提示并追加序号，禁止覆盖；后缀格式未定稿。
-- **已确认业务口径**：**全部钢索→无需询价；充电桩配套配电箱→汽车充电桩；所有水龙头→水阀门；“风口风阀”统一为“风口、风阀”。**
-
-## 5. 当前进度总览
-
-| 任务 | 状态 | 证据与边界 |
+| 范围 | 当前状态 | 不应重复开发的部分 / 尚缺部分 |
 | --- | --- | --- |
-| 1、2 WPS接入 | 完成 | `5d24365`；真实WPS加载、两表写入/另存/重开、四清单33张表读取通过；仍是开发版，无离线安装包 |
-| 3 清单识别 | 完成 | `b07d779`；表头/材料行/专业识别、分页预览、问题筛选、特征展开与行定位；四项目候选263/3143/1473/2708共7587条 |
-| 4 精确合并核心 | 完成 | `b2e1154`；默认分离，显式开启后按三字段精确合并、十进制累加、完整来源明细、重复输入拦截 |
-| 5 来源与异常核对 | 完成 | `4c6a613`；逐行修正材料/工程/专业、数值编码显式确认、区段歧义、续行归属、非材料理由、撤销与本机保存恢复 |
-| 6 多文件导入与预览 | 完成 | `eb4268d`；原件复制、路径/指纹防重复、独立核对、可选精确合并、来源明细与副本定位；7587→5399条 |
-| 7 内部清单另存 | 进行中（剩P5实机边界） | `582745c`；三表输出、文本分块写入与重开逐值校验、独占发布、侧栏确认与失败恢复；分离及精确合并模式均已实机另存+独立读取，两种取消/已存在目标拒绝实机通过；来源明细行高已修复并独立读回 |
-| 8 项目状态与工作副本管理 | 完成（分类列写入能力已具备） | `af99fde`/`df97afd`/`5b4b355`/`cc16274`/`b187bb1` |
-| 9A 分类库与可解释匹配 | 完成 | `98d715a`；四类四规则、确定性匹配、冲突不强选、停用项保留不生效 |
-| 9B 分类确认 | 完成（剩实机复核） | `3354367`/`ac95429`/`c26c934`/`9dfa3c4`；建议与依据、逐行与批量确认、撤销、剩1行阻断、写工作副本/合并表、随项目恢复 |
-| 9C 习惯学习 | 模型层完成 | `4ee732e`；只学人工确认、项目例外隔离、可撤销、冲突可见；接线与维护界面待做 |
-| 10～13 | 未开始 | 见§9路线 |
+| WPS接入、清单识别 | 已实现、主要路径实机通过 | 功能区、侧栏、多表读取、分页、来源定位；仍有窗格稳定性问题，无正式安装交付 |
+| 来源核对、多文件导入、精确合并 | 已实现、主要路径实机通过 | 复制原件、重复输入阻断、逐行核对、默认分离、三字段精确合并、十进制累加、来源追溯 |
+| 内部清单另存（任务7） | 功能实现，异常验收未闭环 | 三表输出、文本精度、重开校验、取消和禁止覆盖已通过；余下见A3 |
+| 项目状态与副本管理（任务8） | 已有模型与保存恢复 | 项目编号、来源恢复、分类进度/阶段恢复已通过；未来品牌/生成/拆分持久化及全阶段衔接见C1 |
+| 分类库与分类确认（9A/9B） | 已实现、主要写列路径实机通过 | 四条确认口径、建议依据、逐行/批量/撤销、未全确认阻断、分别写副本或合并表、回执防过期 |
+| 习惯记忆（9C） | **只有模型完成** | `category-memory.js`已有学习/查询/撤销；建议接线、本机持久化、维护界面未做 |
+| 分类品牌表、品牌参考、供应商、抬头（10） | **未实现** | C1～C5 |
+| 总询价工作簿（11） | **未实现** | D1～D2；现有内部清单输出不是供应商询价表 |
+| 拆分（12） | **未实现** | E1～E2 |
+| 安装包、四项目完整验收、操作说明（13） | **未实现** | F1～F3 |
 
-## 6. 已完成部分（明细）
+### 已有实机证据，后续只做受改动影响的回归
 
-### 6.1 WPS接入（`5d24365`）
-`wps-addin/`宿主适配、功能区“项目询价”、侧栏、开发注册与本机资源服务；真实WPS加载、两表写入/另存/重开、四清单33张表读取通过。
+- 分离3→3、合并3→2另存；`0.1+0.2=0.3`、`000123`、长小数及字面文本`=1+1`正确；零公式。
+- 首次确认取消、选位置取消、已有目标拒绝；来源明细和处理记录排版可读。
+- 分类剩余2/1行时禁写、撤销复位；四条业务口径建议正确；工作副本分类标题按真实表头行写入。
+- 合并表分类写列后，旧回执因SHA变化拒绝；来源临时导入/移除后旧回执拒绝；重复写工作副本不覆盖原分类列。
+- 项目恢复1份来源、未合并、分类4/4，分类阶段正确；恢复提示项目号正确。
+- 仅把数值编码格式从`000000`改为常规，保存旧核对被拒；关闭且不保存测试格式、重开并读取后，原`000123`核对可恢复，问题1→0。
+- 切换工作簿时保存/恢复均拒绝，错误显示在按钮旁；返回原样本仍能恢复；源文件SHA未变。
 
-### 6.2 清单识别（`b07d779`）
-表头/材料行/专业来源识别、分页预览、问题筛选、特征展开与原行定位；支持按项目名称识别专业；保留项目四63条材料的106行特征续行。
+## 2. 全局约束与交付口径
 
-### 6.3 精确合并核心（`b2e1154`）
-默认分离；显式开启后按三字段精确归组、十进制累加，保留完整来源明细；重复输入拦截、问题阻断。
+- 一期只整理和生成文件；不发送微信/邮件，不做报价回收、比价、采购审批或云端学习。
+- 自动导入先复制，测试用合成件或复制件；原招标清单不作为写入目标。不得批量关闭用户工作簿。
+- 预合并仅按“项目名称＋项目特征描述＋单位”完全相同，默认不合并，不按编码强合并、不换算单位。
+- 输出归集还须类别和品牌要求相同；未选择跨工作簿合并时，必须保留`scopeId`边界，不在后续偷偷合并不同原件。
+- 分类行标识用`group.id`/sourceId，不能用工作簿级`scopeId`代替；原始来源每条计数一次。
+- 全部有效行人工确认类别或“无需询价”后才生成分类品牌表；建议和记忆均不能替代人工确认。
+- 保留已确认口径：全部钢索→无需询价；充电桩配套配电箱→汽车充电桩；所有水龙头→水阀门；“风口风阀”统一为“风口、风阀”。
+- 品牌与供应商独立填写。分类品牌表显示类别、条目数、品牌、供应商、备注，内部另保留材料行映射，不能丢失多品牌适用范围。
+- 对外列参照设计：序号、项目编码、项目名称、项目特征描述、单位、工程量、品牌、报价单价、金额、备注；供应商报价单价和金额先留空，原价/历史报价不带入。来源仅展示必要的工程名称＋专业，路径、SHA、核对JSON只留内部。
+- 成功必须有文件实际存在、重开校验及SHA回执；已有文件不覆盖。部分成功按文件/行如实报告，不说全部成功。
+- 新增页面脚本/规则必须登记`dev/server.cjs`静态白名单与MIME，并在`taskpane.html`按依赖顺序加载。
+- 本机项目/记忆/联系方式/运行数据不进Git；只按明确文件清单暂存。每包验证后提交、推送、核远程SHA，不强推。
 
-### 6.4 来源与异常核对（`4c6a613`）
-侧栏逐行修正材料/工程/专业、数值编码显式确认、区段/材料歧义、续行归属、非材料理由、撤销与本机保存恢复。核对记录键前缀`rfq-import-review-v1:`（导入）与`rfq-source-review-v1:`（单独读取）不得混用；记录绑定原件SHA256。
+## 3. 代码入口与已核对的接线缺口
 
-### 6.5 多文件导入与预览（`eb4268d`）
-原件复制后只读读取（绝不打开原件）、路径与指纹防重复、每份独立核对、可选精确合并、分页来源明细与工作副本定位；7587→5399条，来源与数量守恒。
+| 现有文件（相对仓库根目录） | 职责 / 后续注意点 |
+| --- | --- |
+| `wps-addin/main.js`、`ribbon.xml` | 创建/复用窗格及主动`Navigate`重载；普通打开不等于重建 |
+| `wps-addin/dev/pane-diagnostics.js` | 单个待执行动画回调、生命周期和停滞/恢复探针；尚未再捕获真实冻结事件 |
+| `wps-addin/dev/server.cjs` | 本机接口、静态白名单、探针注入；无探针模式仍叫`development` |
+| `wps-addin/src/host.js`、`parser.js`、`review.js`、`taskpane.js` | 读取、解析、核对、保存/恢复及格式签名 |
+| `wps-addin/src/collection.js`、`merge.js`、`import-ui.js` | 导入集合与归组；`merge.js`的十进制加法是内部函数，未来复用时需小范围抽取并保持原回归 |
+| `wps-addin/src/export-model.js`、`export-host.js`、`export-ui.js` | 当前仅内部三表模型；宿主写入要求所有值为字符串并拒绝公式；布局目前首行作表头 |
+| `wps-addin/dev/export-files.cjs` | `prepare/commit/verify`，独占发布；票据在内存且一小时过期，不能直接当重启后拆分续作凭证 |
+| `wps-addin/src/category-library.js`、`classify.js` | 库校验与规则匹配；`suggest(item, library)`尚未使用第三个context参数，规则过滤还需覆盖其类别被停用的情况 |
+| `wps-addin/src/category-memory.js` | `create/learn/find/revoke`；记忆相近值是`similar`，分类层使用`partial`，接线时需显式转换 |
+| `wps-addin/src/classification.js`、`classification-ui.js` | 决策模型与UI；当前加载静态`rules/defaults.json`，没有记忆协调和动态库维护 |
+| `wps-addin/src/project.js`、`project-ui.js`、`dev/project-store.cjs` | 阶段模型与原子保存；当前UI主要接入来源/合并/分类，`assignments/header/generation/split`字段仍为空 |
+| `wps-addin/dev/register.ps1` | 开发注册/注销；不是正式安装包，需要单独完成服务生命周期及升级/卸载验收 |
 
-### 6.6 内部清单另存（`582745c`，进行中）
-- `export-model.js`生成“清单/来源明细/处理记录”三表；待核对问题阻断；编码与数量按文本保存。
-- `export-host.js`在WPS里每500行分块写入、`SaveAs 51`、禁宏重开逐值校验，失败只关自有工作簿并恢复活动簿与宏设置。
-- `export-files.cjs`用唯一暂存文件独占发布到新xlsx，禁止覆盖，同票据幂等重试。
-- `export-ui.js`串联确认、选位置、写入、提交与失败恢复，并记录最近一次成功回执（目标、SHA256、模式、条数）。
-- 证据：分别保留模式真机另存3→3并独立读取；2026-09-24精确合并模式真机另存3→2并独立读取，水管0.3、来源2条、长小数及`=1+1`文本均正确，见`docs/wps-merge-save-verification.md`。运行文件只留本机`outputs/`。
-- 排版复测：旧合并输出“来源明细”数据行高409.5磅，系764字符核对追溯JSON被换行撑高；仅让四个技术字段单行显示并自动适应行高。新WPS输出独立读回：来源行高为默认/默认/24磅，清单与来源明细逐值未变，三表零公式；处理记录仅保存时间不同。用户在WPS确认“来源明细”和“处理记录”均可读。
+**必须补齐的衔接：** 项目`review/merge/brand/generation/split`阶段不能只靠存在字段就判定完成；C1要将实际核对、用户确认与阶段状态绑定。已确认项目不能因分类库更新而静默改分类；改变分类/品牌/抬头后，旧输出必须标为过期。
 
-### 6.7 项目状态与工作副本管理（任务8，五片）
-- `src/project.js`：阶段链“导入→来源核对→合并→分类→品牌抬头→生成→拆分”，`confirm`记录确认revision，`invalidate`把该阶段置缺失、下游置过期（历史可查），`refresh`保持项目编号并按来源/合并变化失效，`compareSources`区分新增/指纹变化/移除。
-- `dev/project-store.cjs`：唯一临时文件+读回校验+原子替换；失败保留上一版且不残留临时文件；项目编号白名单。
-- `/api/project/save|load|list`：随机会话令牌、Host/Origin限制、64MB上限。
-- `src/project-ui.js`：侧栏“项目状态”卡片，保存/打开/刷新，显示项目编号、版本、合并选择与七阶段状态。
-- 分类阶段同步补漏：实机发现保存的四条人工分类决策已恢复为4/4，但阶段仍写“未完成”；现按当前有效预览行在保存/打开时同步`classification`阶段，撤销后回到未完成、重新确认再完成，来源/合并过期时不沿用旧阶段。恢复提示中的`undefined`项目号也改为真实编号；浏览器先失败后通过，WPS实机显示正确，记录见验证文档。
-- 副本恢复：`restoreCopy`+`/api/project/restore-copy`在副本缺失时读原件算SHA256，只有与保存时指纹一致才重建；原件变化则拒绝打开、不沿用旧进度。
-- 分类列写入：`src/project-host.js`的`appendColumn`只写指定目标，拒绝覆盖已有内容、文本写入、保存后只读重开逐值校验、恢复活动簿与宏设置。
+## 4. 剩余工作量、依赖和里程碑
 
-### 6.8 分类库与可解释匹配（9A，`98d715a`）
-- `rules/defaults.json`：四类四规则，每条带用户确认依据。
-- `src/category-library.js`：校验版本、重复编号、悬空类别、非法字段与启停状态；停用项保留不参与匹配。
-- `src/classify.js`：确定性匹配；给规则编号、命中字段/关键词与依据；名称完全等于关键词记`exact`，否则`partial`；多规则不同类别时`conflicts`列全部候选不自动选；无命中`none`；固定`requiresConfirmation:true`，不输出相似度分数。
+估算单位为**单名熟悉该项目的工程师有效工时**，含该包实现、专门测试、必要回归、记录与备份；不是AI运行时长或日历交付承诺。1人天按8小时。等待用户业务选择、取得样本、隔离WPS环境、历史资料大批人工确认的时间不计入。
 
-### 6.9 分类确认与写列计划（9B模型层，`3354367`）
-- `src/classification.js`：`setDecision`（同一行只留一条、替换留痕）、`removeDecision`（撤销重新阻断）、`summary`（`remaining/pending/conflicts/canGenerateBrandTable`）、`cellText`、`planColumn`。
-- 决策带类别、是否无需询价、匹配度、规则编号、依据、库版本、确认时间与确认revision。
-- `planColumn`：未合并按来源工作表出计划（列取表末+1、行号沿用原文、续行按归集范围一起标注）；已合并输出一张扁平计划；`requireAll`为真时未全确认直接报错。
-
-### 6.10 分类核对侧栏与写入（9B，`ac95429`/`c26c934`/`9dfa3c4`）
-- `src/classification-ui.js`：侧栏“分类核对”卡片，显示建议/匹配度/依据（无命中提示无可靠匹配），支持筛选、单行确认、撤销、批量确认明确选中的单候选行。
-- 未全确认时写入按钮禁用，强行调用只报阻断、零写入。
-- 未合并项目：按原行号写入独立工作副本表末列（`分类备注｜匹配度｜核对状态`），原值不改、行序不变。
-- 已合并项目：以最近一次成功另存的合并表为目标，列号取`RfqExportModel`首表列数+1（当前第9列），按合并组顺序写；没有回执时阻断零写入。
-- 分类确认并入项目记录，保存/打开项目时与来源、合并选择一起恢复。
-- 本轮实机截图在合并2行且未确认时显示“剩余2”，写入按钮灰色禁用；用户暂确认1行后剩1仍禁用，撤销后恢复剩2，零写入。发现按钮仍写“写入工作副本”，容易误导合并模式目标。已做最小文案修正：按钮及失败提示按当前目标显示“工作副本/合并清单”，卡片说明也涵盖两种目标。浏览器用例先失败再通过；用户重载真实WPS侧栏后确认两种目标文案切换正确。
-- 四条业务口径的合成清单在真实WPS显示建议和依据均正确。首份副本写列虽提示成功，独立读回发现三张表列标题均写在第1行工程名称旁，实际表头为第2行；四条分类值在正确材料行，原件SHA不变。根因是未合并写列计划默认为第1行，未读取解析所得表头；现已按每份副本/工作表取首个有效表头行号，缺失则阻断。新副本实机写入并独立读回通过：三张表F1空、F2为列标题、F3起四行值正确，原五列非空内容和原件SHA不变；139项单测和7组浏览器检查通过。旧错位副本仅留本机`outputs/`，详证见`docs/wps-repair-verification-20260924.md`。
-- P5格式边界：原快照只含单元格值，数值编码`123`只改显示格式时旧核对不会失效。新增仅读取解析识别出的数值编码单元格`NumberFormat`并纳入快照签名；格式变化后保存旧核对被阻断。2026-09-25实机已验证从`000000`改为常规后拒绝旧记录，关闭且不保存格式变更、重新打开读取后仍能恢复`000123`核对；原件SHA不变。
-- P5写列防覆盖：原宿主只检查列标题，材料目标格已有分类时仍会直接改写。现在单张工作表的标题与全部目标格写前检查，任一目标格有值或公式就停止，标题和其他行也不写；重复点击被侧栏阻断。多份工作副本顺序写入时若前一份已完成、后一份冲突，侧栏明确报告已完成行数及未完成状态，不再说“未写入”。单测先复现覆盖，浏览器测试先复现错误提示，修复后141项单测和7组浏览器检查通过；真实WPS复核待服务恢复。
-- P8回执来源绑定：合并表SHA校验仅证明旧文件未变化，不能证明它仍对应当前导入集合。浏览器先复现“另存后移除一份清单，旧合并表仍被写入当前分类”；现把成功回执绑定另存时的集合对象，导入、移除或核对更新后须重新另存，分类写列在打开旧表前阻断。重新导入并另存新文件后可继续；141项单测和7组浏览器检查通过，实机待服务恢复。
-- 行标识教训：`merge.js`的`scopeId`是“合并范围/工作簿级”，分类行必须用`group.id`（每行sourceId，合并组取代表sourceId）。
-
-### 6.11 习惯记忆模型（9C第一片，`4ee732e`）
-- `src/category-memory.js`：`learn`只接受带`confirmedAt`的人工确认、重复确认不重复写入；`find`区分完全/相近并给依据、冲突列全部候选；`revoke`撤销后不再匹配并留历史；`scope:'project'`项目例外只在同项目生效；`validate`拒绝版本/状态/字段/历史缺失。
-
-## 7. 需要解决和集中修复的问题（P1–P9）
-
-本轮按用户最新要求先集中修复并整体测试；状态按证据区分“已修复”“已取证、待实机复测”“未完成”，详见`docs/wps-repair-verification-20260924.md`。
-
-| 编号 | 问题 | 现状与证据 | 集中修复做法 | 阻塞范围 |
+| 阶段 | 工作包 | 工时区间 | 前置条件 | 可验收产物 |
 | --- | --- | --- | --- | --- |
-| P1 | 真实WPS侧栏导入后界面不刷新、对合成输入无响应 | 9月25日再次观察到旧窗格脚本与输入仍执行、DOM高度变化而帧计数停在21；主动重载后正常。无探针的新侧栏来源核对保存/恢复正常；新版探针已避免动画回调堆积 | 无探针与新版探针对照，复现后立即封存报告；见§8.1 | **恢复入口实机通过，根因未定位** |
-| P2 | 侧栏内容整体纵向漂移约30像素 | 功能区展开/收起时侧栏标题从y≈209变到y≈239，按旧截图坐标点击会落空 | 实机操作每次点击前即时截图取坐标，或用键盘焦点路径；探针记录`headerTop/importButtonTop`辅助判断 | 操作方法已定，非产品缺陷 |
-| P3 | WPS任务窗格兼容性假设 | 本机有`12.1.0.29161`及`12.1.0.28043`；社区报告为**Writer**的CreateTaskPane/Ribbon故障，不是本插件在表格29161的官方结论 | 先按P1取证，再在不动用户工作簿的测试环境做版本对照；无证据前不归咎宿主 | **未确认**，可能与P1同源 |
-| P4 | 首次导入偶发“无结果” | 旧窗格画面无结果但DOM已有1份；开发服务下三轮新侧栏首次导入正常，不能据此排除偶发问题 | 与P1共用新版探针并以无探针开发服务对照；生产安装包尚未开始 | **未完成**，不得写成已修复 |
-| P5 | 尚未在真实WPS验证的边界 | 合并/分离另存、取消与禁止覆盖、数值显示、辅助表排版、分类写列与各阻断、项目保存恢复均已通过；**本次新增仅改编码格式拒绝旧核对、来源核对关闭重开恢复、切换工作簿时保存/恢复拒绝与就近提示**。详见§8.6及两日证据 | 剩余：真实WPS写入/发布失败、多副本部分成功及异常后活动簿/宏设置恢复；按§8.1执行，144项单测不替代实机 | **部分完成**；任务7与13验收 |
-| P6 | 仓库根目录残留`%SystemDrive%/` | 本轮核查只有三个Windows缓存文件；递归删除被自动审批策略以`blocked by policy`拒绝，已在`.gitignore`显式排除 | 人工核对后用PowerShell按字面路径清理；绝不暂存/提交 | **待人工清理**，非功能缺陷 |
-| P7 | 新脚本未加入服务静态资源白名单 | `src/project.js`、`src/project-ui.js`曾被当`text/plain`拒绝执行，表现为导入按钮一直禁用；**已修复并加回归**，后续新脚本已同步登记 | 已闭环；新增脚本/规则文件时同步白名单与MIME | 无（已解决） |
-| P8 | 合并表分类列写入前不重新核对目标文件哈希与当前来源 | 服务凭成功发布票据重算SHA256，侧栏核对通过后才调用WPS；**真实WPS已验证**合并表写列后旧回执再次写入提示文件变化、目标SHA不变；临时导入并移除合成文件后旧另存回执提示来源变化、目标第9列仍空且SHA不变。校验期间变化的竞态由浏览器注入测试覆盖 | 来源变化或分类列写入后须重新另存取得新回执；保持竞态回归 | **主要路径已实机闭环** |
-| P9 | `scopeId`被误当行标识 | 第一版分类按`scopeId`做行key，确认一行会连带确认同工作簿其他行；已改为`group.id`并加测试 | 已闭环；后续凡按行定位一律用`group.id`/sourceId | 无（已解决） |
+| A 修复与异常验收 | A1 8–12；A2 6–14；A3 8–14；A4 2–4 | **24–44小时** | 现有基线 | 根因/修复证据、P5矩阵、环境边界 |
+| B 分类习惯与库维护（9C） | B1 6–10；B2 6–8；B3 6–10；B4 10–16；B5 6–12 | **34–56小时** | A验收通过 | 可保存、可解释、可撤销的本机分类库与已确认资料迁入报告 |
+| C 品牌、供应商和抬头（10） | C1 6–10；C2 6–10；C3 8–12；C4 6–10；C5 6–10 | **32–52小时** | B；业务决定见§5 | 可手填并恢复的分类品牌表与抬头 |
+| D 总询价工作簿（11） | D1 8–14；D2 8–14 | **16–28小时** | C | 数量正确、带抬头、对外字段干净的总工作簿 |
+| E 文件拆分（12） | E1 6–10；E2 10–16 | **16–26小时** | D；重名规则明确 | 文件预览、逐份回执与失败后续作 |
+| F 安装与验收（13） | F1 12–20；F2 12–16；F3 4–8 | **28–44小时** | E | 安装交付、四项目证据与用户说明 |
+| 合计 | 21个工作包 | **150–250小时，约19–32人天** | 见上 | 一期完整流程 |
 
-## 8. 下一步执行计划：先完成P1/P4/P5实机修复，再继续9C
+安排时可另留20%～30%风险余量，约 **180–325小时（23–41人天）**。A1/A2对偶发冻结只是首轮调查和修复预算：若12小时调查仍不能建立复现，输出已排除因素和下一实验后重估；**不能用预算耗尽作为“卡死已修复”的证据，也不能保证上述上限覆盖未知宿主缺陷。** 每完成A、B、C阶段按实际返工更新后续估算，不能累计重复计算已完成工作。
 
-### 8.1 P1/P4/P3取证、最小修复与P5实机验收（当前第一优先级）
+依赖顺序：`A → B → C → D → E → F`。A内部可先完成不依赖根因的P5取证；C4样本收集可与C2/C3准备并行，但品牌参考的正式验收要有真实格式样本。未获用户要求时不主动拆出多个代理任务。
 
-1. **确认现场**：2026-09-25当前服务不带探针，`/health`为`development`；WPS表格版本`12.1.0.29161`。此前启动拒绝属于历史记录，本次服务已运行。接续先核对38891监听进程、健康接口、加载项地址；测试文件只用`outputs/`合成件，先记SHA256。合成编码样本已关闭、磁盘未改，来源核对记录仍在本机；不要重做已经通过的逐行确认。
-2. **先对照P1/P4**：无探针和新版探针各用新窗格执行同一组动作：首次导入`测试一.xlsx`、滚动、再导入`测试二.xlsx`、精确合并3→2；另开新窗格读取编码样本并恢复已有核对。记录每轮WPS进程/版本、窗格会话、操作时间、是否复用旧窗格及即时截图。先各做3轮，若出现停滞立即停止重复点击并取证；正常结果只说明该组未复现。
-3. **冻结现场按层定位**：探针记录`importCount/importComplete`、禁用状态、DOM高度、`headerTop`、输入事件、可见性、`frameCount/framePendingMs`和停滞/恢复事件。输入没到则查焦点/窗格；输入到了而数据没变则查`import-ui.js`与服务请求；数据和DOM已变但帧停止则查窗口生命周期与宿主交互。报告最多100条，复现后立即复制为独立会话证据，防止早期记录被后续事件淘汰。然后用已有`TaskPane.Navigate`重载入口验证恢复，不加无证据的自动刷新。
-4. **按复现结果最小修复**：先把确定的触发序列化为能失败的回归，再局部修改。新版探针已经修复回调积累，但尚未真实捕获新的停滞事件；不要把探针变化当根因修复。只在证据指向版本差异时，在隔离测试环境比较29161/28043；社区Writer报告不作为表格结论。无探针开发服务也不是生产安装包。
-5. **P5多副本部分成功**：用两份新合成工作副本，分类全部确认；只在第二份副本的计划目标列预置标记，使第一份成功、第二份拒绝。核查侧栏准确报告完成/未完成数量，独立读回第一份分类列、第二份标记和两份原件SHA。重复写入不得覆盖已有列。缺少可控入口时先添加仅供开发验收的隔离测试工具，不改正式产品流程。
-6. **P5写入/发布失败与宿主恢复**：在独立合成目录建立可控失败点，分别使WPS暂存写入失败、写入完成后的独占发布失败；保留一个已知活动测试工作簿。必要时用开发验收工具在prepare/commit之间制造仅本次测试目标的占用/冲突。验收必须包括：无虚假成功回执、不覆盖目标、不关其他工作簿、临时文件与部分结果如实记录；异常后活动簿、宏安全值与执行前一致，不降低安全设置。解除测试故障后另存新文件，独立读回验证可恢复。
-7. **收口与备份**：逐项记录输入/输出SHA、WPS版本、操作、实际提示、截图和独立读取结果到独立证据文档。跑144项现有单测和7组浏览器检查（新增用例则计数相应增加）；更新本文件未完成边界，按明确文件清单审查、提交、推送、核远程SHA。P1/P4/P5未完成就保留具体待办，不跳到9C或宣称一期完成。
+## 5. 待用户决定 / 待资料，提前说清影响
 
-### 8.2 9C目标与验收门槛
+本轮只整理计划，以下问题在对应开发包开始前，以具体界面或样本集中确认，不要求用户现在重复回答已确定的需求。
 
-P1/P4/P5收口后，把习惯记忆接进分类建议（只作候选与依据，仍必须人工确认），并提供分类库/记忆维护界面：可查看命中依据、停用或撤销误记、看到冲突；库变化不回写已确认结果。
+| 编号 | 缺失信息 | 需呈现的具体选择或资料 | 未明确前的处理 | 影响包 |
+| --- | --- | --- | --- | --- |
+| Q1 | 同类别多品牌适用哪些材料 | 用两材料、两品牌样例确认：每品牌询同一组完整需求，还是各品牌只覆盖指定材料子集 | 保留材料ID映射，范围标未确认；不擅自分摊或复制数量后宣称守恒 | C2/C3、D1 |
+| Q2 | 空品牌是否允许及表达 | 明确填写品牌，或经用户确认的“不限品牌”状态；空白不能自行等同不限品牌 | 阻断品牌阶段完成 | C2/C5 |
+| Q3 | 同类别同品牌有多个供应商 | 确认每供应商是否独立询价，以及工作表与供货单位的一一对应 | 显示冲突，禁止任取第一个供应商 | C2、D1/E1 |
+| Q4 | 同类别同供应商多品牌文件重名 | 展示实际文件列表，建议追加品牌或序号，由用户确定一个规则 | 保留基础名`分类_供应商名称.xlsx`，碰撞阻断、绝不覆盖 | E1 |
+| Q5 | 项目品牌参考表实际格式 | 用户已有品牌表的复制件；标注类别、品牌、备注列及合并单元格 | 先做C3手填；C4只做合成映射测试，不能标真实导入验收完成 | C4 |
+| Q6 | 输出模板及抬头细节 | 只读对照本机项目一、项目二材料分类样式，展示脱敏样稿；确认地址/电话等必填项与打印布局 | 使用设计已列字段形成预览，不填真实联系人默认值；必填未确认不完成抬头 | C5/D2 |
+| Q7 | 支持的WPS版本与交付环境 | 当前29161为已测试环境；28043能否在隔离环境启动、是否离线安装、权限范围 | 不动现有安装，不把开发注册冒充生产兼容结论 | A2/F1 |
 
-### 8.3 先写的失败测试
+## 6. 统一数据约定与重点检查
 
-1. `test/classify-memory.test.cjs`（或扩展`classify.test.cjs`）：记忆命中作为额外候选并带“记忆依据”；记忆与规则冲突时仍列全部候选且不自动选；记忆命中不把`requiresConfirmation`改成false。
-2. 撤销记忆后不再作为候选；项目例外只在同项目命中；被停用的类别不再出现在候选与下拉里，但历史决策仍可查看。
-3. `test/library-store.test.cjs`：库文件保存恢复一致、版本不支持/字段缺失拒绝、写入失败保留上一版、记录只落在配置目录。
-4. `test/ui-library-check.cjs`：侧栏维护界面能停用类别、撤销误记、显示冲突与依据；保存失败时本次核对不丢。
+以下为**拟新增接口**，不是当前已经存在的函数。实现时如需改名，同包同步更新调用方、测试和本文件。
 
-### 8.4 实现文件与接口
+- `RfqClassify.suggest(item, library, {memory, projectId})`：保留原有两参调用；候选增加`source: 'rule'|'memory'`及ruleId/memoryId，结果仍`requiresConfirmation:true`、`accepted:null`；统一相近值为`partial`。
+- 本机库包：`{schemaVersion:1, revision, library, memory}`，存一个`library-state.json`，使库和记忆一次原子保存；读写接口为`/api/library/load`与`/api/library/save`。未落盘初始revision为0，每次成功保存加1；save带`expectedRevision`，版本冲突返回409而非覆盖。
+- `RfqProject.contentKey({collection, mergeIdentical, classification, assignments, header})`：固定字段顺序序列化有关内容，保留影响输出的材料/来源顺序；这是业务快照键，不替代文件SHA256。忽略UI筛选、纯时间、派生inputKey及回执字段，包含来源指纹、核对内容、确认结果和品牌抬头。品牌表上游key只传collection/mergeIdentical/classification；生成和拆分key再加入assignments/header，避免把派生键自身循环算入。
+- 项目保留现有顶层schemaVersion 1；扩展`assignments/header/generation/split`的内部schema。旧值为null时迁移到缺失状态，未来未知版本拒绝且不写回旧文件。
+- 分类品牌数据：`{schemaVersion:1,inputKey,coverageMode,rows,assignments}`。coverageMode初始为pending，Q1确认后保存alternative-quotes（各品牌询同一需求）或material-subsets（按材料子集）；不自行选择。rows保存`rowId/categoryId/scopeId/codes/name/feature/unit/quantity/sourceIds/sourceLabels/sources`，sources为已核对来源的内部快照，供生成编码和追溯使用；assignments保存`assignmentId/categoryId/rowIds/brand/supplier/note/coverageConfirmed/confirmedAt`。按类别展示，内部按行追溯；Q1～Q3未定时`coverageConfirmed:false`。
+- `RfqBrandTable.build(groups, classification, inputKey)`返回上列空品牌数据；`RfqBrandTable.validate(data, rows)`返回`{ok, errors}`，不自动补品牌/供应商；同类多品牌用多条assignment，数量来源仍引用rows。
+- `RfqBrandHost.read(application, binding)`读取分类品牌表并返回`{assignments}`；binding含`path/sheet/schemaVersion/rowMap`，rowMap绑定稳定assignmentId及允许编辑的列。测试通过真实或模拟单元格内容制造重复ID，不往正式接口塞测试开关。
+- `RfqInquiryModel.build({brandTable,header,mergeIdentical,inputKey})`返回`{inputKey,sheets,trace}`；每sheet含`sheetId/name/assignmentId/kind:'inquiry'/values/layout`，trace仅内部。公开values全字符串，报价/金额为空。
+- `RfqSplitPlan.build({model,generation,targetDirectory,naming})`返回`{inputKey,files,conflicts}`；每file含`fileId/sheetId/name/target`。实际执行前本机服务再检查路径、文件存在性和总文件SHA。
+- 拆分持久回执：`{schemaVersion:1,inputKey,generationSha256,files:[{fileId,target,state,sha256,error}]}`，状态限定pending/succeeded/failed/needs-verification；最后一种表示文件可能已发布但回执未完整落盘。服务重启后按文件实况与SHA核实，不能复用已过期内存票据。
 
-- `src/classify.js`：`suggest(item, library, context)`新增`context.memory`与`context.projectId`，把`RfqCategoryMemory.find`结果并入`candidates`（标记`source:'memory'`），冲突判定仍按“不同类别”处理。
-- `src/classification-ui.js`：建议区显示规则/记忆来源与依据；确认时把`source`写入决策；确认后调用`RfqCategoryMemory.learn`（默认`global`，界面提供“仅本项目”选项写入`scope:'project'`）。
-- `dev/library-store.cjs`：本机应用数据目录下`library.json`/`memory.json`的原子读写（唯一临时文件+读回校验+替换，失败保留上一版）。
-- `dev/server.cjs`：新增`/api/library/load|save`，沿用随机会话令牌与Host/Origin限制；新脚本同步白名单。
-- `src/library-ui.js`：侧栏“分类库与习惯”卡片，列出类别/规则/记忆与依据，支持停用、撤销误记、冲突提示。
+**五项重点检查（各自落入下文测试）：**
 
-### 8.5 9C执行顺序（TDD）
+1. 分类库/记忆冲突、类别停用：保持人工确认，不暗改历史分类（B1/B3/B4）。
+2. 重载、服务中断、磁盘保存失败：未保存核对不假装成功，已写文件可追踪（A/B2/E2）。
+3. 未合并来源、多品牌适用范围：分组数量与来源只计一次；不同询价对象的数量不得直接加总当工程总量（C2/D1）。
+4. 长名称、前导零、超长特征、文件名大小写碰撞：不截断数据或覆盖文件（D1/D2/E1）。
+5. 旧项目/旧回执与新分类、品牌、抬头混用：下游过期，禁止用旧输出继续拆分（C1/D2/E2）。
 
-1. 写§8.3的失败测试并运行，确认按预期失败。
-2. 实现`classify.js`的记忆候选与冲突合并，跑通模型测试。
-3. 实现`library-store.cjs`与服务接口，跑通存储测试。
-4. 实现`library-ui.js`与分类卡片接线（自动学习、项目例外、撤销），跑通浏览器测试。
-5. 跑完整`node --test`与7组现有浏览器检查，另跑新增`ui-library-check.cjs`；更新本文件。
-6. 明确清单暂存 → 提交 → 推送 → 核对远程SHA。
+## 7. 详细执行工作包
 
-### 8.6 P5实机核对速查（按§8.1先于9C执行）
+每包都按“先写能复现风险的失败用例 → 确认预期失败 → 最小实现 → 专门测试 → 受影响回归/实机 → 证据与交接 → 明确清单提交推送”结束。下列代码是接口与关键断言示例，开发时放入所列测试文件并补齐该包列明的全部场景；不能只测示例一项。
 
-1. 已完成：合成文件导入；分离模式3→3及精确合并模式3→2实机另存、独立读取；合并输出B2前导零和F3完整长小数的WPS显示正确。见`docs/wps-merge-save-verification.md`。
-2. 先解决P1/P4：开发模式新窗格首次导入三轮正常，但9月25日又观察到旧窗格帧计数停滞；无探针下新窗格来源核对恢复正常。按§8.1做新版探针/无探针对照，立即封存冻结报告；没有生产安装包验收结论。
-3. 另存取消和失败：确认取消、位置取消、目标已存在且禁止覆盖已实机通过，旧目标SHA不变；接着用可控合成环境测写入/提交失败，核查目标目录与成功提示，不得虚报成功或覆盖旧文件。
-4. 分类：0/2和1/2时禁写、撤销复位、目标按钮文案切换、四口径建议与依据均已实机确认。未合并副本标题错位已修，新副本真实WPS写入及独立读回确认F2标题、四行值和原五列正确；合并表4→4另存和`清单!I1:I5`写列实机通过，原件SHA不变。写后再次点击被旧回执SHA校验阻断；导入/移除合成文件后旧回执被来源绑定阻断，两个目标文件的第9列和SHA均按预期保持。工作副本重复写入拒绝、项目分类4/4与阶段状态保存/恢复也已实机通过。所有实机输出独立重开逐值校验，原件SHA始终不变。
-5. 数值编码显示格式`000000`：`outputs/wps-numeric-format-20260924/编码格式复测.xlsx`合成样本的`给排水!A3`底层123、格式`000000`、显示`000123`；WPS已提示数值编码核对，用户确认`000123`后另存成功。独立读回输出`清单!B2`为文本`000123`、零公式，WPS目视相同。**仅格式改为常规后保存旧核对已实机拒绝**；关闭不保存测试格式、重开后源SHA仍为`B24A413F...FD810`。
-6. **来源核对保存/关闭/重开/新侧栏读取/恢复已通过**：1条候选、1个问题恢复为1条记录、0个问题，编码`000123`正确；切换到空白簿后保存/恢复均拒绝且原因在按钮旁，返回原样本仍能恢复。项目分类进度及阶段状态恢复也已通过，勿重复要求用户测试。
-7. 来源明细行高已从409.5磅降到默认/24磅，逐值读回无回归；用户确认来源明细/处理记录可读。继续实测活动簿/宏设置恢复。
+本节文件路径约定：`src/`、`dev/`、`test/`、`taskpane.html`、`styles.css`、`main.js`、`ribbon.xml`均相对`F:\材料软件开发\wps-addin\`；`docs/`、`outputs/`、`.gitignore`和`handoff.md`相对仓库根目录。已写完整`wps-addin/`前缀的路径不再重复拼接。
 
-## 9. 后续路线与交付门槛
+### A1｜侧栏停滞对照取证（8–12小时）
 
-| 顺序 | 交付物 | 进入下一项的条件 |
+**文件：** 检查`main.js`、`dev/pane-diagnostics.js`、`dev/server.cjs`、`src/import-ui.js`、`src/taskpane.js`（均位于`wps-addin/`）；必要时仅增诊断。测试：`test/pane-diagnostics.test.cjs`、`test/server.test.cjs`、`test/ui-pane-diagnostics-check.cjs`。
+
+- [ ] 核对38891进程、`/health`、WPS实际版本、加载项地址和Git状态；为本轮报告使用新文件名，所有输入记录SHA。
+- [ ] 无探针和新版探针各做3轮新窗格：只导入测试一→确认列表/滚动→导入测试二→勾选合并3→2；新窗格另测编码样本读取并恢复已有核对。一次只变一个条件。
+- [ ] 记录是否复用窗格、会话号、点击时间、DOM高度、导入数量、控件禁用、可见性、焦点、输入事件、frameCount/framePendingMs；每次点击坐标从即时截图获取。
+- [ ] 出现停滞立即停止连点并封存报告/截图。当前报告仅100条，不能继续操作到旧证据被淘汰。旧会话48a51ada1001e247的早期数据已不在最终JSON，详见9月25日证据。
+- [ ] 分层判定：输入未到→焦点/窗格；输入到但状态未更新→导入服务与状态更新；DOM已变但帧停→窗格生命周期/渲染；复现后用手动重载验证恢复。
+- [ ] 输出独立`docs/wps-pane-root-cause-verification.md`：复现步骤、排除因素、待证假设、下一实验。未复现只写“本组未复现”，不关闭P1/P4。
+
+```powershell
+node --test wps-addin/test/pane-diagnostics.test.cjs wps-addin/test/server.test.cjs
+node wps-addin/test/ui-pane-diagnostics-check.cjs
+```
+
+**出口：** 有可重复触发序列及故障层次，或有明确剩余假设与下一轮实验；后者仍未通过稳定性门槛。
+
+### A2｜按证据修复P1/P4，必要时对照P3（6–14小时，根因未明时重估）
+
+**文件：** 只改A1定位到的模块；保留`test/ribbon-recovery.test.cjs`和原导入/核对回归。
+
+- [ ] 将A1触发序列转成最小回归，观察旧代码失败；若无法自动复现宿主渲染，保留可重复的实机步骤及诊断断言。
+- [ ] 仅修复确定的窗格生命周期、同步宿主调用或状态问题；不靠周期性强制重载掩盖故障，不整页重写。
+- [ ] 自动恢复若确有必要，先证明保存过的核对可恢复、未保存内容不会静默丢失；当前手动重载恢复能力继续保留。
+- [ ] 只有证据指向版本差异时，在隔离环境对照29161/28043；不卸载/替换用户当前WPS，社区Writer报告不当作表格结论。
+- [ ] 修复前后用同一触发序列对照；再覆盖新窗格、复用窗格、导入、确认核对、另存/取消、WPS重开。输出会话证据，跑全套现有测试。
+- [ ] 若仍会卡住，将触发条件、恢复办法和未排除因素写入交接；**不得把A2勾为完成或开始宣称一期可交付**。
+
+```powershell
+node --test wps-addin/test/ribbon-recovery.test.cjs wps-addin/test/pane-diagnostics.test.cjs
+node wps-addin/test/ui-import-check.cjs
+node wps-addin/test/ui-review-check.cjs
+```
+
+**出口：** 原触发序列修复前失败、修复后通过；新增恢复动作无核对丢失；支持版本结论仅限实测环境。
+
+### A3｜补齐P5真实WPS异常矩阵（8–14小时）
+
+**文件：** `src/export-host.js`、`src/export-ui.js`、`src/project-host.js`、`src/classification-ui.js`、`dev/export-files.cjs`；测试`test/export-host.test.cjs`、`test/project-host.test.cjs`、`test/export-files.test.cjs`、`test/ui-export-check.cjs`、`test/ui-classification-check.cjs`。
+
+- [ ] 建立独立合成目录，保存输入SHA、目标清单、当前活动测试簿及宏安全值；不降低安全设置。
+- [ ] 多副本：两份新副本全部分类确认，仅第二份计划目标格预置标记；第一份成功后第二份拒绝。核对实际完成数量、两份副本及原件SHA；重复点击不得覆盖第一份或第二份标记。
+- [ ] 写入失败分两种：已有目标的写前拒绝，以及工作簿已创建并写入后的真实保存失败。后一种使用合成目录下一个从未创建的子目录作为暂存目标父目录，路径语法合法且目标不存在，让实际WPS `SaveAs`失败；验证无成功回执、自建工作簿被清理、其他工作簿不关闭。若宿主不报错或弹窗行为不同，记录实际结果，不拿写前拒绝代替写中失败。
+- [ ] 发布失败：prepare后、commit前仅在测试目标创建哨兵文件；真实WPS暂存写入后commit应拒绝，哨兵内容/SHA不变，侧栏不显示成功。
+- [ ] 若侧栏缺少可控暂停点，新增`dev/acceptance-probe.js`及`test/acceptance-probe.test.cjs`，仅开发诊断模式开启；可在真实WPS第一块写入后注入异常验证清理，证据注明“注入异常”而不是原生WPS写入故障。不得把故障入口加入普通产品页面，F1发布构建排除。
+- [ ] 每个异常后核对活动簿、宏安全值、临时文件和部分输出；解除故障后换新文件名成功另存并独立读回。发现差异先加失败回归再修复。
+
+```javascript
+// 在已有宿主/文件测试的真实返回值上断言，不仅检查提示文本。
+assert.equal(after.activeWorkbook, before.activeWorkbook);
+assert.equal(after.automationSecurity, before.automationSecurity);
+assert.equal(after.sentinelSha256, before.sentinelSha256);
+assert.equal(receipt, null); // 失败不能产生成功回执
+```
+
+**出口：** 每条实机记录具备触发方式、提示、已写/未写文件、SHA、恢复状态；缺一项即该场景未完成。
+
+### A4｜基线、残留和修复阶段交接（2–4小时）
+
+**文件：** `.gitignore`、`handoff.md`、相关证据；不扩展功能。
+
+- [ ] P6的`F:\材料软件开发\%SystemDrive%`曾有3个工具缓存文件，历史递归删除被审批拒绝。保持忽略，不绕过历史拒绝；记录人工按字面路径核对后的处理结果，不因它延误功能验收。
+- [ ] 复核P7静态白名单、P8来源/目标防过期和P9行标识回归仍在；不要重新开发已通过的功能。
+- [ ] 汇总A1～A3状态，区分已修复、实机未验证和未定位。跑§9完整基线；更新支持环境和下一工作包。
+- [ ] 明确文件清单审查、提交、推送、核SHA；生产安装仍列F1，不能写成已交付。
+
+### B1｜记忆加入分类建议（6–10小时）
+
+**修改：** `src/classify.js`、`src/category-library.js`；**新增测试：** `test/classify-memory.test.cjs`；沿用`category-memory.test.cjs`。
+
+- [ ] 写规则与记忆同类/异类、无记忆、撤销、不同项目、类别停用的失败用例；两参旧调用必须兼容。
+- [ ] 注入`RfqCategoryMemory.find`，将`similar`转`partial`；候选保留各自依据，按不同categoryId形成冲突，不用最近记录强覆盖。
+- [ ] 类别被停用时，其规则和记忆都不成为新候选；历史人工决策按保存的类别名可读。
+- [ ] 返回值始终保留人工确认要求；在UI接线前先独立通过模型回归。
+
+```javascript
+const assert = require('node:assert/strict');
+const Classify = require('../src/classify.js');
+const Memory = require('../src/category-memory.js');
+const library = {version:'test',categories:[{id:'a',name:'甲'},{id:'b',name:'乙'}],
+  rules:[{id:'r',categoryId:'a',match:[{field:'name',any:['水管']}]}]};
+const item = {name:'水管',feature:'DN50',unit:'m'};
+const memory = Memory.learn(Memory.create(),{categoryId:'b',confirmedAt:'2026-09-25T00:00:00Z'}, {item});
+const result = Classify.suggest(item,library,{memory,projectId:'p-test001'});
+assert.equal(result.conflicts.length,2);
+assert.equal(result.requiresConfirmation,true);
+assert.equal(result.accepted,null);
+```
+
+### B2｜分类库与记忆原子持久化（6–8小时）
+
+**新增：** `dev/library-store.cjs`、`test/library-store.test.cjs`、`test/library-server.test.cjs`；**修改：** `dev/server.cjs`。
+
+- [ ] 为§6库包实现`createLibraryStore({directory}).load()`和`.save({expectedRevision,library,memory})`；初始目录不存在时使用默认规则及空记忆，不写入项目仓库。
+- [ ] 唯一临时文件→写入→读回及模型校验→原子替换；库和记忆只存一个包，避免两份文件一新一旧。串行化同包写入，校验revision，冲突拒绝。
+- [ ] 覆盖磁盘失败、无效类别引用、损坏JSON、未来schema、并发旧revision；失败保留上一份磁盘数据及前端草稿，读失败不能自动以空库覆盖。
+- [ ] API沿用会话令牌、Host/Origin限制和请求大小上限；正常模式也只能本机访问。
+
+```javascript
+// store为本包createLibraryStore在独立临时目录创建的实例。
+const saved = await store.save({expectedRevision:0,library,memory});
+await assert.rejects(store.save({expectedRevision:0,library,memory}), /版本|冲突/);
+assert.equal((await store.load()).revision,saved.revision);
+```
+
+**出口：** 重启服务后库/记忆一致，过期写入与故障不会覆盖上一版。
+
+### B3｜人工确认、撤销与学习协调（6–10小时）
+
+**修改：** `src/category-memory.js`、`src/classification.js`、`src/classification-ui.js`、`src/project-ui.js`；**新增：** `test/ui-memory-check.cjs`，补模型测试。
+
+- [ ] 在单行/批量最终确认成功后学习；选下拉但未确认、渲染建议、打开旧项目均不触发学习。
+- [ ] 为未保存项目先分配稳定projectId，复用当前项目身份直到新建/打开其他项目；不在每次点击时重新生成。项目例外没有projectId时阻断该记忆操作。
+- [ ] 记录`sourceProjectId/sourceRowId/decisionRevision`作为确认来源；全局和仅本项目分开。重复点击或保存重试不得新增重复依据。
+- [ ] 扩展记忆的确认来源列表：撤销/修改本次确认时只失效该来源；同一材料类别若另有有效确认来源仍保留。无来源的新自动记忆撤销；旧历史记忆保留并允许维护界面人工撤销，不能猜来源删除。
+- [ ] 记忆保存失败时分类确认留在本页并显示“习惯未保存，可重试”；重试幂等，不能误报分类也未确认。已确认项目不因库更新被自动改类。
+
+```javascript
+// ui-memory-check在真实页面事件上检查：只选类别不学习，确认后学习一次。
+assert.equal((await store.load()).memory.memories.length,0);
+await page.getByRole('button',{name:'确认本行分类'}).first().click();
+await page.getByRole('button',{name:'保存习惯重试'}).click(); // 该场景先注入一次保存失败
+assert.equal((await store.load()).memory.memories.length,1);
+```
+
+### B4｜分类库与记忆维护界面（10–16小时）
+
+**新增：** `src/library-ui.js`、`test/ui-library-check.cjs`；**修改：** `taskpane.html`、`styles.css`、`src/category-library.js`、`src/classify.js`、`src/classification-ui.js`、`dev/server.cjs`。
+
+- [ ] 列表/编辑提供类别新增、改名、停用；规则关键词、别名、条件、依据新增修改；稳定ID不随名称改变。
+- [ ] `no-inquiry`保持“无需询价”的特殊决策含义和可选入口，不能因停用普通类别而消失；界面说明其用途，测试停用其他类别后仍可人工选择无需询价。
+- [ ] 别名作为明确的名称匹配关键词保存；排除条件用与match相同的`{field,any}`结构，命中任一排除项则该规则不推荐。缺exclude的旧规则按空数组处理，拒绝空关键词/悬空类别/重复ID。
+- [ ] 记忆列表显示材料、类别、范围、确认来源和时间，可筛选并撤销误记；保留历史，不硬删已有项目引用。
+- [ ] 草稿校验→保存→重载本机库→更新未确认行建议；已确认行保留原决策及库版本。库加载失败时显示可操作的重试，不出现“可选类别”实际为空却宣称可手选的提示。
+- [ ] 浏览器检查新增规则、排除命中、停用、撤销、409冲突、保存失败、380px窄侧栏；真实WPS保存后重载和重启服务确认恢复。
+
+```javascript
+// 新排除规则的关键结果：命中“临时”时不能推荐此条规则。
+const excluded = {...library,rules:[{id:'pipe',categoryId:'a',
+  match:[{field:'name',any:['水管']}],exclude:[{field:'feature',any:['临时']}]}]};
+assert.equal(Classify.suggest({name:'水管',feature:'临时安装',unit:'m'},excluded).candidates.length,0);
+```
+
+### B5｜已确认分类资料整理与迁入（6–12小时，不含重新人工分类）
+
+**拟新增：** `wps-addin/dev/migrate-confirmed-library.cjs`、`wps-addin/test/migrate-confirmed-library.test.cjs`；迁入报告与数据只留`outputs/`和本机库目录。
+
+- [ ] 只读核对本机`outputs/rule-return-20260920/分类人工核对_第十三批确认.xlsx`和`outputs/rule-fix-20260921/answer-overrides.json`是否存在、实际字段及明确确认标记；文件名含“确认”本身不足以证明每行均已确认。
+- [ ] 将可证明的人工答案映射为类别及确认案例，保留原资料定位/确认依据，排除预测、空答案、被后来更正的旧答案及个人联系信息。缺乏最终答案链的记录进入待核对报告。
+- [ ] 实现`buildMigration({rows,overrides},currentLibrary)`，返回`{categories,memories,rejected,conflicts}`；默认只生成预览，不直接改静态defaults或生产库。row统一输入字段为`recordId/item/categoryId/categoryName/confirmed/confirmationSource`，由只读适配层映射实际原表。
+- [ ] 同义类别先建立显式映射；已确认四条口径优先作为一致性检查，不用模糊相似自动合并类别。重复案例保留多条确认来源而不是重复学习；冲突进入人工核对列表，不自动选最新预测。
+- [ ] 逐项核对总数=可迁入+拒绝/待核对，抽查迁入案例与原人工答案；通过B2原子接口应用已核实部分，记录导入批次与版本，可撤销该批贡献。原资料哈希和已有项目决策不变。
+
+```javascript
+const {buildMigration} = require('../dev/migrate-confirmed-library.cjs');
+const result = buildMigration({rows:[{recordId:'case-1',item:{name:'水管',feature:'DN50',unit:'m'},
+  categoryId:'water-valve',categoryName:'水阀门',confirmed:false,confirmationSource:null}],overrides:[]},library);
+assert.equal(result.memories.length,0);
+assert.equal(result.rejected.length,1);
+```
+
+**B阶段出口：** 五包模型、接口、浏览器和WPS恢复通过；分类库变化不暗改已确认项目，学习资料仅来自人工确认。迁入资料缺失或有争议时明确记载待核对范围，不把四条默认规则宣称为完整类别库。
+
+### C1｜项目阶段与未来字段衔接（6–10小时）
+
+**修改：** `src/project.js`、`src/project-ui.js`、`src/import-ui.js`、`src/classification-ui.js`；测试`project.test.cjs`、`project-store.test.cjs`、`ui-project-check.cjs`。
+
+- [ ] 实现§6 contentKey；扩展项目UI获取/恢复assignments、header、generation、split的回调；保留旧项目兼容，不更换已有projectId。
+- [ ] import根据有效导入集合，review根据来源问题清零，merge根据本次模式及预览的明确确认，classification根据当前有效行全部人工确认来置ready；不仅检查对象非空。
+- [ ] 用户不合并也要能明确确认“分别保留”的预览，不强迫另存合并表才能走后续。
+- [ ] 分类变更使brand/generation/split过期；品牌或抬头变更使generation/split过期；来源和合并模式变化不得继续使用旧分组映射。
+- [ ] 旧项目缺未来字段显示未完成；损坏或未知内部版本拒绝恢复且保留旧文件；列表与侧栏进度一致。
+
+```javascript
+const next = RfqProject.invalidate(readyProject,{kind:'header',detail:'联系方式变化'});
+assert.equal(next.stages.generation.state,'stale');
+assert.equal(next.stages.split.state,'stale');
+assert.equal(next.projectId,readyProject.projectId);
+```
+
+### C2｜分类品牌表模型及范围规则（6–10小时）
+
+**新增：** `src/brand-table.js`、`test/brand-table.test.cjs`；修改必要的`src/classification.js`校验。
+
+- [ ] 先用两材料两品牌样例落实Q1～Q3；保留未定状态不自动放行。
+- [ ] 从有效groups和最终分类生成rows，排除无需询价；按类别汇总条目数，内部保留rowId/scopeId/sourceIds及文本数量。
+- [ ] assignment为类别＋品牌＋供应商＋明确rowIds映射，品牌/供应商不串列；检查未知rowId、同assignment重复rowId和漏配材料。
+- [ ] 全部无需询价时输出“无需生成询价表”的空结果，不生成空供应商文件；允许保存该项目状态。
+- [ ] 分类未全确认、范围未确认、空品牌或空供应商均阻断；只有经Q2确认的“不限品牌”才是明确状态。
+
+```javascript
+const pending = RfqClassification.create();
+assert.throws(()=>RfqBrandTable.build([{id:'row-1',name:'水管'}],pending,'input-1'), /确认/);
+// 完整样本生成后：品牌为空不应被当作已完成。
+assert.equal(RfqBrandTable.validate(blankBrandTable,blankBrandTable.rows).ok,false);
+```
+
+### C3｜WPS分类品牌表生成、手填、读回与恢复（8–12小时）
+
+**新增：** `src/brand-host.js`、`src/brand-ui.js`、`test/brand-host.test.cjs`、`test/ui-brand-check.cjs`；修改页面、白名单、项目接线。
+
+- [ ] 生成独立分类品牌表工作簿或明确的插件自有工作表，禁止改原清单；保存时继续使用不覆盖的新文件路径。
+- [ ] 显示类别、材料条目数、品牌、供应商、备注；多品牌按assignment多行展示，并可查看所含材料。稳定assignmentId和rowIds在内部映射中保留。
+- [ ] 用户在WPS手填后点“读取并核对品牌表”；按稳定ID读回，不能只靠当前行号匹配；用户排序后仍正确，删行/重复ID/改固定分类列则明确报具体行。
+- [ ] 只接受品牌、供应商、备注和已获确认的范围编辑；读回成功先预览，明确确认后才更新项目并使旧生成文件过期。
+- [ ] 保存项目、关闭重开WPS、恢复项目后表路径/映射/填写结果一致；副本缺失或被外部改写时提示核对，不能把旧内存当最新表。
+
+```javascript
+assert.deepEqual(readAfterSort.assignments.map(row=>[row.assignmentId,row.brand,row.supplier]).sort(), expected.sort());
+// duplicateIdApplication的模拟品牌表含两条相同assignmentId；binding不变。
+assert.throws(()=>RfqBrandHost.read(duplicateIdApplication,binding), /标识/);
+```
+
+### C4｜项目品牌参考表导入与查看（6–10小时）
+
+**新增：** `src/brand-reference.js`、`test/brand-reference.test.cjs`、`test/ui-brand-reference-check.cjs`；接入C3界面。
+
+- [ ] 取得Q5复制件，只读确认表头、合并单元格、类别、品牌和备注列；记录本机样本路径和哈希，不上传样本。
+- [ ] 实现`RfqBrandReference.parse(snapshot,mapping)`，mapping明确sheet/headerRow/categoryColumn/brandColumn/noteColumn；缺表头不猜、歧义要求选择映射。
+- [ ] 列出参考类别/品牌/备注及来源表行；搜索只供查看，不自动改变分类或覆盖已填品牌。
+- [ ] 覆盖空表、跨行标题、多品牌文本、错误映射、重复行和取消；真实WPS按原样查看并证明原件SHA不变。
+
+```javascript
+// 浏览器测试宿主在文件选择时返回合成参考表；品牌栏事先填入“已选品牌”。
+const before = await page.getByLabel('品牌',{exact:true}).first().inputValue();
+await page.getByRole('button',{name:'导入品牌参考表'}).click();
+assert.equal(await page.getByLabel('品牌',{exact:true}).first().inputValue(),before);
+```
+
+**出口：** 手填路径仍可独立使用；无真实样本时仅C4实机验收保持未完成，不伪造格式兼容结论。
+
+### C5｜询价抬头、本机复用及完整性确认（6–10小时）
+
+**新增：** `src/inquiry-header.js`、`src/header-ui.js`、`dev/header-store.cjs`及同名测试、`test/ui-header-check.cjs`；修改服务/项目接线。
+
+- [ ] `RfqInquiryHeader.validate(value)`校验公司名称、地址、工程名称、材料员、联系方式等Q6确认字段；不填默认真实信息，不用手机号正则排除合法座机/分机。
+- [ ] 提供“保存本机模板”和明确选择后“应用模板”；模板与项目副本分离，修改模板不能改变已保存项目。
+- [ ] 本机API`/api/header/load|save`按B2原子存储/版本冲突方式处理，但文件为独立`header-templates.json`，不与分类库混存。
+- [ ] 确认页同时显示各assignment品牌/供应商和抬头；任何必填或范围未确认都不能使brand阶段ready。
+- [ ] 保存失败保留页面草稿；重启恢复正确；改抬头使生成与拆分过期。真实联系人数据只在本机，测试使用合成字段。
+
+```javascript
+assert.equal(RfqInquiryHeader.validate({company:'',projectName:'测试楼',contact:'测试员',phone:'010-12345678'}).ok,false);
+assert.equal(projectAfterTemplateEdit.header.company,projectBeforeTemplateEdit.header.company);
+```
+
+### D1｜询价分组、数量与字段白名单（8–14小时）
+
+**新增：** `src/inquiry-model.js`、`src/decimal.js`、`test/inquiry-model.test.cjs`、`test/decimal.test.cjs`；**最小修改：** `src/merge.js`改为调用共用十进制函数，原API不变。
+
+- [ ] 先把现有十进制相加行为写成共享回归：长整数、小数、零、前导零及非法数量；抽取`RfqDecimal.add(a,b)`，不改成浮点累加。
+- [ ] 按已确认的类别＋品牌形成询价组，绑定供应商；Q3多供应商未定或同组矛盾就阻断，不任取一个。
+- [ ] 组内仅类别、名称、特征、单位、品牌要求相同才合计；未预合并时额外保留scopeId。使用原来源集合去重计数，不能再把已经合并过的数量重复加一次。
+- [ ] 多品牌若属于替代询价，同一工程需求出现在不同询价对象中应各自守恒，并保留assignment映射；不把各报价对象数量总和当采购总量。该语义以Q1确认结果实现。
+- [ ] 输出values只含§2白名单；不展开内部对象、不复制源sheet。报价/金额空白，字面公式样文本按文本保留；超长单元格明确拒绝，不截断。
+- [ ] worksheet名称限制、字符替换和替换后的碰撞都在预览暴露；ID与显示名分离，稳定顺序可重复生成。
+
+```javascript
+const Decimal = require('../src/decimal.js');
+assert.equal(Decimal.add('0.1','0.2'),'0.3');
+assert.equal(separateModel.trace.some(row=>row.scopeIds.length>1),false);
+assert.equal(model.sheets.every(sheet=>sheet.kind==='inquiry'),true);
+assert.equal(model.sheets.every(sheet=>sheet.values.every(row=>row.every(value=>typeof value==='string'))),true);
+```
+
+### D2｜真实WPS总询价工作簿与版式（8–14小时）
+
+**新增：** `src/inquiry-ui.js`、`test/ui-inquiry-check.cjs`；**修改：** `src/export-host.js`、`src/project-ui.js`、页面/白名单及`test/export-host.test.cjs`。
+
+- [ ] 从Q6脱敏样稿落实抬头区域、清单起始行、列宽、特征换行、打印重复表头和分页；用`sheet.layout`传递布局，旧内部清单无layout时保留当前行为。
+- [ ] 生成前重算contentKey和阶段有效性；用户确认预览、选新路径，沿用prepare→WPS写入→禁宏重开逐值校验→独占commit。
+- [ ] 将D1的询价model.sheets与由trace生成的`kind:'internal'`追溯页组成独立workbookModel，再交给宿主写入；保留D1对外模型的纯询价页边界。E阶段只取kind=inquiry页，绝不按页名猜测。
+- [ ] generation保存target/sha256/inputKey、询价sheetId清单及当次modelSnapshot（固定生成时间、公开值和布局）；E2重启续作复用该快照，不用新时间重新生成另一份内容。控制保存体积并沿用服务大小限制，超过限制明确拒绝；内容变化后旧回执过期，只有全部写入并校验成功才置generation ready。
+- [ ] 测取消、写入/提交失败、长特征、多页、前导零、长小数、两品牌分表；真实WPS查看和独立读回，旧内部三表回归仍通过。
+
+```javascript
+assert.equal(generation.inputKey,currentInputKey);
+assert.deepEqual(generation.sheetIds,model.sheets.filter(sheet=>sheet.kind==='inquiry').map(sheet=>sheet.sheetId));
+assert.equal(readback.prices.every(value=>value===''),true);
+```
+
+### E1｜拆分计划、文件名与预检（6–10小时）
+
+**新增：** `src/split-plan.js`、`test/split-plan.test.cjs`、`src/split-ui.js`、`test/ui-split-check.cjs`；修改页面与白名单。
+
+- [ ] 落实Q4命名规则；基础名保持`分类_供应商名称.xlsx`。非法字符、保留设备名、末尾点/空格、大小写和清洗后同名、过长路径均在预览中给具体冲突。
+- [ ] 文件计划逐项显示类别、品牌、供应商、工作表、材料数和绝对输出路径；一个询价sheetId对应一个fileId，不依赖页名排序。
+- [ ] 拆分前检查全部信息确认、contentKey、总工作簿实际SHA、目标目录和全部已有目标；任何已知冲突在发布第一份之前阻断。
+- [ ] 预检后仍可能发生目标竞争，执行时继续独占发布；不能因为预检通过就使用覆盖式保存。
+
+```javascript
+assert.equal(plan.files.length,inquirySheetIds.length);
+assert.equal(new Set(plan.files.map(file=>file.target.toLowerCase())).size,plan.files.length);
+assert.ok(conflictingPlan.conflicts.length>0);
+```
+
+### E2｜逐份拆分、持久回执和失败续作（10–16小时）
+
+**新增：** `dev/split-store.cjs`、`test/split-store.test.cjs`、`test/split-server.test.cjs`；修改`src/split-ui.js`、`dev/server.cjs`、项目接线及`ui-split-check.cjs`。
+
+- [ ] 为每个fileId创建独立暂存和发布票据，用generation.modelSnapshot中已验证的对应询价页生成单表xlsx；不整簿复制，不带隐藏内部表、路径、注释或价格。
+- [ ] 按文件执行写入/重开校验/独占发布；成功立即原子保存SHA回执，失败记录具体文件与原因；UI显示完成x份/失败y份。
+- [ ] 中途退出或服务重启后，从本机split回执加载，重算已有文件SHA；成功且SHA一致的跳过，只重试未完成项。
+- [ ] 如果文件已发布但回执写入前中断，标记“结果待核对”，重开比对当前模型和内容后才能确认或建议换新名；不盲目覆盖、不悄悄当作成功。
+- [ ] 总文件变化、输入key过期或成功文件被外部改写时拒绝沿用旧拆分状态。全部文件核实成功后才使split ready。
+- [ ] 两品牌/同供应商/重名、第二文件失败、重启重试、响应丢失、外部文件变更实机验证；原总工作簿和原清单SHA不变。
+
+```javascript
+assert.equal(firstRun.succeeded.length,1);
+assert.equal(firstRun.failed.length,1);
+assert.equal(retry.writtenFileIds.includes(firstRun.succeeded[0].fileId),false);
+assert.equal(afterRetry.firstFileSha256,beforeRetry.firstFileSha256);
+```
+
+### F1｜安装、服务启动、升级与卸载（12–20小时）
+
+**拟新增：** `wps-addin/install/install.ps1`、`start.ps1`、`uninstall.ps1`、`test/install.test.cjs`；修改`dev/server.cjs`启动配置/资源清单；增加发布清单与运行说明。
+
+- [ ] 执行时核对WPS官方部署文档和Q7环境，确定支持版本及用户级安装方式；当前`enable_dev`注册不能直接作为生产支持结论。
+- [ ] 选择可验证的本机发行包：固定代码/运行时版本和许可证清单；服务仅监听127.0.0.1，健康检查区分身份，端口冲突不杀陌生进程。
+- [ ] 启动器避免多实例、提供可见的启动失败原因，后台进程默认隐藏窗口；不依赖Codex当前会话维持服务，不擅自降低WPS/Windows安全设置。
+- [ ] 注册前备份publish.xml，只增改本插件节点；卸载只移除本插件、停止其所属进程，默认保留项目/分类库/抬头数据并解释位置。
+- [ ] 升级先备份用户数据并校验兼容，失败回退代码/注册；未来schema不能被旧程序覆盖。正式包不带探针、故障注入入口和测试数据。
+- [ ] 干净测试环境走安装→重启WPS/系统→打开项目→升级→回退→卸载→重装恢复；本机开发环境保持可恢复。
+
+```javascript
+assert.equal(otherPluginXmlAfter,otherPluginXmlBefore);
+assert.equal(userDataShaAfterUninstall,userDataShaBeforeUninstall);
+assert.equal(releaseFiles.some(name=>/host-probe|pane-diagnostics|acceptance-probe|fault/.test(name)),false);
+```
+
+### F2｜四项目完整验收与输出扫描（12–16小时，不含大批人工分类时间）
+
+**新增：** `wps-addin/test/release-audit.cjs`、`docs/wps-phase1-acceptance.md`；合成样本生成/本机结果留`outputs/`。
+
+- [ ] 先跑小型合成全链路，包含重复项、不同来源、无需询价、分类冲突、两品牌和失败续作；再对四项目的复制件验收。
+- [ ] 历史读取基线为33张表、候选263/3143/1473/2708共7587条，曾预合并5399条；只作为相同输入指纹下的对照，不强迫新修正结果凑旧数字。
+- [ ] 四项目逐步走导入→来源核对→可选合并→人工分类→品牌/供应商/抬头→总表→拆分→重启恢复；未有人工确认的条目不得自动全选伪造验收。
+- [ ] 每组对账来源集合、分组数及精确数量；Q1多品牌按询价对象分别对账，工程需求总量单独保留。
+- [ ] 自动解包检查所有对外xlsx：sheet数量、隐藏表、单元格、公式、批注/链接等；只允许白名单输出，不含原价、历史报价、内部路径/核对记录。
+- [ ] 审计工具输入为`files`及本机`expectedManifest`；清单按fileId/sheet/行号映射预期公开值与内部sourceIds。先逐值核对输出，再按该映射对账来源，sourceIds不得为了验收而写进供应商文件。
+- [ ] WPS视觉复核打印/分页/长特征/列宽/抬头；记录所有输入输出SHA和实际耗时，明确卡顿/漏行及恢复结果，不虚构性能门槛。
+
+```javascript
+assert.equal(audit.internalSheets.length,0);
+assert.equal(audit.forbiddenFields.length,0);
+assert.equal(audit.formulaCells.length,0);
+assert.deepEqual(audit.sourceIds.sort(),expectedSourceIds.sort());
+```
+
+### F3｜用户说明、发布核对及最终交接（4–8小时）
+
+**新增：** `docs/wps-user-guide.md`、`docs/wps-install-guide.md`、`docs/wps-phase1-release-checklist.md`；更新本文件。
+
+- [ ] 按真实界面写安装/启动、导入、核对、合并、分类维护、品牌抬头、生成、拆分、恢复操作，不使用效果图充当运行截图。
+- [ ] 说明重载会影响未保存内容、记忆撤销、库保存冲突、部分文件成功、原件保护和数据备份位置；每个错误说明下一步操作。
+- [ ] 一名按文档操作的验收者完整走一遍合成项目，记录文案歧义并修订；用户只核对业务结果，不替代可自动执行的技术测试。
+- [ ] 汇总全部工作包证据、支持环境、已知限制与版本；P1/P4未解决或关键P5未验收时不能标记一期交付。
+- [ ] 明确文件清单提交、推送并核SHA；记录安装包校验值。合入main或创建发布版本作为单独明确操作安排，不擅自强推历史。
+
+## 8. 阶段验收与不重复测试原则
+
+| 门槛 | 必须满足 | 失败时回到 |
 | --- | --- | --- |
-| P1/P4/P5 集中修复与实机复核 | 侧栏根因证据、最小修复、真实WPS验收记录 | 合并另存与分类写列在真实WPS通过；未通过则保留具体阻塞边界 |
-| 9C 习惯学习与维护界面 | 记忆候选接线、库/记忆维护、撤销与冲突 | 建议不得成为确认；库更新不暗改已确认项目；保存失败保留本次核对 |
-| 10 分类品牌表、品牌参考、供应商与抬头 | 类别全确认后生成；品牌与供应商独立；抬头可复用 | 未全确认阻断；空值不默认算完成 |
-| 11 项目总询价工作簿 | 按类别＋品牌分表，白名单列，报价留空 | 来源与数量守恒；不带招标原价/历史报价 |
-| 12 文件预览与一键拆分 | 命名`分类_供应商名称.xlsx`，不覆盖不漏组 | 全部信息确认前不拆分；失败可恢复并如实报告 |
-| 13 安装包、四项目验收与操作说明 | 安装/升级/恢复/卸载有证据 | 完整流程走通并扫描对外文件，才标记一期交付 |
+| A稳定性 | P1/P4根因与修复可核对；P5矩阵有真实WPS证据；P3支持边界明确 | A1/A2/A3；P6非功能残留单列 |
+| B分类习惯 | 人工确认才学、冲突可见、撤销有效、持久化失败不丢当前核对、重启可恢复、确认资料迁入可对账 | B1～B5 |
+| C填写 | 全分类确认才建表；品牌与供应商独立；范围/抬头明确；项目阶段和外部编辑可核对 | C1～C5 |
+| D生成 | 来源/数量正确、版式可读、旧输出过期、无原价泄露 | D1/D2 |
+| E拆分 | 每页对应正确文件、不覆盖、部分失败可追踪与恢复、输出无内部资料 | E1/E2 |
+| F交付 | 独立启动、安装升级卸载可恢复、四项目通过、说明可复现 | F1～F3及发现缺陷所属包 |
 
-### 9.1 任务10：分类品牌表、品牌参考、供应商和询价抬头
+日常小改只跑相关专门测试；每个阶段完成及涉及宿主/共同模型的改动跑全套。实机已通过的样本不要求用户无理由重做；新增测试必须说明要验证哪个尚未关闭风险。所有结果分别标注“单测”“浏览器模拟宿主”“真实WPS”，不得混写。
 
-1. 在`test/classification.test.cjs`新增“剩1行未确认不得生成”“无需询价不进入品牌表”“分类变更使后续品牌表过期”失败用例；从`src/classification.js`的最终人工决策生成一行一材料的分类品牌表模型，不把建议当确认。
-2. 新建`src/brand-table.js`与`test/brand-table.test.cjs`：输出类别、材料名称、特征、单位、数量、来源索引、品牌、供应商独立字段；保留未填状态，禁止把空字符串当完成。按项目阶段记录版本与来源revision。
-3. 找到实际品牌参考表后先做只读格式映射测试，再实现`src/brand-reference.js`；导入只供查看和选择，不自动覆盖手填品牌。没有可用实表时先完成手填路径，并在交接记录样本缺口。
-4. 新建`src/inquiry-header.js`与本机存储接口：公司名称、地址、工程名称、材料员及联系方式分别验证和保存；只在用户明确选择时复用，输出预览显示将带入的值。联系方式仍保存在本机数据目录，不提交Git。
-5. 侧栏新增品牌/供应商/抬头填写与完整性提示，浏览器用例覆盖空值、改分类后的失效、品牌和供应商互不串列。跑全套测试、真实WPS手填/重开检查；更新交接并按§1提交备份。
+## 9. 接续第一轮的具体动作及命令
 
-### 9.2 任务11：项目总询价工作簿
+**接续第一轮只执行A1，遇到证据足以定位时进入A2；不先补新功能。**
 
-1. 新建`src/inquiry-model.js`和`test/inquiry-model.test.cjs`，先写失败用例：按**类别＋品牌**分表，同类别多品牌分开；只有类别、名称、特征、单位、品牌要求完全相同才汇总，十进制数量守恒，来源可回溯。
-2. 定义并测试对外列白名单（抬头、材料字段、需求数量、供应商填写的报价空列）；原招标价格、历史报价、内部来源核对与个人本机路径不得进入对外工作表。用字段级扫描断言，不靠视觉判断。
-3. 复用`src/export-host.js`的文本分块写入/重开逐值校验和`dev/export-files.cjs`的独占发布；另存项目总工作簿前确认分类、品牌、供应商、抬头阶段均有效，保存失败不得产生成功回执。
-4. 浏览器跑生成、取消、写入失败、重试与重名场景；真实WPS读取生成的总工作簿，核对工作表数、命名、数量、换行和文本精度。结果记入独立验证文档后提交备份。
-
-### 9.3 任务12：文件预览与一键拆分
-
-1. 新建`src/split-plan.js`和测试，先生成**确定的文件清单预览**：每张询价表对应一个独立xlsx，基础名`分类_供应商名称.xlsx`；过滤Windows非法文件名、保留映射与来源计数。相同类别/供应商多品牌造成重名时先阻断并显示冲突列表，用真实案例确定后缀规则后再放行。
-2. 拆分前复核项目总工作簿SHA256和阶段revision；品牌/供应商/抬头缺失、目标已存在、文件名冲突或输出目录不可写时零发布。测试中逐一注入失败并确认不覆盖旧文件。
-3. 复用受控宿主写入及独占发布，一文件一回执；失败汇总成功/失败清单并可对未完成项重试，不把部分成功说成全部完成。拆分后保留项目总工作簿，绝不发送文件。
-4. 在真实WPS用两品牌、同供应商和同名样本核对工作簿数量、文件名、内容白名单、数量及原项目文件不变；记录SHA256与独立读取证据，再提交备份。
-
-### 9.4 任务13：安装包与一期验收
-
-1. 固定WPS支持版本、安装目录、服务启动和卸载行为；在干净测试环境做安装、升级、重启、恢复项目、卸载四条路径，失败能回退。版本兼容以P1/P3实测结论为准。
-2. 用四项目清单的**复制件**走导入→来源核对→可选合并→分类→品牌/供应商/抬头→生成→拆分全流程；逐阶段核对行数与数量守恒、输出文件存在且SHA256稳定，原件哈希始终不变。
-3. 自动扫描所有对外xlsx的工作表/列/公式/隐藏内容，确认没有招标原价、历史报价、内部核对表和本机路径；再做人工视觉检查与操作说明的逐步复现。
-4. 整理安装、升级、恢复、卸载和四项目验收证据；只有P5及完整流程都通过才把一期标记交付。按§1明确文件清单提交推送，远程SHA核对后结束。
-
-### 9.5 每个开发片的通用步骤与待人工项
-
-每片按“写能观察结果的失败用例→运行确认预期失败→最小实现→专门测试→全量单测/浏览器回归→必要的真实WPS复核→更新本文件和证据→明确文件清单暂存/审查→提交/推送/核远程SHA”执行。新增`src/*.js`或`rules/*.json`必须同步服务静态白名单与MIME测试。P6缓存目录仍需人工按**字面绝对路径**核对清理；自动审批拒绝的递归删除不得改用跨shell绕过。
-
-## 10. 运行、验证与备份命令
+- [ ] 完整读本文件、用户最新消息、根AGENTS.md和两日验证记录。
+- [ ] 运行下面只读状态检查；监听存在时先确认进程属于本插件，再决定复用，不因端口占用盲目终止。
+- [ ] 为A1新建一个独立报告文件；选择合成`测试一.xlsx/测试二.xlsx`及编码样本，记录SHA；核对已保存核对可直接恢复。
+- [ ] 先完成一轮无探针对照，封存结果；再在核对已保存的前提下切换诊断服务和新窗格。每次只变一个条件，停滞立即保存现场。
+- [ ] 本轮结束更新A1进度、下一实验和证据路径，按§10备份；若不能复现，写清未复现的组合，不反复让用户猜状态。
 
 ```powershell
 git status --short
+git log -1 --oneline
 Get-NetTCPConnection -LocalPort 38891 -State Listen -ErrorAction SilentlyContinue
 Invoke-RestMethod 'http://127.0.0.1:38891/health'
+```
 
+服务命令（仅在确认需要启动且无本插件实例占用时执行；切换前保留现场）：
+
+```powershell
 node wps-addin/dev/server.cjs --import-directory F:\材料软件开发\outputs\wps-save-native\imports
-# P1/P4取证时改用（新侧栏必须在探针服务启动后重新打开）：
-node wps-addin/dev/server.cjs --report F:\材料软件开发\outputs\wps-pane-diagnostic.json --probe-output F:\材料软件开发\outputs\wps-pane-probe.xlsx --import-directory F:\材料软件开发\outputs\wps-save-native\imports
-node --test wps-addin/test/*.test.cjs
+# 诊断模式：报告文件名每个会话使用新名称；此处为示例。
+node wps-addin/dev/server.cjs --report F:\材料软件开发\outputs\wps-pane-next-session.json --probe-output F:\材料软件开发\outputs\wps-pane-next-output.xlsx --import-directory F:\材料软件开发\outputs\wps-save-native\imports
+```
 
+当前完整回归命令（新增测试脚本须加入该清单）：
+
+```powershell
+node --test wps-addin/test/*.test.cjs
 $env:NODE_PATH='C:\Users\刘杨\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\node_modules'
 node wps-addin/test/ui-check.cjs
 node wps-addin/test/ui-review-check.cjs
@@ -251,47 +548,56 @@ node wps-addin/test/ui-export-check.cjs
 node wps-addin/test/ui-project-check.cjs
 node wps-addin/test/ui-classification-check.cjs
 node wps-addin/test/ui-pane-diagnostics-check.cjs
+```
 
-git add -- <明确文件清单>
+`NODE_PATH`仅为本机已验证位置；换机器先查询环境。当前144是历史基线，新增测试后按实际输出更新计数；代码未变的纯文档整理只做文档/路径/差异检查，不无故重复运行整套WPS测试。
+
+## 10. 每包提交和交接要求
+
+1. 核对工作包修改文件和验证结果；文件清单中不得出现原始清单、报价、联系方式、凭据、本机配置、输出和历史网页资料。
+2. 独立证据记实际输入指纹、场景、输出/提示、通过与未通过项。本文件只更新状态、估算变动、下一项；未完成项保持未勾选。
+3. 只暂存本包明确路径，审查完整暂存差异，`git diff --cached --check`通过后提交；推送已配置分支并比对本地与远程SHA。
+4. 推送失败保留本地提交，记录待同步与原因；不强推，不声称已备份。不要为记录当前提交自己的SHA反复创建只有SHA变化的循环提交。
+
+```powershell
+# git add -- 后逐一列出本包实际文件；禁止 git add . / git add -A。
 git diff --cached --check
 git diff --cached
-git commit -m "..."
+git commit -m "本包具体改动"
 git push origin feat/wps-phase1
 git rev-parse HEAD
 git ls-remote origin refs/heads/feat/wps-phase1
 ```
 
-`NODE_PATH`为本机已验证路径，换机器先重新查询；WPS实机操作前先复制原件，不要批量关闭工作簿。
+**本次计划整理的备份基线：** 代码修复`045b0f7`及状态补录`82de08e`已推送并核对。此次仅修改`handoff.md`，文档检查后以包含本文件的新提交推送；提交号和远程核对结果在任务最终回复中记录，本段不预写未发生的成功。
 
-## 11. 本地数据边界与资料入口
+## 11. 现场、样本和证据索引
 
-- 运行数据：导入副本默认`%LOCALAPPDATA%\WpsRfqAddin\imports`，项目记录默认`%LOCALAPPDATA%\WpsRfqAddin\projects`；核对记录在侧栏localStorage（键前缀见6.4）；均不进Git。
-- 证据文档：`docs/wps-foundation-verification.md`、`docs/wps-parser-verification.md`、`docs/wps-exact-merge-verification.md`、`docs/wps-source-review-verification.md`、`docs/wps-multi-import-verification.md`、`docs/wps-merge-save-verification.md`、`docs/wps-repair-verification-20260924.md`、`docs/wps-pane-review-verification-20260925.md`。
-- 设计与计划：`docs/wps-addin-phase1-design-v2.md`、`docs/superpowers/plans/`。
-- 本地输入与格式样本：`分类/`下项目一至四清单与材料分类文件；输出样式优先参考`项目一材料分类.xlsx`、`项目二材料分类.xls`。
-- 人工分类依据：`outputs/rule-return-20260920/分类人工核对_第十三批确认.xlsx`加`outputs/rule-fix-20260921/answer-overrides.json`（仅参考，不进仓库）。
-- 效果图`docs/mockups/`仅设计示意，不代表已实现功能。
+### 最近现场（历史观察，接续时重新检查）
 
-## 12. 待定业务事项
+- 2026-09-25最后实机使用WPS表格`12.1.0.29161`；38891无探针服务健康接口为`development`。此处不保证当前进程仍运行。
+- 编码合成样本已关闭且磁盘未变；核对记录保存在WPS侧栏localStorage。来源核对保存记录和项目分类记录是不同入口，不要混用。
+- 合成项目`p-muflwtzr-whahd6u2`曾恢复1份来源、未合并、分类4/4及正确阶段；仅作测试项目，不覆盖真实项目记录。
 
-| 事项 | 当前状态 | 处理时点 |
-| --- | --- | --- |
-| 匹配度展示 | 用完全/相近/无可靠匹配＋依据；数值评分未定 | 已按此实现，9C接线后复核措辞 |
-| 多品牌同供应商重名 | 基础文件名已定，追加序号仍为建议 | 任务12用具体文件列表定稿，此前冲突阻断 |
-| 品牌参考表格式 | 尚未找到独立实际表 | 任务10找到资料后做映射验收 |
-| 品牌范围与缺省值 | 多品牌分表已定，空品牌/材料范围待定 | 任务10结合填写界面确认，不默认空值完成 |
-| 一个类别/品牌多个供应商 | 如出现需明确分表与供货单位对应 | 任务10/11提示冲突并确认映射 |
+### 本机合成样本（不入Git）
 
-## 13. 本轮交接的备份状态
+| 路径 | 用途 / 已知结果 |
+| --- | --- |
+| `outputs/wps-save-native/测试一.xlsx`、`测试二.xlsx` | 导入和3→2合并；水管数量0.1/0.2与异常字面文本边界 |
+| `outputs/wps-classification-case-20260924/分类口径复测.xlsx` | 四条已确认业务口径、3张表、真实表头第2行 |
+| `outputs/wps-numeric-format-20260924/编码格式复测.xlsx` | 给排水A3数字123、格式000000；SHA `B24A413F7AF8EE14378581607863E0985E5740D822AE9A6E58D5D604CFFFD810` |
+| `outputs/wps-numeric-format-20260924/编码格式输出.xlsx` | 清单B2文本000123；SHA `DE1C75530DA1173DE27426779012088366AF32CC09122D3C1E5511CDCDDB9638` |
+| `outputs/wps-pane-diagnostic-20260925.json` | 滚动报告最终只剩新会话100条，不能当作旧冻结完整证据 |
 
-- **2026-09-25本次修复已备份**：`045b0f7`包含探针回调去重及生命周期取证、来源核对失败就近提示、格式失效/关闭重开恢复实机证据与执行计划。最终144项Node和7组浏览器检查通过；已推送`feat/wps-phase1`，当次本地/远程SHA均为`045b0f7ff1dc693644d48b5c0d60aec2b8fbc188`。本条为推送成功后的状态补录。
-- 历史功能提交：`5d24365`（接入）、`b07d779`（识别）、`b2e1154`（合并）、`4c6a613`（来源核对）、`eb4268d`（多文件导入）、`582745c`（内部清单另存）、`af99fde`/`df97afd`/`5b4b355`/`cc16274`/`b187bb1`（任务8五片）、`98d715a`（9A分类库）、`3354367`（9B模型层）、`ac95429`（9B侧栏与写入）、`c26c934`（分类随项目恢复）、`9dfa3c4`（合并项目写合并表）、`4ee732e`（9C习惯记忆模型）。
-- P8与首版探针在`7864626`推送；后续交接状态见`f3bfd35`。主动重载、限流探针、合并另存实机证据和交接更新在`6f02e42`推送到`feat/wps-phase1`，本地及远程SHA均为`6f02e42a81da3830475d50dc7fb7463ef2d7387d`。
-- 来源明细行高修复、两种取消/禁止覆盖/辅助表视觉实机证据及138项整体回归已在`5c9d39c`推送到`feat/wps-phase1`，本地与远程 SHA 均为`5c9d39c203914b8271894acbd5d65eff33a39e49`；备份状态补录在`945b48f`，其本地与远程 SHA 均为`945b48f31b9b4ec73d5f418411697262772586e5`。用户分类截图及复测确认0/2、1/2禁写与撤销复位，新版目标文案在实机切换正确；该文案片已在`29abdfd`推送。
-- `ec6000a`已推送并核对本地/远程SHA同为`ec6000a5f6329ab4dc2a0175bc0808d30a5ba7de`，包含工作副本分类列标题行号修复及实机证据；数值编码格式签名修复与自动化回归已在`4cb6e45`推送，本地/远程SHA同为`4cb6e4566c7b25323710dd9f2d7805b671a571ff`，工作区干净。
-- 分类列防覆盖与部分成功提示已在`b5dbc19`推送，本地/远程SHA同为`b5dbc19738ad4206738c01fbc1902a82857761f1`。
-- 回执来源绑定已在`e4619da`推送，本地/远程SHA同为`e4619da3514a5e745dec8673afdec995619f8daa`；复核时38891仍拒绝连接，真实WPS写列未进行，工作区干净。
-- 探针保留修复已在`7fb217a`推送，本地/远程SHA同为`7fb217aefef1df6ba47f4f9dfef1d0f2deed0106`：旧报告只保留最后100条心跳，关键早期事件被挤掉；现优先淘汰心跳，先红后绿测试通过。完整Node回归142/142、相关浏览器另存/分类/探针三组通过；此前其余四组浏览器检查通过。P1/P4触发根因仍未关闭。代启服务先前被自动审批拒绝，未换方式绕过。
-- 分类阶段同步与恢复提示修复已在`387cac7`推送，本地/远程SHA同为`387cac7bf255d430a4ad7b013e1642f426cf342c`；142项Node与7组浏览器检查通过，真实WPS保存/重载后分类4/4、阶段“已确认”、恢复项目编号均正确，本机项目JSON也持久为`ready`。
-- 9月24日用户恢复服务后完成的合并分类写列、来源变化阻断、重复写入拒绝、项目阶段恢复和三轮首次导入记录，详见`docs/wps-repair-verification-20260924.md`。9月25日新增格式失效、核对关闭重开恢复与侧栏取证结果，见`docs/wps-pane-review-verification-20260925.md`；下一项按§8.1执行。
-- 已知本地待清理：仓库根目录`%SystemDrive%/`（三个工具误写缓存文件），自动审批拒绝递归删除，请人工确认后清理；`outputs/`下诊断与截图仅本机，不上传。
+### 数据与文件边界
+
+导入副本默认`%LOCALAPPDATA%\WpsRfqAddin\imports`，项目默认`%LOCALAPPDATA%\WpsRfqAddin\projects`；本机测试服务也可能指定`outputs/`目录。核对localStorage键前缀：导入用`rfq-import-review-v1:`，当前工作簿用`rfq-source-review-v1:`。现有默认分类仅四类四规则，不代表历史全类别已迁入；按B5检查明确人工答案后扩展，不能批量接受旧网页预测。
+
+### 独立证据（接手按当前任务查阅）
+
+- 近期缺陷、分类写列、数值输出：`docs/wps-repair-verification-20260924.md`。
+- 最近侧栏取证、格式失效、关闭重开恢复和144项回归：`docs/wps-pane-review-verification-20260925.md`。
+- 内部另存：`docs/wps-merge-save-verification.md`。
+- 接入、识别、核对、导入、合并：`docs/wps-foundation-verification.md`、`docs/wps-parser-verification.md`、`docs/wps-source-review-verification.md`、`docs/wps-multi-import-verification.md`、`docs/wps-exact-merge-verification.md`。
+- 设计：`docs/wps-addin-phase1-design-v2.md`；历史分片计划在`docs/superpowers/plans/`，当前待办以本文件为准。
+- 原始业务资料只留本机`分类/`；输出样式参考项目一/项目二材料分类文件。`docs/mockups/`是效果图，不是开发或验收进度。
