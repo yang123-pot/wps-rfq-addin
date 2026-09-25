@@ -6,6 +6,7 @@ const os = require('node:os');
 const {prepareFiles,restoreCopy} = require('./import-files.cjs');
 const {createExportStore} = require('./export-files.cjs');
 const {createProjectStore} = require('./project-store.cjs');
+const {createLibraryStore} = require('./library-store.cjs');
 
 const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.css', '/src/host.js',
   '/src/taskpane.js', '/src/parser.js', '/src/merge.js', '/src/review.js', '/src/review-ui.js',
@@ -17,12 +18,13 @@ const TYPES = {'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=
   '.html':'text/html; charset=utf-8','.xml':'application/xml; charset=utf-8','.svg':'image/svg+xml',
   '.json':'application/json; charset=utf-8'};
 
-function createServer({root, probeConfig = null, reportPath = null, importDirectory = null, projectDirectory = null}) {
+function createServer({root, probeConfig = null, reportPath = null, importDirectory = null, projectDirectory = null, libraryDirectory = null}) {
   const reports = [];
   let writes = Promise.resolve();
   const importToken = crypto.randomBytes(32).toString('hex');
   const exports = importDirectory ? createExportStore({directory:path.join(importDirectory,'exports')}) : null;
   const projects = createProjectStore({directory: projectDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'projects')});
+  const libraries = createLibraryStore({directory: libraryDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'library')});
   let importing = false;
   const server = http.createServer(async (req, res) => {
     const origin = 'http://127.0.0.1:' + server.address().port;
@@ -75,6 +77,24 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         }
         return json(200,{projects:await projects.list()});
       } catch(error) {return json(400,{error:error.message});}
+    }
+    if (['/api/library/load','/api/library/save'].includes(url.pathname)) {
+      const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');
+      if (req.method !== 'POST') return json(405,{error:'POST required'});
+      if (req.headers['x-rfq-import-token'] !== importToken ||
+          !/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) return json(403,{error:'分类库会话失效，请重新打开侧栏。'});
+      try {
+        let size=0; const chunks=[];
+        for await (const chunk of req) { size+=chunk.length; if(size<=4194304)chunks.push(chunk); }
+        if(size>4194304)return json(413,{error:'分类库请求过大，未保存。'});
+        let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'分类库请求无效。'});}
+        if(!data||Array.isArray(data))return json(400,{error:'分类库请求无效。'});
+        if(url.pathname==='/api/library/load')return json(200,await libraries.load());
+        return json(200,await libraries.save(data));
+      } catch(error) {
+        if(error.code==='REVISION_CONFLICT')return json(409,{error:error.message});
+        return json(400,{error:error.message});
+      }
     }
     if (url.pathname === '/__probe/report') {
       if (!probeConfig || !reportPath) return reply(404, 'Not found');
@@ -159,7 +179,8 @@ async function main() {
   const sourcePaths = outputPath ? await prepareProbeSources(inputPaths, path.dirname(path.resolve(outputPath))) : [];
   const probeConfig = outputPath ? {token:crypto.randomBytes(24).toString('hex'), outputPath:path.resolve(outputPath),sourcePaths} : null;
   const importDirectory=path.resolve(arg('--import-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','imports')));
-  const server = createServer({root:path.resolve(__dirname,'..'),probeConfig,reportPath:reportPath && path.resolve(reportPath),importDirectory});
+  const libraryDirectory=path.resolve(arg('--library-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','library')));
+  const server = createServer({root:path.resolve(__dirname,'..'),probeConfig,reportPath:reportPath && path.resolve(reportPath),importDirectory,libraryDirectory});
   server.on('error', error => { console.error(error.message); process.exitCode = 1; });
   server.listen(port, '127.0.0.1', () => console.log('WPS add-in ready: http://127.0.0.1:' + port + (probeConfig ? ' (probe enabled)' : '')));
 }
