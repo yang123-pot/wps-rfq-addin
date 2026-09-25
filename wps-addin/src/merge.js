@@ -1,32 +1,12 @@
 (function (root, factory) {
   'use strict';
-  var api = factory();
+  var api = factory(typeof module === 'object' && module.exports ? require('./decimal.js') : root.RfqDecimal);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.RfqMerge = api;
-}(typeof window === 'object' ? window : globalThis, function () {
+}(typeof window === 'object' ? window : globalThis, function (decimal) {
   'use strict';
   function pathKey(value) { return String(value || '').replace(/[\\/]+/g, '/').toLowerCase(); }
-  function normalize(value) {
-    var parts = value.split('.');
-    var integer = parts[0].replace(/^0+(?=\d)/, '');
-    var fraction = (parts[1] || '').replace(/0+$/, '');
-    return integer + (fraction ? '.' + fraction : '');
-  }
-  function addDecimal(a, b) {
-    var left = a.split('.'), right = b.split('.');
-    var scale = Math.max((left[1] || '').length, (right[1] || '').length);
-    var x = left[0] + (left[1] || '').padEnd(scale, '0');
-    var y = right[0] + (right[1] || '').padEnd(scale, '0');
-    var size = Math.max(x.length, y.length), carry = 0, sum = '';
-    x = x.padStart(size, '0'); y = y.padStart(size, '0');
-    for (var i = size - 1; i >= 0; i--) {
-      var digit = Number(x[i]) + Number(y[i]) + carry;
-      sum = String(digit % 10) + sum; carry = Math.floor(digit / 10);
-    }
-    if (carry) sum = String(carry) + sum;
-    if (scale) sum = sum.slice(0, -scale) + '.' + sum.slice(-scale);
-    return normalize(sum);
-  }
+  var normalize = decimal.normalize, addDecimal = decimal.add;
   function preview(books, options) {
     if (!Array.isArray(books) || !books.length) throw new Error('请先添加解析后的工作簿。');
     options = options || {};

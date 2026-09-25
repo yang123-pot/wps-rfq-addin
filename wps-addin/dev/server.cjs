@@ -7,6 +7,7 @@ const {prepareFiles,restoreCopy} = require('./import-files.cjs');
 const {createExportStore} = require('./export-files.cjs');
 const {createProjectStore} = require('./project-store.cjs');
 const {createLibraryStore} = require('./library-store.cjs');
+const {createHeaderStore} = require('./header-store.cjs');
 
 const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.css', '/src/host.js',
   '/src/taskpane.js', '/src/parser.js', '/src/merge.js', '/src/review.js', '/src/review-ui.js',
@@ -14,18 +15,20 @@ const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.cs
   '/src/export-host.js', '/src/export-ui.js', '/src/project.js', '/src/project-ui.js',
   '/src/project-host.js', '/src/category-library.js', '/src/classify.js', '/src/classification.js',
   '/src/classification-ui.js', '/src/category-memory.js', '/src/library-ui.js', '/rules/defaults.json',
-  '/src/brand-table.js', '/src/brand-model.js', '/src/brand-host.js', '/src/brand-ui.js', '/assets/inquiry.svg']);
+  '/src/brand-table.js', '/src/brand-model.js', '/src/brand-host.js', '/src/brand-ui.js', '/src/decimal.js',
+  '/src/brand-reference.js', '/src/inquiry-header.js', '/src/inquiry-model.js', '/assets/inquiry.svg']);
 const TYPES = {'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
   '.html':'text/html; charset=utf-8','.xml':'application/xml; charset=utf-8','.svg':'image/svg+xml',
   '.json':'application/json; charset=utf-8'};
 
-function createServer({root, probeConfig = null, reportPath = null, importDirectory = null, projectDirectory = null, libraryDirectory = null}) {
+function createServer({root, probeConfig = null, reportPath = null, importDirectory = null, projectDirectory = null, libraryDirectory = null, headerDirectory = null}) {
   const reports = [];
   let writes = Promise.resolve();
   const importToken = crypto.randomBytes(32).toString('hex');
   const exports = importDirectory ? createExportStore({directory:path.join(importDirectory,'exports')}) : null;
   const projects = createProjectStore({directory: projectDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'projects')});
   const libraries = createLibraryStore({directory: libraryDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'library')});
+  const headers = createHeaderStore({directory: headerDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'headers')});
   let importing = false;
   const server = http.createServer(async (req, res) => {
     const origin = 'http://127.0.0.1:' + server.address().port;
@@ -92,6 +95,24 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         if(!data||Array.isArray(data))return json(400,{error:'分类库请求无效。'});
         if(url.pathname==='/api/library/load')return json(200,await libraries.load());
         return json(200,await libraries.save(data));
+      } catch(error) {
+        if(error.code==='REVISION_CONFLICT')return json(409,{error:error.message});
+        return json(400,{error:error.message});
+      }
+    }
+    if (['/api/header/load','/api/header/save'].includes(url.pathname)) {
+      const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');
+      if (req.method !== 'POST') return json(405,{error:'POST required'});
+      if (req.headers['x-rfq-import-token'] !== importToken ||
+          !/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) return json(403,{error:'抬头模板会话失效，请重新打开侧栏。'});
+      try {
+        let size=0; const chunks=[];
+        for await (const chunk of req) { size+=chunk.length; if(size<=1048576)chunks.push(chunk); }
+        if(size>1048576)return json(413,{error:'抬头模板请求过大，未保存。'});
+        let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'抬头模板请求无效。'});}
+        if(!data||Array.isArray(data))return json(400,{error:'抬头模板请求无效。'});
+        if(url.pathname==='/api/header/load')return json(200,await headers.load());
+        return json(200,await headers.save(data));
       } catch(error) {
         if(error.code==='REVISION_CONFLICT')return json(409,{error:error.message});
         return json(400,{error:error.message});
