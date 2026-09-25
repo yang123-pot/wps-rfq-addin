@@ -3,7 +3,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
 (async()=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-ui-import-')),files=[path.join(root,'一号.xlsx'),path.join(root,'二号.xls')];
  await fs.writeFile(files[0],'first file');await fs.writeFile(files[1],'second file');
- const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(root,'copies')});await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(root,'copies'),libraryDirectory:path.join(root,'library')});await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const browser=await chromium.launch({channel:'msedge',headless:true});
  try{
   const page=await browser.newPage({viewport:{width:380,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());

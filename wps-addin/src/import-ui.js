@@ -11,10 +11,13 @@
     var projects=RfqProjectUI.create({getCollection:function(){return collection;},mergeIdentical:function(){return merge.checked;},
       restore:function(project){return restoreProject(project);},getClassification:function(){return classifier.snapshot();},
       restoreClassification:function(value){classifier.restore(value);},onBusy:function(value){busy=value;options.onBusy(value);}});
+    var libraryPanel=null;
     var classifier=RfqClassificationUI.create({application:options.application,getCollection:function(){return collection;},
       mergeIdentical:function(){return merge.checked;},getMergedTarget:function(){return exporter.last();},
       getProjectId:function(){return projects.identity();},
+      onMemoryChange:function(state){if(libraryPanel)libraryPanel.adoptMemory(state);},
       onBusy:function(value){busy=value;options.onBusy(value);}});
+    libraryPanel=RfqLibraryUI.create({onChange:function(state){classifier.adopt(state);}});
     function tell(text,error){message.textContent=text;message.className=error?'error':'';}
     function restoreProject(project){
       var inputs=(project.sources||[]).map(function(source){

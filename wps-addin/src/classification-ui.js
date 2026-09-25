@@ -50,6 +50,9 @@
     {memory:memoryState,projectId:projectId()});
   }
   function renderMemory(){if(retry)retry.hidden=!unsavedMemory;}
+  function notifyMemory(){
+   if(options.onMemoryChange)options.onMemoryChange({revision:libraryRevision,library:library,memory:memoryState});
+  }
   function sourceContext(row,rowId){
    return {item:{name:row.group.name,feature:row.group.feature,unit:row.group.unit},projectId:projectId(),
     sourceProjectId:projectId(),rowId:rowId};
@@ -71,6 +74,7 @@
    saveMemory().then(function(){
     unsavedMemory=false;renderMemory();
     memoryTell('分类习惯已保存到本机分类库（版本 '+libraryRevision+'）。');
+    notifyMemory();
     render();
    }).catch(function(error){
     renderMemory();
@@ -83,6 +87,7 @@
    saveMemory().then(function(){
     unsavedMemory=false;renderMemory();
     memoryTell('分类习惯已保存到本机分类库（版本 '+libraryRevision+'）。');
+    notifyMemory();
     render();
    }).catch(function(error){
     renderMemory();memoryTell('习惯未保存，可重试：'+error.message,true);
@@ -254,6 +259,15 @@
    classification:function(){return state;},
    snapshot:function(){return state;},
    memory:function(){return memoryState;},
+   adopt:function(value){
+    if(!value||!value.library||!value.memory)return false;
+    var check=RfqCategoryLibrary.validate(value.library);
+    if(!check.ok)return false;
+    library=value.library;memoryState=value.memory;
+    libraryRevision=Number.isSafeInteger(value.revision)?value.revision:libraryRevision;
+    render();
+    return true;
+   },
    restore:function(value){
     state=value&&value.schemaVersion===RfqClassification.SCHEMA_VERSION?value:RfqClassification.create();
     selected={};render();
