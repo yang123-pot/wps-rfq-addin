@@ -42,6 +42,10 @@
  function categories(library){return ((library&&library.categories)||[]).filter(function(category){return category.state!=='disabled';});}
  function category(library,id){var list=((library&&library.categories)||[]).filter(function(item){return item.id===id;});return list.length?list[0]:null;}
  function categoryName(library,id){var found=category(library,id);return found?found.name:String(id);}
- function rules(library){return ((library&&library.rules)||[]).filter(function(rule){return rule.state!=='disabled';});}
+ function rules(library){return ((library&&library.rules)||[]).filter(function(rule){
+  if(rule.state==='disabled')return false;
+  var target=category(library,rule.categoryId);
+  return !!target&&target.state!=='disabled';
+ });}
  return {validate:validate,categories:categories,category:category,categoryName:categoryName,rules:rules,FIELDS:FIELDS.slice(),STATES:STATES.slice()};
 }));
