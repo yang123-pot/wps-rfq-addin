@@ -7,6 +7,10 @@
  var SCHEMA_VERSION=1,DECISION='no-inquiry',
   COVERAGE=['pending','alternative-quotes','material-subsets'],
   COVERAGE_LABELS={pending:'范围未确认','alternative-quotes':'各品牌询同一组完整需求','material-subsets':'各品牌只覆盖指定材料子集'};
+ // 生成待填写汇总表时只校验结构与覆盖；品牌阶段只要求品牌；严格校验留给需要供应商的询价拆分步骤。
+ var STRUCTURE={requireBrand:false,requireSupplier:false,requireCoverage:false},
+  BRAND_STAGE={requireBrand:true,requireSupplier:false,requireCoverage:false},
+  STRICT={requireBrand:true,requireSupplier:true,requireCoverage:true};
  function copy(value){return JSON.parse(JSON.stringify(value));}
  function text(value){return value==null?'':String(value).trim();}
  function unique(list){var out=[];(list||[]).forEach(function(item){if(item!=null&&out.indexOf(item)<0)out.push(item);});return out;}
@@ -40,7 +44,17 @@
     quantity:String(group.quantity),sourceIds:(group.sources||[]).map(function(source){return source.id;}),
     sourceLabels:(group.sourceLabels||[]).slice(),sources:copy(group.sources||[])});
   });
-  return {schemaVersion:SCHEMA_VERSION,inputKey:text(inputKey),coverageMode:'pending',rows:rows,assignments:[]};
+  // 默认每个类别一行，人工只需在汇总表里填品牌；同类多品牌时再由用户拆成多行。
+  var grouped=[],assignments=[];
+  rows.forEach(function(row){
+   var found=grouped.filter(function(item){return item.categoryId===row.categoryId;})[0];
+   if(!found){found={categoryId:row.categoryId,categoryName:row.categoryName,rowIds:[]};grouped.push(found);}
+   found.rowIds.push(row.rowId);
+  });
+  grouped.forEach(function(category){
+   assignments.push(createAssignment({assignments:assignments},category.categoryId,category.rowIds.slice()));
+  });
+  return {schemaVersion:SCHEMA_VERSION,inputKey:text(inputKey),coverageMode:'pending',rows:rows,assignments:assignments};
  }
  function isEmpty(data){return !((data&&data.rows)||[]).length;}
  function categories(data){
@@ -71,6 +85,29 @@
   return {assignmentId:attempt,categoryId:String(categoryId||''),rowIds:(rowIds||[]).slice(),brand:'',supplier:'',
    note:'',coverageConfirmed:false,confirmedAt:null};
  }
+ // 品牌单一来源：询价表、拆分文件都只能从这里取品牌，不允许另行填写或改写。
+ function brandMap(data){
+  var map={};
+  ((data&&data.assignments)||[]).forEach(function(assignment){
+   (assignment.rowIds||[]).forEach(function(rowId){
+    map[rowId]={assignmentId:assignment.assignmentId,categoryId:assignment.categoryId,
+     brand:text(assignment.brand),supplier:text(assignment.supplier),note:text(assignment.note)};
+   });
+  });
+  return map;
+ }
+ function brandForRow(data,rowId){return brandMap(data)[rowId]||null;}
+ // 询价表按行取品牌时用这里：没有品牌就等于没有联动，必须报错而不是留空。
+ function requireBrands(data,expectedRowIds){
+  var map=brandMap(data);
+  return (expectedRowIds||[]).map(function(rowId){
+   var found=map[rowId];
+   if(!found)throw Error('材料行没有对应的品牌分配：'+String(rowId));
+   if(!found.brand)throw Error('材料行还没有填写品牌：'+String(rowId));
+   return {rowId:rowId,brand:found.brand,supplier:found.supplier,categoryId:found.categoryId,
+    assignmentId:found.assignmentId};
+  });
+ }
  function setCoverageMode(data,mode){
   if(COVERAGE.indexOf(mode)<0)throw Error('无法识别的覆盖范围模式：'+String(mode));
   var next=copy(data||{});
@@ -82,7 +119,10 @@
   }
   return next;
  }
- function validate(data,expectedRows){
+ // options.allowEmptyBrands用于“生成待填写的品牌表”这一步：结构与覆盖仍要完整，品牌与供应商允许留空等用户填写。
+ function validate(data,expectedRows,options){
+  var settings=options||{},requireBrand=settings.requireBrand!==false,
+   requireSupplier=settings.requireSupplier!==false,requireCoverage=settings.requireCoverage!==false;
   var errors=[];
   if(!data||typeof data!=='object'||Array.isArray(data))return {ok:false,errors:['分类品牌数据不是有效对象。']};
   if(data.schemaVersion!==SCHEMA_VERSION)errors.push('分类品牌数据版本不支持：'+String(data.schemaVersion));
@@ -118,8 +158,8 @@
    if(typeof assignment.categoryId!=='string'||!assignment.categoryId)errors.push(at+'缺少类别。');
    else if(list.length&&!list.some(function(row){return row.categoryId===assignment.categoryId;}))
     errors.push(at+'引用了当前清单没有的类别：'+assignment.categoryId);
-   if(!text(assignment.brand))errors.push(at+'品牌为空，不能自动补空。');
-   if(!text(assignment.supplier))errors.push(at+'供应商为空，不能自动补空。');
+   if(requireBrand&&!text(assignment.brand))errors.push(at+'品牌为空，不能自动补空。');
+   if(requireSupplier&&!text(assignment.supplier))errors.push(at+'供应商为空，不能自动补空。');
    if(!Array.isArray(assignment.rowIds)||!assignment.rowIds.length)errors.push(at+'缺少材料行。');
    var seen={};
    (assignment.rowIds||[]).forEach(function(rowId){
@@ -130,15 +170,20 @@
     if(row.categoryId!==assignment.categoryId)errors.push(at+'类别与材料行不一致：'+rowId);
     (covered[rowId]=covered[rowId]||[]).push(assignment.assignmentId);
    });
-   if(assignment.coverageConfirmed!==true)errors.push(at+'覆盖范围尚未确认。');
+   if(requireCoverage&&assignment.coverageConfirmed!==true)errors.push(at+'覆盖范围尚未确认。');
   });
   list.forEach(function(row){
    if(row&&row.rowId&&!covered[row.rowId])errors.push('材料行漏配品牌与供应商：'+row.rowId);
   });
-  if(list.length&&data.coverageMode==='pending')errors.push('覆盖范围模式仍是未确认，不能算完成。');
+  if(requireCoverage&&list.length&&data.coverageMode==='pending')errors.push('覆盖范围模式仍是未确认，不能算完成。');
   return {ok:errors.length===0,errors:errors};
  }
+ // 品牌阶段：汇总表每一行都必须填品牌；供应商与范围确认留给后续询价拆分步骤。
+ function validateBrands(data,expectedRows){return validate(data,expectedRows,BRAND_STAGE);}
  return {SCHEMA_VERSION:SCHEMA_VERSION,DECISION:DECISION,COVERAGE:COVERAGE.slice(),COVERAGE_LABELS:COVERAGE_LABELS,
-  build:build,validate:validate,categories:categories,rowsOf:rowsOf,assignmentsFor:assignmentsFor,requiredRowIds:requiredRowIds,
+  STRUCTURE:STRUCTURE,BRAND_STAGE:BRAND_STAGE,STRICT:STRICT,
+  build:build,validate:validate,validateBrands:validateBrands,categories:categories,rowsOf:rowsOf,
+  assignmentsFor:assignmentsFor,requiredRowIds:requiredRowIds,brandMap:brandMap,brandForRow:brandForRow,
+  requireBrands:requireBrands,
   createAssignment:createAssignment,setCoverageMode:setCoverageMode,isEmpty:isEmpty};
 }));

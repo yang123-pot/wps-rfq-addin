@@ -35,7 +35,11 @@ test('build keeps row identity, source trace and text quantities while dropping 
  assert.deepEqual(Object.keys(data).sort(),['assignments','coverageMode','inputKey','rows','schemaVersion']);
  assert.equal(data.inputKey,'ck1-test');
  assert.equal(data.coverageMode,'pending','Q1未定时保留未确认状态，不得自动选择口径');
- assert.deepEqual(data.assignments,[],'不得自动补品牌或供应商');
+ assert.equal(data.assignments.length,1,'默认按类别自动生成一行，人工只需要填品牌');
+ assert.deepEqual(data.assignments[0].rowIds,['row-1','row-2']);
+ assert.equal(data.assignments[0].categoryId,'water-valve');
+ assert.equal(data.assignments[0].brand,'');
+ assert.equal(data.assignments[0].supplier,'','不得自动补品牌或供应商');
  assert.deepEqual(data.rows.map(row=>row.rowId),['row-1','row-2']);
  const water=data.rows[0];
  assert.equal(water.categoryId,'water-valve');
@@ -140,6 +144,43 @@ test('build works on the real preview groups and follows the confirmed decisions
  assert.equal(data.rows.length,1);
  assert.equal(data.rows[0].quantity,'0.3','精确合并后数量按文本十进制守恒');
  assert.equal(data.rows[0].sourceIds.length,2);
- assert.deepEqual(brand.validate(data,preview.groups),{ok:false,errors:brand.validate(data,preview.groups).errors});
- assert.match(brand.validate(data,preview.groups).errors.join('；'),/漏配品牌与供应商/);
+ assert.equal(data.assignments.length,1,'一个类别默认一行，人工只需填品牌');
+ assert.deepEqual(data.assignments[0].rowIds,[data.rows[0].rowId]);
+ assert.match(brand.validate(data,brand.requiredRowIds(preview.groups,state)).errors.join('；'),/品牌为空/,
+  '严格校验（询价拆分步骤用）仍要求供应商与范围确认');
+ assert.match(brand.validateBrands(data,brand.requiredRowIds(preview.groups,state)).errors.join('；'),/品牌为空/);
+});
+test('the brand stage only needs a brand while the strict check still wants a supplier',()=>{
+ const data=brand.build(groups,confirmed,'ck1-brand'),required=brand.requiredRowIds(groups,confirmed);
+ assert.equal(data.assignments.length,1);
+ assert.equal(brand.validateBrands(data,required).ok,false);
+ assert.match(brand.validateBrands(data,required).errors.join('；'),/品牌为空/);
+ const filled=Object.assign({},data,{assignments:[{...data.assignments[0],brand:'某品牌'}]});
+ assert.deepEqual(brand.validateBrands(filled,required),{ok:true,errors:[]},'人工只填品牌即可通过品牌阶段');
+ assert.equal(brand.validate(filled,required).ok,false,'严格校验仍要求供应商');
+ const covered=Object.assign({},filled,{coverageMode:'material-subsets',
+  assignments:[{...filled.assignments[0],supplier:'某供应商',coverageConfirmed:true}]});
+ assert.deepEqual(brand.validate(covered,required),{ok:true,errors:[]});
+ assert.equal(brand.STRUCTURE.requireBrand,false);
+ assert.equal(brand.validate(data,required,brand.STRUCTURE).ok,true,'生成待填写汇总表时品牌可以为空');
+});
+test('the brand filled in the summary is the only source for the quotation brand column',()=>{
+ const data=brand.build(groups,confirmed,'ck1-brand'),required=brand.requiredRowIds(groups,confirmed);
+ const filled=Object.assign({},data,{assignments:[Object.assign({},data.assignments[0],{brand:'品牌甲'})]});
+ const map=brand.brandMap(filled);
+ assert.deepEqual(Object.keys(map).sort(),['row-1','row-2'],'每个材料行都要能查到品牌');
+ assert.equal(map['row-1'].brand,'品牌甲');
+ assert.equal(map['row-2'].brand,'品牌甲','同一类别默认同一品牌');
+ assert.equal(map['row-1'].assignmentId,filled.assignments[0].assignmentId);
+ const linked=brand.requireBrands(filled,required);
+ assert.deepEqual(linked.map(item=>[item.rowId,item.brand]),[['row-1','品牌甲'],['row-2','品牌甲']]);
+ assert.equal(brand.brandForRow(filled,'row-3'),null,'无需询价行不参与品牌联动');
+ const empty=brand.build(groups,confirmed,'ck1-brand');
+ assert.throws(()=>brand.requireBrands(empty,required),/还没有填写品牌/,'汇总表没填品牌时询价表不得留空放过');
+ assert.throws(()=>brand.requireBrands(filled,required.concat(['row-9'])),/没有对应的品牌分配/);
+ const split=Object.assign({},filled,{assignments:[
+  Object.assign({},filled.assignments[0],{rowIds:['row-1'],brand:'品牌甲'}),
+  Object.assign({},filled.assignments[0],{assignmentId:'a-2',rowIds:['row-2'],brand:'品牌乙'})]});
+ assert.deepEqual(brand.requireBrands(split,required).map(item=>item.brand),['品牌甲','品牌乙'],
+  '同类多品牌时按材料行分别联动，不复制数量也不吞并品牌');
 });

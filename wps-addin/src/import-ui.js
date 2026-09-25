@@ -17,14 +17,26 @@
       getPreview:function(){return collection.entries.length?RfqCollection.preview(collection,merge.checked):null;},
       getMergeConfirmation:function(){return mergeConfirmedKey;},
       restoreMergeConfirmation:function(key){mergeConfirmedKey=typeof key==='string'&&key?key:null;},
+      getAssignments:function(){return brandPanel?brandPanel.data():null;},
+      restoreAssignments:function(value){if(brandPanel)brandPanel.restore(value);},
+      getBrandVerdict:function(){return brandPanel?brandPanel.verdict():null;},
       onBusy:function(value){busy=value;options.onBusy(value);}});
-    var libraryPanel=null;
+    var libraryPanel=null,brandPanel=null;
+    // 品牌与供应商面板的输入：当前清单、合并方式、来源校验结果、逐行分类确认与合并预览确认键。
+    function brandContext(){
+      var preview=collection.entries.length?RfqCollection.preview(collection,merge.checked):null;
+      return {collection:collection,mergeIdentical:merge.checked===true,preview:preview,
+        classification:classifier.snapshot(),rows:classifier.rows(),mergeConfirmedKey:mergeConfirmedKey};
+    }
     var classifier=RfqClassificationUI.create({application:options.application,getCollection:function(){return collection;},
       mergeIdentical:function(){return merge.checked;},getMergedTarget:function(){return exporter.last();},
       getProjectId:function(){return projects.identity();},
       onMemoryChange:function(state){if(libraryPanel)libraryPanel.adoptMemory(state);},
+      onChange:function(){if(brandPanel)brandPanel.refresh();},
       onBusy:function(value){busy=value;options.onBusy(value);}});
     libraryPanel=RfqLibraryUI.create({onChange:function(state){classifier.adopt(state);}});
+    brandPanel=RfqBrandUI.create({application:options.application,context:brandContext,
+      onBusy:function(value){busy=value;options.onBusy(value);}});
     function tell(text,error){message.textContent=text;message.className=error?'error':'';}
     function restoreProject(project){
       var inputs=(project.sources||[]).map(function(source){
@@ -86,10 +98,11 @@
       });
       document.getElementById('merge-section').hidden=!collection.entries.length;
       projects.refresh();
-      if(!collection.entries.length){exporter.refresh({canFinalize:false});classifier.refresh({groups:[]});return;}
+      if(!collection.entries.length){exporter.refresh({canFinalize:false});classifier.refresh({groups:[]});if(brandPanel)brandPanel.refresh();return;}
       var result=RfqCollection.preview(collection,merge.checked),pages=Math.max(1,Math.ceil(result.groups.length/20));page=Math.min(page,pages-1);
       exporter.refresh(result);
       classifier.refresh(result);
+      if(brandPanel)brandPanel.refresh();
       document.getElementById('merge-summary').textContent='原始 '+result.inputCount+' 项 → 预览 '+result.outputCount+' 项 · '+(merge.checked?'已选择精确合并':'按来源分别保留');
       var mergeConfirmed=mergeConfirmedKey===RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true});
       confirmMerge.disabled=busy||!result.canFinalize;

@@ -14,7 +14,7 @@ const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.cs
   '/src/export-host.js', '/src/export-ui.js', '/src/project.js', '/src/project-ui.js',
   '/src/project-host.js', '/src/category-library.js', '/src/classify.js', '/src/classification.js',
   '/src/classification-ui.js', '/src/category-memory.js', '/src/library-ui.js', '/rules/defaults.json',
-  '/src/brand-table.js', '/assets/inquiry.svg']);
+  '/src/brand-table.js', '/src/brand-model.js', '/src/brand-host.js', '/src/brand-ui.js', '/assets/inquiry.svg']);
 const TYPES = {'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
   '.html':'text/html; charset=utf-8','.xml':'application/xml; charset=utf-8','.svg':'image/svg+xml',
   '.json':'application/json; charset=utf-8'};

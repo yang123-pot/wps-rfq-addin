@@ -172,6 +172,7 @@
    if(!rows.length)list.appendChild(node('li','先在上方导入清单，再核对分类。','empty'));
    write.textContent='写入'+(options.mergeIdentical&&options.mergeIdentical()===true?'合并清单':'工作副本');
    write.disabled=busy||!options.application||!summary.canGenerateBrandTable;
+  if(options.onChange)options.onChange();
   }
   function batchConfirm(){
    var applied=0,skipped=[];
