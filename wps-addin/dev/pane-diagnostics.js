@@ -2,9 +2,17 @@
  'use strict';
  var config=window.__RFQ_PANE_PROBE__;
  if(!config)return;
- var frameCount=0,lastEvent={},paneSession=('00000000'+Math.floor(Math.random()*0xffffffff).toString(16)).slice(-8)+
+ var frameCount=0,pendingSince=null,stalled=false,visibleSince=Date.now(),lastEvent={},paneSession=('00000000'+Math.floor(Math.random()*0xffffffff).toString(16)).slice(-8)+
   ('00000000'+Math.floor(Math.random()*0xffffffff).toString(16)).slice(-8);
- function frame(){window.requestAnimationFrame(function(){frameCount++;});}
+ function frame(){
+  // A stopped compositor must not accumulate one callback per heartbeat.
+  if(pendingSince!==null)return;
+  pendingSince=Date.now();
+  window.requestAnimationFrame(function(){
+   frameCount++;pendingSince=null;
+   if(stalled){stalled=false;report('pane-render-resumed');}
+  });
+ }
  function metrics(stage,event,target){
   var header=document.querySelector('header'),button=document.getElementById('import-files'),controls=document.getElementById('task-controls');
   var message=document.getElementById('import-message'),merge=document.getElementById('merge-identical');
@@ -19,7 +27,8 @@
    controlsDisabled:!!controls&&controls.disabled,importDisabled:!!button&&button.disabled,
    scrollY:window.scrollY,scrollHeight:document.documentElement.scrollHeight,innerHeight:window.innerHeight,
    headerTop:header?Math.round(header.getBoundingClientRect().top):null,
-   importButtonTop:button?Math.round(button.getBoundingClientRect().top):null,frameCount:frameCount};
+   importButtonTop:button?Math.round(button.getBoundingClientRect().top):null,frameCount:frameCount,
+   framePendingMs:pendingSince===null?0:Math.max(0,Date.now()-pendingSince)};
  }
  function report(stage,event,target){
   fetch('/__probe/report',{method:'POST',headers:{'content-type':'application/json','x-rfq-probe-token':config.token},
@@ -35,7 +44,22 @@
     report('pane-event',type,event.target);
    },true);
   });
-  window.setInterval(function(){report('pane-heartbeat');frame();},3000);
+  ['visibilitychange','focus','blur','pageshow','pagehide','resize'].forEach(function(type){
+   window.addEventListener(type,function(){
+    if(type==='visibilitychange')visibleSince=Date.now();
+    if(type==='resize'){
+     var now=Date.now();if(now-(lastEvent[type]||0)<300)return;lastEvent[type]=now;
+    }
+    report('pane-lifecycle',type);
+   });
+  });
+  window.setInterval(function(){
+   if(!stalled&&document.visibilityState==='visible'&&pendingSince!==null&&
+    Date.now()-pendingSince>=9000&&Date.now()-visibleSince>=9000){
+    stalled=true;report('pane-render-stalled');
+   }
+   report('pane-heartbeat');frame();
+  },3000);
  });
  window.addEventListener('error',function(event){report('pane-error',String(event.message||'error').slice(0,300));});
  window.addEventListener('unhandledrejection',function(){report('pane-error','unhandledrejection');});

@@ -34,6 +34,12 @@
     return node;
   }
   function report(error) { message.className = 'error'; message.textContent = error.message; }
+  function reportReview(error, action) {
+    report(error);
+    var status = document.getElementById('review-status');
+    status.textContent = (record ? record.decisions.length : 0) + ' 项核对记录 · ' +
+      (dirty ? '有修改未保存' : '本次记录未修改') + '。' + action + '未完成：' + error.message;
+  }
   function assertCurrent(contents) {
     if (imported) return; // Imported snapshots belong to the selected file, independently of the active WPS book.
     var current = contents ? WpsHost.readWorkbook(application) : WpsHost.inspectWorkbook(application);
@@ -77,7 +83,7 @@
       if (imported) imports.update(imported.id, record, false);
       refresh(); document.getElementById('review-status').textContent = record.decisions.length + ' 项核对记录 · 已保存到本机';
       message.className = ''; message.textContent = '核对记录已保存到本机，重新打开后读取同一清单，再点击恢复。';
-    } catch (error) { report(error); }
+    } catch (error) { reportReview(error, '保存'); }
   });
   document.getElementById('restore-review').addEventListener('click', function () {
     try {
@@ -90,7 +96,7 @@
       record = saved; parsed = restored; dirty = false; refresh();
       document.getElementById('review-status').textContent = record.decisions.length + ' 项核对记录 · 已恢复本机保存';
       message.className = ''; message.textContent = '已恢复核对记录。原始工作簿未修改。';
-    } catch (error) { report(error); }
+    } catch (error) { reportReview(error, '恢复'); }
   });
   window.addEventListener('beforeunload', function (event) {
     if (dirty || (imports && imports.hasUnsaved())) { event.preventDefault(); event.returnValue = ''; }

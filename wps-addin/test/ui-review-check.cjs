@@ -63,12 +63,16 @@ const {createServer} = require('../dev/server.cjs');
     await page.locator('#save-review').click();
     assert.match(await page.locator('#message').innerText(),/工作簿内容已变化/,'仅修改数值编码显示格式也应阻断旧核对记录');
     assert.match(await page.locator('#review-status').innerText(),/未保存/);
+    assert.match(await page.locator('#review-status').innerText(),/工作簿内容已变化/,'保存按钮旁必须解释拒绝原因，不能只在屏幕外的顶部提示');
+    await page.locator('#restore-review').click();
+    assert.match(await page.locator('#review-status').innerText(),/4 项核对记录 · 有修改未保存。恢复未完成：工作簿内容已变化/);
     await page.evaluate(()=>{window.__codeFormat='General';});
     // Failing storage must keep unsaved data and never show a success state.
     await page.evaluate(()=>{Storage.prototype.setItem=function(){throw Error('QuotaExceededError');};});
     await page.locator('#save-review').click();
     assert.match(await page.locator('#message').innerText(),/保存失败/);
     assert.match(await page.locator('#review-status').innerText(),/未保存/);
+    assert.match(await page.locator('#review-status').innerText(),/保存失败/);
     await page.locator('#preview-mode').selectOption('decisions');
     assert.equal(await page.locator('#preview-list > li').count(),4);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
