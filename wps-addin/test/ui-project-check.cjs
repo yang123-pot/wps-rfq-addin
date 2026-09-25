@@ -63,6 +63,11 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
    const state=stored.stages[stage].state,text=state==='ready'?'已确认':state==='stale'?'已过期':'未完成';
    assert.ok(statusText.includes(stageLabels[stage]+'：'+text),'侧栏进度必须与项目记录一致：'+stageLabels[stage]);
   });
+  await page.locator('#merge-identical').uncheck();
+  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('预览确认后才能继续'));
+  assert.equal(await page.locator('#confirm-merge').innerText(),'确认本次合并预览','合并方式变化后原确认必须失效');
+  await page.locator('#merge-identical').check();
+  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次预览已确认'));
   assert.equal(await page.evaluate(()=>window.RfqProjectUI===undefined),false);
 
   await fs.rm(path.join(root,'copies'),{recursive:true,force:true});
