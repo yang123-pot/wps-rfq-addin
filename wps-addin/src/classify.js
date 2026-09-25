@@ -48,8 +48,11 @@
     if(hits.length)matched.push({field:condition.field,keywords:hits});
     return hits.length>0;
    });
-   if(!all||ruleExcluded(item,rule))return;
-   var name=item&&item.name!=null?String(item.name).trim():'',nameKeywords=[];
+   var name=item&&item.name!=null?String(item.name).trim():'';
+   var aliasKeywords=library.aliases(rule).filter(function(keyword){return name&&name.indexOf(keyword)>=0;});
+   if(aliasKeywords.length)matched.push({field:'name',keywords:aliasKeywords});
+   if((!all&&!aliasKeywords.length)||ruleExcluded(item,rule))return;
+   var nameKeywords=aliasKeywords.slice();
    (rule.match||[]).forEach(function(condition){
     if(condition.field==='name'||condition.field==='text')nameKeywords=nameKeywords.concat(condition.any||[]);
    });

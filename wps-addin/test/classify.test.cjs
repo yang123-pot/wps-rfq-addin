@@ -42,3 +42,24 @@ test('disabled rules are ignored and unknown libraries never throw',()=>{
  assert.equal(classify.suggest(item('水龙头','','个'),null).matchLevel,'none');
  assert.deepEqual(classify.suggest(item('水龙头','','个'),null).candidates,[]);
 });
+test('aliases add a name-matching branch and exclude conditions suppress the rule',()=>{
+ const aliased={version:'test',categories:[{id:'water-valve',name:'水阀门'}],
+  rules:[{id:'r',categoryId:'water-valve',basis:'测试依据',match:[{field:'text',any:['水龙头']}],aliases:['龙头']}]};
+ const byAlias=classify.suggest(item('龙头','','个'),aliased);
+ assert.equal(byAlias.candidates.length,1,'别名命中名称时也要能给出建议');
+ assert.equal(byAlias.matchLevel,'exact');
+ assert.match(byAlias.reasons.join('；'),/测试依据/);
+ const excluded={...aliased,rules:[{...aliased.rules[0],exclude:[{field:'feature',any:['临时']}]}]};
+ assert.equal(classify.suggest(item('龙头','临时安装','个'),excluded).candidates.length,0,'命中任一排除项就不推荐');
+ assert.equal(classify.suggest(item('水龙头','DN15','个'),excluded).candidates.length,1);
+});
+test('disabled category rules still disappear while no-inquiry stays selectable',()=>{
+ const disabled={version:'test',categories:[{id:'no-inquiry',name:'无需询价',state:'disabled'},
+  {id:'a',name:'类别A',state:'disabled'}],
+  rules:[{id:'rule-a',categoryId:'a',match:[{field:'text',any:['水龙头']}]},
+   {id:'rule-skip',categoryId:'no-inquiry',match:[{field:'text',any:['钢索']}]}]};
+ assert.deepEqual(classify.suggest(item('水龙头','','个'),disabled).candidates,[]);
+ const skip=classify.suggest(item('电动排烟阀钢索','','套'),disabled);
+ assert.equal(skip.candidates.length,1);
+ assert.equal(skip.candidates[0].categoryId,'no-inquiry');
+});
