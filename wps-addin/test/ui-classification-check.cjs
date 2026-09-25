@@ -3,7 +3,8 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
 (async()=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-ui-classification-')),files=[path.join(root,'一号.xlsx'),path.join(root,'二号.xls')];
  await fs.writeFile(files[0],'first file');await fs.writeFile(files[1],'second file');
- const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(root,'copies'),projectDirectory:path.join(root,'projects')});
+ const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(root,'copies'),
+  projectDirectory:path.join(root,'projects'),libraryDirectory:path.join(root,'library')});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const browser=await chromium.launch({channel:'msedge',headless:true});
  try{
@@ -92,7 +93,8 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.waitForFunction(()=>document.querySelector('#classification-message').textContent.includes('已把'));
   const written=await page.evaluate(()=>window.__written.map(item=>item.value));
   assert.equal(written.filter(value=>value==='水阀门｜完全匹配｜已确认').length,1);
-  assert.equal(written.filter(value=>value==='无需询价｜无可靠匹配｜已确认').length,2);
+  assert.equal(written.filter(value=>value==='无需询价｜无可靠匹配｜已确认').length,1,'该材料首次确认时还没有习惯记忆，按无可靠匹配写入');
+  assert.equal(written.filter(value=>value==='无需询价｜完全匹配｜已确认').length,1,'同一材料再次确认时命中已保存的本机习惯记忆');
   assert.equal(written.filter(value=>value==='分类备注｜匹配度｜核对状态').length,2,'每张工作表写一次列标题');
   const headersWritten=await page.evaluate(()=>window.__written.filter(item=>item.value==='分类备注｜匹配度｜核对状态')
    .map(item=>item.sheet+':'+item.row+':'+item.column).sort());
@@ -206,7 +208,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   const mergedWrites=await page.evaluate(()=>window.__written.slice());
   assert.equal(mergedWrites.every(item=>item.path===mergedTarget),true,'合并列只写入插件另存出的合并表');
   assert.deepEqual(mergedWrites.map(item=>item.sheet+':'+item.row+':'+item.column+':'+item.value).sort(),
-   ['清单:1:9:分类备注｜匹配度｜核对状态','清单:2:9:无需询价｜无可靠匹配｜已确认','清单:3:9:水阀门｜完全匹配｜已确认'],
+   ['清单:1:9:分类备注｜匹配度｜核对状态','清单:2:9:无需询价｜完全匹配｜已确认','清单:3:9:水阀门｜完全匹配｜已确认'],
    '合并表按组顺序写在第9列（8列清单之后），原工作表不被写入');
   assert.equal(mergedWrites.every(item=>item.path.toLowerCase().indexOf('copies')<0),true,'合并模式不得写回工作副本');
   assert.deepEqual(errors,[]);

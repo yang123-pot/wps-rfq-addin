@@ -19,10 +19,11 @@
     sheetCount:(snapshot.sheets||[]).length,materialCount:(snapshot.materials||[]).length,issueCount:(snapshot.issues||[]).length,snapshot:snapshot};
   });
  }
- function create(input,mergeIdentical){
+ function create(input,mergeIdentical,options){
   var entries=input&&input.entries||[],stages={};
   STAGES.forEach(function(stage,index){stages[stage]={state:index===0?'ready':'missing',revision:index===0?1:null,updatedAt:index===0?now():null,detail:null};});
-  return {schemaVersion:SCHEMA_VERSION,projectId:newId(),
+  var requested=options&&options.projectId;
+  return {schemaVersion:SCHEMA_VERSION,projectId:requested?String(requested):newId(),
    name:entries.length?String(entries[0].metadata.originalName).replace(/\.[^.]+$/,''):'未命名项目',
    createdAt:now(),updatedAt:now(),revision:1,mergeIdentical:!!mergeIdentical,stages:stages,
    sources:sourcesOf(input),
@@ -99,5 +100,6 @@
   return next;
  }
  return {SCHEMA_VERSION:SCHEMA_VERSION,STAGES:STAGES.slice(),STAGE_LABELS:STAGE_LABELS,create:create,validate:validate,
-  assertValid:assertValid,stageState:stageState,confirm:confirm,invalidate:invalidate,compareSources:compareSources,refresh:refresh};
+  assertValid:assertValid,stageState:stageState,confirm:confirm,invalidate:invalidate,compareSources:compareSources,refresh:refresh,
+  newId:newId};
 }));

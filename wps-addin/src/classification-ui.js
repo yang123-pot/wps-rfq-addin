@@ -5,35 +5,115 @@
   var message=document.getElementById('classification-message'),progress=document.getElementById('classification-progress'),
     filter=document.getElementById('classification-filter'),list=document.getElementById('classification-list'),
     batch=document.getElementById('batch-confirm'),write=document.getElementById('write-classification');
+  var memoryStatus=document.getElementById('memory-status'),retry=document.getElementById('memory-retry');
   var library=null,state=RfqClassification.create(),groups=[],busy=false,selected={};
+  var memoryState=null,libraryRevision=0,unsavedMemory=false;
   function tell(text,error){message.textContent=text;message.className=error?'error':'';}
-  function loadLibrary(){
-   if(library)return Promise.resolve(library);
+  function memoryTell(text,error){if(!memoryStatus)return;memoryStatus.textContent=text;memoryStatus.className=error?'error':'note';}
+  function projectId(){try{return options.getProjectId&&options.getProjectId()||null;}catch(_){return null;}}
+  function libraryReady(){return !!(library&&library.categories&&library.categories.length&&memoryState);}
+  function fallbackLibrary(){
    return fetch('/rules/defaults.json').then(function(response){
     if(!response.ok)throw Error('HTTP '+response.status);
     return response.json();
-   }).then(function(data){
-    var check=RfqCategoryLibrary.validate(data);
+   }).then(function(data){return {revision:0,library:data,memory:RfqCategoryMemory.create(),persisted:false};});
+  }
+  function loadLibraryState(){
+   var token=window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token;
+   if(!token)return fallbackLibrary();
+   return fetch('/api/library/load',{method:'POST',headers:{'content-type':'application/json','x-rfq-import-token':token},body:'{}'})
+    .then(function(response){return response.text().then(function(text){
+     var result;try{result=JSON.parse(text);}catch(_){throw Error('分类库返回无效。');}
+     if(!response.ok)throw Error(result.error||'分类库读取失败。');
+     return result;});})
+    .catch(function(error){return fallbackLibrary().then(function(result){
+     result.notice='本机分类库未读取（'+error.message+'），本次只用默认规则，习惯先保存在本页。';
+     return result;});});
+  }
+  function loadLibrary(){
+   if(library)return Promise.resolve(library);
+   return loadLibraryState().then(function(result){
+    var check=RfqCategoryLibrary.validate(result.library);
     if(!check.ok)throw Error(check.errors.join('；'));
-    library=data;return library;
+    library=result.library;libraryRevision=Number.isSafeInteger(result.revision)?result.revision:0;
+    memoryState=result.memory&&typeof result.memory==='object'?result.memory:RfqCategoryMemory.create();
+    if(result.notice)memoryTell(result.notice,true);
+    return library;
    }).catch(function(error){
-    library={version:'unavailable',categories:[],rules:[]};
+    library={version:'unavailable',categories:[],rules:[]};memoryState=null;
     tell('分类库未加载，只能手工选类别：'+error.message,true);
     return library;
    });
   }
-  function suggestionFor(group){return RfqClassify.suggest({name:group.name,feature:group.feature,unit:group.unit},library,{});}
+  function suggestionFor(group){
+   return RfqClassify.suggest({name:group.name,feature:group.feature,unit:group.unit},library,
+    {memory:memoryState,projectId:projectId()});
+  }
+  function renderMemory(){if(retry)retry.hidden=!unsavedMemory;}
+  function sourceContext(row,rowId){
+   return {item:{name:row.group.name,feature:row.group.feature,unit:row.group.unit},projectId:projectId(),
+    sourceProjectId:projectId(),rowId:rowId};
+  }
+  function saveMemory(){
+   var token=window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token;
+   if(!token||!libraryReady())return Promise.reject(Error('当前会话未启用本机分类库。'));
+   return fetch('/api/library/save',{method:'POST',headers:{'content-type':'application/json','x-rfq-import-token':token},
+    body:JSON.stringify({expectedRevision:libraryRevision,library:library,memory:memoryState})})
+    .then(function(response){return response.text().then(function(text){
+     var result;try{result=JSON.parse(text);}catch(_){result={};}
+     if(!response.ok)throw Error(result.error||('习惯保存失败（HTTP '+response.status+'）。'));
+     libraryRevision=Number.isSafeInteger(result.revision)?result.revision:libraryRevision+1;
+     return true;});});
+  }
+  function persistMemory(){
+   if(!libraryReady())return;
+   unsavedMemory=true;renderMemory();memoryTell('正在保存分类习惯…');
+   saveMemory().then(function(){
+    unsavedMemory=false;renderMemory();
+    memoryTell('分类习惯已保存到本机分类库（版本 '+libraryRevision+'）。');
+    render();
+   }).catch(function(error){
+    renderMemory();
+    memoryTell('习惯未保存，可重试：'+error.message,true);
+   });
+  }
+  function retryMemory(){
+   if(!unsavedMemory)return;
+   memoryTell('正在重新保存分类习惯…');
+   saveMemory().then(function(){
+    unsavedMemory=false;renderMemory();
+    memoryTell('分类习惯已保存到本机分类库（版本 '+libraryRevision+'）。');
+    render();
+   }).catch(function(error){
+    renderMemory();memoryTell('习惯未保存，可重试：'+error.message,true);
+   });
+  }
+  function remember(row,rowId,previous,record){
+   if(!libraryReady()||!record)return;
+   var context=sourceContext(row,rowId);
+   if(previous&&previous.categoryId&&previous.categoryId!==record.categoryId)
+    memoryState=RfqCategoryMemory.releaseSource(memoryState,{categoryId:previous.categoryId},context);
+   memoryState=RfqCategoryMemory.learn(memoryState,record,context);
+   persistMemory();
+  }
+  function forget(row,rowId,previous){
+   if(!libraryReady()||!previous||!previous.categoryId)return;
+   memoryState=RfqCategoryMemory.releaseSource(memoryState,{categoryId:previous.categoryId},sourceContext(row,rowId));
+   persistMemory();
+  }
   function decide(rowId,row,groupId){
    var value=document.querySelector('[data-category="'+groupId+'"]');
    var categoryId=value&&value.value;
    if(!categoryId){tell('请先为第'+(Number(groupId)+1)+'行选择类别，或标记“无需询价”。',true);return;}
    var category=RfqCategoryLibrary.category(library,categoryId),candidate=row.suggestion.candidates.filter(function(item){
     return item.categoryId===categoryId;})[0];
+   var previous=RfqClassification.decisionFor(state,rowId);
    state=RfqClassification.setDecision(state,rowId,{categoryId:categoryId,categoryName:category?category.name:categoryId,
     skip:categoryId==='no-inquiry',matchLevel:candidate?candidate.matchLevel:'none',ruleId:candidate?candidate.ruleId:null,
-    basis:candidate?candidate.basis:'人工选择',libraryVersion:library.version});
+    memoryId:candidate?candidate.memoryId:null,basis:candidate?candidate.basis:'人工选择',libraryVersion:library.version});
    tell('已确认第'+(Number(groupId)+1)+'行：'+(category?category.name:categoryId)+'。');
    render();
+   remember(row,rowId,previous,RfqClassification.decisionFor(state,rowId));
   }
   function render(){
    list.textContent='';
@@ -62,9 +142,10 @@
     var select=document.createElement('select');select.setAttribute('data-category',String(index));
     var placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='请选择类别';
     select.appendChild(placeholder);
+    var agreed=row.suggestion.candidates.length&&!row.suggestion.conflicts.length?row.suggestion.candidates[0].categoryId:null;
     RfqCategoryLibrary.categories(library).forEach(function(category){
      var option=document.createElement('option');option.value=category.id;option.textContent=category.name;
-     if(decided?decided.categoryId===category.id:(row.suggestion.candidates.length===1&&row.suggestion.candidates[0].categoryId===category.id))
+     if(decided?decided.categoryId===category.id:agreed===category.id)
       option.selected=true;
      select.appendChild(option);
     });
@@ -73,8 +154,11 @@
     confirm.addEventListener('click',function(){decide(row.rowId,row,String(index));});li.appendChild(confirm);
     if(decided){
      var revoke=node('button','撤销确认','locate');revoke.type='button';
-     revoke.addEventListener('click',function(){state=RfqClassification.removeDecision(state,row.rowId);
-      tell('已撤销第'+(index+1)+'行的分类确认，后续生成重新阻断。');render();});
+     revoke.addEventListener('click',function(){
+      var previous=RfqClassification.decisionFor(state,row.rowId);
+      state=RfqClassification.removeDecision(state,row.rowId);
+      tell('已撤销第'+(index+1)+'行的分类确认，后续生成重新阻断。');render();
+      forget(row,row.rowId,previous);});
      li.appendChild(revoke);
      li.appendChild(node('p','已确认：'+decided.categoryName+'（'+(RfqClassification.LEVELS[decided.matchLevel]||'无可靠匹配')+'）','confirmed-note'));
     }
@@ -89,14 +173,19 @@
    var rows=groups.map(function(group,index){return {group:group,index:index,rowId:group.id||group.scopeId,suggestion:suggestionFor(group)};});
    rows.forEach(function(row){
     if(!selected[row.rowId])return;
-    if(RfqClassification.decisionFor(state,row.rowId))return;
-    var candidate=row.suggestion.candidates.length===1?row.suggestion.candidates[0]:null;
-    if(!candidate||row.suggestion.conflicts.length>1){skipped.push(row.group.name||('第'+(row.index+1)+'行'));return;}
+    var previous=RfqClassification.decisionFor(state,row.rowId);
+    if(previous)return;
+    var ids=row.suggestion.candidates.map(function(item){return item.categoryId;});
+    var agreed=ids.length&&!row.suggestion.conflicts.length&&ids.every(function(id){return id===ids[0];});
+    var candidate=agreed?row.suggestion.candidates[0]:null;
+    if(!candidate){skipped.push(row.group.name||('第'+(row.index+1)+'行'));return;}
     var category=RfqCategoryLibrary.category(library,candidate.categoryId);
     state=RfqClassification.setDecision(state,row.rowId,{categoryId:candidate.categoryId,
      categoryName:category?category.name:candidate.categoryName,skip:candidate.categoryId==='no-inquiry',
-     matchLevel:candidate.matchLevel,ruleId:candidate.ruleId,basis:candidate.basis,libraryVersion:library.version});
+     matchLevel:candidate.matchLevel,ruleId:candidate.ruleId,memoryId:candidate.memoryId,basis:candidate.basis,
+     libraryVersion:library.version});
     applied++;
+    remember(row,row.rowId,previous,RfqClassification.decisionFor(state,row.rowId));
    });
    tell(applied?('已批量确认'+applied+'行。'+(skipped.length?'以下行需要人工选择：'+skipped.join('、'):''))
      :('没有可批量确认的行。'+(skipped.length?'需人工选择：'+skipped.join('、'):'请先勾选明确的单候选行。')),!applied);
@@ -158,10 +247,13 @@
   filter.addEventListener('change',render);
   batch.addEventListener('click',batchConfirm);
   write.addEventListener('click',writeCopy);
-  loadLibrary().then(render);
+  if(retry)retry.addEventListener('click',retryMemory);
+  renderMemory();
+  loadLibrary().then(function(){renderMemory();render();});
   return {refresh:function(result){groups=(result&&result.groups)||[];selected={};render();},
    classification:function(){return state;},
    snapshot:function(){return state;},
+   memory:function(){return memoryState;},
    restore:function(value){
     state=value&&value.schemaVersion===RfqClassification.SCHEMA_VERSION?value:RfqClassification.create();
     selected={};render();

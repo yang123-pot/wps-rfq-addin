@@ -5,9 +5,15 @@
   var saveButton=document.getElementById('save-project'),openButton=document.getElementById('open-project'),
     refreshButton=document.getElementById('refresh-projects'),message=document.getElementById('project-message'),
     status=document.getElementById('project-status'),list=document.getElementById('project-list');
-  var current=null,busy=false;
+  var current=null,busy=false,pendingId=null;
   var STATE={ready:'已确认',stale:'已过期',missing:'未完成'};
   function tell(text,error){message.textContent=text;message.className=error?'error':'';}
+  // 未保存项目也要有稳定身份，本机分类习惯按它记录确认来源；保存或打开其他项目前不重新生成。
+  function identity(){
+    if(current&&current.projectId)return current.projectId;
+    if(!pendingId)pendingId=RfqProject.newId();
+    return pendingId;
+  }
   function stageText(project){
     return RfqProject.STAGES.map(function(stage){
       return RfqProject.STAGE_LABELS[stage]+'：'+(STATE[RfqProject.stageState(project,stage)]||'未完成');
@@ -66,11 +72,12 @@
     busy=true;if(options.onBusy)options.onBusy(true);
     try{
       tell('正在保存项目记录…');
-      var next=current?RfqProject.refresh(current,collection,options.mergeIdentical()):RfqProject.create(collection,options.mergeIdentical());
+      var next=current?RfqProject.refresh(current,collection,options.mergeIdentical())
+        :RfqProject.create(collection,options.mergeIdentical(),{projectId:identity()});
       if(options.getClassification)next=alignClassification(next,collection,options.mergeIdentical(),options.getClassification());
       RfqProject.assertValid(next);
       var receipt=await request('save',{project:next});
-      current=next;renderStatus();await listProjects();
+      current=next;pendingId=null;renderStatus();await listProjects();
       tell('项目已保存到本机：'+next.projectId+'（版本 '+next.revision+'）。项目记录不上传。');
       return receipt;
     }catch(error){tell('项目未保存。'+error.message,true);return null;}
@@ -97,6 +104,7 @@
       if(!options.restore||options.restore(result.project)===false)throw Error('项目内容无法恢复到侧栏。');
       if(options.restoreClassification)options.restoreClassification(result.project.classification);
       current=options.getClassification?alignClassification(result.project,options.getCollection(),options.mergeIdentical(),options.getClassification()):result.project;
+      pendingId=null;
       renderStatus();
       tell('已恢复项目'+result.project.projectId+'（版本 '+result.project.revision+'）。'+(rebuilt?'已按原件SHA校验重建'+rebuilt+'份工作副本。':'工作副本完整。')+'原件不变，快照可用于继续核对。');
       return true;
@@ -107,7 +115,7 @@
   openButton.addEventListener('click',listProjects);
   refreshButton.addEventListener('click',listProjects);
   renderStatus();
-  return {refresh:renderStatus,current:function(){return current;},reload:listProjects};
+  return {refresh:renderStatus,current:function(){return current;},identity:identity,reload:listProjects};
  }
  window.RfqProjectUI={create:create};
 }());

@@ -13,6 +13,7 @@
       restoreClassification:function(value){classifier.restore(value);},onBusy:function(value){busy=value;options.onBusy(value);}});
     var classifier=RfqClassificationUI.create({application:options.application,getCollection:function(){return collection;},
       mergeIdentical:function(){return merge.checked;},getMergedTarget:function(){return exporter.last();},
+      getProjectId:function(){return projects.identity();},
       onBusy:function(value){busy=value;options.onBusy(value);}});
     function tell(text,error){message.textContent=text;message.className=error?'error':'';}
     function restoreProject(project){

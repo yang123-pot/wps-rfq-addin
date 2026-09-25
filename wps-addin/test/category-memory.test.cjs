@@ -43,3 +43,42 @@ test('validation rejects unsupported or damaged memory files',()=>{
  assert.throws(()=>memory.learn({schemaVersion:1,version:'x',memories:[]},confirmed,{item:item}),/习惯记忆不完整/);
  assert.match(memory.validate({...memory.create(),history:null}).errors.join('；'),/变更历史/);
 });
+test('each confirming project adds a source instead of duplicating the same memory',()=>{
+ const first=memory.learn(memory.create(),confirmed,{item:item,sourceProjectId:'p-alpha'});
+ assert.equal(first.memories.length,1);
+ assert.deepEqual(first.memories[0].sources,[{sourceProjectId:'p-alpha',sourceRowId:'row-1',decisionRevision:2}]);
+ assert.equal(memory.learn(first,confirmed,{item:item,sourceProjectId:'p-alpha'}),first,'同一项目同一行重复确认不得新增依据');
+ const second=memory.learn(first,{...confirmed,rowId:'row-9'},{item:item,sourceProjectId:'p-beta'});
+ assert.equal(second.memories.length,1,'同一材料同一类别只保留一条记忆');
+ assert.deepEqual(second.memories[0].sources.map(entry=>entry.sourceProjectId),['p-alpha','p-beta']);
+ assert.equal(memory.summary(second).sourceCount,2);
+ assert.equal(second.history[second.history.length-1].action,'learn-source');
+});
+test('releasing one confirmation keeps the others and only the last one revokes',()=>{
+ let current=memory.learn(memory.create(),confirmed,{item:item,sourceProjectId:'p-alpha'});
+ current=memory.learn(current,{...confirmed,rowId:'row-9'},{item:item,sourceProjectId:'p-beta'});
+ const released=memory.releaseSource(current,{categoryId:'water-valve'},{item:item,sourceProjectId:'p-beta',rowId:'row-9'});
+ assert.equal(released.memories.length,1);
+ assert.equal(released.memories[0].state,'active');
+ assert.deepEqual(released.memories[0].sources.map(entry=>entry.sourceProjectId),['p-alpha']);
+ assert.equal(released.history[released.history.length-1].action,'release-source');
+ assert.equal(memory.find(released,item).matchLevel,'exact','另有有效确认来源时不得失效');
+ const gone=memory.releaseSource(released,{categoryId:'water-valve'},{item:item,sourceProjectId:'p-alpha',rowId:'row-1'});
+ assert.equal(gone.memories[0].state,'revoked');
+ assert.equal(gone.history[gone.history.length-1].action,'release-revoke');
+ assert.equal(memory.find(gone,item).matchLevel,'none');
+ assert.equal(memory.releaseSource(gone,{categoryId:'water-valve'},{item:item,sourceProjectId:'p-alpha',rowId:'row-1'}),gone,
+  '撤销不存在的来源不产生新版本');
+});
+test('legacy memories without recorded sources are kept and never guessed away',()=>{
+ const legacy={schemaVersion:1,version:'local-1',updatedAt:'2026-01-01T00:00:00.000Z',
+  memories:[{id:'m-legacy',item:{name:'水龙头',feature:'DN15',unit:'个'},categoryId:'water-valve',categoryName:'水阀门',
+   scope:'global',projectId:null,sourceRowId:'row-1',state:'active',learnedAt:'2026-01-01T00:00:00.000Z'}],history:[]};
+ assert.equal(memory.validate(legacy).ok,true);
+ assert.equal(memory.releaseSource(legacy,{categoryId:'water-valve'},{item:item,sourceProjectId:'p-alpha',rowId:'row-1'}),legacy,
+  '旧历史记忆没有来源清单时保持原样');
+ assert.equal(memory.find(legacy,item).matchLevel,'exact');
+ assert.throws(()=>memory.releaseSource(memory.create(),{},{item:item}),/撤销习惯需要原类别/);
+ assert.match(memory.validate({...memory.create(),memories:[{id:'m',categoryId:'c',item:{name:'x'},state:'active',sources:'bad'}]})
+  .errors.join('；'),/确认来源无效/);
+});

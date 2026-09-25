@@ -9,6 +9,19 @@
  function copy(value){return JSON.parse(JSON.stringify(value));}
  function text(value){return value==null?'':String(value).trim();}
  function signature(item){return [text(item&&item.name),text(item&&item.feature),text(item&&item.unit)].join('\u0000');}
+ function sourceRef(decision,context){
+  return {sourceProjectId:context.sourceProjectId!=null?text(context.sourceProjectId):null,
+   sourceRowId:text(decision.rowId||context.rowId)||null,
+   decisionRevision:decision.revision==null?null:decision.revision};
+ }
+ function sourceKey(reference){return [text(reference&&reference.sourceProjectId),text(reference&&reference.sourceRowId)].join('\u0001');}
+ function scopeOf(context){return context.scope==='project'?'project':'global';}
+ function scopeProject(scope,context){return scope==='project'?(context.projectId||null):null;}
+ function matchRecord(memory,scope,projectId,categoryId,item){
+  return memory.memories.filter(function(record){
+   return record.state==='active'&&record.scope===scope&&record.projectId===projectId&&
+    record.categoryId===categoryId&&signature(record.item)===signature(item);})[0];
+ }
  function create(){return {schemaVersion:SCHEMA_VERSION,version:'local-1',updatedAt:now(),memories:[],history:[]};}
  function validate(memory){
   var errors=[];
@@ -23,6 +36,7 @@
    if(typeof record.categoryId!=='string'||!record.categoryId)errors.push(at+'缺少类别。');
    if(!record.item||typeof record.item!=='object')errors.push(at+'缺少材料字段。');
    if(['active','revoked'].indexOf(record.state)<0)errors.push(at+'状态无效。');
+   if(record.sources!=null&&!Array.isArray(record.sources))errors.push(at+'确认来源无效。');
    if(record.scope!=null&&['global','project'].indexOf(record.scope)<0)errors.push(at+'适用范围无效。');
   });
   if(!Array.isArray(memory.history))errors.push('习惯记忆缺少变更历史。');
@@ -37,19 +51,59 @@
   context=context||{};
   var item={name:text(context.item&&context.item.name),feature:text(context.item&&context.item.feature),unit:text(context.item&&context.item.unit)};
   if(!item.name)throw Error('记忆需要材料名称。');
-  var scope=context.scope==='project'?'project':'global',projectId=scope==='project'?(context.projectId||null):null;
+  var scope=scopeOf(context),projectId=scopeProject(scope,context);
   if(scope==='project'&&!projectId)throw Error('项目例外记忆需要项目标识。');
-  var existing=memory.memories.filter(function(record){
-   return record.state==='active'&&record.scope===scope&&record.projectId===projectId&&
-    record.categoryId===decision.categoryId&&signature(record.item)===signature(item);})[0];
-  if(existing)return memory;
+  var source=sourceRef(decision,context),existing=matchRecord(memory,scope,projectId,decision.categoryId,item);
+  if(existing){
+   var known=(Array.isArray(existing.sources)?existing.sources:[]).some(function(reference){
+    return sourceKey(reference)===sourceKey(source);});
+   if(known)return memory;
+   var grown=copy(memory);
+   grown.memories=grown.memories.map(function(record){
+    if(record.id!==existing.id)return record;
+    var merged=Object.assign({},record,{sources:(Array.isArray(record.sources)?record.sources:[]).concat([source])});
+    if(merged.sourceRowId==null)merged.sourceRowId=source.sourceRowId;
+    if(merged.decisionRevision==null)merged.decisionRevision=source.decisionRevision;
+    return merged;
+   });
+   grown.updatedAt=now();
+   grown.history=(grown.history||[]).concat([{at:grown.updatedAt,action:'learn-source',categoryId:decision.categoryId,
+    scope:scope,projectId:projectId,sourceProjectId:source.sourceProjectId,sourceRowId:source.sourceRowId}]);
+   return grown;
+  }
   var next=copy(memory);
   next.memories=next.memories.concat([{id:newId(),item:item,categoryId:decision.categoryId,
    categoryName:decision.categoryName||decision.categoryId,scope:scope,projectId:projectId,
    sourceRowId:decision.rowId||null,libraryVersion:decision.libraryVersion||context.libraryVersion||null,
-   decisionRevision:decision.revision==null?null:decision.revision,state:'active',learnedAt:now()}]);
+   decisionRevision:decision.revision==null?null:decision.revision,sources:[source],state:'active',learnedAt:now()}]);
   next.updatedAt=now();
-  next.history=(next.history||[]).concat([{at:next.updatedAt,action:'learn',categoryId:decision.categoryId,scope:scope,projectId:projectId}]);
+  next.history=(next.history||[]).concat([{at:next.updatedAt,action:'learn',categoryId:decision.categoryId,scope:scope,
+   projectId:projectId,sourceProjectId:source.sourceProjectId,sourceRowId:source.sourceRowId}]);
+  return next;
+ }
+ function releaseSource(memory,decision,context){
+  assertValid(memory);
+  if(!decision||typeof decision!=='object'||typeof decision.categoryId!=='string'||!decision.categoryId)
+   throw Error('撤销习惯需要原类别。');
+  context=context||{};
+  var item={name:text(context.item&&context.item.name),feature:text(context.item&&context.item.feature),unit:text(context.item&&context.item.unit)};
+  if(!item.name)return memory;
+  var scope=scopeOf(context),projectId=scopeProject(scope,context);
+  var target=matchRecord(memory,scope,projectId,decision.categoryId,item);
+  if(!target||!Array.isArray(target.sources))return memory;
+  var source=sourceRef(decision,context),removeKey=sourceKey(source);
+  var remaining=target.sources.filter(function(reference){return sourceKey(reference)!==removeKey;});
+  if(remaining.length===target.sources.length)return memory;
+  var revoked=remaining.length===0,next=copy(memory);
+  next.memories=next.memories.map(function(record){
+   if(record.id!==target.id)return record;
+   if(revoked)return Object.assign({},record,{sources:remaining,state:'revoked',revokedAt:now()});
+   return Object.assign({},record,{sources:remaining});
+  });
+  next.updatedAt=now();
+  next.history=(next.history||[]).concat([{at:next.updatedAt,action:revoked?'release-revoke':'release-source',
+   categoryId:decision.categoryId,scope:scope,projectId:projectId,sourceProjectId:source.sourceProjectId,
+   sourceRowId:source.sourceRowId}]);
   return next;
  }
  function revoke(memory,memoryId){
@@ -78,7 +132,7 @@
    else if(record.item.name&&record.item.name===target.name)level='similar';
    if(!level)return;
    candidates.push({memoryId:record.id,categoryId:record.categoryId,categoryName:record.categoryName,matchLevel:level,
-    basis:'项目'+(record.scope==='project'?'例外':'').replace('项目例外','例外')+'记忆：'+record.item.name+'→'+record.categoryName,
+    basis:(record.scope==='project'?'本项目习惯记忆：':'本机习惯记忆：')+record.item.name+'→'+record.categoryName,
     learnedAt:record.learnedAt,sourceRowId:record.sourceRowId});
   });
   var distinct=[],seen={};
@@ -92,8 +146,9 @@
   assertValid(memory);
   var active=memory.memories.filter(function(record){return record.state==='active';});
   return {total:memory.memories.length,active:active.length,revoked:memory.memories.length-active.length,
-   byCategory:active.reduce(function(out,record){out[record.categoryId]=(out[record.categoryId]||0)+1;return out;},{})};
+   byCategory:active.reduce(function(out,record){out[record.categoryId]=(out[record.categoryId]||0)+1;return out;},{}),
+   sourceCount:active.reduce(function(total,record){return total+(Array.isArray(record.sources)?record.sources.length:0);},0)};
  }
  return {SCHEMA_VERSION:SCHEMA_VERSION,LEVELS:LEVELS,create:create,validate:validate,assertValid:assertValid,
-  learn:learn,revoke:revoke,find:find,summary:summary};
+  learn:learn,releaseSource:releaseSource,revoke:revoke,find:find,summary:summary};
 }));

@@ -43,8 +43,9 @@
    throw Error('确认分类需要类别或“无需询价”。');
   var next=copy(classification),previous=decisionFor(classification,rowId);
   var record={rowId:rowId,categoryId:decision.categoryId,categoryName:decision.categoryName||decision.categoryId,
-   skip:decision.skip===true,matchLevel:decision.matchLevel||null,ruleId:decision.ruleId||null,basis:decision.basis||null,
-   libraryVersion:decision.libraryVersion||null,note:decision.note||null,confirmedAt:now(),revision:classification.revision};
+   skip:decision.skip===true,matchLevel:decision.matchLevel||null,ruleId:decision.ruleId||null,
+   memoryId:decision.memoryId||null,basis:decision.basis||null,libraryVersion:decision.libraryVersion||null,
+   note:decision.note||null,confirmedAt:now(),revision:classification.revision};
   next.decisions=next.decisions.filter(function(item){return item.rowId!==rowId;}).concat([record]);
   next.revision=classification.revision+1;next.updatedAt=now();
   next.history=(next.history||[]).concat([{at:next.updatedAt,action:previous?'replace':'confirm',rowId:rowId,
@@ -75,6 +76,10 @@
    pending:pending,conflicts:conflicts,canGenerateBrandTable:list.length>0&&pending.length===0};
  }
  function levelLabel(level){return LEVELS[level]||LEVELS.none;}
+ function sourceOf(decision){
+  if(!decision||typeof decision!=='object')return null;
+  return {categoryId:decision.categoryId,categoryName:decision.categoryName,rowId:decision.rowId,revision:decision.revision};
+ }
  function cellText(decision){return decision.categoryName+'｜'+levelLabel(decision.matchLevel)+'｜已确认';}
  function columnOf(entry,sheet){
   var found=((entry&&entry.snapshot&&entry.snapshot.sheets)||[]).filter(function(item){return item.name===sheet;})[0];
@@ -131,5 +136,6 @@
   return {mode:'separate',plans:plans};
  }
  return {SCHEMA_VERSION:SCHEMA_VERSION,HEADER:HEADER,LEVELS:LEVELS,create:create,validate:validate,assertValid:assertValid,
-  decisionFor:decisionFor,setDecision:setDecision,removeDecision:removeDecision,summary:summary,cellText:cellText,planColumn:planColumn};
+  decisionFor:decisionFor,setDecision:setDecision,removeDecision:removeDecision,summary:summary,cellText:cellText,
+  planColumn:planColumn,sourceOf:sourceOf};
 }));
