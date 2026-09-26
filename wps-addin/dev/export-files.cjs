@@ -4,16 +4,27 @@ function digest(bytes){return crypto.createHash('sha256').update(bytes).digest('
 async function absent(file){try{await fs.lstat(file);}catch(e){if(e.code==='ENOENT')return;throw e;}throw Error('目标文件已存在，请使用新文件名，禁止覆盖。');}
 function createExportStore({directory}){
  const tickets=new Map(),root=path.resolve(directory);
- async function prepare(target){
+ async function prepare(target,options){
   if(typeof target!=='string'||target.length>4096||!path.isAbsolute(target)||path.extname(target).toLowerCase()!=='.xlsx'||/[<>:"|?*]|[. ]$/.test(path.basename(target)))throw Error('请选择有效的新xlsx绝对路径。');
   const parent=await fs.realpath(path.dirname(target)),destination=path.join(parent,path.basename(target));
   if(!(await fs.stat(parent)).isDirectory())throw Error('保存目录不存在。');
   await absent(destination);
   for(const [id,entry] of tickets)if(Date.now()-entry.created>3600000)tickets.delete(id);
   if(tickets.size>=100)throw Error('另存会话过多，请重启开发服务后重试。');
-  await fs.mkdir(root,{recursive:true});const folder=await fs.mkdtemp(path.join(root,'export-'));
-  const ticket=crypto.randomBytes(24).toString('hex'),stagePath=path.join(folder,'rfq-'+crypto.randomUUID()+'.xlsx');
-  tickets.set(ticket,{created:Date.now(),target:destination,stagePath,busy:false,result:null});
+  const settings=options&&typeof options==='object'?options:{};
+  // 带相对超链接的汇总表必须在最终目录里的唯一相邻暂存生成，否则地址基准会落在中心暂存目录，整目录搬移后链接失效。
+  const adjacent=settings.adjacent===true;
+  let stagePath;
+  if(adjacent){
+   stagePath=path.join(parent,'.'+path.basename(destination)+'.tmp-'+crypto.randomBytes(6).toString('hex')+'.xlsx');
+   if(path.dirname(stagePath)!==parent)throw Error('相邻暂存路径越出目标目录，已停止。');
+   await absent(stagePath);
+  } else {
+   await fs.mkdir(root,{recursive:true});const folder=await fs.mkdtemp(path.join(root,'export-'));
+   stagePath=path.join(folder,'rfq-'+crypto.randomUUID()+'.xlsx');
+  }
+  const ticket=crypto.randomBytes(24).toString('hex');
+  tickets.set(ticket,{created:Date.now(),target:destination,stagePath,busy:false,result:null,adjacent});
   return {ticket,target:destination,stagePath};
  }
  async function commit(ticket){
@@ -34,7 +45,9 @@ function createExportStore({directory}){
    try{await fs.copyFile(entry.stagePath,entry.target,constants.COPYFILE_EXCL);}
    catch(e){if(e.code==='EEXIST')throw Error('目标文件已存在，未覆盖，请使用新文件名。');throw Error('目标文件写入失败：'+e.message);}
    if(digest(await fs.readFile(entry.target))!==sha256)throw Error('另存文件校验失败，请检查目标文件；未确认保存成功。');
-   entry.result={target:entry.target,sha256,bytes:bytes.length};return entry.result;
+   entry.result={target:entry.target,sha256,bytes:bytes.length};
+   if(entry.adjacent)await fs.rm(entry.stagePath,{force:true});
+   return entry.result;
   }finally{entry.busy=false;}
  }
  async function verify(ticket,target,sha256){

@@ -40,6 +40,71 @@ test('unsafe or already opened staging path fails before adding a workbook',()=>
  h.previous.FullName=stage;assert.throws(()=>host.write(h.app,model,stage),/已打开/);assert.equal(h.added,0);
 });
 
+// R2：版式、原生超链接与区域下拉的模拟宿主。只模拟本包真正用到的API。
+function layoutFixture(overrides){
+ const options=overrides||{},stage='C:\\temp\\rfq-layout.xlsx';
+ const merges={},fills={},validations={},links={};
+ function rangeFor(address){
+  if(ranges.has(address))return ranges.get(address);
+  const range={Font:{Size:null,Bold:false},NumberFormat:null,value:null,WrapText:null,HasFormula:false,MergeCells:false,
+   Rows:{AutoFit(){this.autoFitCount=(this.autoFitCount||0)+1;}},
+   get Value2(){return this.value;},
+   set Value2(rows){this.value=rows.map(r=>r.slice());},
+   Merge(){if(options.mergeFails)throw Error('merge failed');this.MergeCells=true;merges[address]=true;},
+   Interior:{Color:null},
+   Select(){selected=address;},
+   Validation:{Formula1:null,InCellDropdown:null,IgnoreBlank:null,
+    Add(type,style,operator,formula1){if(options.validationFails)throw Error('validation failed');
+     this.Formula1=formula1;validations[anchorKey({__address:address})]=formula1;},
+    Delete(){this.Formula1=null;}},
+   get Hyperlinks(){return hyperlinkView(anchorKey({__address:address}));}};
+  range.__address=address;
+  ranges.set(address,range);return range;
+ }
+ function hyperlinkView(address){
+  const list=links[address]||(links[address]=[]);
+  return {get Count(){return list.length;},Item(index){return list[index-1]||{};}};
+ }
+ const ranges=new Map();let selected='';
+ const sheets=[];
+ function newSheet(name){
+  const cells=new Map();
+  const sheet={Name:name||'Sheet',Range:rangeFor,
+   Cells:{Item(row,column){const address=colName(column)+row;if(!cells.has(address))cells.set(address,rangeFor(address));return cells.get(address);}},
+   Columns:{Item(index){const key='col'+index;if(!columnWidths.has(key))columnWidths.set(key,{ColumnWidth:null});return columnWidths.get(key);}},
+   Rows:{Item(index){const key='row'+index;if(!rowHeights.has(key))rowHeights.set(key,{RowHeight:null,Font:{Bold:false},AutoFit(){}});return rowHeights.get(key);}},
+   PageSetup:{PrintArea:null,PrintTitleRows:null}};
+  if(!options.noHyperlinks){
+   sheet.Hyperlinks={Add(anchor,address,subAddress,screenTip,display){
+    if(options.linkAddThrows)throw Error('link unsupported');
+    if(options.dropLink)return;
+    const list=links[anchorKey(anchor)]||(links[anchorKey(anchor)]=[]);
+    list.push({Address:address,SubAddress:subAddress,ScreenTip:screenTip,TextToDisplay:display});
+   }};
+  }
+  return sheet;
+ }
+ function anchorKey(anchor){return String(anchor.__address||'').split(':')[0];}
+ function colName(index){let name='';for(;index>0;index=Math.floor((index-1)/26))name=String.fromCharCode(65+(index-1)%26)+name;return name;}
+ const columnWidths=new Map(),rowHeights=new Map();
+ const previous={FullName:'C:\\user.xlsx',Activate(){app._active=this;},Close(){assert.fail('user book closed');}};
+ const book={FullName:'Book1',Worksheets:{get Count(){return sheets.length;},
+   Item(i){return typeof i==='number'?sheets[i-1]:sheets.filter(s=>s.Name===i)[0];},
+   Add(){const s=newSheet();sheets.push(s);return s;}},
+  SaveAs(file,format){assert.equal(format,51);this.FullName=file;saved=true;},
+  Close(save){assert.equal(save,false);closed++;},
+  Activate(){app._active=this;}};
+ let closed=0,saved=false;
+ const app={AutomationSecurity:1,FileSystem:{Exists:()=>false},ActiveWindow:{FreezePanes:false,get Frozen(){return this.FreezePanes;}},
+  get ActiveWorkbook(){return app._active;},Workbooks:{Count:1,Item(){return previous;},
+   Add(){app._active=book;const s=newSheet();sheets.push(s);return book;},
+   Open(file){app._active=book;return book;}}};
+ app._active=previous;
+ // Range()缓存必须按地址记忆住合并/填充/下拉状态，才能被读回校验。
+ return {app,book,ranges,get sheets(){return sheets;},get saved(){return saved;},merges,fills,validations,links,columnWidths,rowHeights,
+  get selected(){return selected;},get closed(){return closed;}};
+}
+
 function writingFixture(overrides){
  const written=[],writtenRows={},closedUser=[];
  function sheet(){
@@ -84,6 +149,74 @@ test('cleanup, macro restore and active book restore failures never report succe
   assert.deepEqual(h.closedUser.filter(v=>v===true),[],'用户工作簿不得被关闭');
  }
 });
+test('落地获批版式：等宽矩阵、列宽、表头填充、冻结、打印、原生链接与区域下拉',()=>{
+ const layoutModule=require('../src/workbook-layout.js');
+ const values=layoutModule.equalize([['示例园区材料询价表'],
+  ['项目名称：示例园区'],
+  ['序号','项目编码','项目名称','项目特征描述','单位','工程量','品牌','报价单价','金额','备注'],
+  ['1','FM-001','阀门','DN50','个','20','通达 / 海岳','','','']],10);
+ const spec=layoutModule.build({columns:values[2].map(function(_,i){return {index:i+1,width:i===3?42:14};}),
+  headerRows:[3],freeze:{row:4,column:1},
+  merges:[{row:1,column:1,columnSpan:10}],
+  fills:[layoutModule.headerFill(3,10),layoutModule.inputFill(4,7,1,1)],
+  hyperlinks:[{row:4,column:2,address:'C:\\out\\分类工作簿\\阀门.xlsx',display:'阀门'}],
+  validations:[layoutModule.listValidation(4,8,1,1,'内部选项','$A$1:$A$5')],
+  print:{area:{row:1,column:1,rowSpan:4,columnSpan:10},repeatRow:3},metadata:{profile:'category-detail'}},
+  {rowCount:values.length,columnCount:10});
+ const h=layoutFixture();
+ host.write(h.app,{sheets:[{name:'材料明细',values:values,layout:spec}]},'C:\\temp\\rfq-layout.xlsx');
+ assert.equal(h.sheets[0].Columns.Item(4).ColumnWidth,42,'长特征列按版式加宽');
+ assert.equal(h.sheets[0].Columns.Item(1).ColumnWidth,14);
+ assert.equal(h.sheets[0].Rows.Item(3).Font.Bold,true,'表头行加粗');
+ assert.equal(h.sheets[0].Range('A3:J3').Interior.Color,layoutModule.toColor('#DCE6F1'),'表头浅色填充');
+ assert.equal(h.sheets[0].Range('G4:G4').Interior.Color,layoutModule.toColor('#FFF7D6'),'可填写区黄色');
+ assert.equal(h.sheets[0].Range('A1:J1').MergeCells,true,'标题合并成整行');
+ assert.equal(h.app.ActiveWindow.FreezePanes,true,'冻结首行/首列');
+ assert.equal(h.sheets[0].PageSetup.PrintArea,'A1:J4');
+ assert.equal(h.sheets[0].PageSetup.PrintTitleRows,'$3:$3','打印重复表头');
+ assert.deepEqual(h.links['B4'].map(function(item){return item.Address+'|'+item.TextToDisplay;}),
+  ['C:\\out\\分类工作簿\\阀门.xlsx|阀门'],'用原生超链接，显示类别名');
+ assert.equal(h.validations['H4'],"='内部选项'!$A$1:$A$5",'分类下拉用区域引用，避免类别名被拆开');
+ assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx','用户工作簿保持活动');
+ assert.equal(h.app.AutomationSecurity,1,'宏安全设置恢复');
+});
+
+test('版式读回缺失或宿主缺API时明确报错，不产出“看起来像”的文件',()=>{
+ const layoutModule=require('../src/workbook-layout.js');
+ const values=layoutModule.equalize([['清单'],['序号','项目编码','项目名称','项目特征描述','单位','工程量','品牌','报价单价','金额','备注'],
+  ['1','FM-001','阀门','DN50','个','20','通达','','','']],10);
+ const spec=layoutModule.build({columns:values[1].map(function(_,i){return {index:i+1};}),headerRows:[2],
+  hyperlinks:[{row:3,column:2,address:'C:\\out\\阀门.xlsx',display:'阀门'}],
+  validations:[layoutModule.listValidation(3,8,1,1,'内部选项','$A$1:$A$5')]},
+  {rowCount:values.length,columnCount:10});
+ const dropped=layoutFixture({dropLink:true});
+ assert.throws(function(){host.write(dropped.app,{sheets:[{name:'材料明细',values:values,layout:spec}]},'C:\\temp\\rfq-layout.xlsx');},
+  /超链接未生效|超链接读回缺失/,'链接未真正写入时必须失败');
+ const noApi=layoutFixture({noHyperlinks:true});
+ assert.throws(function(){host.write(noApi.app,{sheets:[{name:'材料明细',values:values,layout:spec}]},'C:\\temp\\rfq-layout.xlsx');},
+  /Hyperlinks\.Add/,'缺API时必须报出具体API名');
+ assert.equal(noApi.saved,false,'缺API时不得保存/发布文件');
+ const badValidation=layoutFixture({validationFails:true});
+ assert.throws(function(){host.write(badValidation.app,{sheets:[{name:'材料明细',values:values,layout:spec}]},'C:\\temp\\rfq-layout.xlsx');},
+  /validation failed|分类下拉读回|下拉未生效/);
+ const noMerge=layoutFixture({mergeFails:true});
+ assert.throws(function(){host.write(noMerge.app,{sheets:[{name:'材料明细',values:values,
+  layout:layoutModule.build({columns:values[1].map(function(_,i){return {index:i+1};}),headerRows:[2],
+   merges:[{row:1,column:1,columnSpan:10}]},{rowCount:values.length,columnCount:10})}]},'C:\\temp\\rfq-layout.xlsx');},
+  /merge failed|合并/,'合并失败必须停止');
+});
+
+test('无layout的旧模型仍按原行为写出，版式校验拦住越界区域',()=>{
+ const layoutModule=require('../src/workbook-layout.js');
+ const legacy={sheets:[{name:'清单',values:[['编码','量'],['000123','0.3']]}]};
+ const h=layoutFixture();
+ host.write(h.app,legacy,'C:\\temp\\rfq-layout.xlsx');
+ assert.deepEqual(h.sheets[0].Range('A1:B2').Value2,[['编码','量'],['000123','0.3']],'旧模型不带layout也能写出');
+ assert.deepEqual(layoutModule.validate(layoutModule.build({columns:[{index:1}],
+  merges:[{row:1,column:1,columnSpan:4}]},{rowCount:2,columnCount:2}),{rowCount:2,columnCount:2}).errors,
+  ['第1个合并超出工作表列范围。'],'越界合并必须在写盘前被拦住');
+});
+
 test('publishing stops before creating a workbook when the staging file already exists',()=>{
  const h=writingFixture({stageExists:true});
  assert.throws(()=>host.write(h.app,model,stage),/已存在/);

@@ -1,0 +1,82 @@
+const test=require('node:test'),assert=require('node:assert/strict');
+const layout=require('../src/workbook-layout.js');
+
+// 材料明细：短标题行＋10列公共列，模拟“分块宽度取首行”导致的截断/错位。
+const DETAIL_HEADER=['序号','项目编码','项目名称','项目特征描述','单位','工程量','品牌','报价单价','金额','备注'];
+
+test('等宽矩阵：短标题行和被补齐的行不决定列宽，也不截断任何内容',()=>{
+ const values=[['示例园区材料询价表'],
+  ['项目名称：示例园区'],
+  DETAIL_HEADER,
+  ['1','FM-001','阀门','DN50','个','20','通达 / 海岳','','','']];
+ const rows=layout.equalize(values,10);
+ assert.equal(rows.length,4);
+ rows.forEach(function(row,index){assert.equal(row.length,10,'第'+(index+1)+'行必须补齐到10列');});
+ assert.deepEqual(rows[0],['示例园区材料询价表','','','','','','','','','']);
+ assert.deepEqual(rows[2],DETAIL_HEADER,'表头不得被改写');
+ assert.equal(rows[3][5],'20','工程量按文本原样保留');
+ assert.equal(layout.equalize(values,12)[0].length,12,'允许更宽的矩阵');
+ assert.deepEqual(layout.equalize(values)[0].length,10,'未指定时取最宽行');
+ assert.throws(function(){layout.equalize(values,5);},/拒绝截断/,'列数小于内容必须拒绝而不是截断');
+ assert.throws(function(){layout.equalize([['a'],'b'],2);},/二维数组/);
+});
+
+test('颜色转换按WPS的BGR整数，非法颜色直接拒绝',()=>{
+ assert.equal(layout.toColor('#FFFFFF'),16777215);
+ assert.equal(layout.toColor('#FF0000'),255,'红色在BGR低位');
+ assert.equal(layout.toColor('#0000FF'),16711680,'蓝色在BGR高位');
+ assert.throws(function(){layout.toColor('red');},/颜色/);
+ assert.throws(function(){layout.toColor('#FFF');},/颜色/);
+});
+
+test('build补齐默认值并保持稳定结构，旧模型可无layout继续使用',()=>{
+ const built=layout.build({columns:[{index:1,title:'序号'},{index:2,title:'名称',width:24,wrap:false}],
+  headerRows:[3],freeze:{row:4,column:1},merges:[{row:1,column:1,columnSpan:10}],
+  fills:[layout.inputFill(4,7,1,1)],
+  validations:[layout.listValidation(4,8,5,1,'内部选项','$A$1:$A$5')],
+  hyperlinks:[{row:4,column:2,address:'C:\\out\\水泵.xlsx',display:'水泵'}],
+  print:{area:{row:1,column:1,rowSpan:20,columnSpan:10},repeatRow:3},metadata:{profile:'category-detail'}},
+  {rowCount:20,columnCount:10});
+ assert.equal(built.schemaVersion,1);
+ assert.equal(built.fontSize,10);
+ assert.equal(built.columns[0].width,18);assert.equal(built.columns[0].numberFormat,'@');
+ assert.equal(built.columns[1].width,24);assert.equal(built.columns[1].wrap,false);
+ assert.equal(built.merges[0].rowSpan,1,'合并区默认跨度补齐');
+ assert.equal(built.validations[0].inCellDropdown,true);
+ assert.equal(built.validations[0].allowBlank,true);
+ assert.equal(built.metadata.profile,'category-detail');
+ assert.deepEqual(layout.validate(built,{rowCount:20,columnCount:10}),{ok:true,errors:[]});
+});
+
+test('版式校验拒绝未知版本、缺列、非法颜色、错误链接与坏下拉区域',()=>{
+ const base=layout.build({columns:[{index:1}],headerRows:[1]});
+ assert.match(layout.validate({...base,schemaVersion:9}).errors.join('；'),/版本/);
+ const noColumns={...base};delete noColumns.columns;
+ assert.match(layout.validate(noColumns).errors.join('；'),/列定义/);
+ assert.match(layout.validate({...base,fills:[{row:1,column:1,color:'#GGGGGG'}]}).errors.join('；'),/颜色/);
+ assert.match(layout.validate({...base,hyperlinks:[{row:1,column:1,address:'  '}]}).errors.join('；'),/链接缺少地址/);
+ assert.match(layout.validate({...base,validations:[{row:1,column:1,listSheet:'内部选项',listRange:'A1'}]}).errors.join('；'),/选项区域/);
+ assert.match(layout.validate({...base,validations:[{row:1,column:1,listRange:'$A$1:$A$5'}]}).errors.join('；'),/选项表/);
+ assert.match(layout.validate({...base,freeze:{row:-1,column:1}}).errors.join('；'),/冻结/);
+ assert.throws(function(){layout.assertValid({...base,schemaVersion:9});},/版式不完整/);
+});
+
+test('bounds校验拦住超出工作表范围的合并/填充/下拉，避免短标题行导致越界',()=>{
+ const layoutSpec=layout.build({columns:Array.from({length:10},function(_,index){return {index:index+1};}),
+  merges:[{row:1,column:1,columnSpan:10}],fills:[layout.inputFill(2,7,1,1)]});
+ assert.equal(layout.validate(layoutSpec,{rowCount:4,columnCount:10}).ok,true);
+ const beyond=layout.build({columns:Array.from({length:10},function(_,index){return {index:index+1};}),
+  merges:[{row:1,column:4,columnSpan:10}]});
+ assert.match(layout.validate(beyond,{rowCount:4,columnCount:10}).errors.join('；'),/列范围/);
+ const rowBeyond=layout.build({columns:[{index:1}],fills:[layout.inputFill(9,1,1,1)]});
+ assert.match(layout.validate(rowBeyond,{rowCount:4,columnCount:1}).errors.join('；'),/行范围/);
+});
+
+test('便捷区域统一表头/填写区颜色，便于图02–07复用同一套版式',()=>{
+ assert.deepEqual(layout.headerFill(3,10),{row:3,column:1,rowSpan:1,columnSpan:10,color:'#DCE6F1'});
+ assert.equal(layout.inputFill(4,7,1,1).color,'#FFF7D6');
+ assert.equal(layout.inputFill(4,7,1,1,layout.COLORS.accent).color,'#FDE9D9');
+ const rule=layout.listValidation(4,8,1,4,'内部选项','$A$1:$A$5');
+ assert.deepEqual(rule,{row:4,column:8,rowSpan:1,columnSpan:4,listSheet:'内部选项',listRange:'$A$1:$A$5',
+  allowBlank:true,inCellDropdown:true});
+});
