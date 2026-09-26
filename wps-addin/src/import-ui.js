@@ -167,11 +167,12 @@
     document.getElementById('merge-next').addEventListener('click',function(){page++;render();});
     picker.disabled=!options.application||!window.__RFQ_IMPORT__;
     if(options.application&&!window.__RFQ_IMPORT__)tell('多文件导入需要启动最新开发服务并重新打开侧栏。');
-    picker.addEventListener('click',async function(){
+    // 导入主体：选路径的方式（系统对话框或侧栏内置选择器）不同，复制、读取、渲染完全一致。
+    async function runImport(select){
       if(busy)return;
       var added=false;
       try{
-        var paths=RfqImportHost.selectFiles(options.application);if(!paths.length){tell('已取消文件选择，原列表保留。');return;}
+        var paths=await select();if(!paths.length){tell('已取消文件选择，原列表保留。');return;}
         busy=true;options.onBusy(true);tell('正在复制原件并检查重复…');
         var response=await fetch('/api/import/prepare',{method:'POST',headers:{'content-type':'application/json','x-rfq-import-token':window.__RFQ_IMPORT__.token},
           body:JSON.stringify({paths:paths,existing:collection.entries.map(function(e){return e.metadata;})})});
@@ -192,7 +193,33 @@
       }catch(error){tell((added?'文件已加入，但界面更新失败，请重新选择文件核对。':'本批未加入，已有列表保留。')+error.message,true);}
       // 导入结束后必须再渲染一次：导入过程中的渲染发生在busy=true时，控件会保持禁用。
       finally{busy=false;options.onBusy(false);render();}
-    });
+    }
+    picker.addEventListener('click',function(){return runImport(function(){return RfqImportHost.selectFiles(options.application);});});
+    // 侧栏内置选择器：原生模态文件对话框会让侧栏停止出帧（2026-09-26实机证据），这里不创建任何原生窗口。
+    var browse=document.getElementById('browse-files');
+    var canBrowse=!!(options.application&&browse&&window.RfqPathPicker&&window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.browse);
+    if(browse){
+      browse.hidden=!canBrowse;browse.disabled=!canBrowse;
+      browse.addEventListener('click',function(){
+        if(!canBrowse||busy)return;
+        browse.disabled=true;
+        function done(){if(canBrowse)browse.disabled=false;}
+        runImport(function(){
+          var startPath='';
+          try{startPath=window.localStorage.getItem('rfq-browse-import-v1')||'';}catch(_){startPath='';}
+          return new Promise(function(resolve,reject){
+            RfqPathPicker.open({mode:'files',extensions:['.xls','.xlsx'],token:window.__RFQ_IMPORT__.token,startPath:startPath,
+              title:'选择要导入的清单',confirmLabel:'导入选中的清单',
+              onConfirm:function(paths){
+                try{window.localStorage.setItem('rfq-browse-import-v1',String(paths[0]).replace(/[\\/][^\\/]*$/,''));}catch(_){}
+                resolve(paths);
+              },
+              onCancel:function(){resolve([]);},
+              onError:function(message){reject(Error(message));}});
+          });
+        }).then(done,done);
+      });
+    }
     render();
     return {
       update:function(id,record,dirty){collection=RfqCollection.update(collection,id,record,dirty);render();},

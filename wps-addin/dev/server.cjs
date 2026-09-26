@@ -8,6 +8,7 @@ const {createExportStore} = require('./export-files.cjs');
 const {createProjectStore} = require('./project-store.cjs');
 const {createLibraryStore} = require('./library-store.cjs');
 const {createHeaderStore} = require('./header-store.cjs');
+const {listDirectory} = require('./fs-list.cjs');
 
 const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.css', '/src/host.js',
   '/src/taskpane.js', '/src/parser.js', '/src/merge.js', '/src/review.js', '/src/review-ui.js',
@@ -17,7 +18,8 @@ const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.cs
   '/src/classification-ui.js', '/src/category-memory.js', '/src/library-ui.js', '/rules/defaults.json',
   '/src/brand-table.js', '/src/brand-model.js', '/src/brand-host.js', '/src/brand-ui.js', '/src/decimal.js',
   '/src/brand-reference.js', '/src/inquiry-header.js', '/src/inquiry-model.js', '/src/split-plan.js',
-  '/src/split-state.js', '/src/header-ui.js', '/src/inquiry-ui.js', '/src/split-ui.js', '/assets/inquiry.svg']);
+  '/src/split-state.js', '/src/header-ui.js', '/src/inquiry-ui.js', '/src/split-ui.js',
+  '/src/path-picker.js', '/assets/inquiry.svg']);
 const TYPES = {'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
   '.html':'text/html; charset=utf-8','.xml':'application/xml; charset=utf-8','.svg':'image/svg+xml',
   '.json':'application/json; charset=utf-8'};
@@ -119,6 +121,21 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         return json(400,{error:error.message});
       }
     }
+    if (url.pathname === '/api/fs/list') {
+      const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');
+      if (!importDirectory) return json(404,{error:'当前服务未启用侧栏文件浏览，请启动最新开发服务。'});
+      if (req.method !== 'POST') return json(405,{error:'POST required'});
+      if (req.headers['x-rfq-import-token'] !== importToken ||
+          !/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) return json(403,{error:'侧栏会话失效，请重新打开侧栏。'});
+      try {
+        let size=0; const chunks=[];
+        for await (const chunk of req) { size+=chunk.length; if(size<=8192)chunks.push(chunk); }
+        if(size>8192)return json(413,{error:'目录请求过大。'});
+        let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'目录请求无效。'});}
+        if(!data||Array.isArray(data))return json(400,{error:'目录请求无效。'});
+        return json(200,await listDirectory(data));
+      } catch(error) {return json(400,{error:error.message});}
+    }
     if (url.pathname === '/__probe/report') {
       if (!probeConfig || !reportPath) return reply(404, 'Not found');
       if (req.method !== 'POST') return reply(405, 'POST required');
@@ -161,7 +178,8 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
     try {
       let content = await fs.readFile(path.join(root, url.pathname.slice(1)));
       if (importDirectory && url.pathname === '/taskpane.html') {
-        content = content.toString('utf8').replace('<head>', '<head><script>window.__RFQ_IMPORT__=' + JSON.stringify({token:importToken}) + ';</script>');
+        content = content.toString('utf8').replace('<head>', '<head><script>window.__RFQ_IMPORT__=' +
+          JSON.stringify({token:importToken,browse:true}) + ';</script>');
       }
       if (probeConfig && url.pathname === '/taskpane.html') {
         const token = JSON.stringify(probeConfig.token);

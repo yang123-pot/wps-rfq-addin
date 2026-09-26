@@ -6,25 +6,25 @@ const os = require('node:os');
 const path = require('node:path');
 const { createServer, prepareProbeSources } = require('../dev/server.cjs');
 
-async function setup(t, probe = false) {
+function client(server) {
+  const port = server.address().port;
+  return (url, options = {}) => new Promise((resolve, reject) => {
+    const req = http.request({hostname:'127.0.0.1',port,path:url,method:options.method || 'GET',headers:options.headers}, res => {
+      let body = ''; res.on('data', c => body += c); res.on('end', () => resolve({status:res.statusCode,body,headers:res.headers}));
+    });
+    req.on('error', reject); req.end(options.body);
+  });
+}
+async function setup(t, probe = false, extra = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'rfq-http-'));
   await fs.writeFile(path.join(root, 'main.js'), 'window.example = true;');
   await fs.writeFile(path.join(root, 'secret.txt'), 'private-data');
   const reportPath = path.join(root, 'report.json');
   const server = createServer({ root, reportPath,
-    probeConfig: probe ? { token: 'unit-test-token', outputPath: 'C:\\test\\probe.xlsx' } : null });
+    probeConfig: probe ? { token: 'unit-test-token', outputPath: 'C:\\test\\probe.xlsx' } : null, ...extra });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await new Promise(resolve => server.close(resolve)); await fs.rm(root, {recursive:true,force:true}); });
-  const port = server.address().port;
-  function request(url, options = {}) {
-    return new Promise((resolve, reject) => {
-      const req = http.request({hostname:'127.0.0.1',port,path:url,method:options.method || 'GET',headers:options.headers}, res => {
-        let body = ''; res.on('data', c => body += c); res.on('end', () => resolve({status:res.statusCode,body,headers:res.headers}));
-      });
-      req.on('error', reject); req.end(options.body);
-    });
-  }
-  return {request,reportPath};
+  return {request:client(server),reportPath};
 }
 test('serves plugin assets but not arbitrary workspace files', async t => {
   const {request} = await setup(t);
@@ -63,6 +63,30 @@ test('rejects hostile Host, Origin and state changing static requests', async t 
 test('diagnostic report endpoint is disabled during normal use', async t => {
   const {request} = await setup(t);
   assert.equal((await request('/__probe/report', {method:'POST',body:'{}'})).status, 404);
+});
+test('侧栏目录浏览只服务会话令牌，可过滤扩展名且不开放写入', async t => {
+  const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'rfq-fs-http-'));
+  t.after(() => fs.rm(folder, {recursive:true,force:true}));
+  await fs.mkdir(path.join(folder, '清单文件夹'));
+  await fs.writeFile(path.join(folder, '清单文件夹', '清单.xlsx'), 'x');
+  await fs.writeFile(path.join(folder, '清单文件夹', '说明.txt'), 'y');
+  const server = createServer({root:path.resolve(__dirname, '..'), importDirectory:path.join(folder, 'copies')});
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const request = client(server);
+  const page = await request('/taskpane.html');
+  const injected = JSON.parse(/window\.__RFQ_IMPORT__=(\{[^;]*\});/.exec(page.body)[1]);
+  assert.equal(injected.browse, true, '侧栏必须知道本机服务支持内置文件浏览');
+  assert.equal((await request('/api/fs/list')).status, 405);
+  assert.equal((await request('/api/fs/list', {method:'POST', body:JSON.stringify({path:folder})})).status, 403);
+  const bad = await request('/api/fs/list', {method:'POST', headers:{'content-type':'application/json','x-rfq-import-token':injected.token},
+    body:JSON.stringify({path:path.join(folder, '不存在')})});
+  assert.equal(bad.status, 400);
+  const listed = await request('/api/fs/list', {method:'POST', headers:{'content-type':'application/json','x-rfq-import-token':injected.token},
+    body:JSON.stringify({path:path.join(folder, '清单文件夹'), extensions:['.xlsx']})});
+  assert.equal(listed.status, 200);
+  assert.equal(listed.headers['cache-control'], 'no-store');
+  assert.deepEqual(JSON.parse(listed.body).entries.map(item => item.name + ':' + item.type), ['清单.xlsx:file']);
 });
 test('probe accepts only authenticated bounded JSON reports and persists evidence', async t => {
   const {request,reportPath} = await setup(t, true);

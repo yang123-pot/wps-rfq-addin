@@ -15,7 +15,13 @@ function buttonAction(id){
  return action[1];
 }
 function load(options={}){
- const events=[],pane={ID:7,Visible:true,Width:380,Navigate(url){events.push(['navigate',url]);if(options.failNavigate)throw Error('导航失败');}};
+ const events=[];let paneVisible=true,paneWidth=380;
+ const pane={ID:7,
+  get Visible(){return paneVisible;},
+  set Visible(value){if(options.refuseHide&&value===false)throw Error('宿主拒绝隐藏');paneVisible=value;events.push(['visible',value]);},
+  get Width(){return paneWidth;},
+  set Width(value){paneWidth=value;events.push(['width',value]);},
+  Navigate(url){events.push(['navigate',url]);if(options.failNavigate)throw Error('导航失败');}};
  const store={getItem(){return options.hasPane===false?null:7;},setItem(key,value){events.push(['store',key,value]);}};
  const application={PluginStorage:store,GetTaskPane(){if(options.failGet)throw Error('旧面板不存在');return options.hasPane===false?null:pane;},
   CreateTaskPane(url){events.push(['create',url]);return pane;}};
@@ -34,7 +40,8 @@ test('普通打开复用现有侧栏且不重载页面内存',()=>{
 test('恢复按钮由用户确认后重载现有 WPS 侧栏',()=>{
  const {context,events}=load();
  assert.equal(context[buttonAction('rfqReloadPane')](),true);
- assert.deepEqual(events,[['confirm'],['navigate','http://127.0.0.1:38891/taskpane.html']]);
+ assert.deepEqual(events,[['confirm'],['visible',false],['visible',true],['width',381],['width',380],
+  ['navigate','http://127.0.0.1:38891/taskpane.html']],'停住后必须按重建处理：先隐藏再显示、改动宽度、最后导航');
 });
 
 test('取消恢复保留当前侧栏且不调用 Navigate',()=>{
@@ -43,10 +50,18 @@ test('取消恢复保留当前侧栏且不调用 Navigate',()=>{
  assert.deepEqual(events,[['confirm']]);
 });
 
+test('宿主不支持隐藏窗格时仍然导航重载，不让恢复入口失效',()=>{
+ const {context,events}=load({refuseHide:true});
+ assert.equal(context[buttonAction('rfqReloadPane')](),true);
+ assert.deepEqual(events,[['confirm'],['visible',true],['width',381],['width',380],
+  ['navigate','http://127.0.0.1:38891/taskpane.html']]);
+});
+
 test('无旧侧栏时恢复按钮创建新侧栏，导航失败则提示失败',()=>{
  const missing=load({hasPane:false});
  assert.equal(missing.context[buttonAction('rfqReloadPane')](),true);
- assert.deepEqual(missing.events,[['create','http://127.0.0.1:38891/taskpane.html'],['store','rfq.taskpane.id',7]]);
+ assert.deepEqual(missing.events,[['create','http://127.0.0.1:38891/taskpane.html'],['store','rfq.taskpane.id',7],
+  ['visible',true],['width',380]]);
  const failed=load({failNavigate:true});
  assert.equal(failed.context[buttonAction('rfqReloadPane')](),false);
  assert.equal(failed.events.some(event=>event[0]==='alert'&&/导航失败/.test(event[1])),true);
@@ -55,5 +70,6 @@ test('无旧侧栏时恢复按钮创建新侧栏，导航失败则提示失败',
 test('旧面板编号失效时恢复按钮仍可新建侧栏',()=>{
  const {context,events}=load({failGet:true});
  assert.equal(context[buttonAction('rfqReloadPane')](),true);
- assert.deepEqual(events,[['create','http://127.0.0.1:38891/taskpane.html'],['store','rfq.taskpane.id',7]]);
+ assert.deepEqual(events,[['create','http://127.0.0.1:38891/taskpane.html'],['store','rfq.taskpane.id',7],
+  ['visible',true],['width',380]]);
 });

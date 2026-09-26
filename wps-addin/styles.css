@@ -3,3 +3,25 @@
 .review-editor{margin-top:12px;border-top:1px dashed #dfe8e1;padding-top:10px}.review-editor>summary{font-weight:600;color:#237555}.review-form{padding:6px 0 12px}.review-form label{display:block;margin:10px 0;color:#526959;font-size:12px}.review-form input{font:inherit;display:block;width:100%;padding:9px;border:1px solid #cfdcd3;border-radius:5px;margin-top:5px;color:#243b32;background:#fff}.review-form input[type=checkbox]{display:inline;width:auto;margin-right:8px}.review-form input:focus{outline:2px solid #98c8ac}.review-form button{font-size:12px}.continuation-form{border-top:1px solid #e4ebe6;margin-top:8px}.review-actions{display:flex;gap:8px}.review-actions button{font-size:11px;padding:10px 7px}#review-status{font-size:12px;color:#856126}.confirmed-note{font-size:11px;color:#237555}
 #task-controls{border:0;margin:0;padding:0;min-width:0}#imported-books,#merge-list,.source-list{list-style:none;padding:0;margin:12px 0}#imported-books>li,#merge-list>li,.source-list>li{border-bottom:1px solid #e2eae4;padding:12px 0;overflow-wrap:anywhere}#imported-books>li.selected-file{border-left:3px solid #237555;padding-left:10px}#imported-books .locate{margin-right:7px}#import-message{font-size:12px;overflow-wrap:anywhere}#import-message.error{color:#9a542d}.merge-option{display:block;line-height:1.8;margin:14px 0;font-size:12px}.merge-option input{accent-color:#237555}.source-list{background:#f7faf8;padding:10px;border-radius:6px}.source-list strong{font-size:12px}#merge-summary{font-size:13px;margin-top:14px}#merge-status{font-size:12px}#merge-list strong{font-size:14px}
 .library-list{list-style:none;padding:0;margin:12px 0}.library-list>li{border-bottom:1px solid #e2eae4;padding:12px 0;overflow-wrap:anywhere}.library-list input{font:inherit;display:block;width:100%;padding:9px;border:1px solid #cfdcd3;border-radius:5px;margin-top:6px;color:#243b32;background:#fff}.library-list input:focus{outline:2px solid #98c8ac}.library-list select{margin-top:6px}.condition-row{display:flex;gap:6px;align-items:center;margin-top:6px}.condition-row select{width:38%;margin-top:0}.condition-row input{margin-top:0}.condition-row button{width:auto;margin-top:0;white-space:nowrap}.library-list .card-label{margin:10px 0 0}
+.rfq-picker{position:fixed;inset:0;background:#1a2a2155;display:flex;align-items:stretch;justify-content:center;z-index:2147483600;padding:10px}
+.rfq-picker-panel{background:#fff;border-radius:10px;display:flex;flex-direction:column;width:100%;max-width:760px;padding:14px;box-shadow:0 8px 30px #1c31272e;overflow:hidden}
+.rfq-picker-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rfq-picker-title{font-size:14px}.rfq-picker-close{width:auto;margin:0;padding:2px 8px;background:#eef5ef;color:#326545;font-size:16px;line-height:1.4}
+.rfq-picker-path-row{display:flex;gap:6px;align-items:center;margin-top:10px}
+.rfq-picker-path{font:inherit;flex:1;min-width:0;padding:9px;border:1px solid #cfdcd3;border-radius:5px;color:#243b32;background:#fff}
+.rfq-picker-path:focus{outline:2px solid #98c8ac}
+.rfq-picker-go{width:auto;margin:0;padding:9px 12px;font-size:12px;white-space:nowrap}
+.rfq-picker-hint{margin:8px 0 0}
+.rfq-picker-list{list-style:none;padding:0;margin:10px 0 0;flex:1;overflow:auto;min-height:120px;border:1px solid #e6ede7;border-radius:8px}
+.rfq-picker-list>li{border-bottom:1px solid #eef2ef}
+.rfq-picker-list>li:last-child{border-bottom:0}
+.rfq-picker-entry{display:flex;align-items:center;gap:8px;width:100%;margin:0;padding:9px 10px;background:#fff;color:#314d3c;font-weight:400;font-size:12px;text-align:left;border-radius:0}
+.rfq-picker-entry:hover:enabled{background:#f2f8f3}
+.rfq-picker-entry.selected{background:#e6f2ea;color:#1d5b41;font-weight:600}
+.rfq-picker-entry[data-type=directory]{color:#2c5f46;font-weight:600}
+.rfq-picker-name{flex:1;overflow-wrap:anywhere}
+.rfq-picker-meta{font-size:10px;color:#8b9a90;white-space:nowrap}
+.rfq-picker-status{font-size:11px;color:#697a70;min-height:16px;margin:8px 0 0;overflow-wrap:anywhere}
+.rfq-picker-status.error{color:#9a542d}
+.rfq-picker-summary{margin:4px 0 0}
+.rfq-picker-foot{margin-top:8px}.rfq-picker-foot button{font-size:12px}

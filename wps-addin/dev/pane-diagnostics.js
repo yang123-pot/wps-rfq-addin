@@ -2,14 +2,16 @@
  'use strict';
  var config=window.__RFQ_PANE_PROBE__;
  if(!config)return;
- var frameCount=0,pendingSince=null,stalled=false,visibleSince=Date.now(),lastEvent={},paneSession=('00000000'+Math.floor(Math.random()*0xffffffff).toString(16)).slice(-8)+
+ var frameCount=0,pendingSince=null,lastFrameAt=null,frameLatencyMaxMs=0,stalled=false,visibleSince=Date.now(),lastEvent={},paneSession=('00000000'+Math.floor(Math.random()*0xffffffff).toString(16)).slice(-8)+
   ('00000000'+Math.floor(Math.random()*0xffffffff).toString(16)).slice(-8);
  function frame(){
   // A stopped compositor must not accumulate one callback per heartbeat.
   if(pendingSince!==null)return;
   pendingSince=Date.now();
   window.requestAnimationFrame(function(){
-   frameCount++;pendingSince=null;
+   var latency=Date.now()-pendingSince;
+   if(latency>frameLatencyMaxMs)frameLatencyMaxMs=latency;
+   frameCount++;pendingSince=null;lastFrameAt=Date.now();
    if(stalled){stalled=false;report('pane-render-resumed');}
   });
  }
@@ -30,6 +32,10 @@
    headerTop:header?Math.round(header.getBoundingClientRect().top):null,
    importButtonTop:button?Math.round(button.getBoundingClientRect().top):null,frameCount:frameCount,
    framePendingMs:pendingSince===null?0:Math.max(0,Date.now()-pendingSince),
+   // 停摆定位用：已完成帧的最大等待时长，以及距上一帧的时长；合成器停摆时后者会一路增长。
+   frameLatencyMaxMs:frameLatencyMaxMs,
+   sinceLastFrameMs:lastFrameAt===null?null:Math.max(0,Date.now()-lastFrameAt),
+   browseVisible:(function(){var browse=document.getElementById('browse-files');return !!browse&&!browse.hidden;}()),
    // 诊断用：把侧栏上几条状态文字带回来，便于定位“红色提示到底说了什么”。
    messageText:text('message'),importMessageText:text('import-message'),mergeStatusText:text('merge-status'),
    classificationMessageText:text('classification-message'),classificationProgressText:text('classification-progress'),
