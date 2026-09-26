@@ -19,7 +19,7 @@
 - **真实能力**：旧流程实机走通注册/功能区、侧栏连接、两文件导入、合并确认、分类确认5/5及停摆后重建恢复。横向品牌汇总表与名称链接（R7）已在模型/侧栏层落地，汇总读回与多品牌联动、总询价、拆分仍待开发；R1/R2/R5/R6/R7只到模型、项目库与模拟宿主层，**仍无真实WPS新流程证据**。
 - **下一项**：从R8（汇总读回、多品牌关系与联动，对应图05A/05B→06）开始；先完整阅读本文件、实际打开本包相关图（图05A/05B，必要时图06），再核对Git和代码。汇总表品牌/供应商以表内填写为唯一来源，改品牌须回汇总表修改并重新生成；不要从旧版侧栏确认品牌路线继续。
 - **待定项**：历史32种类别的正式词表/迁入政策、另一WPS版本的隔离验证环境仍未确定；不影响用隔离合成分类库开发新流程。
-- **备份核对（R7见第7.1节与下条记录）**：R6主提交 `12d33e9` 已推送，远程SHA核为 `12d33e93ab1569a63b73139facb63c21db18bb95`。R7主提交及远程SHA见本节R7记录。本轮默认连接先失败（`schannel: failed to receive handshake, SSL/TLS connection failed`），改用单次`git -c 'http.https://github.com/.proxy=' push origin feat/wps-phase1`成功，核对远程ref也使用同一单次参数。**未强推、未修改系统/用户/仓库代理配置**。历史归档主提交2f04d5c的远程SHA为2f04d5cc18b1a06ac00eb34ecf1a08d60de9fb8d。
+- **备份核对（R6已同步；R7待同步）**：R6主提交 `12d33e9` 已推送，远程SHA核为 `12d33e93ab1569a63b73139facb63c21db18bb95`。R7主提交 `ed2a10c`（本地，2026-09-27）**推送失败，尚未同步**：默认路径（仓库已配置代理`http://127.0.0.1:7897`）报`schannel: failed to receive handshake, SSL/TLS connection failed`；按R5/R6做法单次清空该代理直连报`Failed to connect to github.com port 443 after ~21s: Could not connect to server`；经代理改用`-c http.sslBackend=openssl`报`TLS connect error: unexpected eof while reading`；`git ls-remote`同样失败（本机到github.com:443当前不可达）。已停止重试、保留本地提交待网络恢复后重推，**未强推、未修改系统/用户/仓库代理配置、未声称已备份**。历史归档主提交2f04d5c的远程SHA为2f04d5cc18b1a06ac00eb34ecf1a08d60de9fb8d。
 
 原交接共812行，已逐字节保存到[旧交接归档](docs/archive/handoff-before-workflow-v3-20260926.md)。归档包含已过期顺序和相互矛盾的阶段表述，**只作历史资料，不是当前执行命令**。
 
