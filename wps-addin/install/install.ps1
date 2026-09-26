@@ -8,7 +8,7 @@ WPS询价插件本机安装（用户级）：
 param(
   [string]$SourceDir = (Join-Path $PSScriptRoot '..'),
   [string]$AppDir = (Join-Path $env:LOCALAPPDATA 'WpsRfqAddin\app'),
-  [string]$PublishPath = (Join-Path $env:APPDATA 'kingsoft\office6\jsaddons\publish.xml'),
+  [string]$PublishPath = (Join-Path $env:APPDATA 'kingsoft\wps\jsaddons\publish.xml'),
   [string]$DataRoot = (Join-Path $env:LOCALAPPDATA 'WpsRfqAddin'),
   [int]$Port = 38891,
   [switch]$SkipService,
@@ -53,12 +53,15 @@ $ours = @($xml.DocumentElement.ChildNodes | Where-Object {
 foreach ($node in $ours) { [void]$xml.DocumentElement.RemoveChild($node) }
 if ($ours.Count -gt 0) { Write-Step "已移除本插件旧节点 $($ours.Count) 个" }
 
-$node = $xml.CreateElement('jsplugin')
+# WPS表格实际读取的元素名与属性（与dev/register.ps1一致，已在本机29161上核对）。
+$node = $xml.CreateElement('jspluginonline')
 $node.SetAttribute('name', $pluginGuid)
-$node.SetAttribute('guid', $pluginGuid)
-$node.SetAttribute('url', $pluginUrl)
 $node.SetAttribute('type', 'et')
-$node.SetAttribute('enable', 'true')
+$node.SetAttribute('url', $pluginUrl)
+$node.SetAttribute('debug', '')
+$node.SetAttribute('enable', 'enable_dev')
+$node.SetAttribute('install', 'null')
+$node.SetAttribute('customDomain', '')
 [void]$xml.DocumentElement.AppendChild($node)
 $xml.Save($PublishPath)
 Write-Step "已写入本插件节点：$pluginUrl"

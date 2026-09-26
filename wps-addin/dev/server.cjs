@@ -203,7 +203,9 @@ async function main() {
   const probeConfig = outputPath ? {token:crypto.randomBytes(24).toString('hex'), outputPath:path.resolve(outputPath),sourcePaths} : null;
   const importDirectory=path.resolve(arg('--import-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','imports')));
   const libraryDirectory=path.resolve(arg('--library-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','library')));
-  const server = createServer({root:path.resolve(__dirname,'..'),probeConfig,reportPath:reportPath && path.resolve(reportPath),importDirectory,libraryDirectory});
+  const projectDirectory=path.resolve(arg('--project-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','projects')));
+  const headerDirectory=path.resolve(arg('--header-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','headers')));
+  const server = createServer({root:path.resolve(__dirname,'..'),probeConfig,reportPath:reportPath && path.resolve(reportPath),importDirectory,libraryDirectory,projectDirectory,headerDirectory});
   server.on('error', error => { console.error(error.message); process.exitCode = 1; });
   server.listen(port, '127.0.0.1', () => console.log('WPS add-in ready: http://127.0.0.1:' + port + (probeConfig ? ' (probe enabled)' : '')));
 }

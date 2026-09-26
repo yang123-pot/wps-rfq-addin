@@ -4,6 +4,7 @@
 param(
   [string]$AppDir = (Join-Path $env:LOCALAPPDATA 'WpsRfqAddin\app'),
   [string]$DataRoot = (Join-Path $env:LOCALAPPDATA 'WpsRfqAddin'),
+  [string]$PublishPath = (Join-Path $env:APPDATA 'kingsoft\wps\jsaddons\publish.xml'),
   [int]$Port = 38891
 )
 $ErrorActionPreference = 'Stop'

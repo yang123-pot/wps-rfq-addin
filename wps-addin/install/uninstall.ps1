@@ -6,7 +6,7 @@
 #>
 param(
   [string]$AppDir = (Join-Path $env:LOCALAPPDATA 'WpsRfqAddin\app'),
-  [string]$PublishPath = (Join-Path $env:APPDATA 'kingsoft\office6\jsaddons\publish.xml'),
+  [string]$PublishPath = (Join-Path $env:APPDATA 'kingsoft\wps\jsaddons\publish.xml'),
   [string]$DataRoot = (Join-Path $env:LOCALAPPDATA 'WpsRfqAddin'),
   [int]$Port = 38891,
   [switch]$RemoveAppDir,
