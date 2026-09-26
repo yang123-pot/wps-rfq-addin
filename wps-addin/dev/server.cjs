@@ -76,14 +76,17 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         if(size>67108864)return json(413,{error:'项目记录过大，未保存。'});
         let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'项目请求无效。'});}
         if(!data||Array.isArray(data))return json(400,{error:'项目请求无效。'});
-        if(url.pathname==='/api/project/save')return json(200,await projects.save(data.project));
+        if(url.pathname==='/api/project/save')return json(200,await projects.save(data.project,{expectedRevision:data.expectedRevision}));
         if(url.pathname==='/api/project/load')return json(200,{project:await projects.load(data.projectId)});
         if(url.pathname==='/api/project/restore-copy'){
           if(!importDirectory)return json(404,{error:'当前服务未启用工作副本，请启动最新开发服务。'});
           return json(200,await restoreCopy(data.source,{directory:importDirectory}));
         }
         return json(200,{projects:await projects.list()});
-      } catch(error) {return json(400,{error:error.message});}
+      } catch(error) {
+        if(error.code==='REVISION_CONFLICT')return json(409,{error:error.message});
+        return json(400,{error:error.message});
+      }
     }
     if (['/api/library/load','/api/library/save'].includes(url.pathname)) {
       const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');

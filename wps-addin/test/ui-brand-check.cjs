@@ -107,7 +107,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   assert.match(await page.locator('#brand-status').innerText(),/品牌已填写完整/);
   const binding=await page.evaluate(()=>window.__readBinding);
   assert.equal(binding.path,brandTarget);
-  assert.match(String(binding.inputKey),/^ck1-[0-9a-f]{16}$/,'读回必须带生成时的内容键');
+  assert.match(String(binding.inputKey),/^ck2-[0-9a-f]{16}$/,'读回必须带生成时的内容键');
   assert.equal(Object.keys(binding.rowMap).length,1,'绑定必须按分配标识记录映射');
 
   await page.evaluate(()=>{window.__readFails='品牌表第3行的类别被改动（应为“水阀门”），不能读回。';});
@@ -119,8 +119,8 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.locator('#brand-coverage').selectOption('material-subsets');
   await page.locator('#save-project').click();
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
-  assert.match(await page.locator('#project-status').innerText(),/品牌与抬头：未完成（抬头未填写完整/,
-   '品牌填好但抬头为空时品牌阶段仍不能算完成');
+  assert.match(await page.locator('#project-status').innerText(),/品牌汇总：未完成（抬头未填写完整/,
+   '品牌填好但抬头为空时品牌汇总阶段仍不能算完成');
   await page.evaluate(()=>{
    const values={'header-company':'测试安装工程有限公司','header-address':'测试市测试路1号',
     'header-phone':'010-12345678','header-projectName':'测试楼项目','header-contact':'测试员'};
@@ -137,12 +137,16 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   assert.equal(await page.locator('#header-template-select option').count(),2,'保存后模板下拉里应出现该模板');
   await page.locator('#save-project').click();
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
-  assert.match(await page.locator('#project-status').innerText(),/品牌与抬头：已确认/,'人工填好品牌后品牌阶段必须置为已确认');
-  assert.match(await page.locator('#project-status').innerText(),/生成询价表：未完成/);
+  assert.match(await page.locator('#brand-status').innerText(),/品牌已填写完整/,'人工填好品牌后品牌面板必须显示已完整');
+  assert.match(await page.locator('#project-status').innerText(),/分类工作簿：未完成/,
+   '分类工作簿尚未实现时，品牌汇总不得被误报为已完成');
+  assert.match(await page.locator('#project-status').innerText(),/询价表：未完成/);
   const saved=JSON.parse(await fs.readFile(path.join(root,'projects',(await fs.readdir(path.join(root,'projects')))[0]),'utf8'));
   assert.equal(saved.assignments.assignments[0].brand,'品牌甲','项目记录必须保存人工填写的品牌');
   assert.equal(saved.assignments.binding.path,brandTarget);
-  assert.equal(saved.stages.brand.state,'ready');
+  assert.equal(saved.schemaVersion,2,'项目记录必须写入v2结构');
+  assert.equal(saved.stages.categories.state,'missing','未实现的分类工作簿阶段必须保持未完成');
+  assert.equal(saved.stages.brands.state,'missing','分类工作簿未完成时品牌汇总不得误报完成');
   await page.reload();
   await page.locator('#open-project').click();
   await page.waitForFunction(()=>document.querySelectorAll('#project-list > li button').length>=1);
@@ -170,7 +174,10 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   assert.equal(written.sheets[0].values[7][8],'','金额留空');
   assert.deepEqual(written.sheets.slice(1).map(sheet=>sheet.name),['内部追溯','处理记录'],'内部资料只留在内部页');
   await page.locator('#save-project').click();
-  await page.waitForFunction(()=>document.querySelector('#project-status').textContent.includes('生成询价表：已确认'));
+  await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
+  assert.match(await page.locator('#inquiry-status').innerText(),/已生成：/,'询价工作簿必须真实生成并校验');
+  assert.match(await page.locator('#project-status').innerText(),/询价表：未完成（品牌汇总未完成）/,
+   '阶段未实现前不得因旧生成记录误报完成');
 
   // E2：一个询价页拆成一个文件，成功后写回执；输出目录必须先存在。
   const splitDirectory=path.join(root,'拆分');
@@ -186,13 +193,14 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   const splitFile=path.join(splitDirectory,'水阀门_供应商A.xlsx');
   assert.equal(require('node:fs').existsSync(splitFile),true,'拆分文件必须真实存在');
   await page.locator('#save-project').click();
-  await page.waitForFunction(()=>document.querySelector('#project-status').textContent.includes('拆分文件：已确认'));
+  await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
+  assert.match(await page.locator('#split-status').innerText(),/完成 1/,'拆分必须真实完成并核对');
   const afterSplit=JSON.parse(await fs.readFile(path.join(root,'projects',(await fs.readdir(path.join(root,'projects')))[0]),'utf8'));
   assert.equal(afterSplit.split.files.length,1);
   assert.equal(afterSplit.split.files[0].state,'succeeded');
   assert.match(afterSplit.split.files[0].sha256,/^[a-f0-9]{64}$/);
   assert.equal(afterSplit.generation.target,inquiryTarget,'生成记录必须保存目标文件与内容键');
-  assert.match(afterSplit.generation.inputKey,/^ck1-[0-9a-f]{16}$/);
+  assert.match(afterSplit.generation.inputKey,/^ck2-[0-9a-f]{16}$/);
 
   // 品牌变化后旧生成文件必须过期，拆分也不能继续沿用。
   await page.evaluate(()=>{

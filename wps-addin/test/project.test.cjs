@@ -5,33 +5,55 @@ function input(name,fingerprint,qty){
  return {metadata:{originalPath:path,originalName:name,copyPath:'C:\\copies\\'+name,fingerprint},snapshot:{name,path,fingerprint,sheets:[{name:'给排水',startRow:1,startColumn:1,rowCount:3,columnCount:5,values}]}};
 }
 function fixture(){return collection.add(collection.create(),[input('a.xlsx','a'.repeat(64),'0.1'),input('b.xlsx','b'.repeat(64),'0.2')]);}
-test('creates a project from a collection with source fingerprints and an import stage',()=>{
+function rowsOf(col,merge){return project.rowsFromPreview(collection.preview(col,merge));}
+function legacyRecord(overrides){
+ const sources=fixture().entries.map(function(entry){
+  return {id:entry.id,originalPath:entry.metadata.originalPath,originalName:entry.metadata.originalName,
+   copyPath:entry.metadata.copyPath,fingerprint:entry.metadata.fingerprint,sheetCount:1,materialCount:1,issueCount:0};
+ });
+ const stages={};
+ ['import','review','merge','classification','brand','generation','split'].forEach(function(stage,index){
+  stages[stage]={state:index===0?'ready':'missing',revision:index===0?1:null,updatedAt:null,detail:null};});
+ return Object.assign({schemaVersion:1,projectId:'p-legacy01',name:'a',createdAt:'2026-09-25T00:00:00.000Z',
+  updatedAt:'2026-09-25T00:00:00.000Z',revision:1,mergeIdentical:false,stages:stages,sources:sources,
+  mergeKey:null,review:null,classification:null,assignments:null,header:null,generation:null,split:null,history:[]},overrides||{});
+}
+test('creates a v2 project from a collection with fingerprints and 7 real stages',()=>{
  const created=project.create(fixture(),true);
- assert.equal(created.schemaVersion,1);assert.match(created.projectId,/^[a-z0-9-]{8,64}$/);
- assert.equal(created.revision,1);assert.equal(created.mergeIdentical,true);assert.equal(created.name,'a');
+ assert.equal(project.SCHEMA_VERSION,2);
+ assert.equal(created.schemaVersion,2);assert.match(created.projectId,/^[a-z0-9-]{8,64}$/);
+ assert.equal(created.revision,0);assert.equal(created.mergeIdentical,true);assert.equal(created.name,'a');
+ assert.equal(created.fromProjectId,null);
+ assert.deepEqual(project.STAGES,['import','matching','review','categories','brands','inquiry','split']);
+ assert.deepEqual(project.STAGE_LABELS,{import:'导入与合并',matching:'自动分类',review:'表内审核',
+  categories:'分类工作簿',brands:'品牌汇总',inquiry:'询价表',split:'拆分文件'});
  assert.equal(created.sources.length,2);assert.equal(created.sources[0].fingerprint,'a'.repeat(64));
- assert.equal(created.sources[0].sheetCount,1);assert.ok(created.sources[0].snapshot);
- assert.equal(project.stageState(created,'import'),'ready');assert.equal(project.stageState(created,'review'),'missing');
+ assert.equal(created.sources[0].scopeId,'combined','合并模式下来源边界为combined');
+ assert.ok(created.sources[0].snapshot);
+ project.STAGES.forEach(function(stage){assert.equal(project.stageState(created,stage),'missing',stage);});
  assert.deepEqual(project.validate(created),{ok:true,errors:[]});
+ const separate=project.create(fixture(),false);
+ assert.equal(separate.sources[0].scopeId,'c:/samples/a.xlsx','分别保留时来源边界保留到簿');
 });
 test('confirm then invalidate marks the owning stage missing and all downstream stages stale',()=>{
  let current=project.create(fixture(),false);
- for(const stage of ['review','merge','classification','brand','generation','split'])current=project.confirm(current,stage,{note:stage});
- assert.equal(project.stageState(current,'classification'),'ready');
- const next=project.invalidate(current,{kind:'classification',detail:'改了一条分类'});
- assert.equal(next.revision,current.revision+1);
- assert.equal(project.stageState(next,'import'),'ready');assert.equal(project.stageState(next,'merge'),'ready');
- assert.equal(project.stageState(next,'classification'),'missing');
- for(const stage of ['brand','generation','split'])assert.equal(project.stageState(next,stage),'stale');
- assert.equal(next.history.length,1);assert.equal(next.history[0].kind,'classification');assert.equal(next.history[0].revision,next.revision);
- assert.equal(project.stageState(current,'classification'),'ready','原对象不得被改动');
- assert.equal(project.stageState(project.invalidate(current,{kind:'source'}),'review'),'stale','已确认的来源核对保留为过期记录，供查看历史');
- assert.equal(project.stageState(project.invalidate(current,{kind:'header'}),'brand'),'missing');
- assert.equal(project.stageState(project.invalidate(current,{kind:'header'}),'generation'),'stale');
- const fresh=project.invalidate(project.create(fixture(),false),{kind:'classification'});
- assert.equal(project.stageState(fresh,'import'),'ready');assert.equal(project.stageState(fresh,'brand'),'missing','从未确认的阶段仍为缺失');
- assert.throws(()=>project.invalidate(current,{kind:'unknown'}),/无法识别/);
- assert.throws(()=>project.confirm(current,'unknown'),/无法识别/);
+ project.STAGES.forEach(function(stage){current=project.confirm(current,stage,{note:stage});});
+ assert.equal(project.stageState(current,'brands'),'ready');
+ const next=project.invalidate(current,{kind:'review',detail:'改了一条最终分类'});
+ assert.equal(next.revision,current.revision,'内容变化不改持久化版本号，版本由保存成功时递增');
+ assert.equal(project.stageState(next,'import'),'ready');assert.equal(project.stageState(next,'matching'),'ready');
+ assert.equal(project.stageState(next,'review'),'missing');
+ for(const stage of ['categories','brands','inquiry','split'])assert.equal(project.stageState(next,stage),'stale');
+ assert.equal(next.history.length,1);assert.equal(next.history[0].kind,'review');
+ assert.equal(project.stageState(current,'review'),'ready','原对象不得被改动');
+ assert.equal(project.stageState(project.invalidate(current,{kind:'source'}),'matching'),'stale','来源变化使匹配及之后过期');
+ assert.equal(project.stageState(project.invalidate(current,{kind:'header'}),'inquiry'),'missing');
+ assert.equal(project.stageState(project.invalidate(current,{kind:'header'}),'brands'),'ready','抬头变化不影响品牌汇总');
+ assert.equal(project.stageState(project.invalidate(current,{kind:'header'}),'split'),'stale');
+ const fresh=project.invalidate(project.create(fixture(),false),{kind:'brands'});
+ assert.equal(project.stageState(fresh,'import'),'missing');assert.equal(project.stageState(fresh,'inquiry'),'missing','从未确认的阶段仍为缺失');
+ assert.throws(function(){project.invalidate(current,{kind:'unknown'});},/无法识别/);
+ assert.throws(function(){project.confirm(current,'unknown');},/无法识别/);
 });
 test('validation reports missing fields, bad fingerprints and unsupported versions',()=>{
  const good=project.create(fixture(),false);
@@ -41,8 +63,13 @@ test('validation reports missing fields, bad fingerprints and unsupported versio
  assert.match(project.validate(broken).errors.join('；'),/指纹/);
  const missing={...good};delete missing.stages;
  assert.match(project.validate(missing).errors.join('；'),/阶段/);
+ assert.match(project.validate({...good,fromProjectId:'bad'}).errors.join('；'),/上游项目编号/);
  assert.equal(project.validate({}).ok,false);
- assert.throws(()=>project.assertValid({}),/项目记录/);
+ assert.throws(function(){project.assertValid({});},/项目记录/);
+ const legacy=legacyRecord();
+ assert.equal(project.validate(legacy).ok,true,'v1记录仍可读取');
+ assert.equal(project.isLegacy(legacy),true);assert.equal(project.schemaOf(legacy),1);
+ assert.equal(project.isLegacy(good),false);assert.equal(project.schemaOf(good),2);
 });
 test('compares stored sources against the current collection',()=>{
  const stored=project.create(fixture(),false);
@@ -54,114 +81,104 @@ test('compares stored sources against the current collection',()=>{
  const added=collection.add(collection.create(),[input('a.xlsx','a'.repeat(64),'0.1'),input('b.xlsx','b'.repeat(64),'0.2'),input('c.xlsx','c'.repeat(64),'1')]);
  assert.deepEqual(project.compareSources(stored,added).added,['C:\\samples\\c.xlsx']);
 });
-test('refresh keeps the project id and invalidates affected stages when sources or the merge choice change',()=>{
- const base=project.confirm(project.create(fixture(),false),'review');
+test('refresh keeps the project id and invalidates from import when sources or the merge choice change',()=>{
+ const base=project.create(fixture(),false);
  const unchanged=project.refresh(base,fixture(),false);
  assert.equal(unchanged.projectId,base.projectId);assert.equal(unchanged.revision,base.revision);
- assert.equal(project.stageState(unchanged,'review'),'ready');
+ assert.equal(unchanged.history.length,0);
  const changed=project.refresh(base,collection.add(collection.create(),[input('a.xlsx','c'.repeat(64),'0.1'),input('b.xlsx','b'.repeat(64),'0.2')]),false);
- assert.equal(changed.projectId,base.projectId);assert.equal(changed.revision,base.revision+1);
+ assert.equal(changed.projectId,base.projectId);
  assert.equal(project.stageState(changed,'import'),'missing');
- assert.equal(project.stageState(changed,'review'),'stale','来源变了，已确认的来源核对置为过期');
- assert.match(changed.history[0].detail,/来源变化/);
+ assert.equal(changed.history[0].kind,'source');assert.match(changed.history[0].detail,/来源变化/);
  assert.equal(changed.sources[0].fingerprint,'c'.repeat(64));
  const merged=project.refresh(base,fixture(),true);
- assert.equal(merged.mergeIdentical,true);assert.equal(project.stageState(merged,'review'),'ready','只改合并选择不影响来源核对');
- assert.equal(project.stageState(merged,'merge'),'missing');assert.match(merged.history[0].detail,/精确合并/);
+ assert.equal(merged.mergeIdentical,true);assert.equal(project.stageState(merged,'import'),'missing');
+ assert.match(merged.history[0].detail,/精确合并/);
+ assert.equal(merged.sources[0].scopeId,'combined','合并选择变化时必须同步来源边界');
+ assert.throws(function(){project.refresh(legacyRecord(),fixture(),false);},/旧版|v1/,'v1项目必须走继续副本，不能直接改写');
 });
-test('contentKey is a stable business snapshot key that ignores UI, time and receipt fields',()=>{
- const base=fixture(),key=project.contentKey({collection:base,mergeIdentical:false});
- assert.match(key,/^ck1-[0-9a-f]{16}$/);
- assert.equal(project.contentKey({collection:base,mergeIdentical:false}),key);
- assert.equal(project.contentKey({collection:base,mergeIdentical:false,filter:'pending',
+test('contentKey is a stable v2 business snapshot key that ignores UI, time and in-sheet sorting',()=>{
+ const base=fixture(),groups=rowsOf(base,false);
+ const key=project.contentKey({collection:base,mergeIdentical:false,groups:groups});
+ assert.match(key,/^ck2-[0-9a-f]{16}$/);
+ assert.equal(project.contentKey({collection:base,mergeIdentical:false,groups:groups.slice().reverse()}),key,
+  '成果表内排序不得改变业务键');
+ assert.equal(project.contentKey({collection:base,mergeIdentical:false,groups:groups,filter:'pending',
   updatedAt:'2026-09-26T00:00:00.000Z',receipt:{target:'C:\\out\\a.xlsx'}}),key,'界面筛选、时间与回执字段不得进入内容键');
- assert.notEqual(project.contentKey({collection:base,mergeIdentical:true}),key,'合并模式影响输出');
- assert.notEqual(project.contentKey({collection:{entries:base.entries.slice().reverse()},mergeIdentical:false}),key,
+ assert.notEqual(project.contentKey({collection:base,mergeIdentical:true,groups:groups}),key,'合并模式影响输出');
+ assert.notEqual(project.contentKey({collection:{entries:base.entries.slice().reverse()},mergeIdentical:false,groups:groups}),key,
   '来源顺序影响输出，必须进入内容键');
- const entry=base.entries[0];
- const corrected=collection.update(base,entry.id,review.setDecision(entry.snapshot,entry.record,
-  {kind:'material',sheet:'给排水',row:3,code:'000123',name:'水管',unit:'m',quantity:'0.1',
-   engineering:'测试楼',profession:'给排水'}),true);
- assert.notEqual(project.contentKey({collection:corrected,mergeIdentical:false}),key,'来源核对内容必须进入内容键');
- const classifier={schemaVersion:1,revision:1,updatedAt:'2026-09-26T00:00:00.000Z',
-  decisions:[{rowId:'r1',categoryId:'water-valve',categoryName:'水阀门',skip:false,confirmedAt:'2026-09-26T00:00:00.000Z'}],history:[]};
- const withClassification=project.contentKey({collection:base,mergeIdentical:false,classification:classifier});
- assert.notEqual(withClassification,key);
- assert.equal(project.contentKey({collection:base,mergeIdentical:false,
-  classification:{...classifier,revision:9,updatedAt:'2027-01-01T00:00:00.000Z'}}),withClassification,
-  '确认时间与记录版本变化不影响内容键');
- const brandData={coverageMode:'material-subsets',assignments:[{assignmentId:'a-1',categoryId:'water-valve',
-  rowIds:['r1'],brand:'某品牌',supplier:'某供应商',coverageConfirmed:true,confirmedAt:null}]};
- const withBrand=project.contentKey({collection:base,mergeIdentical:false,classification:classifier,assignments:brandData});
- assert.notEqual(withBrand,withClassification);
- const withHeader=project.contentKey({collection:base,mergeIdentical:false,classification:classifier,
-  assignments:brandData,header:{company:'测试公司'}});
- assert.notEqual(withHeader,withBrand);
- const report=project.assess({collection:base,mergeIdentical:false,classification:classifier,
-  assignments:brandData,header:{company:'测试公司'}});
- assert.equal(report.brandKey,withClassification,'品牌表上游键只含清单、合并与分类');
- assert.equal(report.generationKey,withHeader,'生成与拆分键再加入品牌与抬头');
+ const edited=groups.map(function(row,index){return index?row:Object.assign({},row,{quantity:'9'});});
+ assert.notEqual(project.contentKey({collection:base,mergeIdentical:false,groups:edited}),key,'材料工程量必须进入内容键');
+ const decisions=groups.map(function(row){return {rowId:row.rowId,categoryId:'water-valve',categoryName:'水阀门',skip:false};});
+ assert.equal(key,project.contentKey({collection:base,mergeIdentical:false,groups:groups,review:{rows:decisions}}),
+  '导入阶段键不包含分类确认');
+ const reviewKey=project.contentKey({stage:'review',collection:base,mergeIdentical:false,groups:groups,review:{rows:decisions}});
+ assert.notEqual(reviewKey,project.contentKey({stage:'review',collection:base,mergeIdentical:false,groups:groups,review:{rows:[]}}));
+ assert.equal(reviewKey,project.contentKey({stage:'review',collection:base,mergeIdentical:false,groups:groups,
+  review:{schemaVersion:9,rows:decisions,updatedAt:'2027-01-01T00:00:00.000Z'}}),'确认时间与记录版本变化不影响内容键');
+ const brands=[{categoryId:'water-valve',mode:'combined',groups:[{brand:'某品牌',supplier:'某供应商'}]}];
+ const inquiryKey=project.contentKey({stage:'inquiry',collection:base,mergeIdentical:false,groups:groups,review:{rows:decisions},
+  brands:brands,header:{projectName:'测试楼'}});
+ assert.notEqual(inquiryKey,project.contentKey({stage:'inquiry',collection:base,mergeIdentical:false,groups:groups,
+  review:{rows:decisions},brands:brands}),'抬头影响询价键');
+ const report=project.assess({collection:base,mergeIdentical:false,preview:collection.preview(base,false),groups:groups,
+  mergeConfirmedKey:key,review:{rows:decisions},brands:brands,header:{projectName:'测试楼'}});
+ assert.equal(report.brandKey,reviewKey,'品牌表上游键只含清单、合并与分类确认');
+ assert.equal(report.generationKey,inquiryKey,'生成与拆分键再加入品牌与抬头');
 });
 test('stage readiness comes from real content, never from a non-empty field',()=>{
- const base=fixture(),preview=collection.preview(base,false);
- const bare=project.assess({collection:base,mergeIdentical:false,preview:preview});
- assert.equal(bare.import.ready,true);
- assert.equal(bare.review.ready,true,'来源问题清零后来源核对完成');
- assert.equal(bare.merge.ready,false,'没有明确确认预览时合并阶段不得完成');
- assert.equal(bare.classification.ready,false);
- const merged=project.assess({collection:base,mergeIdentical:false,preview:preview,mergeConfirmedKey:bare.mergeKey});
- assert.equal(merged.merge.ready,true);
- assert.equal(merged.classification.ready,false,'仍有行未确认分类');
- const rows=preview.groups.map(group=>({rowId:group.id||group.scopeId}));
- const classifier={schemaVersion:1,revision:1,decisions:rows.map(row=>({rowId:row.rowId,
-  categoryId:'water-valve',categoryName:'水阀门',skip:false,confirmedAt:'2026-09-26T00:00:00.000Z'})),history:[]};
- const ready=project.assess({collection:base,mergeIdentical:false,preview:preview,mergeConfirmedKey:bare.mergeKey,
-  classification:classifier,rows:rows});
- assert.equal(ready.classification.ready,true);
- assert.equal(ready.brand.ready,false,'品牌与抬头未确认时品牌阶段不得完成');
- assert.equal(ready.generation.ready,false);
- assert.equal(ready.split.ready,false);
+ const base=fixture(),preview=collection.preview(base,false),groups=rowsOf(base,false);
+ const bare=project.assess({collection:base,mergeIdentical:false,preview:preview,groups:groups});
+ assert.equal(bare.import.ready,false,'没有明确确认本次合并选择时导入阶段不得完成');
+ assert.equal(bare.matching.ready,false);
+ const merged=project.assess({collection:base,mergeIdentical:false,preview:preview,groups:groups,mergeConfirmedKey:bare.mergeKey});
+ assert.equal(merged.import.ready,true);
+ assert.equal(merged.matching.ready,false,'没有自动分类结论时匹配阶段不得完成');
+ assert.equal(project.assess({collection:base,mergeIdentical:false,preview:preview,groups:groups,
+  mergeConfirmedKey:bare.mergeKey,matching:{}}).matching.ready,false,'空对象不能冒充已完成');
  assert.equal(project.assess({collection:collection.create(),mergeIdentical:false}).import.ready,false);
  assert.equal(project.assess({collection:{entries:[{metadata:{originalName:'x.xlsx'},snapshot:{}}]},mergeIdentical:false})
   .import.ready,false,'导入记录缺路径、副本或指纹时不得算有效导入');
- assert.equal(project.assess({collection:base,mergeIdentical:false,preview:{canFinalize:false,issues:[{code:'x'}]}}).review.ready,false);
- assert.equal(project.assess({collection:base,mergeIdentical:false,preview:preview,
-  mergeConfirmedKey:'ck1-ffffffffffffffff'}).merge.ready,false,'确认的键与当前预览不一致时不得算完成');
+ assert.equal(project.assess({collection:base,mergeIdentical:false,preview:{canFinalize:false,issues:[{code:'x'}]},
+  groups:groups,mergeConfirmedKey:bare.mergeKey}).import.ready,false,'来源问题未清零不得进入下一步');
+ assert.equal(project.assess({collection:base,mergeIdentical:false,preview:preview,groups:groups,
+  mergeConfirmedKey:'ck2-ffffffffffffffff'}).import.ready,false,'确认的键与当前预览不一致时不得算完成');
+ const full=project.assess({collection:base,mergeIdentical:false,preview:preview,groups:groups,mergeConfirmedKey:bare.mergeKey,
+  matching:{ready:true},review:{ready:true},categories:{ready:true},brands:{ready:true},inquiry:{ready:true},split:{ready:true}});
+ project.STAGES.forEach(function(stage){assert.equal(full[stage].ready,true,stage);});
 });
 test('sync confirms provable stages and lets everything downstream expire when an upstream step breaks',()=>{
- const base=fixture(),preview=collection.preview(base,false);
- const key=project.assess({collection:base,mergeIdentical:false,preview:preview}).mergeKey;
- const rows=preview.groups.map(group=>({rowId:group.id||group.scopeId}));
- const classifier={schemaVersion:1,revision:1,decisions:rows.map(row=>({rowId:row.rowId,
-  categoryId:'water-valve',categoryName:'水阀门',skip:false,confirmedAt:'2026-09-26T00:00:00.000Z'})),history:[]};
- const input={collection:base,mergeIdentical:false,preview:preview,mergeConfirmedKey:key,classification:classifier,rows:rows};
+ const base=fixture(),preview=collection.preview(base,false),groups=rowsOf(base,false);
+ const bare=project.assess({collection:base,mergeIdentical:false,preview:preview,groups:groups});
+ const input={collection:base,mergeIdentical:false,preview:preview,groups:groups,mergeConfirmedKey:bare.mergeKey,
+  matching:{ready:true,detail:'自动匹配完成'},review:{ready:true},categories:{ready:true},brands:{ready:true},
+  inquiry:{ready:true},split:{ready:true}};
  const ready=project.sync(project.create(base,false),project.assess(input));
- for(const stage of ['import','review','merge','classification'])assert.equal(project.stageState(ready,stage),'ready',stage);
- assert.equal(project.stageState(ready,'brand'),'missing','没有品牌数据时下游仍是未完成');
- const dropped=project.sync(ready,project.assess({...input,classification:{...classifier,decisions:classifier.decisions.slice(0,1)}}));
- assert.equal(project.stageState(dropped,'classification'),'missing','分类缺行后分类阶段不得保持已确认');
- const broken=project.sync(ready,project.assess({...input,preview:{canFinalize:false,issues:[{code:'quantity-invalid'}]}}));
- assert.equal(project.stageState(broken,'review'),'missing');
- assert.equal(project.stageState(broken,'merge'),'stale');
- assert.equal(project.stageState(broken,'classification'),'stale');
- assert.equal(broken.projectId,ready.projectId);
- assert.equal(broken.revision,ready.revision+1);
+ project.STAGES.forEach(function(stage){assert.equal(project.stageState(ready,stage),'ready',stage);});
+ const dropped=project.sync(ready,project.assess(Object.assign({},input,{review:{ready:false}})));
+ assert.equal(project.stageState(dropped,'review'),'missing','表内审核未确认后不得保持已确认');
+ assert.equal(project.stageState(dropped,'categories'),'stale');
+ assert.equal(dropped.projectId,ready.projectId);
+ const broken=project.sync(ready,project.assess(Object.assign({},input,{preview:{canFinalize:false,issues:[{code:'quantity-invalid'}]}})));
+ assert.equal(project.stageState(broken,'import'),'missing');
+ assert.equal(project.stageState(broken,'matching'),'stale');
  const again=project.sync(broken,project.assess(input));
- assert.equal(project.stageState(again,'classification'),'ready');
- assert.equal(project.stageState(again,'review'),'ready');
+ assert.equal(project.stageState(again,'review'),'ready');assert.equal(project.stageState(again,'split'),'ready');
 });
 test('validation refuses a bad merge receipt and unknown internal versions',()=>{
  const good=project.create(fixture(),false);
  assert.match(project.validate({...good,mergeKey:7}).errors.join('；'),/合并确认/);
- assert.equal(project.validate({...good,mergeKey:'ck1-'+'a'.repeat(16)}).ok,true);
- assert.match(project.validate({...good,assignments:{schemaVersion:2}}).errors.join('；'),/内部版本不支持/);
+ assert.equal(project.validate({...good,mergeKey:'ck2-'+'a'.repeat(16)}).ok,true);
+ assert.match(project.validate({...good,brands:{schemaVersion:2}}).errors.join('；'),/内部版本不支持/);
  assert.match(project.validate({...good,header:{schemaVersion:9}}).errors.join('；'),/内部版本不支持/);
- assert.match(project.validate({...good,generation:[]}).errors.join('；'),/generation字段无效/);
- assert.equal(project.validate({...good,assignments:{schemaVersion:1,rows:[]}}).ok,true);
- assert.equal(project.KIND_OF_STAGE.classification,'classification');
- assert.throws(()=>project.invalidateStage(good,'nope'),/无法识别/);
- assert.equal(project.stageState(project.invalidateStage(project.confirm(good,'brand'),'brand'),'brand'),'missing');
- const downstream=project.invalidateStage(project.confirm(project.confirm(good,'classification'),'brand'),'classification');
- assert.equal(project.stageState(downstream,'classification'),'missing');
- assert.equal(project.stageState(downstream,'brand'),'stale','已确认的下游阶段过期但保留历史');
+ assert.match(project.validate({...good,categories:[]}).errors.join('；'),/categories字段无效/);
+ assert.match(project.validate({...good,classification:{schemaVersion:2}}).errors.join('；'),/内部版本不支持/,'过渡期暂存字段也要拒绝未知版本');
+ assert.equal(project.validate({...good,inquiry:{schemaVersion:1}}).ok,true);
+ assert.equal(project.KIND_OF_STAGE.review,'review');
+ assert.throws(function(){project.invalidateStage(good,'nope');},/无法识别/);
+ assert.equal(project.stageState(project.invalidateStage(project.confirm(good,'brands'),'brands'),'brands'),'missing');
+ const downstream=project.invalidateStage(project.confirm(project.confirm(good,'review'),'brands'),'review');
+ assert.equal(project.stageState(downstream,'review'),'missing');
+ assert.equal(project.stageState(downstream,'brands'),'stale','已确认的下游阶段过期但保留历史');
 });

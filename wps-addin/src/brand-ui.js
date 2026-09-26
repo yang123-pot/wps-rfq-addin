@@ -18,7 +18,8 @@
    var ctx=context();
    if(!ctx||!ctx.preview){data=null;return;}
    var current=report();
-   if(!current||!current.classification.ready)return;
+   // v2阶段中，品牌表的上游是“自动分类＋表内整表审核确认”。
+   if(!current||!current.review.ready)return;
    if(data&&data.inputKey===current.brandKey)return;
    var rebuilt=!!data;
    try{
@@ -74,8 +75,8 @@
    var ctx=context(),current=report();
    preview.hidden=!pending;
    if(!data){
-    status.textContent=current&&current.classification.ready?'尚未建立品牌行：请新增品牌行并选择覆盖的材料。'
-     :'先完成导入、来源核对、合并预览确认与全部分类确认，再建立品牌表。';
+    status.textContent=current&&current.review.ready?'尚未建立品牌行：请新增品牌行并选择覆盖的材料。'
+     :'先完成导入与合并、自动分类与表内整表审核确认，再建立品牌表。';
     categoryList.textContent='';generateButton.disabled=true;readButton.disabled=true;return;
    }
    coverage.value=data.coverageMode;

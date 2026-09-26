@@ -25,19 +25,38 @@
     status.textContent='项目 '+current.projectId+' · 版本 '+current.revision+' · '+(current.mergeIdentical?'精确合并':'分别保留')+'\n'+stageText(current);
   }
   // 阶段只按当前真实内容判定：导入集合、来源问题、本次预览确认、逐行分类确认，以及后续阶段的明确结论。
+  // R1过渡期：侧栏仍是旧的逐行分类/品牌/生成面板，这里把已有结论映射到v2的matching/review/brands/inquiry/split；
+  // 分类工作簿（categories）等尚未实现的阶段一律保持未完成，绝不因旧数据误报完成。
+  function classificationProgress(){
+    var rows=options.getClassificationRows?options.getClassificationRows():[];
+    var snapshot=options.getClassification?options.getClassification():null;
+    var decided={};
+    ((snapshot&&snapshot.decisions)||[]).forEach(function(decision){if(decision&&decision.rowId)decided[decision.rowId]=true;});
+    var pending=rows.filter(function(row){return !row||!decided[row.rowId];}).length;
+    return {rows:rows,pending:pending};
+  }
   function assessmentInputs(){
+    var progress=classificationProgress();
+    var verdicts=options.getStageVerdicts?options.getStageVerdicts():null;
     return {collection:options.getCollection(),mergeIdentical:options.mergeIdentical()===true,
       preview:options.getPreview?options.getPreview():null,
       mergeConfirmedKey:options.getMergeConfirmation?options.getMergeConfirmation():null,
       classification:options.getClassification?options.getClassification():null,
-      rows:options.getClassificationRows?options.getClassificationRows():[],
+      rows:progress.rows,
       assignments:options.getAssignments?options.getAssignments():null,
       header:options.getHeader?options.getHeader():null,
-      brand:options.getBrandVerdict?options.getBrandVerdict():null,
-      generation:options.getGenerationVerdict?options.getGenerationVerdict():null,
+      matching:(verdicts&&verdicts.matching)||(progress.rows.length?{ready:true,detail:'自动分类建议已生成，尚未人工确认'}
+        :{ready:false,detail:'尚未生成自动分类建议'}),
+      review:(verdicts&&verdicts.review)||(progress.rows.length?(progress.pending?{ready:false,detail:'还有'+progress.pending+'行未确认分类'}
+        :{ready:true,detail:'分类已确认（过渡期沿用侧栏逐行确认）'}):{ready:false,detail:'尚未生成自动分类建议'}),
+      categories:(verdicts&&verdicts.categories)||{ready:false,detail:'分类工作簿将在下一个开发包生成'},
+      brands:options.getBrandVerdict?options.getBrandVerdict():null,
+      inquiry:options.getGenerationVerdict?options.getGenerationVerdict():null,
       split:options.getSplitVerdict?options.getSplitVerdict():null};
   }
   // 未来字段与项目一起保存；对应功能未接入时保持缺失，不拿空对象冒充已完成。
+  // R1过渡期：旧侧栏的分类/品牌/生成面板仍沿用v1字段名暂存，R4–R9会替换为
+  // matching/review/categories/brands/inquiry等v2对象；这些暂存字段不参与阶段判定。
   function collectFutureFields(project){
     project.mergeKey=options.getMergeConfirmation?options.getMergeConfirmation()||null:null;
     project.classification=options.getClassification?options.getClassification():null;
@@ -93,11 +112,17 @@
       next=collectFutureFields(next);
       next=syncStages(next);
       RfqProject.assertValid(next);
-      var receipt=await request('save',{project:next});
-      current=next;pendingId=null;renderStatus();await listProjects();
-      tell('项目已保存到本机：'+next.projectId+'（版本 '+next.revision+'）。项目记录不上传。');
+      var expectedRevision=current?current.revision:0;
+      var receipt=await request('save',{project:next,expectedRevision:expectedRevision});
+      current=Object.assign({},next,{revision:Number(receipt.revision)});
+      pendingId=null;renderStatus();await listProjects();
+      tell('项目已保存到本机：'+current.projectId+'（版本 '+current.revision+'）。项目记录不上传。');
       return receipt;
-    }catch(error){tell('项目未保存。'+error.message,true);return null;}
+    }catch(error){
+      if(error.status===409)tell('项目未被覆盖：该记录已被其他窗口保存。侧栏草稿保留，请重新打开最新记录后再保存。',true);
+      else tell('项目未保存。'+error.message,true);
+      return null;
+    }
     finally{busy=false;if(options.onBusy)options.onBusy(false);}
   }
   async function openProject(projectId){
@@ -108,7 +133,15 @@
       var result=await request('load',{projectId:projectId});
       if(!result.project)throw Error('项目记录不存在或已被移除。');
       RfqProject.assertValid(result.project);
-      var sources=result.project.sources||[],rebuilt=0,failed=[];
+      var loaded=result.project,upgradedFrom=null;
+      // v1原文件保留不动；用户选择继续时另存为v2副本，来源可验证复用，但必须重新整表确认。
+      if(RfqProject.isLegacy(loaded)){
+        var carried=RfqProject.upgradeV1(loaded,{});
+        var receipt=await request('save',{project:carried,expectedRevision:0});
+        carried.revision=Number(receipt.revision);
+        upgradedFrom=loaded.projectId;loaded=carried;
+      }
+      var sources=loaded.sources||[],rebuilt=0,failed=[];
       for(var index=0;index<sources.length;index++){
         try{
           var copy=await request('restore-copy',{source:sources[index]});
@@ -118,14 +151,16 @@
         }catch(error){failed.push((sources[index].originalName||sources[index].originalPath)+'：'+error.message);}
       }
       if(failed.length)throw Error('原件已变化或不可读取，旧进度不能沿用，请重新导入：'+failed.join('；'));
-      if(!options.restore||options.restore(result.project)===false)throw Error('项目内容无法恢复到侧栏。');
-      if(options.restoreClassification)options.restoreClassification(result.project.classification);
-      restoreFutureFields(result.project);
-      current=syncStages(result.project);
+      if(!options.restore||options.restore(loaded)===false)throw Error('项目内容无法恢复到侧栏。');
+      if(options.restoreClassification)options.restoreClassification(
+        loaded.classification||(loaded.carried&&loaded.carried.classification)||null);
+      restoreFutureFields(loaded);
+      current=syncStages(loaded);
       pendingId=null;
       renderStatus();
-      var recomputed=JSON.stringify(current.stages)!==JSON.stringify(result.project.stages);
-      tell('已恢复项目'+result.project.projectId+'（版本 '+result.project.revision+'）。'+(rebuilt?'已按原件SHA校验重建'+rebuilt+'份工作副本。':'工作副本完整。')+
+      var recomputed=JSON.stringify(current.stages)!==JSON.stringify(loaded.stages);
+      tell('已恢复项目'+loaded.projectId+'（版本 '+loaded.revision+'）。'+(upgradedFrom?'旧版项目'+upgradedFrom+'已保留，本次继续写入v2副本，需重新确认合并与整表审核。':'')+
+        (rebuilt?'已按原件SHA校验重建'+rebuilt+'份工作副本。':'工作副本完整。')+
         '原件不变，快照可用于继续核对。'+(recomputed?'阶段状态已按当前来源与确认内容重算，保存后写回项目记录。':''));
       return true;
     }catch(error){tell('项目未打开。'+error.message,true);return false;}

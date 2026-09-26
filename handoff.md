@@ -2,15 +2,17 @@
 
 > 更新：2026-09-26。方案版本：workflow-v3。
 > 本文件是当前交接入口。用户已批准下列8张效果图；**效果获批不代表功能已经实现**。
-> 本次执行范围为R0：保存效果图、详细计划、交接与执行规则，并核对Git备份。R1–R13尚未实施，本轮完成R0后停止功能开发。
+> 进度：R0（效果图/计划/规则/归档）与R1（项目v2、7阶段、失效传播、合成夹具）已完成并各自留证；R2–R13尚未实施。
+> 本轮执行R1，做完R1后停止，不跳到R2；每包结束按第7.2节提交推送并核远程SHA。
 > 后续开发沿用纯JavaScript模型、WPS宿主适配和本机Node服务，按工作包逐项实施、验证、记录与备份，不整体重写。
 
 ## 0. 当前结论与接续入口
 
-- **本轮已落盘**：8张最终效果图、图片清单及SHA256、完整实施计划、执行前看图规则；旧交接原样归档。归档检查见[本轮验证记录](docs/wps-workflow-plan-archive-verification-20260926.md)。
-- **本轮软件代码未改动**：代码基线为分支feat/wps-phase1的f3289e3。仅文档与效果图归档，不执行WPS业务操作，不将历史测试冒充新流程验收。
-- **真实能力**：旧流程实机走通注册/功能区、侧栏连接、两文件导入、合并确认、分类确认5/5及停摆后重建恢复。新表内整表审核、独立分类工作簿、横向品牌汇总与名称链接等仍待开发。
-- **下一项**：后续继续实施时从R1开始；先完整阅读本文件、实际打开全部8图，再核对Git和代码。不要从旧版侧栏确认品牌路线继续。
+- **已落盘**：8张最终效果图、图片清单及SHA256、完整实施计划、执行前看图规则；旧交接原样归档。归档检查见[归档验证记录](docs/wps-workflow-plan-archive-verification-20260926.md)。
+- **R1已完成**：项目schemaVersion=2、7阶段与真实条件判定、逐层失效传播、ck2业务键、expectedRevision乐观锁与409、v1继续副本；第6.1节10行合成夹具＋隔离分类库。证据见[R1验证记录](docs/wps-workflow-v3-r1-evidence.md)，提交/同步以第7.2节命令结果与本文件第7.1节为准。
+- **R1期间软件改动范围**：project/project-store/项目API/project-ui，以及为v2阶段名必要的import-ui、brand-ui适配与对应测试；未改动`rules/defaults.json`生产口径。
+- **真实能力**：旧流程实机走通注册/功能区、侧栏连接、两文件导入、合并确认、分类确认5/5及停摆后重建恢复。新表内整表审核、独立分类工作簿、横向品牌汇总与名称链接等仍待开发；R1只到模型/项目库层，仍无真实WPS新流程证据。
+- **下一项**：从R2开始；先完整阅读本文件、实际打开全部8图，再核对Git和代码。不要从旧版侧栏确认品牌路线继续。
 - **待定项**：历史32种类别的正式词表/迁入政策、另一WPS版本的隔离验证环境仍未确定；不影响用隔离合成分类库开发新流程。
 - **备份核对**：归档主提交2f04d5c已推送，远程SHA核为2f04d5cc18b1a06ac00eb34ecf1a08d60de9fb8d。本轮先绕开代理直连失败，改用仓库默认连接后成功；具体记录见验证文档。随后这次网络说明修订的提交/同步以Git日志、远程refs/heads/feat/wps-phase1及最终回复为准，不循环修改自身SHA。
 
@@ -555,7 +557,7 @@ node wps-addin/test/ui-project-check.cjs
 ### 7.1 工作包状态
 
 - [x] R0：图片、详细计划、看图规则与旧交接归档已落盘；验证见独立记录，提交/推送按第0节核对。
-- [ ] R1：项目v2、阶段、失效及兼容。
+- [x] R1：项目v2、7阶段、失效传播、ck2业务键、expectedRevision乐观锁、v1继续副本及第6.1节合成夹具；证据见[R1验证记录](docs/wps-workflow-v3-r1-evidence.md)。分类工作簿及之后阶段仍按真实条件保持未完成。
 - [ ] R2：真实版式、读写、下拉及链接。
 - [ ] R3：7步UI和先选合并。
 - [ ] R4：自动分类审核成果表。
@@ -569,7 +571,7 @@ node wps-addin/test/ui-project-check.cjs
 - [ ] R12：实机全链路/异常/四项目验收。
 - [ ] R13：安装发布及用户交接。
 
-本轮止于R0。后续先R1，不恢复旧侧栏确认路线；稳定性按新改动影响复验，保留现有有效恢复入口和证据。
+本轮止于R1。后续先R2，不恢复旧侧栏确认路线；稳定性按新改动影响复验，保留现有有效恢复入口和证据。
 
 ### 7.2 每包Git备份
 
@@ -592,6 +594,7 @@ git ls-remote origin refs/heads/feat/wps-phase1
 
 - [旧handoff原样归档](docs/archive/handoff-before-workflow-v3-20260926.md)：历史任务和证据，旧执行顺序失效。
 - [本轮归档验证](docs/wps-workflow-plan-archive-verification-20260926.md)、[图片清单](docs/mockups/approved-20260926/manifest.json)。
+- [R1验证记录](docs/wps-workflow-v3-r1-evidence.md)：项目v2/7阶段/失效/业务键/乐观锁/合成夹具的实际命令与结果。
 - [实机问题记录](docs/wps-phase1-open-issues-20260926.md)、[历史迁入预览](docs/wps-library-migration-preview-20260926.md)。
 - 本机outputs/wps-acceptance-20260926/probe/pane-report.json及两个停摆存档pane-report-20260926-stall.json、pane-report-20260926-nodialog-stall.json，保留不覆盖、不入Git。
 - 本机outputs/nudge-report.txt保留强制重画/CEF改宽无效证据；有效恢复使用功能区重建。

@@ -54,11 +54,12 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   assert.equal(await page.locator('#project-list > li').count(),1,'保存后列表应出现该项目');
   const stored=JSON.parse(await fs.readFile(path.join(root,'projects',saved[0]),'utf8'));
   assert.equal(stored.mergeIdentical,true);assert.equal(stored.sources.length,2);
-  assert.match(String(stored.mergeKey),/^ck1-[0-9a-f]{16}$/,'项目记录必须保存本次确认的合并预览键');
-  assert.match(await page.locator('#project-status').innerText(),/合并确认：已确认（已确认精确合并预览）/,
-   '明确确认预览后合并阶段必须按真实确认置为已确认');
+  assert.match(String(stored.mergeKey),/^ck2-[0-9a-f]{16}$/,'项目记录必须保存本次确认的合并预览键');
+  assert.equal(stored.schemaVersion,2,'项目记录必须写入v2结构');
+  assert.match(await page.locator('#project-status').innerText(),/导入与合并：已确认（已导入2份清单，合并选择已确认）/,
+   '明确确认预览后导入与合并阶段必须按真实确认置为已确认');
   const statusText=await page.locator('#project-status').innerText();
-  const stageLabels={import:'导入清单',review:'来源核对',merge:'合并确认',classification:'分类确认',brand:'品牌与抬头'};
+  const stageLabels={import:'导入与合并',matching:'自动分类',review:'表内审核',categories:'分类工作簿',brands:'品牌汇总'};
   Object.keys(stageLabels).forEach(stage=>{
    const state=stored.stages[stage].state,text=state==='ready'?'已确认':state==='stale'?'已过期':'未完成';
    assert.ok(statusText.includes(stageLabels[stage]+'：'+text),'侧栏进度必须与项目记录一致：'+stageLabels[stage]);
