@@ -53,12 +53,13 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.exposeFunction('__writeBrandFixture',async file=>{await fs.writeFile(file,Buffer.from([0x50,0x4b,3,4,1,2]));});
   const origin='http://127.0.0.1:'+server.address().port;
   await page.goto(origin+'/taskpane.html');
+  await page.locator('#aux-section > summary').click();
   assert.match(await page.locator('#brand-status').innerText(),/先完成导入/,'分类未完成前不得建立品牌表');
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===1);
-  await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 2'));
   await page.locator('#confirm-merge').click();
-  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次预览已确认'));
+  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次选择已确认'));
+  await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 2'));
   await page.waitForFunction(()=>document.querySelector('#brand-status').textContent.includes('分类'));
   const rows=page.locator('#classification-list > li');
   await rows.nth(0).locator('button').first().click();
@@ -148,6 +149,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   assert.equal(saved.stages.categories.state,'missing','未实现的分类工作簿阶段必须保持未完成');
   assert.equal(saved.stages.brands.state,'missing','分类工作簿未完成时品牌汇总不得误报完成');
   await page.reload();
+  await page.locator('#aux-section > summary').click();
   await page.locator('#open-project').click();
   await page.waitForFunction(()=>document.querySelectorAll('#project-list > li button').length>=1);
   await page.locator('#project-list > li button').first().click();

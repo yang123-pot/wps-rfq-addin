@@ -47,6 +47,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.exposeFunction('__writeExportFixture',async file=>{await fs.writeFile(file,Buffer.from([0x50,0x4b,3,4,1,2]));});
   const origin='http://127.0.0.1:'+server.address().port;
   await page.goto(origin+'/taskpane.html');
+  await page.locator('#aux-section > summary').click();
   await page.evaluate(()=>{
    window.RfqExportHost.write=async(app,model,stage)=>{window.__exportedModel=model;if(window.__writeFails)throw Error('合成写入失败');await window.__writeExportFixture(stage);};
   });

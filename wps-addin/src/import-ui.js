@@ -7,12 +7,16 @@
     var mergeConfirmedKey=null;
     var picker=document.getElementById('import-files'),message=document.getElementById('import-message');
     var merge=document.getElementById('merge-identical');merge.checked=false;
+    var mergeSeparate=document.getElementById('merge-separate');
+    var mergeDetail=document.getElementById('merge-detail');
+    var workflow=window.RfqWorkflowUI?window.RfqWorkflowUI.create({}):null;
     var confirmMerge=document.getElementById('confirm-merge');
     var exporter=RfqExportUI.create({application:options.application,getCollection:function(){return collection;},
       mergeIdentical:function(){return merge.checked;},onBusy:function(value){busy=value;options.onBusy(value);}});
     var projects=RfqProjectUI.create({getCollection:function(){return collection;},mergeIdentical:function(){return merge.checked;},
       restore:function(project){return restoreProject(project);},getClassification:function(){return classifier.snapshot();},
       getClassificationRows:function(){return classifier.rows();},
+      afterRestore:function(){render();},
       restoreClassification:function(value){classifier.restore(value);},
       getPreview:function(){return collection.entries.length?RfqCollection.preview(collection,merge.checked):null;},
       getStageVerdicts:function(){return stageVerdicts();},
@@ -143,21 +147,33 @@
       });
       document.getElementById('merge-section').hidden=!collection.entries.length;
       projects.refresh();
-      if(!collection.entries.length){exporter.refresh({canFinalize:false});classifier.refresh({groups:[]});if(brandPanel)brandPanel.refresh();return;}
+      if(!collection.entries.length){
+        exporter.refresh({canFinalize:false});classifier.refresh({groups:[]});
+        if(workflow)workflow.setStats({files:0,rows:0,mergedRows:0});
+        if(brandPanel)brandPanel.refresh();return;
+      }
       var result=RfqCollection.preview(collection,merge.checked),pages=Math.max(1,Math.ceil(result.groups.length/20));page=Math.min(page,pages-1);
+      var mergeConfirmed=mergeConfirmedKey===RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,groups:result.groups});
       exporter.refresh(result);
-      classifier.refresh(result);
+      // R3：确认选择前不进入匹配——未确认时不给任何分类建议，避免越过“先选是否合并”。
+      classifier.refresh(mergeConfirmed?result:{groups:[],inputCount:result.inputCount,outputCount:0,issues:[],canFinalize:false});
+      if(workflow){
+        workflow.setStats({files:collection.entries.length,rows:result.inputCount,mergedRows:result.outputCount});
+        var report=RfqProject.assess(brandContext());
+        var states={};RfqProject.STAGES.forEach(function(stage){states[stage]=RfqProject.stageState(projects.current()||{stages:{}},stage);});
+        workflow.setStageState(states);
+      }
       if(brandPanel)brandPanel.refresh();
       if(headerPanel)headerPanel.refresh();
       if(inquiryPanel)inquiryPanel.refresh();
       if(splitPanel)splitPanel.refresh();
       document.getElementById('merge-summary').textContent='原始 '+result.inputCount+' 项 → 预览 '+result.outputCount+' 项 · '+(merge.checked?'已选择精确合并':'按来源分别保留');
-      var mergeConfirmed=mergeConfirmedKey===RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,groups:result.groups});
       confirmMerge.disabled=busy||!result.canFinalize;
-      confirmMerge.textContent=mergeConfirmed?'已确认本次预览（可重新确认）':'确认本次合并预览';
+      confirmMerge.textContent=mergeConfirmed?'已确认本次选择（可重新确认并继续）':'确认选择，开始自动分类';
       document.getElementById('merge-status').textContent=(result.canFinalize?'本次校验通过，预览尚未另存。':
         result.issues.length+' 个待核对问题仍阻断后续处理；请在上方选择文件逐项核对。')+
-        (mergeConfirmed?' 本次预览已确认，可继续分类、品牌与生成。':' 预览确认后才能继续分类、品牌与生成。');
+        (mergeConfirmed?' 本次选择已确认，可继续自动分类。':' 确认选择后才能进入自动分类。');
+      syncMergeChoices();
       var groups=document.getElementById('merge-list');groups.textContent='';
       result.groups.slice(page*20,(page+1)*20).forEach(function(g){
         var li=node('li');li.appendChild(node('strong',g.name||'名称待补'));
@@ -169,14 +185,33 @@
       document.getElementById('merge-pages').textContent=(page+1)+' / '+pages+' 页';
       document.getElementById('merge-prev').disabled=page===0;document.getElementById('merge-next').disabled=page+1>=pages;
     }
-    merge.addEventListener('change',function(){page=0;render();});
+    // 图01的两个选项互斥：默认“分别保留清单”，勾选“合并完全相同项”才更新精确预览。
+    function syncMergeChoices(){
+      if(mergeSeparate)mergeSeparate.checked=!merge.checked;
+      var separateRow=mergeSeparate&&mergeSeparate.parentNode,combinedRow=merge&&merge.parentNode;
+      if(separateRow)separateRow.classList.toggle('is-selected',!merge.checked);
+      if(combinedRow)combinedRow.classList.toggle('is-selected',merge.checked===true);
+    }
+    function chooseMode(combined){
+      merge.checked=combined===true;
+      page=0;render();
+    }
+    merge.addEventListener('change',function(){chooseMode(merge.checked);tell(merge.checked?'已选择“合并完全相同项”，下方预览按精确合并更新；确认后才进入自动分类。':'已选择“分别保留清单”，不做合并；确认后才进入自动分类。');});
+    if(mergeSeparate)mergeSeparate.addEventListener('change',function(){chooseMode(false);tell('已选择“分别保留清单”，不做合并；确认后才进入自动分类。');});
+    if(mergeDetail)mergeDetail.addEventListener('click',function(){
+      var section=document.getElementById('merge-section'),list=document.getElementById('merge-list');
+      if(section)section.hidden=false;
+      if(list&&typeof list.scrollIntoView==='function')list.scrollIntoView({block:'start'});
+      tell('下方为合并预览明细：只显示会按“项目名称＋项目特征描述＋单位”完全一致合并的项目。');
+    });
     confirmMerge.addEventListener('click',function(){
       if(busy)return;
       var result=collection.entries.length?RfqCollection.preview(collection,merge.checked):null;
       if(!result||!result.canFinalize){tell('还有待核对问题，请先处理来源问题再确认预览。',true);return;}
       mergeConfirmedKey=RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,groups:result.groups});
       render();
-      tell('已确认本次'+(merge.checked?'精确合并':'分别保留')+'预览；来源或合并方式变化后需要重新确认。');
+      if(workflow)workflow.goTo('matching');
+      tell('已确认本次'+(merge.checked?'精确合并':'分别保留')+'选择，开始自动分类；来源或合并方式变化后需要重新确认。');
     });
     document.getElementById('merge-prev').addEventListener('click',function(){page--;render();});
     document.getElementById('merge-next').addEventListener('click',function(){page++;render();});

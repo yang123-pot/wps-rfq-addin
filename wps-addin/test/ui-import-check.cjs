@@ -25,6 +25,8 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   },{files});
   await page.exposeFunction('__writeExportFixture',async file=>{await fs.writeFile(file,Buffer.from([0x50,0x4b,3,4,1,2]));});
   await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html');
+  // R3：另存等过渡工具移入辅助功能；图01的主流程在步骤1里。
+  await page.locator('#aux-section > summary').click();
   const malformed=route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({files:[]})});
   await page.route('**/api/import/prepare',malformed);
   await page.locator('#import-files').click();

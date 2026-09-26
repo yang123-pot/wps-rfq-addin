@@ -155,7 +155,10 @@
       if(options.restoreClassification)options.restoreClassification(
         loaded.classification||(loaded.carried&&loaded.carried.classification)||null);
       restoreFutureFields(loaded);
+      // 先按恢复后的合并确认键重算一次侧栏，再判阶段；否则会误判为“尚未生成自动分类建议”。
+      if(options.afterRestore)options.afterRestore(loaded);
       current=syncStages(loaded);
+      if(options.afterRestore)options.afterRestore(loaded);
       pendingId=null;
       renderStatus();
       var recomputed=JSON.stringify(current.stages)!==JSON.stringify(loaded.stages);

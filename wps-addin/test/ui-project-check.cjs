@@ -41,11 +41,12 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await install();
   const origin='http://127.0.0.1:'+server.address().port;
   await page.goto(origin+'/taskpane.html');
+  await page.locator('#aux-section > summary').click();
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
   await page.locator('#merge-identical').check();
   await page.locator('#confirm-merge').click();
-  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次预览已确认'));
+  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次选择已确认'));
   await page.locator('#save-project').click();
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
   const saved=await fs.readdir(path.join(root,'projects'));
@@ -64,15 +65,17 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
    const state=stored.stages[stage].state,text=state==='ready'?'已确认':state==='stale'?'已过期':'未完成';
    assert.ok(statusText.includes(stageLabels[stage]+'：'+text),'侧栏进度必须与项目记录一致：'+stageLabels[stage]);
   });
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="import"]').click();
   await page.locator('#merge-identical').uncheck();
-  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('预览确认后才能继续'));
-  assert.equal(await page.locator('#confirm-merge').innerText(),'确认本次合并预览','合并方式变化后原确认必须失效');
+  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('确认选择后才能进入自动分类'));
+  assert.equal(await page.locator('#confirm-merge').innerText(),'确认选择，开始自动分类','合并方式变化后原确认必须失效');
   await page.locator('#merge-identical').check();
-  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次预览已确认'));
+  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次选择已确认'));
   assert.equal(await page.evaluate(()=>window.RfqProjectUI===undefined),false);
 
   await fs.rm(path.join(root,'copies'),{recursive:true,force:true});
   await page.reload();
+  await page.locator('#aux-section > summary').click();
   await page.locator('#open-project').click();
   await page.waitForFunction(()=>document.querySelectorAll('#project-list > li button').length>=1);
   await page.locator('#project-list > li button').first().click();
@@ -87,6 +90,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await fs.writeFile(files[0],'changed original bytes');
   await fs.rm(path.join(root,'copies'),{recursive:true,force:true});
   await page.reload();
+  await page.locator('#aux-section > summary').click();
   await page.locator('#open-project').click();
   await page.waitForFunction(()=>document.querySelectorAll('#project-list > li button').length>=1);
   await page.locator('#project-list > li button').first().click();

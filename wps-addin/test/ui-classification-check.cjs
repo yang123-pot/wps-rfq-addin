@@ -62,8 +62,13 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.exposeFunction('__writeExportFixture',async file=>{await fs.writeFile(file,Buffer.from([0x50,0x4b,3,4,1,2]));});
   const origin='http://127.0.0.1:'+server.address().port;
   await page.goto(origin+'/taskpane.html');
+  // R3：先选合并并确认“确认选择，开始自动分类”，确认前不给任何建议；过渡期的分类面板在辅助功能里。
+  await page.locator('#aux-section > summary').click();
+  assert.doesNotMatch(await page.locator('#classification-list').innerText(),/水龙头|水阀门/,'确认选择前不得给出分类建议');
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
+  await page.locator('#confirm-merge').click();
+  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次选择已确认'));
   await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 3'));
   assert.equal(await page.locator('#write-classification').innerText(),'写入工作副本');
   assert.match(await page.locator('#classification-list').innerText(),/水龙头/);
@@ -125,8 +130,6 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.locator('#classification-list > li').first().locator('select').selectOption('no-inquiry');
   await page.locator('#classification-list > li').first().locator('button').first().click();
   await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 0'));
-  await page.locator('#confirm-merge').click();
-  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次预览已确认'));
   await page.locator('#save-project').click();
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
   assert.match(await page.locator('#project-status').innerText(),/导入与合并：已确认/,'明确确认预览后导入与合并阶段必须置为已确认');
@@ -142,6 +145,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.locator('#save-project').click();
   await page.waitForFunction(()=>document.querySelector('#project-status').textContent.includes('表内审核：已确认'));
   await page.reload();
+  await page.locator('#aux-section > summary').click();
   await page.locator('#open-project').click();
   await page.waitForFunction(()=>document.querySelectorAll('#project-list > li button').length>=1);
   await page.locator('#project-list > li button').first().click();
@@ -156,9 +160,12 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   assert.equal(await page.locator('#write-classification').isDisabled(),false);
   await page.locator('#merge-identical').check();
   await page.waitForFunction(()=>document.querySelector('#merge-summary').textContent.includes('预览 2 项'));
+  await page.locator('#confirm-merge').click();
+  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次选择已确认'));
   assert.equal(await page.locator('#write-classification').innerText(),'写入合并清单','合并模式应明确真实写入目标');
   await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 0'));
   await page.evaluate(()=>{window.__written.length=0;});
+  await page.evaluate(()=>{document.querySelector('#write-classification').disabled=false;});
   await page.locator('#write-classification').click();
   await page.waitForFunction(()=>document.querySelector('#classification-message').textContent.includes('请先在“另存内部清单”按合并模式另存'));
   assert.match(await page.locator('#classification-message').innerText(),/^未写入合并清单。/);
@@ -172,16 +179,21 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   },mergedTarget);
   await page.locator('#export-workbook').click();
   await page.waitForFunction(()=>document.querySelector('#export-message').textContent.includes('另存成功'));
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="import"]').click();
   await page.locator('#imported-books > li').nth(1).getByRole('button',{name:'移除此文件'}).click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===1);
   await page.evaluate(()=>{window.__written.length=0;});
+  await page.evaluate(()=>{document.querySelector('#write-classification').disabled=false;});
   await page.locator('#write-classification').click();
   await page.waitForFunction(()=>/来源.*变化|已把/.test(document.querySelector('#classification-message').textContent));
   assert.match(await page.locator('#classification-message').innerText(),/来源.*变化.*重新另存/,'旧合并表不得接受新来源集合的分类');
   assert.equal(await page.evaluate(()=>window.__written.length),0,'来源改变后必须在打开旧合并表前阻断');
   await page.evaluate(file=>{window.__files=[file];},files[1]);
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="import"]').click();
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
+  await page.locator('#confirm-merge').click();
+  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次选择已确认'));
   await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 0'));
   mergedTarget=path.join(root,'合并分类-重新另存.xlsx');
   await page.evaluate(target=>{window.Application.GetSaveAsFilename=()=>target;},mergedTarget);
@@ -193,8 +205,11 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.route('**/api/export/verify',async route=>{
    verifyStarted();await new Promise(resolve=>{releaseVerify=resolve;});await route.continue();
   });
+  console.log('DEBUG before merged write:',await page.locator('#write-classification').isDisabled(),
+   await page.locator('#classification-message').innerText(),'|',await page.locator('#classification-progress').innerText());
   await page.locator('#write-classification').click();
   await started;
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="import"]').click();
   await page.locator('#merge-identical').uncheck();
   assert.equal(await page.locator('#write-classification').innerText(),'写入工作副本');
   releaseVerify();

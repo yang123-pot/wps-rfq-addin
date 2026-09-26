@@ -25,3 +25,25 @@
 .rfq-picker-status.error{color:#9a542d}
 .rfq-picker-summary{margin:4px 0 0}
 .rfq-picker-foot{margin-top:8px}.rfq-picker-foot button{font-size:12px}
+.workflow h2{font-size:13px;margin:0 0 6px}
+.workflow-nav{display:flex;flex-wrap:wrap;gap:4px;list-style:none;margin:0;padding:0}
+.workflow-step{flex:1 1 44px;min-width:0}
+.workflow-step-button{display:flex;flex-direction:column;align-items:center;gap:2px;width:100%;padding:5px 2px;border:0;border-radius:6px;background:transparent;color:#6d7d73;cursor:pointer}
+.workflow-step-button .workflow-step-number{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1px solid #c8d6cd;font-size:10px;line-height:1}
+.workflow-step-button .workflow-step-label{font-size:10px;line-height:1.15;text-align:center;overflow-wrap:anywhere}
+.workflow-step-button.is-current{background:#e6f2ea;color:#1d6f4a}
+.workflow-step-button.is-current .workflow-step-number{background:#1d6f4a;border-color:#1d6f4a;color:#fff}
+.workflow-step-button.is-done .workflow-step-number{background:#cfe6d9;border-color:#9ec4ae;color:#1d6f4a}
+.workflow-stats{margin:8px 0 0}
+.workflow-stats div{align-items:baseline}
+.merge-choice{display:flex;flex-direction:column;gap:6px;margin:6px 0}
+.merge-option{display:grid;grid-template-columns:auto 1fr;gap:2px 6px;align-items:start;padding:6px;border:1px solid #dde6e0;border-radius:6px;background:#fbfdfb;cursor:pointer}
+.merge-option.is-selected{border-color:#8fb79f;background:#eef7f1}
+.merge-option input{margin:2px 0 0}
+.merge-option .merge-title{font-size:12px;font-weight:600}
+.merge-option .note{grid-column:2;margin:0;font-size:11px}
+.stage-panel>.card:first-child,.stage-panel>section:first-child{margin-top:0}
+.stage-info{margin:6px 0 0}
+.stage-status{margin:6px 0 0}
+.aux>summary{cursor:pointer;font-size:12px}
+@media (max-width:360px){.workflow-step{flex:1 1 40px}.workflow-step-button .workflow-step-label{font-size:9px}}

@@ -80,8 +80,11 @@ async function waitFor(check,label){
   });
   const origin='http://127.0.0.1:'+server.address().port;
   await page.goto(origin+'/taskpane.html');
+  await page.locator('#aux-section > summary').click();
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
+  await page.locator('#confirm-merge').click();
+  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次选择已确认'));
   await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 2'));
   assert.equal(await exists(),false,'只渲染建议不得写入习惯');
 
@@ -145,6 +148,7 @@ async function waitFor(check,label){
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
   const beforeReload=await fs.readFile(stateFile,'utf8');
   await page.reload();
+  await page.locator('#aux-section > summary').click();
   await page.locator('#open-project').click();
   await page.waitForFunction(()=>document.querySelectorAll('#project-list > li button').length>=1);
   await page.locator('#project-list > li button').first().click();

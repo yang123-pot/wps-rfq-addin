@@ -73,6 +73,7 @@ async function setInput(locator,value){
   });
   const origin='http://127.0.0.1:'+server.address().port;
   await page.goto(origin+'/taskpane.html');
+  await page.locator('#aux-section > summary').click();
   await page.waitForFunction(()=>document.querySelector('#library-status').textContent.includes('本机分类库版本 0'));
   assert.equal(await page.locator('#library-categories > li').count(),4);
   assert.equal(await page.locator('#library-rules > li').count(),4);
@@ -81,6 +82,8 @@ async function setInput(locator,value){
 
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===1);
+  await page.locator('#confirm-merge').click();
+  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次选择已确认'));
   await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 2'));
   const rows=page.locator('#classification-list > li');
   assert.equal(await rows.count(),2);

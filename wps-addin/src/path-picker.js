@@ -26,7 +26,7 @@
  }
  function open(options){
   var config=options||{};
-  var mode=config.mode==='directory'?'directory':(config.mode==='files'?'files':'file');
+  var mode=config.mode==='directory'?'directory':(config.mode==='files'?'files':(config.mode==='save'?'save':'file'));
   var extensions=(config.extensions||[]).slice(0,20);
   var token=config.token;
   var onConfirm=typeof config.onConfirm==='function'?config.onConfirm:null;
@@ -56,6 +56,21 @@
   go.type='button';
   pathRow.appendChild(pathInput);pathRow.appendChild(go);
   panel.appendChild(pathRow);
+  // R3新增save模式：目录＋文件名＋已有目标提示；取消不改变阶段，后续另存/选目录统一复用本选择器。
+  var nameRow=null,nameInput=null,existsNote=null;
+  if(mode==='save'){
+   nameRow=element('div',null,'rfq-picker-name-row');
+   nameInput=element('input',null,'rfq-picker-name');
+   nameInput.type='text';
+   nameInput.setAttribute('aria-label','文件名');
+   nameInput.value=normalizePath(config.fileName);
+   nameInput.placeholder='文件名.xlsx';
+   nameRow.appendChild(nameInput);
+   panel.appendChild(nameRow);
+   existsNote=element('p','','note rfq-picker-exists');
+   existsNote.setAttribute('role','status');
+   panel.appendChild(existsNote);
+  }
   var note=element('p',config.hint||'只列目录和'+ (extensions.length?extensions.join(' / '):'全部') +'文件；先进入目录，再勾选文件。','note rfq-picker-hint');
   panel.appendChild(note);
   var list=element('ul',null,'rfq-picker-list');
@@ -120,8 +135,17 @@
    status.textContent=state.loading?'正在读取目录…':state.message;
    if(state.truncated)status.textContent=(state.message?state.message+' ':'')+'此目录共 '+state.total+' 项，只显示前 '+state.entries.length+' 项，请输入更具体的路径。';
    var paths=selectedPaths();
-   summary.textContent=mode==='directory'?(state.path||'尚未选择目录'):(paths.length?'已选 '+paths.length+' 项：'+paths.join('；'):'尚未选择文件');
-   confirm.disabled=state.loading||(mode==='directory'?!state.path:!paths.length);
+   var fileName=mode==='save'?String(nameInput.value||'').trim():'';
+   var targetExists=mode==='save'&&!!fileName&&state.entries.some(function(entry){
+    return entry.type==='file'&&fileKey(entry.name)===fileKey(fileName);});
+   if(mode==='save'){
+    summary.textContent=(state.path||'尚未选择目录')+(fileName?'\\'+fileName:'（请输入文件名）');
+    if(existsNote)existsNote.textContent=targetExists?
+      '该目录下已有同名文件：插件不会覆盖，请在“保存/发布”时改用新文件名。':'';
+    if(existsNote)existsNote.className='note rfq-picker-exists'+(targetExists?' error':'');
+   }
+   else summary.textContent=mode==='directory'?(state.path||'尚未选择目录'):(paths.length?'已选 '+paths.length+' 项：'+paths.join('；'):'尚未选择文件');
+   confirm.disabled=state.loading||(mode==='directory'?!state.path:(mode==='save'?(!state.path||!fileName):!paths.length));
   }
   function toggle(path,autoConfirm){
    var key=fileKey(path);
@@ -143,6 +167,14 @@
    if(mode==='directory'){
     if(!state.path){state.message='请先进入要输出的目录。';render();return;}
     closePicker();if(onConfirm)onConfirm([state.path]);return;
+   }
+   if(mode==='save'){
+    var fileName=String(nameInput.value||'').trim();
+    if(!state.path){state.message='请先进入要保存的目录。';render();return;}
+    if(!fileName){state.message='请填写文件名。';render();return;}
+    if(/[\\/]/.test(fileName)||/[<>:"|?*]|[. ]$/.test(fileName)){state.message='文件名不能包含 \\ / : * ? " < > | 或以点/空格结尾。';render();return;}
+    var target=state.path.replace(/[\\/]+$/,'')+'\\'+fileName;
+    closePicker();if(onConfirm)onConfirm({directory:state.path,name:fileName,target:target});return;
    }
    if(!paths.length){state.message='请先选择文件。';render();return;}
    if(mode==='file'&&paths.length!==1){state.message='这里只能选择一个文件。';render();return;}
@@ -180,6 +212,7 @@
   pathInput.addEventListener('keydown',function(event){
    if(event.key==='Enter'){event.preventDefault();load(pathInput.value);}
   });
+  if(nameInput)nameInput.addEventListener('input',function(){render();});
   document.addEventListener('keydown',onKey,true);
   render();
   load(state.path);
