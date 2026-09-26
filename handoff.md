@@ -17,7 +17,7 @@
 - **真实能力**：旧流程实机走通注册/功能区、侧栏连接、两文件导入、合并确认、分类确认5/5及停摆后重建恢复。新表内整表审核、独立分类工作簿、横向品牌汇总与名称链接仍待开发；R1/R2只到模型、项目库与模拟宿主层，**仍无真实WPS新流程证据**。
 - **下一项**：从R6（独立分类工作簿，对应图04）开始；先完整阅读本文件、实际打开本包相关图（图04，必要时图03），再核对Git和代码。不要从旧版侧栏确认品牌路线继续。
 - **待定项**：历史32种类别的正式词表/迁入政策、另一WPS版本的隔离验证环境仍未确定；不影响用隔离合成分类库开发新流程。
-- **备份核对**：归档主提交2f04d5c已推送，远程SHA核为2f04d5cc18b1a06ac00eb34ecf1a08d60de9fb8d。本轮先绕开代理直连失败，改用仓库默认连接后成功；具体记录见验证文档。随后这次网络说明修订的提交/同步以Git日志、远程refs/heads/feat/wps-phase1及最终回复为准，不循环修改自身SHA。
+- **备份核对（R5本轮推送失败，待同步）**：R4结束点199dd7c已在远程。本轮R5提交e052bd4（及随后这条状态说明提交）在推送时失败：`git push origin feat/wps-phase1`报`schannel: failed to receive handshake, SSL/TLS connection failed`；同一错误在仓库已配置的本地代理`http://127.0.0.1:7897`、单次`-c 'http.https://github.com/.proxy='`直连、`-c http.sslBackend=openssl`（报`unexpected eof while reading`）下均出现；PowerShell`Invoke-WebRequest https://github.com`与`curl.exe`直连/走代理也同样TLS失败，说明是本机当前网络/TLS通道问题，不是仓库或提交内容问题。**本地提交已保留、未强推、未改动代理配置**；网络恢复后需执行`git push origin feat/wps-phase1`并核`git ls-remote origin refs/heads/feat/wps-phase1`等于本地HEAD。历史归档主提交2f04d5c的远程SHA为2f04d5cc18b1a06ac00eb34ecf1a08d60de9fb8d。
 
 原交接共812行，已逐字节保存到[旧交接归档](docs/archive/handoff-before-workflow-v3-20260926.md)。归档包含已过期顺序和相互矛盾的阶段表述，**只作历史资料，不是当前执行命令**。
 
