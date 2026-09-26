@@ -12,7 +12,7 @@
 - **真实能力**：旧流程实机走通注册/功能区、侧栏连接、两文件导入、合并确认、分类确认5/5及停摆后重建恢复。新表内整表审核、独立分类工作簿、横向品牌汇总与名称链接等仍待开发。
 - **下一项**：后续继续实施时从R1开始；先完整阅读本文件、实际打开全部8图，再核对Git和代码。不要从旧版侧栏确认品牌路线继续。
 - **待定项**：历史32种类别的正式词表/迁入政策、另一WPS版本的隔离验证环境仍未确定；不影响用隔离合成分类库开发新流程。
-- **备份核对**：本轮按明确清单提交、推送并核远程SHA。具体提交和同步结果以Git日志、远程refs/heads/feat/wps-phase1及本轮最终回复为准；不反复修改文档内自身SHA制造循环提交。
+- **备份核对**：归档主提交2f04d5c已推送，远程SHA核为2f04d5cc18b1a06ac00eb34ecf1a08d60de9fb8d。本轮先绕开代理直连失败，改用仓库默认连接后成功；具体记录见验证文档。随后这次网络说明修订的提交/同步以Git日志、远程refs/heads/feat/wps-phase1及最终回复为准，不循环修改自身SHA。
 
 原交接共812行，已逐字节保存到[旧交接归档](docs/archive/handoff-before-workflow-v3-20260926.md)。归档包含已过期顺序和相互矛盾的阶段表述，**只作历史资料，不是当前执行命令**。
 
@@ -581,12 +581,12 @@ git status --short
 git diff --cached --check
 git diff --cached
 git commit -m "本包具体改动"
-git -c 'http.https://github.com/.proxy=' push origin feat/wps-phase1
+git push origin feat/wps-phase1
 git rev-parse HEAD
-git -c 'http.https://github.com/.proxy=' ls-remote origin refs/heads/feat/wps-phase1
+git ls-remote origin refs/heads/feat/wps-phase1
 ~~~
 
-已有仓库代理曾导致TLS失败，单次绕开，不改系统/用户代理。推送失败保留本地提交，记录原因和待同步，不声称已备份；实际核远程SHA后才报告同步。
+网络路径按当前结果选择：历史仓库代理曾导致TLS失败，但本轮绕开代理直连发生连接重置/443超时，默认连接推送和远程核对成功。因此先用上面的普通命令；只有当前代理失败时，才尝试单次加 git -c 'http.https://github.com/.proxy='，不要把历史绕开办法写成永远必选，也不修改系统/用户代理。推送失败保留本地提交，记录原因和待同步，不声称已备份；实际核远程SHA后才报告同步。
 
 ### 7.3 历史及本机证据
 
