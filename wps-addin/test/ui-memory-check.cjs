@@ -12,9 +12,9 @@ async function waitFor(check,label){
 (async()=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-ui-memory-')),files=[path.join(root,'一号.xlsx'),path.join(root,'二号.xls')];
  await fs.writeFile(files[0],'first file');await fs.writeFile(files[1],'second file');
- const libraryDirectory=path.join(root,'library'),stateFile=path.join(libraryDirectory,STATE);
+ const libraryDirectory=path.join(root,'library'),headerDirectory=path.join(root,'headers'),stateFile=path.join(libraryDirectory,STATE);
  const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(root,'copies'),
-  projectDirectory:path.join(root,'projects'),libraryDirectory});
+  projectDirectory:path.join(root,'projects'),headerDirectory:path.join(root,'headers'),libraryDirectory});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const store=createLibraryStore({directory:libraryDirectory});
  const browser=await chromium.launch({channel:'msedge',headless:true});

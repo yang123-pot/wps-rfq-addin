@@ -4,7 +4,9 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
 async function until(reportPath,predicate){
  const deadline=Date.now()+10000;
  while(Date.now()<deadline){
-  const data=await fs.readFile(reportPath,'utf8').then(JSON.parse,()=>({reports:[]}));
+  // 服务端写入不是原子的，读到半份JSON时按“还没好”处理，避免把测试竞态当成产品缺陷。
+  const data=await fs.readFile(reportPath,'utf8').then(
+   text=>{try{return JSON.parse(text);}catch(_){return {reports:[]};}},()=>({reports:[]}));
   if(predicate(data.reports))return data.reports;
   await new Promise(resolve=>setTimeout(resolve,100));
  }

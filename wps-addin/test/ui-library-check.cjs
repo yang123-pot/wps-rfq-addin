@@ -8,9 +8,9 @@ async function setInput(locator,value){
 (async()=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-ui-library-')),files=[path.join(root,'测试一.xlsx')];
  await fs.writeFile(files[0],'first file');
- const libraryDirectory=path.join(root,'library');
+ const libraryDirectory=path.join(root,'library'),headerDirectory=path.join(root,'headers');
  const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(root,'copies'),
-  projectDirectory:path.join(root,'projects'),libraryDirectory});
+  projectDirectory:path.join(root,'projects'),headerDirectory:path.join(root,'headers'),libraryDirectory});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const store=createLibraryStore({directory:libraryDirectory});
  const browser=await chromium.launch({channel:'msedge',headless:true});
