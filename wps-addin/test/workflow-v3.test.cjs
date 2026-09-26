@@ -158,6 +158,40 @@ test('业务键覆盖影响输出的字段，并忽略表内排序与界面字�
     groups: groups, review: review }), '品牌阶段的上游键不含品牌本身');
 });
 
+test('R8：品牌组进入询价/拆分业务键但不进入品牌阶段键，改品牌只让询价及之后失效', () => {
+  const col = sample.buildCollection(), input = mergeInput(true);
+  const rows = project.rowsFromPreview(input.preview).map(function (row) {
+    return { rowId: row.rowId, categoryId: 'pump', categoryName: '水泵', skip: false, note: '' }; });
+  const header = { projectName: '示例园区', company: '示例建设公司', contact: '测试员', phone: '010-12345678' };
+  const brands = [{ categoryId: 'pump', mode: 'per-brand',
+    groups: [{ brand: '青源', supplier: '华川设备' }, { brand: '恒流', supplier: '启明机电' }] },
+   { categoryId: 'valve', mode: 'synthesize',
+    groups: [{ brand: '通达', supplier: '正通商贸' }, { brand: '海岳', supplier: '安合设备' }] }];
+  const first = project.assess(Object.assign({}, input, { review: { ready: true, rows: rows },
+    brands: { ready: true, rows: brands }, header: header }));
+  const changed = brands.map(function (entry, index) {
+    return index ? entry : Object.assign({}, entry, { groups: [entry.groups[0], { brand: '启明机电', supplier: '启明机电' }] }); });
+  const second = project.assess(Object.assign({}, input, { review: { ready: true, rows: rows },
+    brands: { ready: true, rows: changed }, header: header }));
+  assert.equal(first.brandsKey, second.brandsKey, '品牌阶段键只含上游审核，不含品牌本身');
+  assert.notEqual(first.inquiryKey, second.inquiryKey, '改品牌必须改变询价键');
+  assert.notEqual(first.splitKey, second.splitKey, '改品牌必须使拆分失效');
+  const modeChanged = brands.map(function (entry, index) {
+    return index ? entry : Object.assign({}, entry, { mode: 'synthesize' }); });
+  const third = project.assess(Object.assign({}, input, { review: { ready: true, rows: rows },
+    brands: { ready: true, rows: modeChanged }, header: header }));
+  assert.notEqual(first.inquiryKey, third.inquiryKey, '改询价生成方式同样改变询价输出');
+  // 读回顺序稳定后不改变内容键：与材料行、审核行一样按稳定字段规范化。
+  const reordered = project.assess(Object.assign({}, input, { review: { ready: true, rows: rows.slice().reverse() },
+    brands: { ready: true, rows: brands.slice().reverse() }, header: header }));
+  assert.equal(first.inquiryKey, reordered.inquiryKey, '读回顺序不得改变询价键');
+  // 品牌变化只让询价及之后失效，品牌阶段本身仍完成。
+  const ready = project.sync(project.create(col, true, { projectId: newId('i') }),
+    project.assess(Object.assign({}, input, readyVerdicts())));
+  const invalidated = project.invalidateStage(ready, 'brands');
+  assert.deepEqual(STAGES.map(function (stage) { return project.stageState(invalidated, stage); }),
+    ['ready', 'ready', 'ready', 'ready', 'missing', 'stale', 'stale']);
+});
 test('v1项目保留原文件；继续时新建v2副本并记录fromProjectId', () => {
   const legacy = legacyV1Record();
   const legacyText = JSON.stringify(legacy);

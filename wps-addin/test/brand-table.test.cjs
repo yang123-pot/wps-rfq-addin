@@ -169,9 +169,9 @@ test('the brand filled in the summary is the only source for the quotation brand
  const filled=Object.assign({},data,{assignments:[Object.assign({},data.assignments[0],{brand:'品牌甲'})]});
  const map=brand.brandMap(filled);
  assert.deepEqual(Object.keys(map).sort(),['row-1','row-2'],'每个材料行都要能查到品牌');
- assert.equal(map['row-1'].brand,'品牌甲');
- assert.equal(map['row-2'].brand,'品牌甲','同一类别默认同一品牌');
- assert.equal(map['row-1'].assignmentId,filled.assignments[0].assignmentId);
+ assert.equal(map['row-1'][0].brand,'品牌甲');
+ assert.equal(map['row-2'][0].brand,'品牌甲','同一类别默认同一品牌');
+ assert.equal(map['row-1'][0].assignmentId,filled.assignments[0].assignmentId);
  const linked=brand.requireBrands(filled,required);
  assert.deepEqual(linked.map(item=>[item.rowId,item.brand]),[['row-1','品牌甲'],['row-2','品牌甲']]);
  assert.equal(brand.brandForRow(filled,'row-3'),null,'无需询价行不参与品牌联动');
@@ -183,4 +183,27 @@ test('the brand filled in the summary is the only source for the quotation brand
   Object.assign({},filled.assignments[0],{assignmentId:'a-2',rowIds:['row-2'],brand:'品牌乙'})]});
  assert.deepEqual(brand.requireBrands(split,required).map(item=>item.brand),['品牌甲','品牌乙'],
   '同类多品牌时按材料行分别联动，不复制数量也不吞并品牌');
+});
+test('R8：同一材料行被多组品牌覆盖时保留全部，不再被最后一组覆盖',()=>{
+ const data=brand.build(groups,confirmed,'ck1-multi'),required=brand.requiredRowIds(groups,confirmed);
+ // 替代询价：两个品牌各询同一组完整需求（row-1、row-2 都被 a-1、a-2 覆盖）。
+ const alternative=Object.assign({},data,{coverageMode:'alternative-quotes',assignments:[
+  {assignmentId:'a-1',categoryId:'water-valve',rowIds:['row-1','row-2'],brand:'品牌甲',supplier:'供应商A',
+   note:'',coverageConfirmed:true,confirmedAt:null},
+  {assignmentId:'a-2',categoryId:'water-valve',rowIds:['row-1','row-2'],brand:'品牌乙',supplier:'供应商B',
+   note:'',coverageConfirmed:true,confirmedAt:null}]});
+ const map=brand.brandMap(alternative);
+ assert.deepEqual(map['row-1'].map(item=>item.brand),['品牌甲','品牌乙'],'多值映射保留全部品牌，后项不得覆盖前项');
+ assert.deepEqual(map['row-2'].map(item=>[item.brand,item.supplier]),[['品牌甲','供应商A'],['品牌乙','供应商B']]);
+ const linked=brand.requireBrands(alternative,required);
+ assert.deepEqual(linked.map(item=>item.groups.map(group=>group.brand)),
+  [['品牌甲','品牌乙'],['品牌甲','品牌乙']],'每个材料行都显式携带全部适用品牌组');
+ assert.deepEqual(brand.brandForRow(alternative,'row-1').map(item=>item.supplier),['供应商A','供应商B']);
+ // 半组（有品牌无供应商）仍必须在联动阶段被拦住，不进入询价输出。
+ const half=Object.assign({},alternative,{assignments:[
+  {assignmentId:'a-1',categoryId:'water-valve',rowIds:['row-1','row-2'],brand:'品牌甲',supplier:'',
+   note:'',coverageConfirmed:true,confirmedAt:null}]});
+ assert.deepEqual(brand.requireBrands(half,required).map(item=>item.supplier),['',''],
+  '联动阶段只保证品牌；供应商完整性由严格校验负责');
+ assert.match(brand.validate(half,required).errors.join('；'),/供应商为空/);
 });

@@ -117,3 +117,152 @@ test('blocks are refused early and empty values never become a finished brand ta
  const read=model.parseSheet(sheetValues(),model.bindingFor('C:\\out\\分类品牌表.xlsx',workbook()));
  assert.equal(read.assignments.every(item=>item.brand===''),true);
 });
+
+// ===== R8（图05A/05B→06）：汇总表读回、多品牌关系与联动口径 =====
+const R8_ROOT='C:\\out\\示例园区',R8_SUMMARY=R8_ROOT+'\\分类汇总表.xlsx';
+const R8_CATEGORIES=[
+ {categoryId:'pump',categoryName:'水泵',rowCount:2,path:R8_ROOT+'\\分类工作簿\\水泵.xlsx'},
+ {categoryId:'valve',categoryName:'阀门',rowCount:2,path:R8_ROOT+'\\分类工作簿\\阀门.xlsx'},
+ {categoryId:'fan',categoryName:'风机',rowCount:2,path:R8_ROOT+'\\分类工作簿\\风机.xlsx'},
+ {categoryId:'ev-charger',categoryName:'汽车充电桩',rowCount:1,path:R8_ROOT+'\\分类工作簿\\汽车充电桩.xlsx'}];
+// 第6.1节样例填写：水泵2组按品牌分别生成→2份，阀门2组合成→1份，风机/充电桩各1份；合计5份。
+const R8_FILLS=[
+ {mode:'per-brand',groups:[{brand:'青源',supplier:'华川设备'},{brand:'恒流',supplier:'启明机电'}]},
+ {mode:'synthesize',groups:[{brand:'通达',supplier:'正通商贸'},{brand:'海岳',supplier:'安合设备'}]},
+ {mode:'synthesize',groups:[{brand:'瑞风',supplier:'瑞风设备'}]},
+ {mode:'synthesize',groups:[{brand:'驰电',supplier:'远程电气'}]}];
+function r8Summary(layoutName,fills){
+ const plan=model.summaryPlan(R8_CATEGORIES,{directory:R8_ROOT,inputKey:'ck2-r8-sample',layout:layoutName,projectName:'示例园区'});
+ const workbook=model.buildSummary(plan,{});
+ const values=workbook.sheets[0].values.map(row=>row.slice());
+ const spec=model.summaryLayoutFor(layoutName);
+ (fills||R8_FILLS).forEach((fill,index)=>{
+  const row=spec.firstRow+index;
+  (fill.groups||[]).forEach((group,groupIndex)=>{
+   if(spec.name==='combined')
+    values[row-1][spec.groups[groupIndex][0]-1]='品牌：'+group.brand+'\n供应商：'+group.supplier;
+   else{values[row-1][spec.groups[groupIndex][0]-1]=group.brand;values[row-1][spec.groups[groupIndex][1]-1]=group.supplier;}
+  });
+  values[row-1][spec.modeColumn-1]=fill.mode?model.summaryModeLabel(fill.mode):'';
+ });
+ return {workbook,values,binding:model.summaryBindingFor(R8_SUMMARY,workbook)};
+}
+function r8Fills(first){return [first,R8_FILLS[1],R8_FILLS[2],R8_FILLS[3]];}
+test('R8汇总读回：两种布局解析等价，1至3组与生成方式一致，预计5份',()=>{
+ const separated=r8Summary('separated'),combined=r8Summary('combined');
+ const separatedRead=model.parseSummary(separated.values,separated.binding);
+ const combinedRead=model.parseSummary(combined.values,combined.binding);
+ assert.equal(separatedRead.ok,true,(separatedRead.issues[0]||{}).message);
+ assert.equal(combinedRead.ok,true,(combinedRead.issues[0]||{}).message);
+ const business=function(list){return list.map(item=>({categoryId:item.categoryId,mode:item.mode,groups:item.groups}));};
+ assert.deepEqual(business(separatedRead.categories),business(combinedRead.categories),'两种布局必须解析成同一套品牌口径');
+ assert.deepEqual(separatedRead.categories.map(item=>[item.categoryId,item.mode,item.groups.length,item.groups.map(g=>g.brand)]),
+  [['pump','per-brand',2,['青源','恒流']],['valve','synthesize',2,['通达','海岳']],
+   ['fan','synthesize',1,['瑞风']],['ev-charger','synthesize',1,['驰电']]]);
+ assert.equal(separatedRead.expectedSheets,5,'水泵2、阀门1、风机1、充电桩1共5份');
+ assert.equal(combinedRead.expectedSheets,5);
+ assert.equal(model.summarySheetCount(separatedRead.categories),5);
+ assert.equal(model.summaryCountsText(separatedRead.categories),'水泵 2 份、阀门 1 份、风机 1 份、汽车充电桩 1 份');
+ assert.equal(separatedRead.totalGroups,6);
+});
+test('R8汇总读回：单组默认合成、空组忽略、半组/重复组合/多组未选方式都报单元格',()=>{
+ const single=r8Summary('separated',r8Fills({mode:'',groups:[{brand:'甲',supplier:'S1'}]}));
+ const singleRead=model.parseSummary(single.values,single.binding);
+ assert.equal(singleRead.ok,true,(singleRead.issues[0]||{}).message);
+ assert.equal(singleRead.categories[0].mode,'synthesize','单组默认合成一份');
+ assert.equal(singleRead.expectedSheets,4,'四类各单组，每类仍只有一份');
+ const spec=model.summaryLayoutFor('separated');
+ // 半组：只填品牌不填供应商，定位到该组单元格。
+ const half=r8Summary('separated',r8Fills(R8_FILLS[0]));
+ half.values[spec.firstRow-1][spec.groups[1][1]-1]='';
+ const halfRead=model.parseSummary(half.values,half.binding);
+ assert.equal(halfRead.ok,false);
+ assert.equal(halfRead.issues[0].code,'group-half');
+ assert.equal(halfRead.issues[0].cell,'G4','半组定位到第2组的供应商单元格');
+ // 重复组合：完全相同的品牌/供应商组合出现两次。
+ const dup=r8Summary('separated',r8Fills({mode:'synthesize',groups:[{brand:'通达',supplier:'正通商贸'},{brand:'通达',supplier:'正通商贸'}]}));
+ const dupRead=model.parseSummary(dup.values,dup.binding);
+ assert.equal(dupRead.ok,false);
+ assert.match(dupRead.issues.map(item=>item.code).join('；'),/group-duplicate/);
+ assert.equal(dupRead.issues[0].cell,'F4');
+ // 同品牌不同供应商是允许的，不得误判为重复。
+ const sameBrand=r8Summary('separated',r8Fills({mode:'synthesize',groups:[{brand:'通达',supplier:'正通商贸'},{brand:'通达',supplier:'安合设备'}]}));
+ assert.equal(model.parseSummary(sameBrand.values,sameBrand.binding).ok,true);
+ // 多组未选方式：不放行并定位到方式列。
+ const noMode=r8Summary('separated',r8Fills({mode:'',groups:[{brand:'甲',supplier:'S1'},{brand:'乙',supplier:'S2'}]}));
+ const noModeRead=model.parseSummary(noMode.values,noMode.binding);
+ assert.equal(noModeRead.ok,false);
+ assert.equal(noModeRead.issues[0].code,'mode-missing');
+ assert.equal(noModeRead.issues[0].cell,'J4');
+});
+test('R8汇总读回：稳定类别ID读回，排序不串类；删行/复制行/改名称条数都定位到单元格',()=>{
+ const base=r8Summary('separated');
+ // 排序不串类：交换两行数据，仍按隐藏类别ID对应，名称/条数/品牌都不串。
+ const rows=[base.values[3].slice(),base.values[4].slice()];
+ const sorted=base.values.map(row=>row.slice());sorted[3]=rows[1];sorted[4]=rows[0];
+ const sortedRead=model.parseSummary(sorted,base.binding);
+ assert.equal(sortedRead.ok,true,(sortedRead.issues[0]||{}).message);
+ assert.deepEqual(sortedRead.categories.map(item=>item.categoryId).slice(0,2),['valve','pump'],'按隐藏类别ID读回，排序不串类');
+ assert.deepEqual(sortedRead.categories.filter(item=>item.categoryId==='pump')[0].groups.map(g=>g.brand),['青源','恒流']);
+ // 复制行：同一类别出现两次，报单元格。
+ const copied=base.values.map(row=>row.slice());copied.splice(4,0,copied[3].slice());
+ const copiedRead=model.parseSummary(copied,base.binding);
+ assert.equal(copiedRead.ok,false);
+ assert.equal(copiedRead.issues[0].code,'category-duplicate');
+ assert.equal(copiedRead.issues[0].cell,'K5');
+ // 删行：缺少类别行。
+ const deleted=base.values.map(row=>row.slice());deleted.splice(4,1);
+ const deletedRead=model.parseSummary(deleted,base.binding);
+ assert.equal(deletedRead.ok,false);
+ assert.match(deletedRead.issues.map(item=>item.message).join('；'),/缺少类别“阀门”/);
+ // 改名称/条数：固定列被改动，定位到名称/条数单元格。
+ const renamed=base.values.map(row=>row.slice());renamed[4][1]='阀门（改）';
+ const renamedRead=model.parseSummary(renamed,base.binding);
+ assert.equal(renamedRead.ok,false);
+ assert.equal(renamedRead.issues[0].code,'name-changed');
+ assert.equal(renamedRead.issues[0].cell,'B5');
+ const recounted=base.values.map(row=>row.slice());recounted[4][2]='9';
+ const recountedRead=model.parseSummary(recounted,base.binding);
+ assert.equal(recountedRead.ok,false);
+ assert.equal(recountedRead.issues[0].code,'count-changed');
+ assert.equal(recountedRead.issues[0].cell,'C5');
+ // 未知类别ID：不是本次汇总表的行。
+ const unknown=base.values.map(row=>row.slice());unknown[4][10]='unknown';
+ const unknownRead=model.parseSummary(unknown,base.binding);
+ assert.equal(unknownRead.ok,false);
+ assert.equal(unknownRead.issues[0].code,'category-unknown');
+ assert.equal(unknownRead.issues[0].cell,'K5');
+});
+test('R8同格读回：标签错误/缺标签/额外文本报单元格，两行解析成独立字段',()=>{
+ const base=r8Summary('combined');
+ assert.equal(model.parseSummary(base.values,base.binding).ok,true);
+ const missing=base.values.map(row=>row.slice());missing[4][3]='青源';// 缺少“品牌：”标签
+ const missingRead=model.parseSummary(missing,base.binding);
+ assert.equal(missingRead.ok,false);
+ assert.equal(missingRead.issues[0].cell,'D5');
+ const extra=base.values.map(row=>row.slice());extra[4][3]='品牌：青源\n供应商：华川设备\n备注：这是不该出现的';
+ const extraRead=model.parseSummary(extra,base.binding);
+ assert.equal(extraRead.ok,false);
+ assert.equal(extraRead.issues[0].code,'combined-unknown');
+ assert.equal(extraRead.issues[0].cell,'D5');
+ const half=base.values.map(row=>row.slice());half[4][3]='品牌：青源';
+ const halfRead=model.parseSummary(half,base.binding);
+ assert.equal(halfRead.ok,false);
+ assert.equal(halfRead.issues[0].code,'combined-supplier-missing');
+ // 英文冒号与换行兼容。
+ const english=base.values.map(row=>row.slice());english[4][3]='品牌: 青源\r\n供应商: 华川设备';
+ const englishRead=model.parseSummary(english,base.binding);
+ assert.equal(englishRead.ok,true,(englishRead.issues[0]||{}).message);
+ assert.deepEqual(englishRead.categories.filter(item=>item.categoryId==='pump')[0].groups[0],{brand:'青源',supplier:'华川设备'});
+});
+test('R8读回记录：只保留可复现业务字段，供项目brands保存与询价/拆分内容键使用',()=>{
+ const base=r8Summary('combined');
+ const read=model.parseSummary(base.values,base.binding);
+ const record=model.summaryReadRecord(read,{readAt:'2026-09-27T00:00:00.000Z',summaryPath:R8_SUMMARY});
+ assert.equal(record.schemaVersion,1);
+ assert.equal(record.layout,'combined');
+ assert.equal(record.expectedSheets,5);
+ assert.equal(record.summaryPath,R8_SUMMARY);
+ assert.deepEqual(Object.keys(record.categories[0]).sort(),['categoryId','categoryName','groups','mode','rowCount']);
+ assert.deepEqual(record.categories[0].groups,[{brand:'青源',supplier:'华川设备'},{brand:'恒流',supplier:'启明机电'}]);
+});

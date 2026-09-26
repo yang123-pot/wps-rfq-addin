@@ -303,7 +303,8 @@
   var source=workbook||{};
   return {schemaVersion:SUMMARY_SCHEMA_VERSION,path:target,sheet:source.sheet||SUMMARY_SHEET,
    layout:source.layout||'separated',headerRow:source.headerRow||2,firstRow:source.firstRow||4,lastRow:source.lastRow||3,
-   modeColumn:source.modeColumn||10,inputKey:source.inputKey==null?null:text(source.inputKey),
+   modeColumn:source.modeColumn||10,auxCategory:source.auxCategory||null,auxFile:source.auxFile||null,
+   inputKey:source.inputKey==null?null:text(source.inputKey),
    projectName:source.projectName==null?'':text(source.projectName),
    categories:(source.categories||[]).map(function(entry){
     return {categoryId:text(entry.categoryId),categoryName:text(entry.categoryName),rowCount:Number(entry.rowCount)||0,
@@ -318,8 +319,180 @@
   if(SUMMARY_LAYOUTS.indexOf(text(binding.layout))<0)errors.push('分类汇总表绑定缺少有效布局。');
   if(!Number.isSafeInteger(binding.headerRow)||binding.headerRow<1)errors.push('分类汇总表绑定缺少表头行号。');
   if(!Number.isSafeInteger(binding.firstRow)||binding.firstRow<=binding.headerRow)errors.push('分类汇总表绑定缺少数据起始行。');
+  if(binding.modeColumn!=null&&(!Number.isSafeInteger(binding.modeColumn)||binding.modeColumn<1))
+   errors.push('分类汇总表绑定缺少询价生成方式列。');
   if(!Array.isArray(binding.categories)||!binding.categories.length)errors.push('分类汇总表绑定缺少类别清单。');
+  ['auxCategory','auxFile'].forEach(function(field){
+   if(binding[field]==null)return;
+   if(!Number.isSafeInteger(binding[field])||binding[field]<1)errors.push('分类汇总表绑定'+field+'无效。');
+  });
   return {ok:errors.length===0,errors:errors};
+ }
+ // ===== R8：按稳定类别ID读回汇总表内填写的品牌与供应商 =====
+ // 两种布局解析成同一套口径：每类一行、1至3组品牌/供应商、每类一个询价生成方式。读回通过后即“品牌汇总”
+ // 阶段的唯一依据；询价对象显式携带groups，分别/合成取值不再被最后一品牌覆盖。
+ function summaryCellAddress(row,column){return columnLetter(column)+String(row);}
+ function summaryIssueAt(code,title,message,row,column,categoryId){
+  var cell=row&&column?summaryCellAddress(row,column):null;
+  return {code:code,title:title,message:(cell?('分类汇总表!'+cell+'：'):'')+message,
+   row:row==null?null:row,column:column==null?null:column,cell:cell,categoryId:categoryId==null?null:text(categoryId)};
+ }
+ function summaryCellAt(values,row,column){
+  var line=Array.isArray(values)?values[row-1]:null,value=Array.isArray(line)?line[column-1]:null;
+  return value==null?'':String(value).trim();
+ }
+ function summaryRowBlank(values,row){
+  var line=Array.isArray(values)?values[row-1]:null;
+  if(!Array.isArray(line))return true;
+  return line.every(function(value){return value==null||String(value).trim()==='';});
+ }
+ // 同格布局：单格两行“品牌：…”“供应商：…”，兼容中英文冒号；缺标签/重复标签/额外不明文本都报单元格，不猜。
+ function parseCombinedGroup(raw,row,column,categoryId){
+  var lines=text(raw).split(/\r?\n/).map(function(line){return line.trim();}).filter(function(line){return line!=='';});
+  var brand=null,supplier=null,brandSeen=false,supplierSeen=false,duplicate=false,unknown=null;
+  lines.forEach(function(line){
+   var match=line.match(/^(品牌|brand)\s*[:：]\s*(.*)$/i);
+   if(match){if(brandSeen)duplicate=true;brandSeen=true;brand=match[2].trim();return;}
+   match=line.match(/^(供应商|supplier|供货单位)\s*[:：]\s*(.*)$/i);
+   if(match){if(supplierSeen)duplicate=true;supplierSeen=true;supplier=match[2].trim();return;}
+   if(unknown===null)unknown=line;
+  });
+  if(unknown!==null)return {issue:summaryIssueAt('combined-unknown','同格填写含无法识别的内容',
+   '同格填写只能有两行“品牌：…”与“供应商：…”，这一格还有“'+unknown+'”，请按格式修改。',row,column,categoryId)};
+  if(duplicate)return {issue:summaryIssueAt('combined-duplicate','同格填写标签重复',
+   '同格填写的“品牌/供应商”标签出现多次，请合并为两行。',row,column,categoryId)};
+  if(lines.length&&!brandSeen)return {issue:summaryIssueAt('combined-brand-missing','同格填写缺少品牌标签',
+   '同格填写缺少“品牌：…”这一行，请按格式修改。',row,column,categoryId)};
+  if(lines.length&&!supplierSeen)return {issue:summaryIssueAt('combined-supplier-missing','同格填写缺少供应商标签',
+   '同格填写缺少“供应商：…”这一行，请按格式修改。',row,column,categoryId)};
+  return {group:{brand:brand==null?'':brand,supplier:supplier==null?'':supplier}};
+ }
+ // 读回汇总表：表头、稳定类别ID、名称/条数固定列、每组品牌供应商、生成方式都逐项核对，错误定位到具体单元格。
+ function parseSummary(values,binding){
+  var issues=[],check=validateSummaryBinding(binding);
+  if(!check.ok){
+   check.errors.forEach(function(message){issues.push({code:'binding-invalid',title:'汇总表绑定无效',
+    message:message,row:null,column:null,cell:null,categoryId:null});});
+   return {ok:false,issues:issues,categories:[],expectedSheets:0,totalGroups:0,sheet:SUMMARY_SHEET};
+  }
+  var spec=summaryLayoutFor(binding.layout),
+   auxCategory=binding.auxCategory||spec.auxCategory,modeColumn=binding.modeColumn||spec.modeColumn;
+  if(!Array.isArray(values)||!values.length){
+   issues.push({code:'sheet-empty',title:'汇总表为空',message:'分类汇总表没有内容，请用插件重新生成后再填写。',
+    row:null,column:null,cell:null,categoryId:null});
+   return {ok:false,issues:issues,categories:[],expectedSheets:0,totalGroups:0,sheet:SUMMARY_SHEET};
+  }
+  summaryHeaders(spec).forEach(function(line,index){
+   var rowNumber=binding.headerRow+index;
+   line.forEach(function(expected,column){
+    if(!expected)return;
+    var actual=summaryCellAt(values,rowNumber,column+1);
+    if(actual!==expected)issues.push(summaryIssueAt('header-changed','汇总表表头被改动',
+     '第'+rowNumber+'行应为“'+expected+'”，实际是“'+actual+'”，请用插件重新生成汇总表。',rowNumber,column+1,null));
+   });
+  });
+  var expected={},order=[];
+  (binding.categories||[]).forEach(function(item){
+   var categoryId=text(item.categoryId);
+   if(!categoryId||expected[categoryId])return;
+   expected[categoryId]={categoryId:categoryId,categoryName:text(item.categoryName),rowCount:Number(item.rowCount)||0};
+   order.push(expected[categoryId]);
+  });
+  var seen={},categories=[],expectedSheets=0,totalGroups=0,row;
+  for(row=binding.firstRow;row<=values.length;row++){
+   if(summaryRowBlank(values,row))continue;
+   var categoryId=summaryCellAt(values,row,auxCategory);
+   // 生成时在数据区下方留了一行操作说明（列A以“点击名称/单格按两行”开头），它不是数据行，直接跳过。
+   if(!categoryId&&/^(?:点击名称|单格按两行)/.test(summaryCellAt(values,row,1)))continue;
+   if(!categoryId){issues.push(summaryIssueAt('category-id-missing','缺少类别标识',
+    '这一行没有类别标识，请用插件重新生成汇总表。',row,auxCategory,null));continue;}
+   var target=expected[categoryId];
+   if(!target){issues.push(summaryIssueAt('category-unknown','类别不属于本次汇总表',
+    '类别标识“'+categoryId+'”不属于本次汇总表，请重新生成后再填写。',row,auxCategory,categoryId));continue;}
+   if(seen[categoryId]){issues.push(summaryIssueAt('category-duplicate','类别行重复',
+    '第'+seen[categoryId]+'行与这一行的类别标识重复：'+categoryId+'，请删除多出来的行。',row,auxCategory,categoryId));continue;}
+   seen[categoryId]=row;
+   var name=summaryCellAt(values,row,2),count=summaryCellAt(values,row,3);
+   if(name!==target.categoryName)issues.push(summaryIssueAt('name-changed','类别名称被改动',
+    '类别名称应为“'+target.categoryName+'”，实际是“'+name+'”；请还原或重新生成汇总表。',row,2,categoryId));
+   if(count!==String(target.rowCount))issues.push(summaryIssueAt('count-changed','材料条数被改动',
+    '材料条数应为'+target.rowCount+'，实际是“'+count+'”；请还原或重新生成汇总表。',row,3,categoryId));
+   var groupIssues=[],parsedGroups=[];
+   spec.groups.forEach(function(columns,index){
+    var parsed;
+    if(spec.name==='combined')parsed=parseCombinedGroup(summaryCellAt(values,row,columns[0]),row,columns[0],categoryId);
+    else parsed={group:{brand:summaryCellAt(values,row,columns[0]),supplier:summaryCellAt(values,row,columns[1])}};
+    if(parsed.issue){groupIssues.push(parsed.issue);return;}
+    parsedGroups.push({brand:text(parsed.group.brand),supplier:text(parsed.group.supplier),
+     index:index,columns:columns,column:columns[0]});
+   });
+   if(groupIssues.length){issues=issues.concat(groupIssues);continue;}
+   // 空组忽略；只要有一项不完整就报半组并定位到该组单元格，不猜也不补。
+   var complete=[];
+   parsedGroups.forEach(function(group){
+    if(!group.brand&&!group.supplier)return;
+    if(!group.brand||!group.supplier){
+     var badColumn=group.brand?group.columns[group.columns.length-1]:group.columns[0];
+     issues.push(summaryIssueAt('group-half','品牌与供应商没有成对填写',
+      '第'+(group.index+1)+'组只填了'+(group.brand?'品牌':'供应商')+'，请补齐或清空这一组。',row,badColumn,categoryId));
+     return;}
+    complete.push(group);
+   });
+   if(!complete.length){issues.push(summaryIssueAt('group-empty','还没有填写品牌与供应商',
+    '这一类至少要填写一组完整的品牌与供应商。',row,spec.groups[0][0],categoryId));continue;}
+   var combination={};
+   complete.forEach(function(group){
+    var key=(group.brand+'/'+group.supplier).toLowerCase();
+    if(combination[key])issues.push(summaryIssueAt('group-duplicate','品牌与供应商组合重复',
+     '“'+group.brand+' / '+group.supplier+'”出现了两次，请删除重复的一组。',row,group.column,categoryId));
+    else combination[key]=true;
+   });
+   var modeLabel=summaryCellAt(values,row,modeColumn),mode=summaryModeValue(modeLabel);
+   if(modeLabel&&!mode)issues.push(summaryIssueAt('mode-unknown','询价生成方式无法识别',
+    '“'+modeLabel+'”不是可选方式，请从下拉里选择“合成一份”或“按品牌分别生成”。',row,modeColumn,categoryId));
+   else if(complete.length>1&&!mode)issues.push(summaryIssueAt('mode-missing','多组品牌未选择询价生成方式',
+    '这一类有'+complete.length+'组品牌，请选择“合成一份”或“按品牌分别生成”。',row,modeColumn,categoryId));
+   if(!mode)mode='synthesize';
+   categories.push({categoryId:categoryId,categoryName:target.categoryName,rowCount:target.rowCount,
+    mode:mode,groups:complete.map(function(group){return {brand:group.brand,supplier:group.supplier};}),row:row});
+   totalGroups+=complete.length;
+   expectedSheets+=mode==='per-brand'?complete.length:1;
+  }
+  order.forEach(function(item){
+   if(seen[item.categoryId])return;
+   issues.push({code:'category-missing',title:'汇总表缺少类别行',
+    message:'汇总表里缺少类别“'+item.categoryName+'”这一行，可能删除了行；请重新生成汇总表后再填写。',
+    row:null,column:null,cell:null,categoryId:item.categoryId});
+  });
+  return {ok:issues.length===0,issues:issues,categories:issues.length?[]:categories,
+   expectedSheets:issues.length?0:expectedSheets,totalGroups:issues.length?0:totalGroups,
+   layout:spec.name,inputKey:binding.inputKey,sheet:SUMMARY_SHEET,path:binding.path,
+   projectName:binding.projectName==null?'':text(binding.projectName)};
+ }
+ // 汇总读回的紧凑记录：只保留可复现的业务内容，供项目brands字段保存与询价/拆分内容键使用。
+ function summaryReadRecord(read,options){
+  var input=options||{},source=read||{};
+  return {schemaVersion:SUMMARY_SCHEMA_VERSION,layout:text(source.layout),
+   inputKey:source.inputKey==null?null:text(source.inputKey),
+   summaryPath:input.summaryPath==null?(source.path==null?null:text(source.path)):text(input.summaryPath),
+   sheet:SUMMARY_SHEET,readAt:input.readAt==null?null:text(input.readAt),
+   expectedSheets:Number(source.expectedSheets)||0,
+   categories:(source.categories||[]).map(function(entry){
+    return {categoryId:text(entry.categoryId),categoryName:text(entry.categoryName),rowCount:Number(entry.rowCount)||0,
+     mode:text(entry.mode),groups:(entry.groups||[]).map(function(group){
+      return {brand:text(group.brand),supplier:text(group.supplier)};})};})};
+ }
+ // 预计份数：单组只有一份；多组按“合成一份”1份、“按品牌分别生成”按品牌组数各一份。
+ function summarySheetCount(categories){
+  return (Array.isArray(categories)?categories:[]).reduce(function(total,entry){
+   var groups=(entry&&entry.groups)||[];
+   if(!groups.length)return total;
+   return total+(text(entry.mode)==='per-brand'?groups.length:1);},0);
+ }
+ function summaryCountsText(categories){
+  return (Array.isArray(categories)?categories:[]).map(function(entry){
+   var groups=(entry&&entry.groups)||[];
+   return text(entry.categoryName)+' '+String(text(entry.mode)==='per-brand'?groups.length:1)+' 份';}).join('、');
  }
  return {SCHEMA_VERSION:SCHEMA_VERSION,SHEET:SHEET,DETAIL:DETAIL,NOTE:NOTE,COLUMNS:COLUMNS,EDITABLE:EDITABLE.slice(),
   buildWorkbook:buildWorkbook,bindingFor:bindingFor,validateBinding:validateBinding,parseSheet:parseSheet,apply:apply,
@@ -327,5 +500,7 @@
   SUMMARY_MODES:SUMMARY_MODES.map(function(item){return Object.assign({},item);}),
   summaryLayoutFor:summaryLayoutFor,summaryModeLabel:summaryModeLabel,summaryModeValue:summaryModeValue,
   relativePath:relativePath,summaryPlan:summaryPlan,buildSummary:buildSummary,
-  summaryBindingFor:summaryBindingFor,validateSummaryBinding:validateSummaryBinding};
+  summaryBindingFor:summaryBindingFor,validateSummaryBinding:validateSummaryBinding,
+  parseSummary:parseSummary,summaryReadRecord:summaryReadRecord,
+  summarySheetCount:summarySheetCount,summaryCountsText:summaryCountsText};
 }));

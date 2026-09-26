@@ -86,26 +86,31 @@
    note:'',coverageConfirmed:false,confirmedAt:null};
  }
  // 品牌单一来源：询价表、拆分文件都只能从这里取品牌，不允许另行填写或改写。
+ // 多值映射：同一材料行可被多个品牌分配覆盖（分别询价/按品牌分表），这里保留全部而不是后来覆盖前面。
  function brandMap(data){
   var map={};
   ((data&&data.assignments)||[]).forEach(function(assignment){
    (assignment.rowIds||[]).forEach(function(rowId){
-    map[rowId]={assignmentId:assignment.assignmentId,categoryId:assignment.categoryId,
-     brand:text(assignment.brand),supplier:text(assignment.supplier),note:text(assignment.note)};
+    (map[rowId]=map[rowId]||[]).push({assignmentId:assignment.assignmentId,categoryId:assignment.categoryId,
+     brand:text(assignment.brand),supplier:text(assignment.supplier),note:text(assignment.note)});
    });
   });
   return map;
  }
- function brandForRow(data,rowId){return brandMap(data)[rowId]||null;}
+ function brandForRow(data,rowId){var found=brandMap(data)[rowId];return found&&found.length?found:null;}
  // 询价表按行取品牌时用这里：没有品牌就等于没有联动，必须报错而不是留空。
  function requireBrands(data,expectedRowIds){
   var map=brandMap(data);
   return (expectedRowIds||[]).map(function(rowId){
    var found=map[rowId];
-   if(!found)throw Error('材料行没有对应的品牌分配：'+String(rowId));
-   if(!found.brand)throw Error('材料行还没有填写品牌：'+String(rowId));
-   return {rowId:rowId,brand:found.brand,supplier:found.supplier,categoryId:found.categoryId,
-    assignmentId:found.assignmentId};
+   if(!found||!found.length)throw Error('材料行没有对应的品牌分配：'+String(rowId));
+   // 显式携带该行适用的全部品牌/供应商组：分别生成取当前组、合成列出全部组，不再被最后一组覆盖。
+   var groups=found.map(function(item){
+    if(!item.brand)throw Error('材料行还没有填写品牌：'+String(rowId));
+    return {brand:item.brand,supplier:item.supplier,assignmentId:item.assignmentId};});
+   return {rowId:rowId,categoryId:found[0].categoryId,brand:groups[0].brand,supplier:groups[0].supplier,
+    assignmentId:groups[0].assignmentId,groups:groups,
+    assignmentIds:found.map(function(item){return item.assignmentId;})};
   });
  }
  function setCoverageMode(data,mode){

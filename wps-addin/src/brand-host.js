@@ -48,8 +48,25 @@
  }
 // 生成沿用内部清单已验证的独占发布路径：不覆盖已有文件、写入后重开逐值校验。
 function write(app,workbook,stagePath){return host.write(app,workbook,stagePath);}
- // R7：分类汇总表按同一独占发布路径写入（暂存必须落在最终目录的相邻位置，名称超链接才能用相对地址）。
- function summaryWrite(app,workbook,stagePath){return host.write(app,workbook,stagePath);}
+ // R8：读取用户填写后的分类汇总表。优先复用WPS里已打开的同路径工作簿（含未保存的最新填写），
+ // 未打开时以只读方式打开、读完后关闭；解析与校验全部交给模型，错误定位到具体单元格。
+ function readSummary(app,binding){
+  if(!app||typeof app.Workbooks!=='object')throw Error('读取分类汇总表需要连接WPS。');
+  var check=model.validateSummaryBinding(binding);
+  if(!check.ok)throw Error('分类汇总表绑定无效：'+check.errors.join('；'));
+  var handle=openBook(app,binding.path),opened=null;
+  try{
+   opened=handle.book;
+   var sheet=sheetOf(opened,binding.sheet);
+   if(!sheet)throw Error('分类汇总表缺少工作表“'+binding.sheet+'”，请用插件重新生成后再填写。');
+   var parsed=model.parseSummary(valuesOf(sheet),binding);
+   return Object.assign({path:binding.path,sheet:binding.sheet,inputKey:binding.inputKey},parsed);
+  } finally {
+   if(handle.opened)try{opened.Close(false);}catch(_){}
+  }
+ }
+// R7：分类汇总表按同一独占发布路径写入（暂存必须落在最终目录的相邻位置，名称超链接才能用相对地址）。
+function summaryWrite(app,workbook,stagePath){return host.write(app,workbook,stagePath);}
  // 汇总表生成后打开供填写：优先复用已打开的同路径工作簿，未打开则以可编辑方式打开并恢复宏安全值。
  function openSummary(app,filePath){
   if(!/^(?:[a-z]:[\\/]|\\\\)/i.test(String(filePath||''))||!/^.+\.xlsx$/i.test(String(filePath||'')))
@@ -75,5 +92,5 @@ function write(app,workbook,stagePath){return host.write(app,workbook,stagePath)
   return {path:filePath,opened:true,reused:false};
  }
  return {read:read,write:write,selectTarget:host.selectTarget,valuesOf:valuesOf,
-  summaryWrite:summaryWrite,openSummary:openSummary};
+  readSummary:readSummary,summaryWrite:summaryWrite,openSummary:openSummary};
 }));

@@ -77,6 +77,7 @@
     project.reviewDraft=reviewDraft;
     project.categories=options.getCategories?options.getCategories()||null:null;
     project.summary=options.getSummary?options.getSummary()||null:null;
+    project.brands=options.getBrands?options.getBrands()||null:null;
     project.classification=options.getClassification?options.getClassification():null;
     project.assignments=options.getAssignments?options.getAssignments():null;
     project.header=options.getHeader?options.getHeader():null;
@@ -93,6 +94,7 @@
     if(options.restoreReviewDraft)options.restoreReviewDraft(reviewDraft);
     if(options.restoreCategories)options.restoreCategories(project.categories||null);
     if(options.restoreSummary)options.restoreSummary(project.summary||null);
+    if(options.restoreBrands)options.restoreBrands(project.brands||null);
     if(options.restoreAssignments)options.restoreAssignments(project.assignments||null);
     if(options.restoreHeader)options.restoreHeader(project.header||null);
     if(options.restoreGeneration)options.restoreGeneration(project.generation||null);

@@ -58,3 +58,31 @@ test('R7：汇总表写入沿用独占发布路径，打开支持复用已打开
  assert.deepEqual(opened,{path:target.FullName,opened:true,reused:true});
  assert.equal(target.activated,true,'同名已打开工作簿直接复用并置前');
 });
+test('R8：读回分类汇总表，复用已打开工作簿、未打开则只读打开后关闭，解析成品牌口径',()=>{
+ const root='C:\\out\\示例园区';
+ const categories=[{categoryId:'pump',categoryName:'水泵',rowCount:2,path:root+'\\分类工作簿\\水泵.xlsx'},
+  {categoryId:'valve',categoryName:'阀门',rowCount:2,path:root+'\\分类工作簿\\阀门.xlsx'}];
+ const plan=model.summaryPlan(categories,{directory:root,inputKey:'ck2-host',layout:'separated',projectName:'示例园区'});
+ const workbook=model.buildSummary(plan,{});
+ const spec=model.summaryLayoutFor('separated');
+ const grid=workbook.sheets[0].values.map(row=>row.slice());
+ grid[spec.firstRow-1][3]='青源';grid[spec.firstRow-1][4]='华川设备';
+ grid[spec.firstRow-1][5]='恒流';grid[spec.firstRow-1][6]='启明机电';
+ grid[spec.firstRow-1][spec.modeColumn-1]='按品牌分别生成';
+ grid[spec.firstRow][3]='通达';grid[spec.firstRow][4]='正通商贸';grid[spec.firstRow][spec.modeColumn-1]='合成一份';
+ const binding=model.summaryBindingFor(root+'\\分类汇总表.xlsx',workbook);
+ const open=book(binding.path,[sheet('分类汇总表',grid)]);
+ const result=host.readSummary(app([open]),binding);
+ assert.equal(result.ok,true,(result.issues[0]||{}).message);
+ assert.equal(result.expectedSheets,3,'水泵2份＋阀门1份');
+ assert.deepEqual(result.categories.map(item=>[item.categoryId,item.mode,item.groups.map(entry=>entry.brand)]),
+  [['pump','per-brand',['青源','恒流']],['valve','synthesize',['通达']]]);
+ assert.equal(open._closed,false,'已打开的用户工作簿不得被关闭');
+ const stored=book(binding.path,[sheet('分类汇总表',grid)]);
+ const application={Workbooks:{Count:0,Item(){return null;},Open(path){
+  return stored.FullName.toLowerCase()===String(path).toLowerCase()?stored:null;}}};
+ assert.equal(host.readSummary(application,binding).ok,true);
+ assert.equal(stored._closed,true,'插件自己打开的只读汇总表必须关闭');
+ assert.throws(()=>host.readSummary(app([]),binding),/未返回指定品牌表/);
+ assert.throws(()=>host.readSummary(app([open]),Object.assign({},binding,{schemaVersion:7})),/绑定无效/);
+});
