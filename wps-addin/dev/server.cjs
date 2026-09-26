@@ -155,7 +155,8 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
       return reply(200, '<!doctype html><html><head><meta charset="utf-8"></head><body>' +
         '<script src="/main.js"></script>' + probe + '</body></html>', TYPES['.html']);
     }
-    const isProbeScript = probeConfig && ['/dev/host-probe.js','/dev/pane-diagnostics.js'].includes(url.pathname);
+    const isProbeScript = probeConfig &&
+      ['/dev/host-probe.js','/dev/pane-diagnostics.js','/dev/acceptance-probe.js'].includes(url.pathname);
     if (!ASSETS.has(url.pathname) && !isProbeScript) return reply(404, 'Not found');
     try {
       let content = await fs.readFile(path.join(root, url.pathname.slice(1)));
@@ -164,7 +165,8 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
       }
       if (probeConfig && url.pathname === '/taskpane.html') {
         const token = JSON.stringify(probeConfig.token);
-        content = content.toString('utf8').replace('</body>', '<script>window.__RFQ_PANE_PROBE__={token:' + token + '};</script><script src="/dev/pane-diagnostics.js"></script></body>');
+        content = content.toString('utf8').replace('</body>', '<script>window.__RFQ_PANE_PROBE__={token:' + token + '};</script>' +
+          '<script src="/dev/pane-diagnostics.js"></script><script src="/dev/acceptance-probe.js"></script></body>');
       }
       return reply(200, content, TYPES[path.extname(url.pathname)] || 'application/octet-stream');
     } catch (_) { return reply(404, 'Not found'); }
