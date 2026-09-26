@@ -43,7 +43,9 @@
    fields:result.rows.map(function(row){
     return {rowId:row.rowId,index:String(row.index),name:row.name,feature:row.feature,unit:row.unit,
      quantity:row.quantity,code:row.code,autoCategoryName:model.autoLabel(row),
-     autoCategoryId:row.autoCategoryId==null?null:String(row.autoCategoryId)};}),
+     autoCategoryId:row.autoCategoryId==null?null:String(row.autoCategoryId),
+     // R6分类工作簿需要按rowId取来源边界与来源标识；只进内部绑定，不增加公开列。
+     scopeId:text(row.scopeId),sourceIds:((row.sourceIds||[]).map(function(id){return text(id);}))};}),
    inputKey:input.inputKey?String(input.inputKey):null,
    title:input.title?String(input.title):null,
    generatedAt:input.generatedAt?String(input.generatedAt):null};

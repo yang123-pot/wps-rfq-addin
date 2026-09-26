@@ -6,12 +6,14 @@ function createExportStore({directory}){
  const tickets=new Map(),root=path.resolve(directory);
  async function prepare(target,options){
   if(typeof target!=='string'||target.length>4096||!path.isAbsolute(target)||path.extname(target).toLowerCase()!=='.xlsx'||/[<>:"|?*]|[. ]$/.test(path.basename(target)))throw Error('请选择有效的新xlsx绝对路径。');
+  const settings=options&&typeof options==='object'?options:{};
+  // R6：分类工作簿目录（成果批次/分类工作簿）由插件创建，只在显式要求且目标不存在时才建目录。
+  if(settings.createParent===true)await fs.mkdir(path.dirname(target),{recursive:true});
   const parent=await fs.realpath(path.dirname(target)),destination=path.join(parent,path.basename(target));
   if(!(await fs.stat(parent)).isDirectory())throw Error('保存目录不存在。');
   await absent(destination);
   for(const [id,entry] of tickets)if(Date.now()-entry.created>3600000)tickets.delete(id);
   if(tickets.size>=100)throw Error('另存会话过多，请重启开发服务后重试。');
-  const settings=options&&typeof options==='object'?options:{};
   // 带相对超链接的汇总表必须在最终目录里的唯一相邻暂存生成，否则地址基准会落在中心暂存目录，整目录搬移后链接失效。
   const adjacent=settings.adjacent===true;
   let stagePath;
@@ -58,6 +60,18 @@ function createExportStore({directory}){
   if(digest(await fs.readFile(entry.target))!==sha256)throw Error('已另存文件发生变化，未写入分类列。');
   return {target:entry.target,sha256:entry.result.sha256};
  }
- return {prepare,commit,verify};
+ // 重启后按记录SHA核对已经发布的文件：不依赖内存票据，已发布未记账（needs-verification）也用同一入口。
+ async function inspect(target,expected){
+  if(typeof target!=='string'||target.length>4096||!path.isAbsolute(target)||path.extname(target).toLowerCase()!=='.xlsx')
+   throw Error('请提供有效的xlsx绝对路径。');
+  let info;try{info=await fs.lstat(target);}
+  catch(e){if(e.code==='ENOENT')return {target,exists:false,sha256:null,bytes:0,matches:false};throw e;}
+  if(!info.isFile())throw Error('目标不是文件，未核对。');
+  if(info.size>256*1024*1024)throw Error('目标文件过大，未核对。');
+  const bytes=await fs.readFile(target),sha256=digest(bytes);
+  return {target,exists:true,sha256,bytes:bytes.length,
+   matches:typeof expected==='string'&&expected?sha256===expected.toLowerCase():null};
+ }
+ return {prepare,commit,verify,inspect};
 }
 module.exports={createExportStore};

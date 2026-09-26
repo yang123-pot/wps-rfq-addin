@@ -21,6 +21,8 @@
       getReviewBinding:function(){return reviewBinding;},
       restoreReviewBinding:function(value){reviewBinding=value||null;return reviewBinding;},
       setReviewBinding:function(value){reviewBinding=value||null;},
+      getCategories:function(){return categoryReceipt;},
+      restoreCategories:function(value){categoryReceipt=value||null;return categoryReceipt;},
       getClassificationRows:function(){return classifier.rows();},
       afterRestore:function(){render();},
       restoreClassification:function(value){classifier.restore(value);},
@@ -60,7 +62,7 @@
         review:fresh?{ready:true,detail:'整表已确认并保存快照（'+confirmation.rows.length+' 行）',rows:confirmation.rows}
           :{ready:false,detail:matched?(draft?('审核草稿已保存（'+draft.counts.filled+' / '+draft.counts.rows+' 行已填），尚未整表确认')
             :'尚未完成整表审核确认'):'尚未生成自动分类建议'},
-        categories:{ready:false,detail:'分类工作簿将在下一个开发包生成'}};
+        categories:categoryVerdict()};
     }
     function brandContext(){
       var preview=collection.entries.length?RfqCollection.preview(collection,merge.checked):null,verdicts=stageVerdicts();
@@ -167,7 +169,7 @@
       if(!collection.entries.length){
         exporter.refresh({canFinalize:false});classifier.refresh({groups:[]});
         if(workflow)workflow.setStats({files:0,rows:0,mergedRows:0});
-        if(brandPanel)brandPanel.refresh();return;
+        if(brandPanel)brandPanel.refresh();renderCategories();return;
       }
       var result=RfqCollection.preview(collection,merge.checked),pages=Math.max(1,Math.ceil(result.groups.length/20));page=Math.min(page,pages-1);
       var mergeConfirmed=mergeConfirmedKey===RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,groups:result.groups});
@@ -178,6 +180,7 @@
       reviewModel=mergeConfirmed?buildReview():null;
       renderReview();
       renderSheetReview();
+      renderCategories();
       if(workflow){
         workflow.setStats({files:collection.entries.length,rows:result.inputCount,mergedRows:result.outputCount});
         var report=RfqProject.assess(brandContext());
@@ -540,6 +543,10 @@
         else
           sheetTell('整表已确认并保存快照；分类习惯未保存，可点“习惯保存重试”：'+learned.error.message,'true');
         if(workflow)workflow.goTo('categories');
+        // 图03主按钮“审核完成，生成分类工作簿”：确认快照落盘后才按新快照生成独立分类工作簿。
+        generateCategoryWorkbooks({auto:true}).catch(function(error){
+          categoryTell('分类工作簿未生成：'+error.message,true);
+        });
       }catch(error){sheetTell('整表确认未完成：'+error.message,true);}
       finally{sheetReviewBusy=false;renderSheetReview();}
     }
@@ -553,6 +560,314 @@
         renderSheetReview();
         sheetTell(ok?'分类习惯已保存。':'分类习惯仍未保存，可再次重试。',!ok);
       });
+    });
+    // R6：独立分类工作簿。按整表确认快照的categoryId分组、排除无需询价，先预检全部目标（含非法名称/重名/已存在），
+    // 再逐份写入→重开核→独占发布→记录SHA/状态；局部成功不显示全部完成，重试只处理未完成。
+    var categoryReceipt=null,categoryPlan=null,categoryIssues=[],categoryBusy=false,categoryBlocked=null;
+    function categoryEl(id){return document.getElementById(id);}
+    function categoryTell(text,error){var box=categoryEl('categories-message');if(box){box.textContent=text;box.className=error?'error':'';}}
+    function pad2(value){return (value<10?'0':'')+value;}
+    function stampText(){
+      var now=new Date();
+      return String(now.getFullYear())+pad2(now.getMonth()+1)+pad2(now.getDate())+'-'+
+        pad2(now.getHours())+pad2(now.getMinutes())+pad2(now.getSeconds());
+    }
+    function newBatchRoot(base){
+      return base+'\\'+RfqCategoryWorkbooks.safeName(projectDisplayName())+'_'+stampText()+'_'+
+        Math.random().toString(16).slice(2,8);
+    }
+    function selectedLayout(){
+      var select=categoryEl('categories-layout');
+      return select&&select.value?select.value:'separated';
+    }
+    function findCategoryFile(receipt,name){
+      var found=((receipt&&receipt.files)||[]).filter(function(item){return item&&item.name===name;});
+      return found.length?found[0]:null;
+    }
+    // 分类工作簿阶段只认“本次整表确认”的结果：成果表换新、确认版本变化都要重新生成（不覆盖旧批次）。
+    function categoryVerdict(){
+      if(!reviewFresh())return {ready:false,detail:'尚未完成整表审核确认'};
+      if(!categoryReceipt)return {ready:false,detail:'尚未生成分类工作簿'};
+      if(categoryReceipt.inputKey!==matchingKey())
+        return {ready:false,detail:'分类工作簿绑定的是旧内容：请重新生成审核成果表并整表确认后再生成'};
+      var confirmation=reviewConfirmation(),summary=RfqCategoryWorkbooks.summarize(categoryReceipt);
+      if(!categoryReceipt.files.length)return {ready:true,detail:'全部为无需询价，无待输出的分类工作簿'};
+      if(Number(categoryReceipt.reviewRevision)!==Number(confirmation.revision))
+        return {ready:false,detail:'整表确认已更新（第'+(confirmation?confirmation.revision:'?')+'次），需要重新生成分类工作簿'};
+      if(summary.status!=='complete')
+        return {ready:false,detail:'已生成 '+summary.generated+' / '+summary.categories+' 份，尚未全部通过校验'};
+      return {ready:true,detail:'分类工作簿已生成并校验（'+summary.categories+' 份）'};
+    }
+    function categoryFileLine(file){
+      var li=node('li');
+      li.appendChild(node('strong',file.name));
+      li.appendChild(node('p',file.categoryName+' · '+file.rowCount+' 行 · '+
+        (file.status==='succeeded'?'已生成并校验'+(file.sha256?'（SHA '+file.sha256.slice(0,12)+'…）':'')
+          :(file.status==='needs-verification'?'待核对：文件被外部修改，未覆盖'
+            :(file.status==='failed'?'未生成：'+(file.error||'未知原因'):'尚未生成'))),'note'));
+      if(file.status==='succeeded'&&options.application){
+        li.appendChild(button('打开该分类工作簿',function(){
+          try{
+            RfqCategoryWorkbooks.openForEditing(options.application,file.path);
+            categoryTell('已打开分类工作簿：'+file.path);
+          }catch(error){categoryTell('分类工作簿未打开：'+error.message,true);}
+        }));
+      }
+      return li;
+    }
+    function renderCategories(){
+      var banner=categoryEl('categories-banner'),progress=categoryEl('categories-progress'),stats=categoryEl('categories-stats'),
+        status=categoryEl('categories-status'),list=categoryEl('categories-files'),generate=categoryEl('categories-generate'),
+        retry=categoryEl('categories-retry'),rebuild=categoryEl('categories-rebuild'),layout=categoryEl('categories-layout'),
+        summary=categoryEl('categories-summary'),issues=categoryEl('categories-issues');
+      if(!banner)return;
+      var confirmation=reviewConfirmation(),ready=!!reviewBinding&&selectionConfirmed(),fresh=reviewFresh();
+      var verdict=categoryVerdict(),record=categoryReceipt;
+      var counts=(record&&record.counts)||{},report=RfqCategoryWorkbooks.summarize(record);
+      var generatedFiles=(record&&record.files)||[];
+      if(!ready||!fresh){
+        banner.textContent=ready?'整表确认已更新':'尚未完成整表审核确认';
+        banner.className='result-banner';
+        progress.textContent='当前进度 4 / 7 · 等待第3步整表确认';
+        stats.textContent=ready?'请先在“表内审核”重新整表确认，再生成分类工作簿。'
+          :'确认合并选择、生成审核成果表并整表确认后，才能生成分类工作簿。';
+        status.textContent='';
+      }else if(!record){
+        banner.textContent='尚未生成分类工作簿';
+        banner.className='result-banner';
+        progress.textContent='当前进度 4 / 7 · 整表已确认（'+(confirmation?confirmation.rows.length:0)+' 行），等待生成分类工作簿';
+        stats.textContent='每个询价类别一个独立.xlsx；无需询价行只保留在审核成果表中。';
+        status.textContent=reviewBinding?('成果批次目录：'+RfqCategoryWorkbooks.rootOf(reviewBinding.path)+' · 分类工作簿子目录：'+
+          RfqCategoryWorkbooks.batchDirectory(reviewBinding.path)):'';
+      }else if(record.inputKey!==matchingKey()||Number(record.reviewRevision)!==Number(confirmation?confirmation.revision:NaN)){
+        banner.textContent='分类工作簿已过期';
+        banner.className='result-banner';
+        progress.textContent='当前进度 4 / 7 · 清单、合并选择或整表确认已变化，需要重新生成分类工作簿';
+        stats.textContent='上次生成 '+report.generated+' 份（'+(record.directory||'未记录目录')+'），不再作为当前依据。';
+        status.textContent='旧文件保留且不覆盖；重新生成会创建新的成果批次目录。';
+      }else if(!record.files.length){
+        banner.textContent='无需输出分类工作簿';
+        banner.className='result-banner is-done';
+        progress.textContent='当前进度 4 / 7 · 全部为无需询价（'+counts.totalRows+' 行），没有待输出的分类工作簿';
+        stats.textContent='无需询价保留在审核成果表中；不会生成空品牌表或空供应商文件。';
+        status.textContent=record.createdAt?('确认时间：'+record.createdAt):'';
+      }else if(report.status==='complete'){
+        banner.textContent=report.text;
+        banner.className='result-banner is-done';
+        progress.textContent='当前进度 4 / 7 · 已生成并校验 '+report.categories+' 份分类工作簿';
+        stats.textContent=report.detail+' · 无需询价保留在审核成果表。';
+        status.textContent='实际目录：'+record.directory;
+      }else{
+        banner.textContent='已生成 '+report.generated+' / '+report.categories+' 份分类工作簿';
+        banner.className='result-banner';
+        progress.textContent='当前进度 4 / 7 · 分类工作簿尚未全部通过校验';
+        stats.textContent=report.detail+' · 未完成 '+report.pending+' 份，可重试未完成文件。';
+        status.textContent=record.directory?('实际目录：'+record.directory):'';
+      }
+      if(list){
+        list.textContent='';
+        generatedFiles.forEach(function(file){list.appendChild(categoryFileLine(file));});
+      }
+      if(issues){
+        issues.textContent='';
+        (categoryIssues||[]).slice(0,12).forEach(function(item){
+          var li=node('li');
+          li.appendChild(node('strong',item.title||'生成问题'));
+          li.appendChild(node('p',item.message,'note'));
+          issues.appendChild(li);
+        });
+      }
+      if(generate){
+        generate.disabled=categoryBusy||!ready||!fresh||!options.application;
+        generate.textContent=record&&record.files.length?'重新生成分类工作簿（新批次）':'生成分类工作簿';
+      }
+      if(retry)retry.hidden=!(record&&record.files.length&&report.status!=='complete');
+      if(retry)retry.disabled=categoryBusy||!options.application;
+      if(rebuild)rebuild.hidden=!(categoryBlocked&&categoryBlocked.length);
+      // 只有“本次整表确认对应的分类工作簿全部核实通过”才解锁布局与生成汇总；过期批次不得解锁。
+      var unlocked=!!record&&report.status==='complete'&&verdict.ready===true;
+      if(layout){layout.disabled=!unlocked;if(record&&record.layout)layout.value=record.layout;}
+      if(summary)summary.disabled=!unlocked;
+      if(status&&!verdict.ready&&verdict.detail)status.textContent=(status.textContent?status.textContent+' · ':'')+verdict.detail;
+    }
+    function categoryIssueText(list){
+      return (list||[]).map(function(item){return item.title+'：'+item.message;}).join('；');
+    }
+    async function persistCategories(message,error){
+      var receipt=await projects.save();
+      if(!receipt){categoryTell(message+(projects.lastError&&projects.lastError()?('（项目记录未保存：'+projects.lastError().message+'）'):''),true);return null;}
+      if(error)categoryTell(message,true);
+      return receipt;
+    }
+    async function generateCategoryWorkbooks(opts){
+      var input=opts||{};
+      if(categoryBusy)return {ok:false,busy:true};
+      if(!options.application){categoryTell('请在WPS内打开侧栏，才能生成分类工作簿。',true);return {ok:false};}
+      var confirmation=reviewConfirmation();
+      if(!reviewFresh()||!confirmation){categoryTell('请先在“表内审核”完成整表确认，再生成分类工作簿。',true);renderCategories();return {ok:false};}
+      if(!reviewBinding||!reviewBinding.path){categoryTell('缺少审核成果表绑定，请重新生成审核成果表后整表确认。',true);return {ok:false};}
+      categoryBlocked=null;
+      var base=RfqCategoryWorkbooks.rootOf(reviewBinding.path);
+      // 首次生成用成果表所在目录（图04：项目名/分类工作簿）；同一版整表确认的续作沿用已记录批次；
+      // 重新生成或整表确认有变化时另建批次目录，不覆盖已生成的分类工作簿与已填汇总。
+      var continuing=!input.force&&categoryReceipt&&categoryReceipt.inputKey===matchingKey()&&categoryReceipt.root&&
+        Number(categoryReceipt.reviewRevision)===Number(confirmation.revision);
+      var root=continuing?categoryReceipt.root:base,plan=null;
+      if(!continuing){
+        try{
+          var probe=RfqCategoryWorkbooks.plan(confirmation,{binding:reviewBinding,
+            directory:RfqCategoryWorkbooks.batchDirectory(reviewBinding.path),inputKey:matchingKey(),root:base});
+          for(var index=0;index<probe.files.length;index++){
+            var check=await exportRequest('inspect',{target:probe.files[index].path});
+            if(check.exists){root=newBatchRoot(base);break;}
+          }
+        }catch(error){/* 预检问题留给正式plan报出 */ }
+      }
+      try{
+        plan=RfqCategoryWorkbooks.plan(confirmation,{binding:reviewBinding,
+          directory:RfqCategoryWorkbooks.workbookDirectory(root),inputKey:matchingKey(),root:root,
+          batchId:continuing?(categoryReceipt&&categoryReceipt.batchId)||null:RfqProject.newId()});
+      }catch(error){categoryTell('分类工作簿未生成：'+error.message,true);renderCategories();return {ok:false};}
+      categoryPlan=plan;categoryIssues=plan.issues.slice();renderCategories();
+      if(!plan.ok){categoryTell('分类工作簿未生成：'+categoryIssueText(plan.issues),true);return {ok:false};}
+      if(!plan.files.length){
+        categoryReceipt=RfqCategoryWorkbooks.receipt(plan,{layout:selectedLayout()});
+        categoryReceipt.status='empty';categoryReceipt.reviewRevision=confirmation.revision;
+        await persistCategories('本次全部为无需询价，无待输出的分类工作簿。');
+        renderCategories();render();
+        return {ok:true,empty:true,receipt:categoryReceipt};
+      }
+      categoryBusy=true;renderCategories();
+      var receipt=(categoryReceipt&&categoryReceipt.inputKey===matchingKey()&&categoryReceipt.root===plan.root)?
+        categoryReceipt:RfqCategoryWorkbooks.receipt(plan,{layout:selectedLayout()});
+      var entriesByName={};
+      plan.files.forEach(function(entry){entriesByName[entry.file]=entry;});
+      receipt.layout=selectedLayout();receipt.reviewRevision=confirmation.revision;receipt.root=plan.root;
+      receipt.directory=plan.directory;
+      receipt.files.forEach(function(file){
+        var previous=findCategoryFile(categoryReceipt,file.name);
+        // 只有同一批次、同一路径的已成功文件才按记录SHA跳过；换批次不能沿用旧批次的状态。
+        if(previous&&previous.path===file.path&&previous.sha256&&previous.status==='succeeded'){
+          file.sha256=previous.sha256;file.bytes=previous.bytes;file.status='succeeded';
+        }
+      });
+      categoryReceipt=receipt;
+      try{
+        // 1) 已成功的文件按记录SHA核对：通过则跳过，被外部改写时拒绝覆盖。
+        var pending=[],blocked=[];
+        for(index=0;index<receipt.files.length;index++){
+          var record=receipt.files[index];
+          if(record.status==='succeeded'){
+            try{
+              var actual=await exportRequest('inspect',{target:record.path,sha256:record.sha256});
+              if(actual.matches){record.bytes=actual.bytes;continue;}
+              record.status='needs-verification';
+              record.error=actual.exists?'文件已被外部修改，未覆盖':'文件已不存在';
+              blocked.push({file:record,error:record.error});
+              continue;
+            }catch(error){
+              record.status='needs-verification';record.error=error.message;
+              blocked.push({file:record,error:error.message});continue;
+            }
+          }
+          pending.push(record);
+        }
+        if(blocked.length){
+          categoryBlocked=blocked;
+          receipt.updatedAt=new Date().toISOString();receipt.status=RfqCategoryWorkbooks.statusOf(receipt);
+          await persistCategories('分类工作簿未全部生成：'+categoryIssueText(blocked.map(function(item){
+            return {title:item.file.name,message:item.error};})),true);
+          renderCategories();render();
+          return {ok:false,blocked:blocked};
+        }
+        // 2) 先预检全部目标（目标是否存在、文件名是否合法、目录是否可用），全部通过才写第一份。
+        var tickets=[];
+        for(index=0;index<pending.length;index++){
+          try{
+            var prepared=await exportRequest('prepare',{target:pending[index].path,createParent:true});
+            tickets.push({file:pending[index],ticket:prepared.ticket,stagePath:prepared.stagePath});
+          }catch(error){
+            blocked.push({file:pending[index],error:error.message});
+          }
+        }
+        if(blocked.length){
+          categoryBlocked=blocked;categoryIssues=categoryIssues.concat(blocked.map(function(item){
+            return {code:'target-blocked',title:'目标不可用：'+item.file.name,message:item.error};}));
+          categoryTell('分类工作簿未生成（先检查全部目标，未写任何文件）：'+categoryIssueText(blocked.map(function(item){
+            return {title:item.file.name,message:item.error};})),true);
+          renderCategories();render();
+          return {ok:false,blocked:blocked};
+        }
+        // 3) 逐份写入→重开核→独占发布→记录SHA/状态；每份成功立即落盘回执。
+        var succeededBefore=receipt.files.filter(function(file){return file.status==='succeeded';}).length,
+          succeeded=0,failed=0;
+        for(index=0;index<tickets.length;index++){
+          var item=tickets[index];
+          try{
+            var entry=entriesByName[item.file.name];
+            if(!entry)throw Error('本次分组里找不到“'+item.file.name+'”的材料行，请重新生成分类工作簿。');
+            await RfqCategoryWorkbooks.write(options.application,entry,item.stagePath,{batchId:receipt.batchId});
+            var published=await exportRequest('commit',{ticket:item.ticket});
+            await exportRequest('verify',{ticket:item.ticket,target:published.target,sha256:published.sha256});
+            item.file.status='succeeded';item.file.sha256=published.sha256;item.file.bytes=published.bytes;item.file.error=null;
+            succeeded++;
+          }catch(error){
+            item.file.status='failed';item.file.error=error.message;failed++;
+          }
+          // 落盘前先按真实状态更新回执状态，避免侧栏显示“全部完成”时记录里还是未完成。
+          receipt.updatedAt=new Date().toISOString();receipt.status=RfqCategoryWorkbooks.statusOf(receipt);
+          if(succeeded>0||succeededBefore>0)await projects.save();
+          renderCategories();
+        }
+        receipt.status=RfqCategoryWorkbooks.statusOf(receipt);
+        categoryReceipt=receipt;
+        if(succeeded>0||succeededBefore>0)await projects.save();
+        // 4) 全部核实后才显示完成、真实目录、数量，并解锁布局选择与生成汇总。
+        if(receipt.status==='complete'){
+          var report=RfqCategoryWorkbooks.summarize(receipt),opened=[];
+          receipt.files.forEach(function(file){
+            try{RfqCategoryWorkbooks.openForEditing(options.application,file.path);opened.push(file.name);}catch(_){}
+          });
+          categoryTell('已生成并校验 '+report.categories+' 份分类工作簿（'+report.detail+'）：'+receipt.directory+
+            (opened.length?'。已打开：'+opened.join('、'):'。可在下方逐份打开。'));
+          renderCategories();render();
+          return {ok:true,receipt:receipt,plan:plan};
+        }
+        categoryTell('分类工作簿未全部生成：'+succeeded+' / '+receipt.files.length+' 份成功'+
+          (failed?'，'+failed+' 份失败':'')+'。可点“重试未完成文件”；已成功的文件按SHA跳过，原文件不变。',true);
+        renderCategories();render();
+        return {ok:false,receipt:receipt};
+      }catch(error){
+        categoryTell('分类工作簿未生成：'+error.message,true);
+        return {ok:false};
+      }finally{categoryBusy=false;renderCategories();}
+    }
+    var categoryGenerateButton=categoryEl('categories-generate'),categoryRetryButton=categoryEl('categories-retry'),
+      categoryRebuildButton=categoryEl('categories-rebuild'),categorySummaryButton=categoryEl('categories-summary'),
+      categoryLayoutSelect=categoryEl('categories-layout');
+    if(categoryGenerateButton)categoryGenerateButton.addEventListener('click',function(){
+      var regenerate=!!(categoryReceipt&&categoryReceipt.files.length);
+      if(regenerate&&!window.confirm('重新生成会创建新的成果批次目录，不会覆盖已生成的分类工作簿和已填汇总，是否继续？'))return;
+      generateCategoryWorkbooks(regenerate?{force:true}:{}).catch(function(error){
+        categoryTell('分类工作簿未生成：'+error.message,true);
+      });
+    });
+    if(categoryRetryButton)categoryRetryButton.addEventListener('click',function(){
+      generateCategoryWorkbooks({}).catch(function(error){categoryTell('分类工作簿重试失败：'+error.message,true);});
+    });
+    if(categoryRebuildButton)categoryRebuildButton.addEventListener('click',function(){
+      generateCategoryWorkbooks({force:true}).catch(function(error){categoryTell('分类工作簿未生成：'+error.message,true);});
+    });
+    if(categoryLayoutSelect)categoryLayoutSelect.addEventListener('change',function(){
+      if(categoryReceipt)categoryReceipt.layout=selectedLayout();
+      categoryTell('品牌填写布局已选择为“'+(selectedLayout()==='combined'?'品牌与供应商同格填写':'品牌、供应商分列')+
+        '”，将在生成分类汇总表时使用。');
+    });
+    if(categorySummaryButton)categorySummaryButton.addEventListener('click',function(){
+      var report=RfqCategoryWorkbooks.summarize(categoryReceipt);
+      categoryTell('分类工作簿已完成并校验（'+report.categories+' 份、'+report.detail+'），布局为“'+
+        (selectedLayout()==='combined'?'品牌与供应商同格填写':'品牌、供应商分列')+
+        '”。分类汇总表属于下一个开发包（R7）：本包只完成独立分类工作簿，未生成汇总表。',true);
     });
     picker.disabled=!options.application||!window.__RFQ_IMPORT__;
     if(options.application&&!window.__RFQ_IMPORT__)tell('多文件导入需要启动最新开发服务并重新打开侧栏。');
