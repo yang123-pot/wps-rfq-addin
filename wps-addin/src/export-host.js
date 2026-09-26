@@ -46,6 +46,7 @@
     spec.columns.forEach(function(column){
       var target=sheet.Columns.Item(column.index);
       if(column.width!=null)target.ColumnWidth=column.width;
+      if(column.hidden===true)target.Hidden=true;
     });
     (spec.rows||[]).forEach(function(row){sheet.Rows.Item(row.index).RowHeight=row.height;});
     (spec.headerRows||[]).forEach(function(row){sheet.Rows.Item(row).Font.Bold=true;});
@@ -109,6 +110,8 @@
         var actual=sheet.Columns.Item(column.index).ColumnWidth;
         if(Number(actual)!==Number(column.width))
           throw Error('“'+s.name+'”列宽读回不一致：第'+column.index+'列期望'+column.width+'，实际'+String(actual));
+        if(column.hidden===true&&sheet.Columns.Item(column.index).Hidden!==true)
+          throw Error('“'+s.name+'”隐藏辅助列未生效：第'+column.index+'列');
       });
       (spec.merges||[]).forEach(function(merge){
         var range=sheet.Range(address(merge));

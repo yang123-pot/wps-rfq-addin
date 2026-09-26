@@ -51,6 +51,9 @@
   function stepPanel(step){
    if(step.id==='import')return importPanel;
    if(panels[step.id])return panels[step.id];
+   // 页面里已经声明过的阶段面板（例如R4的自动分类面板）直接复用，不再生成占位内容。
+   var declared=document.getElementById('stage-panel-'+step.id);
+   if(declared){panels[step.id]=declared;return declared;}
    var panel=node('section',null,'stage-panel');
    panel.id='stage-panel-'+step.id;
    panel.setAttribute('aria-label',step.title);
@@ -110,6 +113,10 @@
   if(config.stageState)stageState=config.stageState;
   show();
   return {goTo:goTo,current:function(){return current;},
+   panel:function(stage){
+    var found=STEPS.filter(function(item){return item.id===stage;})[0];
+    return found?stepPanel(found):null;
+   },
    setStats:function(values){
     var next=values||{};
     ['files','rows','mergedRows'].forEach(function(key){if(next[key]!=null)stats[key]=Number(next[key])||0;});

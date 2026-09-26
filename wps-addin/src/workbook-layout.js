@@ -49,6 +49,7 @@
    var at='第'+(index+1)+'列';
    if(!isObject(column)||!integer(column.index)){errors.push(at+'缺少列号。');return;}
    if(column.width!=null&&(!Number.isFinite(column.width)||column.width<=0))errors.push(at+'列宽无效。');
+   if(column.hidden!=null&&typeof column.hidden!=='boolean')errors.push(at+'隐藏设置无效。');
    if(column.wrap!=null&&typeof column.wrap!=='boolean')errors.push(at+'自动换行设置无效。');
   });
   (layout.rows||[]).forEach(function(row){
@@ -112,7 +113,8 @@
   var layout={schemaVersion:SCHEMA_VERSION,fontSize:input.fontSize||FONT_SIZE,
    columns:(input.columns||[]).map(function(column,index){
     return {index:column.index||index+1,width:column.width==null?18:column.width,
-     wrap:column.wrap!==false,numberFormat:column.numberFormat||'@',title:column.title==null?'':String(column.title)};}),
+     wrap:column.wrap!==false,numberFormat:column.numberFormat||'@',hidden:column.hidden===true,
+     title:column.title==null?'':String(column.title)};}),
    rows:(input.rows||[]).map(function(row){return {index:row.index,height:row.height};}),
    headerRows:(input.headerRows||[]).slice(),freeze:input.freeze||null,
    merges:(input.merges||[]).map(function(merge){return Object.assign({rowSpan:1,columnSpan:1},merge);}),

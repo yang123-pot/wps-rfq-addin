@@ -59,6 +59,7 @@
   // matching/review/categories/brands/inquiry等v2对象；这些暂存字段不参与阶段判定。
   function collectFutureFields(project){
     project.mergeKey=options.getMergeConfirmation?options.getMergeConfirmation()||null:null;
+    project.matching=options.getReviewBinding?options.getReviewBinding()||null:null;
     project.classification=options.getClassification?options.getClassification():null;
     project.assignments=options.getAssignments?options.getAssignments():null;
     project.header=options.getHeader?options.getHeader():null;
@@ -68,6 +69,7 @@
   }
   function restoreFutureFields(project){
     if(options.restoreMergeConfirmation)options.restoreMergeConfirmation(project.mergeKey||null);
+    if(options.restoreReviewBinding)options.restoreReviewBinding(project.matching||null);
     if(options.restoreAssignments)options.restoreAssignments(project.assignments||null);
     if(options.restoreHeader)options.restoreHeader(project.header||null);
     if(options.restoreGeneration)options.restoreGeneration(project.generation||null);

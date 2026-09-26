@@ -15,7 +15,7 @@ const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.cs
   '/src/import-host.js', '/src/collection.js', '/src/import-ui.js', '/src/export-model.js',
   '/src/workbook-layout.js', '/src/workflow-ui.js', '/src/export-host.js', '/src/export-ui.js', '/src/project.js', '/src/project-ui.js',
   '/src/project-host.js', '/src/category-library.js', '/src/classify.js', '/src/classification.js',
-  '/src/classification-ui.js', '/src/category-memory.js', '/src/library-ui.js', '/rules/defaults.json',
+  '/src/classification-review-model.js', '/src/classification-review-host.js', '/src/classification-ui.js', '/src/category-memory.js', '/src/library-ui.js', '/rules/defaults.json',
   '/src/brand-table.js', '/src/brand-model.js', '/src/brand-host.js', '/src/brand-ui.js', '/src/decimal.js',
   '/src/brand-reference.js', '/src/inquiry-header.js', '/src/inquiry-model.js', '/src/split-plan.js',
   '/src/split-state.js', '/src/header-ui.js', '/src/inquiry-ui.js', '/src/split-ui.js',
@@ -57,7 +57,7 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         if(size>65536)return json(413,{error:'导入请求过大，请分批选择。'});
         let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'导入请求无效。'});}
         if(!data||Array.isArray(data))return json(400,{error:'导入请求无效。'});
-        if(url.pathname==='/api/export/prepare')return json(200,await exports.prepare(data.target));
+        if(url.pathname==='/api/export/prepare')return json(200,await exports.prepare(data.target,{adjacent:data.adjacent===true}));
         if(url.pathname==='/api/export/commit')return json(200,await exports.commit(data.ticket));
         if(url.pathname==='/api/export/verify')return json(200,await exports.verify(data.ticket,data.target,data.sha256));
         const files=await prepareFiles(data.paths,{directory:importDirectory,existing:data.existing});

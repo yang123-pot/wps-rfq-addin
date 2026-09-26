@@ -15,6 +15,9 @@
       mergeIdentical:function(){return merge.checked;},onBusy:function(value){busy=value;options.onBusy(value);}});
     var projects=RfqProjectUI.create({getCollection:function(){return collection;},mergeIdentical:function(){return merge.checked;},
       restore:function(project){return restoreProject(project);},getClassification:function(){return classifier.snapshot();},
+      getReviewBinding:function(){return reviewBinding;},
+      restoreReviewBinding:function(value){reviewBinding=value||null;return reviewBinding;},
+      setReviewBinding:function(value){reviewBinding=value||null;},
       getClassificationRows:function(){return classifier.rows();},
       afterRestore:function(){render();},
       restoreClassification:function(value){classifier.restore(value);},
@@ -47,8 +50,9 @@
       var rows=classifier.rows(),snapshot=classifier.snapshot(),decided={};
       ((snapshot&&snapshot.decisions)||[]).forEach(function(d){if(d&&d.rowId)decided[d.rowId]=true;});
       var pending=rows.filter(function(row){return !row||!decided[row.rowId];}).length;
+      var matched=!!reviewModel&&selectionConfirmed();
       return {
-        matching:rows.length?{ready:true,detail:'自动分类建议已生成，尚未人工确认'}
+        matching:matched?{ready:true,detail:'自动匹配完成，尚未人工确认'}
           :{ready:false,detail:'尚未生成自动分类建议'},
         review:rows.length?(pending?{ready:false,detail:'还有'+pending+'行未确认分类'}
           :{ready:true,detail:'分类已确认（过渡期沿用侧栏逐行确认）'})
@@ -157,6 +161,9 @@
       exporter.refresh(result);
       // R3：确认选择前不进入匹配——未确认时不给任何分类建议，避免越过“先选是否合并”。
       classifier.refresh(mergeConfirmed?result:{groups:[],inputCount:result.inputCount,outputCount:0,issues:[],canFinalize:false});
+      // R4：确认合并选择后跑自动分类，得出建议并准备成果表；这一步不确认也不学习。
+      reviewModel=mergeConfirmed?buildReview():null;
+      renderReview();
       if(workflow){
         workflow.setStats({files:collection.entries.length,rows:result.inputCount,mergedRows:result.outputCount});
         var report=RfqProject.assess(brandContext());
@@ -215,6 +222,122 @@
     });
     document.getElementById('merge-prev').addEventListener('click',function(){page--;render();});
     document.getElementById('merge-next').addEventListener('click',function(){page++;render();});
+    // R4：自动分类→审核成果表。只产出建议并把结果写进独立成果簿；不确认、不学习。
+    var reviewModel=null,reviewBinding=null,reviewBusy=false;
+    function reviewEl(id){return document.getElementById(id);}
+    function reviewTell(text,error){var box=reviewEl('classification-review-message');if(box){box.textContent=text;box.className=error?'error':'';}}
+    function currentLibrary(){return classifier.library?classifier.library():null;}
+    function mergeSelectionKey(){
+      var result=collection.entries.length?RfqCollection.preview(collection,merge.checked):null;
+      return RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,groups:result?result.groups:[]});
+    }
+    function matchingKey(){
+      var result=collection.entries.length?RfqCollection.preview(collection,merge.checked):null;
+      return RfqProject.contentKey({stage:'matching',collection:collection,mergeIdentical:merge.checked===true,
+        groups:result?result.groups:[]});
+    }
+    function selectionConfirmed(){return !!mergeConfirmedKey&&mergeConfirmedKey===mergeSelectionKey();}
+    function buildReview(){
+      var groups=classifier.groups?classifier.groups():[],source=currentLibrary();
+      if(!groups.length||!source||!source.categories||!source.categories.length)return null;
+      return RfqClassificationReviewModel.build(groups,{library:source,
+        memory:classifier.memory?classifier.memory():null,projectId:projects.identity()});
+    }
+    function renderReview(){
+      var banner=reviewEl('classification-review-banner'),stats=reviewEl('classification-review-stats'),status=reviewEl('classification-review-status'),
+        generate=reviewEl('classification-review-generate'),open=reviewEl('classification-review-open');
+      if(!banner)return;
+      var confirmed=selectionConfirmed();
+      if(!confirmed||!reviewModel){
+        reviewModel=null;
+        banner.textContent='尚未自动分类';
+        banner.className='result-banner';
+        if(stats)stats.textContent='确认合并选择后才会开始自动分类。';
+        if(status)status.textContent='';
+        if(generate)generate.disabled=true;
+        if(open)open.disabled=true;
+        return;
+      }
+      var summary=RfqClassificationReviewModel.summary(reviewModel);
+      banner.textContent='自动匹配完成';
+      banner.className='result-banner is-done';
+      if(stats)stats.textContent=summary.text+' · '+summary.detail+' · 尚未人工确认';
+      var fresh=reviewBinding&&reviewBinding.inputKey===matchingKey();
+      if(status)status.textContent=fresh?'成果表已生成：'+reviewBinding.path+'（可打开审核）'
+        :'尚未生成审核成果表：请先生成独立成果簿，再在表内审核。';
+      if(generate)generate.textContent=fresh?'重新生成审核成果表':'生成审核成果表';
+      if(generate)generate.disabled=reviewBusy||!options.application;
+      if(open)open.disabled=!(fresh&&options.application);
+    }
+    function exportRequest(action,data){
+      return fetch('/api/export/'+action,{method:'POST',
+        headers:{'content-type':'application/json','x-rfq-import-token':window.__RFQ_IMPORT__.token},
+        body:JSON.stringify(data)}).then(function(response){
+        return response.json().then(function(result){
+          if(!response.ok){var error=Error(result.error||'审核成果表请求失败。');error.status=response.status;throw error;}
+          return result;
+        });
+      });
+    }
+    function reviewTargetName(){
+      return RfqClassificationReviewHost.suggestedName(projectDisplayName());
+    }
+    // 项目名优先取清单里的“工程名称”（图02即示例园区），没有工程名时退回文件名。
+    function projectDisplayName(){
+      for(var index=0;index<collection.entries.length;index++){
+        var parsed=collection.entries[index].parsed||{},materials=parsed.materials||[];
+        for(var position=0;position<materials.length;position++){
+          var source=materials[position].source||{},engineering=String(source.engineering||'').trim();
+          if(engineering)return engineering;
+        }
+      }
+      return collection.entries.length?String(collection.entries[0].metadata.originalName).replace(/\.[^.]+$/,''):'未命名项目';
+    }
+    function pickReviewTarget(suggested){
+      return new Promise(function(resolve){
+        if(!window.__RFQ_IMPORT__||!RfqPathPicker)return resolve(null);
+        RfqPathPicker.open({mode:'save',token:window.__RFQ_IMPORT__.token,title:'选择成果表保存位置',
+          fileName:suggested,startPath:'',confirmLabel:'生成到此位置',
+          onConfirm:function(value){resolve(value&&value.target?value:null);},onCancel:function(){resolve(null);}});
+      });
+    }
+    async function generateReview(){
+      if(reviewBusy)return;
+      try{
+        if(!selectionConfirmed())throw Error('请先确认合并选择，再生成成果表。');
+        if(!reviewModel)reviewModel=buildReview();
+        if(!reviewModel)throw Error('自动分类还没有结果，请先完成分类库加载。');
+        var name=reviewTargetName(),selection=await pickReviewTarget(name);
+        if(!selection||!selection.target){tell('已取消选择成果表位置，当前阶段不变。');return;}
+        reviewBusy=true;renderReview();
+        reviewTell('正在写入并重新打开校验成果表…');
+        var prepared=await exportRequest('prepare',{target:selection.target,adjacent:true});
+        // 宿主写入通常同步完成；这里await一层，保证任何异步实现（含测试夹具）先落地再发布。
+        await RfqClassificationReviewHost.write(options.application,reviewModel,prepared.stagePath,{title:name});
+        var receipt=await exportRequest('commit',{ticket:prepared.ticket});
+        await exportRequest('verify',{ticket:prepared.ticket,target:receipt.target,sha256:receipt.sha256});
+        reviewBinding=RfqClassificationReviewHost.bindingFor(receipt,reviewModel,{inputKey:matchingKey(),title:name});
+        if(options.setReviewBinding)options.setReviewBinding(reviewBinding);
+        tell('审核成果表已生成：'+receipt.target);
+        try{
+          // 打开只是方便用户立刻编辑；打不开不代表生成失败，可稍后点“打开成果表审核”重试。
+          if(options.application)RfqClassificationReviewHost.openForEditing(options.application,receipt.target);
+          reviewTell('审核成果表已生成并校验：'+receipt.target+'。请在表内修改“最终分类”“审核备注”，完成后回到侧栏。');
+        }catch(openError){
+          reviewTell('审核成果表已生成并校验：'+receipt.target+'，但未能自动打开（'+openError.message+'）。可点“打开成果表审核”重试。');
+        }
+      }catch(error){reviewTell('审核成果表未生成。'+error.message,true);}
+      finally{reviewBusy=false;renderReview();}
+    }
+    var generateButton=reviewEl('classification-review-generate'),openButton=reviewEl('classification-review-open');
+    if(generateButton)generateButton.addEventListener('click',generateReview);
+    if(openButton)openButton.addEventListener('click',function(){
+      if(!reviewBinding){reviewTell('还没有生成审核成果表。',true);return;}
+      try{RfqClassificationReviewHost.openForEditing(options.application,reviewBinding.path);
+        reviewTell('已打开审核成果表：'+reviewBinding.path);}
+      catch(error){reviewTell('成果表未打开。'+error.message,true);}
+    });
+    if(options.restoreReviewBinding)reviewBinding=options.restoreReviewBinding()||null;
     picker.disabled=!options.application||!window.__RFQ_IMPORT__;
     if(options.application&&!window.__RFQ_IMPORT__)tell('多文件导入需要启动最新开发服务并重新打开侧栏。');
     // 导入主体：选路径的方式（系统对话框或侧栏内置选择器）不同，复制、读取、渲染完全一致。

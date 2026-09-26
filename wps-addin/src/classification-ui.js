@@ -264,6 +264,8 @@
    classification:function(){return state;},
    snapshot:function(){return state;},
    memory:function(){return memoryState;},
+    library:function(){return library;},
+    ensureLibrary:function(){return loadLibrary();},
    rows:function(){return groups.map(function(group){return {rowId:group.id||group.scopeId};});},
    groups:function(){return groups;},
    adopt:function(value){

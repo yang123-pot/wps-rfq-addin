@@ -1,5 +1,7 @@
 const assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs/promises'),os=require('node:os');
 const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs');
+const {createLibraryStore}=require('../dev/library-store.cjs');
+const sample=require('./fixtures/workflow-v3-sample.cjs');
 const DRAIN=[['工程名称：示例园区','','','',''],['项目编码','项目名称','项目特征描述','单位','工程量'],
  ['SB-001','水泵','DN50','台','1'],['SB-002','水泵','DN65','台','1'],['FM-001','阀门','DN50','个','20'],
  ['FM-002','阀门','DN65','个','12'],['GS-001','钢索','规格C','m','10']];
@@ -14,6 +16,9 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
  const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(root,'copies'),
   projectDirectory:path.join(root,'projects'),libraryDirectory:path.join(root,'library'),headerDirectory:path.join(root,'headers')});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
+  // 用隔离分类库，保证与图02一致：7行有建议＋1行冲突；不触碰生产defaults。
+  await createLibraryStore({directory:path.join(root,'library')})
+   .save({expectedRevision:0,library:sample.library,memory:sample.createMemory()});
  const browser=await chromium.launch({channel:'msedge',headless:true});
  try{
   const page=await browser.newPage({viewport:{width:380,height:900}}),errors=[];
@@ -90,15 +95,57 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次选择已确认'));
   assert.equal(await page.locator('#stage-panel-import').isHidden(),true,'确认后进入下一阶段');
   assert.equal(await page.locator('#stage-panel-matching').isHidden(),false);
-  assert.match(await page.locator('#stage-status-matching').innerText(),/未完成/,'R4未实现前不得显示已确认');
-  assert.match(await page.locator('#stage-panel-matching').innerText(),/R4 开发包/);
+  // R4：自动分类完成后显示“自动匹配完成”，但仍写明尚未人工确认。
+  await page.waitForFunction(()=>/自动匹配完成/.test(document.querySelector('#classification-review-banner').textContent));
+  assert.match(await page.locator('#classification-review-stats').innerText(),/8 行结果已写入成果表/,'图02统计');
+  assert.match(await page.locator('#classification-review-stats').innerText(),/7 行有建议 · 1 行需重点核对/,'7行建议＋1行重点核对');
+  assert.match(await page.locator('#classification-review-stats').innerText(),/尚未人工确认/,'自动建议不得当成人工确认');
+  assert.equal(await page.locator('#classification-review-open').isDisabled(),true,'尚未生成成果表时不能打开');
+  assert.equal(await page.locator('#classification-review-generate').innerText(),'生成审核成果表');
   await page.waitForFunction(()=>/水泵/.test(document.querySelector('#classification-list').textContent));
   assert.match(await page.locator('#classification-list').innerText(),/水泵/,'确认后才开始匹配');
   assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage'),'matching');
 
+  // 生成独立成果簿：过真实prepare/commit/verify，只把写盘换成夹具，并核对成果簿内容与绑定。
+  const reviewTarget=path.join(root,'示例园区_分类审核成果.xlsx');
+  await page.exposeFunction('__writeReviewFixture',async file=>{await fs.writeFile(file,Buffer.from([0x50,0x4b,3,4,1,2]));});
+  await page.evaluate(target=>{
+   window.__reviewWritten=null;
+   window.__realPathPicker=window.__realPathPicker||window.RfqPathPicker.open;
+   window.RfqPathPicker.open=function(options){options.onConfirm({directory:null,name:'示例园区_分类审核成果.xlsx',target:target});return null;};
+   window.RfqClassificationReviewHost.openForEditing=()=>({path:target,opened:true});
+   window.RfqClassificationReviewHost.write=async(app,result,stagePath,opts)=>{
+    window.__reviewWritten={result:result,stagePath:stagePath,title:opts&&opts.title,
+     sheet:window.RfqClassificationReviewModel.mainSheet(result,{title:opts&&opts.title})};
+    window.__reviewWriteCalled=true;
+    await window.__writeReviewFixture(stagePath);};
+  },reviewTarget);
+  await page.locator('#classification-review-generate').click();
+  await page.waitForFunction(()=>document.querySelector('#classification-review-message').textContent.includes('已生成并校验'));
+  assert.equal(require('node:fs').existsSync(reviewTarget),true,'成果表必须真实发布到所选位置');
+  assert.equal(await page.locator('#classification-review-open').isDisabled(),false,'生成后才能打开成果表审核');
+  assert.equal(await page.locator('#classification-review-generate').innerText(),'重新生成审核成果表');
+  const written=await page.evaluate(()=>window.__reviewWritten);
+  assert.equal(written.title,'示例园区_分类审核成果.xlsx','文件名按“项目名_分类审核成果.xlsx”');
+  assert.deepEqual(written.result.counts,{rows:8,suggested:6,skip:1,conflict:1,none:0,pending:8});
+  assert.deepEqual(written.sheet.values[2].slice(0,9),['序号','项目名称','规格','单位','工程量','自动建议','匹配情况','最终分类','审核备注'],'图03列序');
+  assert.equal(written.sheet.layout.columns[10].hidden,true,'随行行标识列必须隐藏');
+  assert.equal(written.sheet.layout.validations.length,1,'最终分类列挂区域下拉');
+  await page.evaluate(()=>{window.RfqClassificationReviewHost.write=async()=>{};});
+  await page.locator('#save-project').click();
+  await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
+  const storedReview=JSON.parse(await fs.readFile(path.join(root,'projects',(await fs.readdir(path.join(root,'projects')))[0]),'utf8'));
+  assert.equal(storedReview.matching.path,reviewTarget,'项目记录必须保存成果簿路径');
+  assert.equal(storedReview.matching.rowIds.length,8);
+  assert.equal(storedReview.matching.fields.length,8);
+  assert.match(storedReview.matching.inputKey,/^ck2-[0-9a-f]{16}$/);
+  assert.match(await page.locator('#project-status').innerText(),/自动分类：已确认/,'自动分类完成后阶段必须按真实条件置为已确认');
+  assert.match(await page.locator('#project-status').innerText(),/表内审核：未完成/,'R5未实现前不得把表内审核显示为已确认');
+
   // 取消不变阶段：save模式选择器取消时只回调取消，不推进、不返回目标。
   const cancelled=await page.evaluate(async()=>{
    let confirmed='none',cancelledFlag=false;
+   if(window.__realPathPicker)window.RfqPathPicker.open=window.__realPathPicker;
    window.RfqPathPicker.open({mode:'save',token:window.__RFQ_IMPORT__.token,title:'另存汇总表',fileName:'分类汇总表.xlsx',
     startPath:'',onConfirm:function(value){confirmed=JSON.stringify(value);},onCancel:function(){cancelledFlag=true;}});
    await new Promise(r=>setTimeout(r,50));
