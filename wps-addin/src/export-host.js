@@ -61,6 +61,14 @@
       if(!range.Interior)throw Error('当前WPS不支持单元格填充API（Range.Interior），未按获批版式输出“'+sheet.Name+'”。');
       range.Interior.Color=layout.toColor(fill.color);
     });
+    // 字体样式（名称超链接的蓝色下划线等）：只在模型显式给出颜色/加粗/下划线时落地。
+    (spec.fonts||[]).forEach(function(font){
+      var range=sheet.Range(address(font));
+      if(!range.Font)throw Error('当前WPS不支持字体样式API（Range.Font），未按获批版式输出“'+sheet.Name+'”。');
+      if(font.color!=null)range.Font.Color=layout.toColor(font.color);
+      if(font.bold!=null)range.Font.Bold=font.bold===true;
+      if(font.underline!=null)range.Font.Underline=font.underline===true?2:0;
+    });
     if(spec.freeze){
       var window=app.ActiveWindow;
       if(!window||typeof window.FreezePanes==='undefined')
@@ -117,13 +125,21 @@
         var range=sheet.Range(address(merge));
         if(range.MergeCells!==true)throw Error('“'+s.name+'”合并读回不一致：'+address(merge));
       });
+      (spec.fonts||[]).forEach(function(font){
+        var range=sheet.Range(address(font)),target=range.Font||{};
+        if(font.underline===true&&!target.Underline)
+          throw Error('“'+s.name+'”下划线读回缺失：'+address(font));
+        if(font.color!=null&&target.Color!=null&&Number(target.Color)!==Number(layout.toColor(font.color)))
+          throw Error('“'+s.name+'”字体颜色读回不一致：'+address(font));
+      });
       (spec.hyperlinks||[]).forEach(function(link){
         var anchor=sheet.Range(address(link));
         var count=anchor.Hyperlinks&&anchor.Hyperlinks.Count;
         if(count==null)throw Error('“'+s.name+'”无法读回超链接，未确认获批版式：'+address(link));
         if(Number(count)<1)throw Error('“'+s.name+'”超链接读回缺失：'+address(link));
         var actual=anchor.Hyperlinks.Item(1).Address;
-        if(key(actual)!==key(link.address))
+        // 相对链接按目录整体搬移仍可用：读回可能是原样相对路径，也可能是WPS解析后的绝对路径。
+        if(key(actual)!==key(link.address)&&key(actual).slice(-key(link.address).length)!==key(link.address))
           throw Error('“'+s.name+'”超链接地址读回不一致：期望'+link.address+'，实际'+String(actual));
       });
       (spec.validations||[]).forEach(function(rule){

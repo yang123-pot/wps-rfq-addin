@@ -231,11 +231,12 @@ function initScript(context){
   await dumpEvidence('category-workbook-rows.json',firstFour.map(item=>({name:item.name,rowCount:item.rowCount,
    rowIds:item.rowIds,values:item.values})));
   await shot(SHOT);
-  // 布局选择会随项目保存，生成汇总表按钮按图04可点但明确本包尚未实现汇总。
+  // 布局选择会随项目保存。图04主按钮“生成分类汇总表”切到第5步并按当前布局生成汇总表（R7）。
   await page.locator('#categories-layout').selectOption('combined');
   await page.waitForFunction(()=>document.querySelector('#categories-message').textContent.includes('同格填写'));
   await page.locator('#categories-summary').click();
-  await page.waitForFunction(()=>document.querySelector('#categories-message').textContent.includes('R7'));
+  await page.waitForFunction(()=>document.querySelector('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage')==='brands');
+  await page.waitForFunction(()=>/分类汇总表/.test(document.querySelector('#brands-message').textContent));
   // 过期与重新生成＝新批次：整表确认变化后旧分类工作簿必须失效，重新生成不覆盖旧批次与已填汇总。
   const before=await projectRecord(),beforeBatch=before.categories.directory;
   const beforeBytes=await Promise.all(before.categories.files.map(file=>fs.readFile(file.path)));

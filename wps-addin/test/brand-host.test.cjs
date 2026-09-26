@@ -48,3 +48,13 @@ test('duplicate identifiers, missing sheets and missing workbooks are refused',(
  assert.throws(()=>host.read(app([]),binding),/未返回指定品牌表/);
  assert.throws(()=>host.read(app([duplicate]),{...binding,schemaVersion:7}),/绑定无效/);
 });
+test('R7：汇总表写入沿用独占发布路径，打开支持复用已打开的同路径工作簿',()=>{
+ // summaryWrite与内部清单写入同一条独占发布路径：非法暂存路径必须在写入前就被拒绝。
+ assert.throws(()=>host.summaryWrite({AutomationSecurity:1,FileSystem:{Exists:()=>false},Workbooks:{Count:0}},
+  {sheets:[]},'relative.xlsx'),/暂存路径无效/);
+ const target={FullName:'C:\\out\\分类汇总表.xlsx',Activate(){this.activated=true;}};
+ const opened=host.openSummary({AutomationSecurity:1,Workbooks:{Count:1,Item(){return target;},Open(){throw Error('must reuse');}}},
+  target.FullName);
+ assert.deepEqual(opened,{path:target.FullName,opened:true,reused:true});
+ assert.equal(target.activated,true,'同名已打开工作簿直接复用并置前');
+});

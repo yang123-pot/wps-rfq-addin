@@ -20,7 +20,7 @@
  var KIND_OF_STAGE={import:'source',matching:'matching',review:'review',categories:'categories',
   brands:'brands',inquiry:'inquiry',split:'split'};
  // review是整表审核确认快照；reviewDraft是“保存审核成果”的草稿（都不代表下游已完成）。
- var FUTURE_FIELDS=['matching','review','reviewDraft','categories','brands','inquiry','split','header'];
+ var FUTURE_FIELDS=['matching','review','reviewDraft','categories','summary','brands','inquiry','split','header'];
  // R1过渡期旧侧栏仍在使用的暂存字段；内部版本未知时同样必须拒绝，防止误读。
  var INTERIM_FIELDS=['classification','assignments','generation'];
  // 每个阶段的业务键包含哪些确认内容；所有键都含来源、合并方式与材料行。
@@ -61,7 +61,7 @@
    name:name||'未命名项目',createdAt:now(),updatedAt:now(),revision:0,
    fromProjectId:input.fromProjectId?String(input.fromProjectId):null,
    mergeIdentical:!!mergeIdentical,stages:emptyStages(),sources:[],mergeKey:null,
-   matching:null,review:null,categories:null,brands:null,inquiry:null,split:null,header:null,carried:null,history:[]};
+   matching:null,review:null,categories:null,summary:null,brands:null,inquiry:null,split:null,header:null,carried:null,history:[]};
  }
  function create(input,mergeIdentical,options){
   var entries=(input&&input.entries)||[];

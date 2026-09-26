@@ -7,7 +7,7 @@
  // 统一版式模型：等宽矩阵＋layout。模型只描述“应该长什么样”，真正写盘由export-host执行。
  // layout随模型→workbook→host→拆分传递；旧的无layout模型仍然兼容。
  var SCHEMA_VERSION=1,FONT_SIZE=10;
- var COLORS={header:'#DCE6F1',input:'#FFF7D6',accent:'#FDE9D9',note:'#F2F2F2'};
+ var COLORS={header:'#DCE6F1',input:'#FFF7D6',accent:'#FDE9D9',note:'#F2F2F2',link:'#0563C1'};
  function isObject(value){return !!value&&typeof value==='object'&&!Array.isArray(value);}
  function integer(value,min){return Number.isSafeInteger(value)&&value>=(min==null?1:min);}
  function toColor(hex){
@@ -54,13 +54,21 @@
   });
   (layout.rows||[]).forEach(function(row){
    if(!isObject(row)||!integer(row.index)||!Number.isFinite(row.height)||row.height<=0)errors.push('行高定义无效。');});
-  ['merges','fills','hyperlinks','validations'].forEach(function(field){
+  ['merges','fills','fonts','hyperlinks','validations'].forEach(function(field){
    if(layout[field]!=null&&!Array.isArray(layout[field]))errors.push(field+'必须是数组。');
   });
   (layout.merges||[]).forEach(function(merge,index){rect(merge,'第'+(index+1)+'个合并',errors);});
   (layout.fills||[]).forEach(function(fill,index){
    rect(fill,'第'+(index+1)+'个填充',errors);
    if(isObject(fill)){try{toColor(fill.color);}catch(error){errors.push(error.message);}}});
+  // 字体区域：用于名称超链接的蓝色下划线等获批样式；缺省不动，给了颜色/加粗/下划线才落地。
+  (layout.fonts||[]).forEach(function(font,index){
+   rect(font,'第'+(index+1)+'个字体',errors);
+   if(!isObject(font))return;
+   if(font.color!=null){try{toColor(font.color);}catch(error){errors.push(error.message);}}
+   ['bold','underline'].forEach(function(field){
+    if(font[field]!=null&&typeof font[field]!=='boolean')errors.push('第'+(index+1)+'个字体'+field+'设置无效。');});
+  });
   (layout.hyperlinks||[]).forEach(function(link,index){
    rect(link,'第'+(index+1)+'个链接',errors);
    if(!isObject(link))return;
@@ -97,6 +105,7 @@
    (layout.fills||[]).forEach(function(fill,index){within(fill,'第'+(index+1)+'个填充');});
    (layout.hyperlinks||[]).forEach(function(link,index){within(link,'第'+(index+1)+'个链接');});
    (layout.validations||[]).forEach(function(rule,index){within(rule,'第'+(index+1)+'个下拉');});
+   (layout.fonts||[]).forEach(function(font,index){within(font,'第'+(index+1)+'个字体');});
    (layout.columns||[]).forEach(function(column,index){
     if(integer(columnCount)&&integer(column.index)&&column.index>columnCount)errors.push('第'+(index+1)+'列超出工作表列范围。');});
   }
@@ -119,6 +128,7 @@
    headerRows:(input.headerRows||[]).slice(),freeze:input.freeze||null,
    merges:(input.merges||[]).map(function(merge){return Object.assign({rowSpan:1,columnSpan:1},merge);}),
    fills:(input.fills||[]).map(function(fill){return Object.assign({rowSpan:1,columnSpan:1},fill);}),
+   fonts:(input.fonts||[]).map(function(font){return Object.assign({rowSpan:1,columnSpan:1},font);}),
    hyperlinks:(input.hyperlinks||[]).map(function(link){return Object.assign({rowSpan:1,columnSpan:1},link);}),
    validations:(input.validations||[]).map(function(rule){
     return Object.assign({rowSpan:1,columnSpan:1,allowBlank:true,inCellDropdown:true},rule);}),
@@ -128,10 +138,15 @@
  // 便捷区域：材料明细的浅色表头与黄色填写区都按获批效果图统一定义。
  function headerFill(row,columnSpan,color){return {row:row,column:1,rowSpan:1,columnSpan:columnSpan,color:color||COLORS.header};}
  function inputFill(row,column,rowSpan,columnSpan,color){return {row:row,column:column,rowSpan:rowSpan,columnSpan:columnSpan,color:color||COLORS.input};}
+ // 名称超链接的获批样式：蓝色下划线；由export-host落到Range.Font。
+ function linkFont(row,column,rowSpan,columnSpan){
+  return {row:row,column:column,rowSpan:rowSpan||1,columnSpan:columnSpan||1,color:COLORS.link,underline:true};
+ }
  function listValidation(row,column,rowSpan,columnSpan,listSheet,listRange){
   return {row:row,column:column,rowSpan:rowSpan,columnSpan:columnSpan,listSheet:listSheet,listRange:listRange,
    allowBlank:true,inCellDropdown:true};
  }
  return {SCHEMA_VERSION:SCHEMA_VERSION,COLORS:COLORS,FONT_SIZE:FONT_SIZE,equalize:equalize,validate:validate,
-  assertValid:assertValid,build:build,toColor:toColor,headerFill:headerFill,inputFill:inputFill,listValidation:listValidation};
+  assertValid:assertValid,build:build,toColor:toColor,headerFill:headerFill,inputFill:inputFill,linkFont:linkFont,
+  listValidation:listValidation};
 }));

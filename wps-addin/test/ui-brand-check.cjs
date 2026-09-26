@@ -1,6 +1,11 @@
 const assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs/promises'),os=require('node:os');
 const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs');
-(async()=>{
+const {createLibraryStore}=require('../dev/library-store.cjs');
+const sample=require('./fixtures/workflow-v3-sample.cjs');
+const collection=require('../src/collection.js');
+const reviewModel=require('../src/classification-review-model.js');
+// 上面这段是R1–R6过渡期侧栏品牌面板的回归用例；下面summaryFlow是R7（图05A/05B）的分类汇总表用例。
+async function legacyBrandFlow(){
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-ui-brand-')),files=[path.join(root,'测试一.xlsx')];
  await fs.writeFile(files[0],'first file');
  const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(root,'copies'),
@@ -120,8 +125,8 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.locator('#brand-coverage').selectOption('material-subsets');
   await page.locator('#save-project').click();
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
-  assert.match(await page.locator('#project-status').innerText(),/品牌汇总：未完成（抬头未填写完整/,
-   '品牌填好但抬头为空时品牌汇总阶段仍不能算完成');
+  assert.match(await page.locator('#project-status').innerText(),/品牌汇总：未完成/,
+   'R7起品牌汇总阶段只认分类汇总表；过渡期侧栏面板填好品牌也不代表该阶段完成');
   await page.evaluate(()=>{
    const values={'header-company':'测试安装工程有限公司','header-address':'测试市测试路1号',
     'header-phone':'010-12345678','header-projectName':'测试楼项目','header-contact':'测试员'};
@@ -221,6 +226,263 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   assert.match(await page.locator('#split-status').innerText(),/冲突 1：.*(不一致|重新生成)/,'过期后必须阻断旧拆分计划并说明原因');
   assert.equal(await page.locator('#split-run').isDisabled(),true,'过期计划不得再执行发布');
   assert.deepEqual(errors,[]);
-  console.log('PASS: 品牌汇总表按类别自动生成与人工填品牌、抬头必填并保存本机模板、询价表按白名单生成且品牌来自汇总表、报价与金额留空、拆分一份一文件并写回执、品牌变化后旧生成文件与拆分计划立即阻断。');
+  console.log('PASS(过渡期面板): 品牌表按类别自动生成与人工填品牌、抬头必填、询价表按白名单生成且品牌来自汇总表、报价与金额留空、拆分一份一文件并写回执、品牌变化后旧生成文件与拆分计划立即阻断。');
  }finally{await browser.close();await new Promise(r=>server.close(r));await fs.rm(root,{recursive:true,force:true});}
-})().catch(e=>{console.error(e);process.exitCode=1;});
+}
+
+// R7（图05A/05B）：分类汇总表一类一行、双布局、名称指向独立分类工作簿。模拟WPS宿主写入，
+// 相邻暂存/独占发布/项目与分类库走真实服务端；汇总表按第6.1节合成样例4类2/2/2/1行核对。
+const DRAIN=[['工程名称：示例园区','','','',''],['项目编码','项目名称','项目特征描述','单位','工程量'],
+ ['SB-001','水泵','DN50','台','1'],['SB-002','水泵','DN65','台','1'],['FM-001','阀门','DN50','个','20'],
+ ['FM-002','阀门','DN65','个','12'],['GS-001','钢索','规格C','m','10']];
+const MEP=[['工程名称：示例园区','','','',''],['项目编码','项目名称','项目特征描述','单位','工程量'],
+ ['','给排水','','',''],['SB-101','水泵','DN50','台','1'],['SB-102','水泵','DN65','台','2'],
+ ['','暖通','','',''],['FJ-101','送风机','规格A','台','2'],['FJ-102','排风机','规格B','台','3'],
+ ['','强电','','',''],['CD-101','充电桩配电箱','充电桩配套','台','1']];
+const REVIEW_VALUES=(function(){
+ const preview=collection.preview(sample.buildCollection(),true);
+ const result=reviewModel.build(preview.groups,{library:sample.library,memory:sample.createMemory(),projectId:'p-sample01'});
+ return reviewModel.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'}).values;
+}());
+const CONFLICT_ROW=REVIEW_VALUES.findIndex(row=>row[1]==='充电桩配电箱')+1;
+function summaryInitScript(context){
+ const {files,reviewTarget}=context;
+ window.__copies=[];window.__openBooks=[];window.__stores={};window.__categoryWrites=[];
+ window.__summaryModels=[];window.__summaryOpened=[];
+ const nativeFetch=window.fetch;
+ window.fetch=async function(...args){
+  const response=await nativeFetch(...args);
+  if(String(args[0])==='/api/import/prepare'&&response.ok){
+   const data=await response.clone().json();
+   if(Array.isArray(data.files))window.__copies=data.files;
+  }
+  return response;
+ };
+ const grids={'给排水清单.xlsx':{sheet:'给排水',values:context.drain},'机电清单.xlsx':{sheet:'机电安装',values:context.mep}};
+ function seededReview(){try{return JSON.parse(window.localStorage.getItem('rfq-summary-review')||'null');}catch(_){return null;}}
+ function storeFor(file){
+  if(window.__stores[file])return window.__stores[file];
+  const copy=window.__copies.filter(item=>item.copyPath===file)[0];
+  const name=copy?copy.originalName:(String(file)===String(reviewTarget)?'示例园区_分类审核成果.xlsx':null);
+  const grid=name?grids[name]:null;
+  const values=grid?grid.values.map(row=>row.slice())
+   :(String(file)===String(reviewTarget)?((seededReview()||context.reviewValues).map(row=>row.slice()))
+    :Array.from({length:5},()=>['','','','','']));
+  window.__stores[file]={sheet:grid?grid.sheet:'分类审核成果',values:values,cells:{}};
+  return window.__stores[file];
+ }
+ function sheetFor(file,requested){
+  const store=storeFor(file);
+  return {Name:typeof requested==='string'?requested:store.sheet,
+   UsedRange:{Row:1,Column:1,Rows:{Count:store.values.length},Columns:{Count:store.values[0].length},Value2:store.values},
+   Activate(){},
+   Cells:{Item(row,column){return {NumberFormat:'',
+    get Value2(){const value=store.cells[row+':'+column];return value===undefined?(store.values[row-1]||[])[column-1]:value;},
+    set Value2(value){store.cells[row+':'+column]=value;},
+    get HasFormula(){return false;},Select(){}};}}};
+ }
+ function openBook(file,readOnly){
+  const book={FullName:file,ReadOnly:!!readOnly,
+   Worksheets:{Count:1,Item(requested){return sheetFor(file,requested);}},
+   Activate(){app.ActiveWorkbook=book;},Save(){book.saved=true;},
+   Close(){window.__openBooks=window.__openBooks.filter(item=>item!==book);}};
+  window.__openBooks.push(book);
+  return book;
+ }
+ const previous={Name:'用户文件.xlsx',FullName:'C:\\用户文件.xlsx',Activate(){app.ActiveWorkbook=this;}};
+ const app={ActiveWorkbook:previous,AutomationSecurity:1,GetOpenFilename(){return window.__files;},
+  Workbooks:{get Count(){return 1+window.__openBooks.length;},
+   Item(index){return index===1?previous:window.__openBooks[index-2];},
+   Open(file,links,readOnly){
+    if(files.includes(file))throw Error('original was opened');
+    const known=window.__copies.some(item=>item.copyPath===file)||String(file).startsWith(context.root);
+    if(!known)throw Error('unknown book: '+file);
+    return window.__openBooks.filter(item=>item.FullName===file)[0]||openBook(file,readOnly);
+   }}};
+ window.Application=app;window.__files=files;
+ window.__setCell=function(row,column,value){storeFor(reviewTarget).cells[row+':'+column]=value;};
+ window.__seedReview=function(values){
+  const copied=values.map(row=>row.slice());
+  storeFor(reviewTarget).values=copied;storeFor(reviewTarget).cells={};
+  try{window.localStorage.setItem('rfq-summary-review',JSON.stringify(copied));}catch(_){}
+ };
+}
+const SUMMARY_SHOT=process.env.RFQ_UI_SUMMARY_SCREENSHOT,SUMMARY_EVIDENCE=process.env.RFQ_UI_SUMMARY_EVIDENCE;
+async function summaryFlow(){
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-ui-summary-')),
+  files=[path.join(root,'给排水清单.xlsx'),path.join(root,'机电清单.xlsx')],
+  reviewTarget=path.join(root,'示例园区_分类审核成果.xlsx'),projectDirectory=path.join(root,'projects'),
+  workbookDirectory=path.join(root,'分类工作簿'),summaryTarget=path.join(root,'分类汇总表.xlsx');
+ await fs.writeFile(files[0],'drain');await fs.writeFile(files[1],'mep');
+ const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(root,'copies'),
+  projectDirectory:projectDirectory,libraryDirectory:path.join(root,'library'),headerDirectory:path.join(root,'headers')});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ await createLibraryStore({directory:path.join(root,'library')}).save({expectedRevision:0,
+  library:sample.library,memory:sample.createMemory()});
+ const projectFile=async()=>{
+  const list=(await fs.readdir(projectDirectory)).filter(name=>name.endsWith('.json')&&!name.startsWith('.'));
+  return path.join(projectDirectory,list[0]);
+ };
+ const projectRecord=async()=>JSON.parse(await fs.readFile(await projectFile(),'utf8'));
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ try{
+  const page=await browser.newPage({viewport:{width:420,height:900}}),errors=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  page.on('dialog',dialog=>dialog.accept());
+  await page.addInitScript(summaryInitScript,{files,drain:DRAIN,mep:MEP,reviewTarget,reviewValues:REVIEW_VALUES,root});
+  await page.exposeFunction('__writeReviewFixture',async file=>{await fs.writeFile(file,Buffer.from([0x50,0x4b,3,4,1,2]));});
+  await page.exposeFunction('__writeCategoryFixture',async(file,payload)=>{
+   await fs.writeFile(file,Buffer.concat([Buffer.from([0x50,0x4b,3,4]),Buffer.from(String(payload))]));});
+  await page.exposeFunction('__writeSummaryFixture',async(file,payload)=>{
+   await fs.writeFile(file,Buffer.concat([Buffer.from([0x50,0x4b,3,4]),Buffer.from(String(payload))]));});
+  const installStubs=()=>page.evaluate(()=>{
+   window.RfqCategoryWorkbooks.write=async function(app,entry,stagePath,options){
+    window.__categoryWrites.push({path:stagePath,categoryId:entry.categoryId,categoryName:entry.categoryName,name:entry.file});
+    await window.__writeCategoryFixture(stagePath,entry.file);};
+   // 汇总表写入换成夹具文件；模型内容仍取插件真实模型，便于逐项核对公开版式与链接。
+   window.RfqBrandHost.summaryWrite=async function(app,model,stagePath){
+    const spec=model.sheets[0].layout;
+    window.__summaryModels.push({stagePath:stagePath,layout:model.layout,headerRow:model.headerRow,firstRow:model.firstRow,
+     lastRow:model.lastRow,auxCategory:model.auxCategory,auxFile:model.auxFile,auxOptions:model.auxOptions,
+     categories:model.categories.map(item=>({categoryId:item.categoryId,categoryName:item.categoryName,
+      rowCount:item.rowCount,relative:item.relative,file:item.file})),
+     hyperlinks:spec.hyperlinks.map(link=>({address:link.address,display:link.display,relative:link.relative})),
+     hidden:spec.columns.filter(column=>column.hidden).map(column=>column.index),
+     validation:{row:spec.validations[0].row,rowSpan:spec.validations[0].rowSpan,column:spec.validations[0].column,
+      listRange:spec.validations[0].listRange},
+     rows:model.sheets[0].values.slice(model.firstRow-1,model.lastRow).map(row=>row.slice(0,10))});
+    await window.__writeSummaryFixture(stagePath,'summary');};
+   window.RfqBrandHost.openSummary=function(app,filePath){window.__summaryOpened.push(filePath);return {path:filePath,opened:true};};
+  });
+  const openProject=async()=>{
+   await page.locator('#aux-section > summary').click();
+   await page.locator('#open-project').click();
+   await page.waitForFunction(()=>document.querySelectorAll('#project-list > li button').length>=1);
+   await page.locator('#project-list > li button').first().click();
+   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已恢复项目'));
+  };
+  const waitIdle=()=>page.waitForFunction(()=>document.getElementById('task-controls').disabled===false);
+  const shot=async file=>{
+   if(!SUMMARY_SHOT)return;
+   await page.evaluate(()=>{const aux=document.getElementById('aux-section');if(aux)aux.open=false;});
+   await page.screenshot({path:file,fullPage:true});
+  };
+  const dumpEvidence=async(name,value)=>{
+   if(!SUMMARY_EVIDENCE)return;
+   await fs.mkdir(SUMMARY_EVIDENCE,{recursive:true});
+   await fs.writeFile(path.join(SUMMARY_EVIDENCE,name),JSON.stringify(value,null,2));
+  };
+  await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html');
+  // 图01→图04：导入、合并确认、整表确认（含改选汽车充电桩）、生成4份独立分类工作簿。
+  await page.locator('#import-files').click();
+  await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
+  await page.locator('#merge-identical').check();
+  await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='8');
+  await page.locator('#confirm-merge').click();
+  await page.waitForFunction(()=>/自动匹配完成/.test(document.querySelector('#classification-review-banner').textContent));
+  await page.evaluate(target=>{
+   window.RfqPathPicker.open=function(options){options.onConfirm({directory:null,name:'示例园区_分类审核成果.xlsx',target:target});return null;};
+   window.RfqClassificationReviewHost.write=async(app,result,stagePath,options)=>{
+    const sheet=window.RfqClassificationReviewModel.mainSheet(result,{title:options&&options.title});
+    window.__seedReview(sheet.values);
+    await window.__writeReviewFixture(stagePath);};
+  },reviewTarget);
+  await installStubs();
+  await page.locator('#classification-review-generate').click();
+  await page.waitForFunction(()=>document.querySelector('#classification-review-message').textContent.includes('已生成并校验'));
+  await page.locator('#classification-review-open').click();
+  await page.waitForFunction(()=>document.querySelector('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage')==='review');
+  await page.evaluate(({row})=>{window.__setCell(row,8,'汽车充电桩');window.__setCell(row,9,'充电桩配套');},{row:CONFLICT_ROW});
+  await page.locator('#sheet-review-confirm').click();
+  await page.waitForFunction(()=>/整表已确认（8 行）|整表未通过校验|整表确认未完成|整表确认未保存/.test(
+   document.querySelector('#sheet-review-message').textContent));
+  assert.match(await page.locator('#sheet-review-message').innerText(),/整表已确认（8 行）/,'整表一次确认必须通过并落盘');
+  await page.waitForFunction(()=>/4 个分类工作簿已生成/.test(document.querySelector('#categories-banner').textContent));
+  assert.deepEqual((await fs.readdir(workbookDirectory)).sort(),
+   ['汽车充电桩.xlsx','水泵.xlsx','阀门.xlsx','风机.xlsx'].sort(),'4份独立分类工作簿已真实发布');
+  console.log('PASS(R7-1): 图05前序链路成立——4类2/2/2/1行分类工作簿已生成。');
+  // 图05A：生成分类汇总表（默认分列布局），一类一行，名称是蓝色下划线相对链接。
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="brands"]').click();
+  await page.waitForFunction(()=>document.querySelector('#brands-banner').textContent.includes('尚未生成分类汇总表'));
+  assert.equal(await page.locator('#brands-layout').isEnabled(),true,'分类工作簿核实后解锁布局选择');
+  assert.equal(await page.locator('#brands-layout').inputValue(),'separated','默认布局为品牌、供应商分列');
+  assert.equal(await page.locator('#brands-generate').isEnabled(),true,'分类工作簿完成后可生成分类汇总表');
+  assert.equal(await page.locator('#brands-list > li').count(),4,'一类一行，共4个类别');
+  assert.match(await page.locator('#brands-list').innerText(),/水泵[\s\S]*链接目标：水泵\.xlsx/,'每行显示链接目标');
+  await page.locator('#brands-generate').click();
+  await page.waitForFunction(()=>window.__summaryModels.length>=1&&
+   /已生成并校验分类汇总表/.test(document.querySelector('#brands-message').textContent));
+  const separated=await page.evaluate(()=>window.__summaryModels[0]);
+  assert.equal(separated.layout,'separated');
+  assert.deepEqual(separated.categories.map(item=>[item.categoryName,item.rowCount,item.relative]),
+   [['水泵',2,'分类工作簿\\水泵.xlsx'],['阀门',2,'分类工作簿\\阀门.xlsx'],['风机',2,'分类工作簿\\风机.xlsx'],
+    ['汽车充电桩',1,'分类工作簿\\汽车充电桩.xlsx']],'一类一行，条数取自该类快照');
+  assert.deepEqual(separated.hyperlinks.map(link=>[link.address,link.display,link.relative]),
+   [['分类工作簿\\水泵.xlsx','水泵',true],['分类工作簿\\阀门.xlsx','阀门',true],['分类工作簿\\风机.xlsx','风机',true],
+    ['分类工作簿\\汽车充电桩.xlsx','汽车充电桩',true]],'名称加蓝色下划线相对链接，指向对应独立分类工作簿');
+  assert.deepEqual(separated.rows.map(row=>row.slice(0,3)),
+   [['1','水泵','2'],['2','阀门','2'],['3','风机','2'],['4','汽车充电桩','1']]);
+  assert.equal(separated.rows.every(row=>row.slice(3,9).every(value=>value==='')),true,'品牌与供应商初始空白');
+  assert.deepEqual(separated.hidden,[11,12,13],'隐藏列保存稳定类别ID/相对链接/方式选项');
+  assert.deepEqual([separated.validation.row,separated.validation.rowSpan,separated.validation.column,separated.validation.listRange],
+   [4,4,10,'$M$1:$M$2'],'询价生成方式下拉覆盖4行');
+  assert.equal((await fs.readdir(root)).includes('分类汇总表.xlsx'),true,'汇总表已真实发布到项目目录');
+  const receipt=await projectRecord();
+  assert.equal(receipt.summary.layout,'separated');
+  assert.equal(path.resolve(receipt.summary.path).toLowerCase(),path.resolve(summaryTarget).toLowerCase(),
+   '项目记录必须保存汇总表真实路径');
+  assert.deepEqual(receipt.summary.categories.map(item=>item.categoryId),['pump','valve','fan','ev-charger']);
+  assert.match(String(receipt.summary.sha256),/^[a-f0-9]{64}$/,'汇总表回执必须带SHA');
+  assert.match(await page.locator('#brands-banner').innerText(),/分类汇总表已生成（4 类）/);
+  assert.match(await page.locator('#project-status').textContent(),
+   /品牌汇总：未完成（分类汇总表已生成（4 类，品牌、供应商分列），请填写品牌与供应商后生成询价表）/,
+   '生成汇总表但未读回填写内容前，品牌汇总阶段不得误报完成');
+  await page.locator('#brands-open').click();
+  assert.deepEqual(await page.evaluate(()=>window.__summaryOpened.map(item=>String(item).toLowerCase())),
+   [String(receipt.summary.path).toLowerCase()],'打开汇总表指向已生成的真实文件');
+  await shot(SUMMARY_SHOT&&SUMMARY_SHOT.replace(/\.png$/,'-separated.png'));
+  await dumpEvidence('summary-binding-separated.json',receipt.summary);
+  await dumpEvidence('summary-files.json',(await fs.readdir(root)).filter(name=>name.startsWith('分类汇总表')));
+  await page.locator('#brands-confirm').click();
+  await page.waitForFunction(()=>/R8|读取汇总表/.test(document.querySelector('#brands-message').textContent));
+  assert.equal(errors.length,0);
+  await waitIdle();
+  // 图05B：切到同格布局，重新生成新的汇总表文件（不覆盖已生成文件）。
+  await page.locator('#brands-layout').selectOption('combined');
+  await page.waitForFunction(()=>document.querySelector('#brands-banner').textContent.includes('已过期'));
+  await page.locator('#brands-generate').click();
+  await page.waitForFunction(()=>window.__summaryModels.length>=2&&
+   /已生成并校验分类汇总表/.test(document.querySelector('#brands-message').textContent));
+  const combined=await page.evaluate(()=>window.__summaryModels[1]);
+  assert.equal(combined.layout,'combined');
+  assert.equal(combined.headerRow,4,'同格布局单行表头');
+  assert.deepEqual(combined.hyperlinks.map(link=>link.address),separated.hyperlinks.map(link=>link.address),
+   '两种布局名称链接与目标一致');
+  assert.deepEqual(combined.rows.map(row=>row.slice(0,3)),separated.rows.map(row=>row.slice(0,3)),
+   '两种布局类别、条数一致');
+  assert.equal(combined.rows.every(row=>row.slice(3,6).every(value=>value==='')),true,'同格单格初始空白');
+  assert.notEqual(combined.stagePath,separated.stagePath,'重新生成另存新文件，不覆盖已生成汇总表');
+  const receipt2=await projectRecord();
+  assert.equal(receipt2.summary.layout,'combined');
+  assert.notEqual(path.resolve(receipt2.summary.path).toLowerCase(),path.resolve(summaryTarget).toLowerCase(),
+   '同格布局必须另存新文件');
+  assert.ok((await fs.readdir(root)).filter(name=>name.startsWith('分类汇总表')).length>=2,'两份汇总表文件同时保留');
+  await shot(SUMMARY_SHOT&&SUMMARY_SHOT.replace(/\.png$/,'-combined.png'));
+  await dumpEvidence('summary-models.json',[separated,combined]);
+  await dumpEvidence('summary-binding-combined.json',receipt2.summary);
+  await dumpEvidence('summary-stage-status.json',{brands:await page.locator('#brands-status').textContent(),
+   projectStatus:await page.locator('#project-status').textContent()});
+  // 重开恢复：项目记录里的汇总绑定与布局必须恢复。
+  await waitIdle();
+  await page.reload();
+  await installStubs();
+  await openProject();
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="brands"]').click();
+  await page.waitForFunction(()=>/分类汇总表已生成（4 类）/.test(document.querySelector('#brands-banner').textContent));
+  assert.equal(await page.locator('#brands-list > li').count(),4);
+  assert.equal(await page.locator('#brands-layout').inputValue(),'combined','恢复后布局必须与项目记录一致');
+  assert.deepEqual(errors,[]);
+  console.log('PASS(R7): 图05A/05B分类汇总表——一类一行、双布局可用、4名称链接指向正确独立分类工作簿、相邻暂存核最终位置、回执随项目保存与恢复。');
+ }finally{await browser.close();await new Promise(r=>server.close(r));await fs.rm(root,{recursive:true,force:true});}
+}
+(async()=>{await legacyBrandFlow();await summaryFlow();})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,5 +1,22 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const brand=require('../src/brand-table.js'),model=require('../src/brand-model.js');
+test('R7：分类汇总表模型与旧品牌表模型共存，双布局可用且名称链接指向独立工作簿',()=>{
+ assert.equal(model.SUMMARY_SHEET,'分类汇总表');
+ assert.deepEqual(model.SUMMARY_LAYOUTS,['separated','combined']);
+ assert.equal(model.summaryModeLabel('per-brand'),'按品牌分别生成');
+ const categories=[{categoryId:'pump',categoryName:'水泵',rowCount:2,path:'C:\\out\\分类工作簿\\水泵.xlsx'},
+  {categoryId:'valve',categoryName:'阀门',rowCount:2,path:'C:\\out\\分类工作簿\\阀门.xlsx'}];
+ ['separated','combined'].forEach(layoutName=>{
+  const plan=model.summaryPlan(categories,{directory:'C:\\out',inputKey:'ck2-summary',layout:layoutName});
+  assert.equal(plan.ok,true,(plan.issues[0]||{}).message);
+  const workbook=model.buildSummary(plan,{});
+  assert.equal(workbook.sheets.length,1,'汇总表保持单页，不新增工作表页签');
+  assert.equal(workbook.sheets[0].name,'分类汇总表');
+  assert.deepEqual(workbook.sheets[0].layout.hyperlinks.map(link=>link.address),
+   ['分类工作簿\\水泵.xlsx','分类工作簿\\阀门.xlsx'],'名称超链接用相对地址指向对应分类工作簿');
+  assert.equal(model.validateSummaryBinding(model.summaryBindingFor('C:\\out\\分类汇总表.xlsx',workbook)).ok,true);
+ });
+});
 function source(id,name,code,quantity){
  return {id:id,itemId:'i-'+id,file:name+'.xlsx',path:'C:\\samples\\'+name+'.xlsx',sheet:'给排水',row:id.length,
   rows:[id.length],code:code,quantity:quantity,quantityRaw:quantity,unit:'m',engineering:'测试楼',profession:'给排水'};

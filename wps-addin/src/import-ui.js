@@ -34,13 +34,10 @@
       restoreAssignments:function(value){if(brandPanel)brandPanel.restore(value);},
       getHeader:function(){return headerPanel?headerPanel.header():null;},
       restoreHeader:function(value){if(headerPanel)headerPanel.restore(value);},
-      getBrandVerdict:function(){
-        var brand=brandPanel?brandPanel.verdict():null;
-        if(!brand||!brand.ready)return brand||{ready:false,detail:'尚未建立品牌行'};
-        var head=headerPanel?headerPanel.verdict():null;
-        if(!head||!head.ready)return head||{ready:false,detail:'询价抬头未填写'};
-        return {ready:true,detail:'品牌、供应商与抬头已确认'};
-      },
+      // R7起“品牌汇总”阶段只认分类汇总表：生成后仍需填写并读回（R8）才算完成，不再由侧栏品牌面板判定。
+      getBrandVerdict:function(){return summaryVerdict();},
+      getSummary:function(){return summaryReceipt;},
+      restoreSummary:function(value){summaryReceipt=value||null;return summaryReceipt;},
       getGeneration:function(){return inquiryPanel?inquiryPanel.generation():null;},
       restoreGeneration:function(value){if(inquiryPanel)inquiryPanel.restore(value);},
       getGenerationVerdict:function(){return inquiryPanel?inquiryPanel.verdict():null;},
@@ -62,7 +59,8 @@
         review:fresh?{ready:true,detail:'整表已确认并保存快照（'+confirmation.rows.length+' 行）',rows:confirmation.rows}
           :{ready:false,detail:matched?(draft?('审核草稿已保存（'+draft.counts.filled+' / '+draft.counts.rows+' 行已填），尚未整表确认')
             :'尚未完成整表审核确认'):'尚未生成自动分类建议'},
-        categories:categoryVerdict()};
+        categories:categoryVerdict(),
+        brands:summaryVerdict()};
     }
     function brandContext(){
       var preview=collection.entries.length?RfqCollection.preview(collection,merge.checked):null,verdicts=stageVerdicts();
@@ -169,7 +167,7 @@
       if(!collection.entries.length){
         exporter.refresh({canFinalize:false});classifier.refresh({groups:[]});
         if(workflow)workflow.setStats({files:0,rows:0,mergedRows:0});
-        if(brandPanel)brandPanel.refresh();renderCategories();return;
+        if(brandPanel)brandPanel.refresh();renderCategories();renderBrands();return;
       }
       var result=RfqCollection.preview(collection,merge.checked),pages=Math.max(1,Math.ceil(result.groups.length/20));page=Math.min(page,pages-1);
       var mergeConfirmed=mergeConfirmedKey===RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,groups:result.groups});
@@ -181,6 +179,7 @@
       renderReview();
       renderSheetReview();
       renderCategories();
+      renderBrands();
       if(workflow){
         workflow.setStats({files:collection.entries.length,rows:result.inputCount,mergedRows:result.outputCount});
         var report=RfqProject.assess(brandContext());
@@ -860,14 +859,182 @@
     });
     if(categoryLayoutSelect)categoryLayoutSelect.addEventListener('change',function(){
       if(categoryReceipt)categoryReceipt.layout=selectedLayout();
+      if(summaryLayoutSelect)summaryLayoutSelect.value=selectedLayout();
       categoryTell('品牌填写布局已选择为“'+(selectedLayout()==='combined'?'品牌与供应商同格填写':'品牌、供应商分列')+
         '”，将在生成分类汇总表时使用。');
+      renderBrands();
     });
     if(categorySummaryButton)categorySummaryButton.addEventListener('click',function(){
-      var report=RfqCategoryWorkbooks.summarize(categoryReceipt);
-      categoryTell('分类工作簿已完成并校验（'+report.categories+' 份、'+report.detail+'），布局为“'+
-        (selectedLayout()==='combined'?'品牌与供应商同格填写':'品牌、供应商分列')+
-        '”。分类汇总表属于下一个开发包（R7）：本包只完成独立分类工作簿，未生成汇总表。',true);
+      // 图04主按钮：切到第5步并按当前布局生成分类汇总表（同名文件已存在时另存新文件，不覆盖）。
+      if(workflow)workflow.goTo('brands');
+      generateSummary({auto:true}).catch(function(error){summaryTell('分类汇总表未生成：'+error.message,true);});
+    });
+    // R7：分类汇总表（图05A/05B）。按R6已核实的分类清单生成一类一行，名称加蓝色下划线原生链接指向对应
+    // 独立分类工作簿；相邻暂存生成并核最终位置链接，两种布局功能一致，品牌与供应商初始空白由用户在表内填写。
+    var summaryReceipt=null,summaryBusy=false,summaryIssues=[];
+    function summaryEl(id){return document.getElementById(id);}
+    function summaryTell(text,error){var box=summaryEl('brands-message');if(box){box.textContent=text;box.className=error?'error':'';}}
+    function summaryLayoutLabel(value){return String(value)==='combined'?'品牌与供应商同格填写':'品牌、供应商分列';}
+    function summaryDirectory(){return RfqCategoryWorkbooks.directoryOf(categoryReceipt.directory);}
+    // 汇总表只收录R6已核实通过的分类工作簿；未完成或过期的批次不允许生成汇总。
+    function summaryCategories(){
+      return ((categoryReceipt&&categoryReceipt.files)||[]).filter(function(file){
+        return file&&file.status==='succeeded';}).map(function(file){
+        return {categoryId:file.categoryId,categoryName:file.categoryName,rowCount:file.rowCount,path:file.path,sha256:file.sha256};
+      });
+    }
+    // 汇总表阶段只认“本次整表确认对应的分类工作簿＋本次布局”：任一变化都要重新生成，不沿用旧绑定。
+    function summaryState(){
+      var categories=categoryVerdict();
+      if(!categories.ready)return {ok:false,reason:categories.detail||'分类工作簿未生成'};
+      if(!summaryCategories().length)return {ok:false,reason:'没有需要询价的类别，无分类汇总表'};
+      if(!summaryReceipt)return {ok:false,reason:'尚未生成分类汇总表'};
+      if(summaryReceipt.inputKey!==matchingKey())return {ok:false,reason:'分类汇总表绑定的是旧内容：请重新生成'};
+      var confirmation=reviewConfirmation();
+      if(Number(summaryReceipt.reviewRevision)!==Number(confirmation?confirmation.revision:NaN))
+        return {ok:false,reason:'整表确认已更新，需要重新生成分类汇总表'};
+      if(summaryReceipt.categoryDirectory!==categoryReceipt.directory)
+        return {ok:false,reason:'分类工作簿批次已更新，需要重新生成分类汇总表'};
+      if(summaryReceipt.layout!==selectedLayout())
+        return {ok:false,reason:'品牌填写布局已改变，需要按新布局重新生成分类汇总表'};
+      var bound={},files=summaryCategories();
+      (summaryReceipt.categories||[]).forEach(function(item){bound[item.categoryId]=true;});
+      if(files.some(function(file){return !bound[file.categoryId];}))
+        return {ok:false,reason:'分类清单已变化，需要重新生成分类汇总表'};
+      return {ok:true,receipt:summaryReceipt};
+    }
+    // 图05的“品牌汇总”阶段：生成后仍需填写并读回（R8），因此这里始终如实显示未完成，只把已生成的产物标出来。
+    function summaryVerdict(){
+      var state=summaryState();
+      if(!state.ok)return {ready:false,detail:state.reason};
+      return {ready:false,generated:true,detail:'分类汇总表已生成（'+summaryReceipt.categories.length+
+        ' 类，'+summaryLayoutLabel(summaryReceipt.layout)+'），请填写品牌与供应商后生成询价表'};
+    }
+    function summaryFileLine(file){
+      var li=node('li'),fileName=file.file||String(file.path||'').split(/[\\/]/).pop();
+      li.appendChild(node('strong',file.categoryName));
+      li.appendChild(node('p',file.rowCount+' 行 · 链接目标：'+fileName+(file.relative?'（'+file.relative+'）':''),'note'));
+      if(options.application){
+        li.appendChild(button('打开该分类工作簿',function(){
+          try{
+            RfqCategoryWorkbooks.openForEditing(options.application,file.path);
+            summaryTell('已打开分类工作簿：'+file.path);
+          }catch(error){summaryTell('分类工作簿未打开：'+error.message,true);}
+        }));
+      }
+      return li;
+    }
+    function renderBrands(){
+      var banner=summaryEl('brands-banner'),progress=summaryEl('brands-progress'),stats=summaryEl('brands-stats'),
+        status=summaryEl('brands-status'),list=summaryEl('brands-list'),generate=summaryEl('brands-generate'),
+        open=summaryEl('brands-open'),layoutSelect=summaryEl('brands-layout'),confirm=summaryEl('brands-confirm'),
+        issues=summaryEl('brands-issues');
+      if(!banner)return;
+      var categories=categoryVerdict(),files=summaryCategories(),state=summaryState(),record=summaryReceipt;
+      if(!categories.ready){
+        banner.textContent='尚未生成分类工作簿';banner.className='result-banner';
+        progress.textContent='当前进度 5 / 7 · 等待第4步分类工作簿全部核实通过';
+        stats.textContent='确认合并选择、整表确认并生成独立分类工作簿后，才能生成分类汇总表。';
+        status.textContent=categories.detail||'';
+      }else if(!record){
+        banner.textContent='尚未生成分类汇总表';banner.className='result-banner';
+        progress.textContent='当前进度 5 / 7 · 分类工作簿已生成（'+files.length+' 类），等待生成分类汇总表';
+        stats.textContent='一类一行；名称是蓝色下划线链接，点击打开对应独立分类工作簿；品牌与供应商初始空白。';
+        status.textContent='汇总表目录：'+summaryDirectory();
+      }else if(!state.ok){
+        banner.textContent='分类汇总表已过期';banner.className='result-banner';
+        progress.textContent='当前进度 5 / 7 · 分类工作簿或整表确认已变化，需要重新生成分类汇总表';
+        stats.textContent='上次生成 '+record.categories.length+' 类（'+(record.path||'未记录路径')+'），不再作为当前依据。';
+        status.textContent=state.reason;
+      }else{
+        banner.textContent='分类汇总表已生成（'+record.categories.length+' 类）';banner.className='result-banner is-done';
+        progress.textContent='当前进度 5 / 7 · 在汇总表黄色区填写品牌与供应商';
+        stats.textContent=record.categories.length+' 类 · '+record.categories.reduce(function(total,item){return total+item.rowCount;},0)+
+          ' 行纳入询价 · 布局“'+summaryLayoutLabel(record.layout)+'”';
+        status.textContent='实际文件：'+record.path;
+      }
+      if(list){
+        list.textContent='';
+        (record&&record.categories?record.categories:files).forEach(function(file){list.appendChild(summaryFileLine(file));});
+      }
+      if(issues){
+        issues.textContent='';
+        (summaryIssues||[]).slice(0,12).forEach(function(item){
+          var li=node('li');
+          li.appendChild(node('strong',item.title||'生成问题'));
+          li.appendChild(node('p',item.message,'note'));
+          issues.appendChild(li);
+        });
+      }
+      if(generate){
+        generate.disabled=summaryBusy||!categories.ready||!options.application;
+        generate.textContent=record?'重新生成分类汇总表（新文件）':'生成分类汇总表';
+      }
+      if(open)open.disabled=summaryBusy||!record||!options.application;
+      if(confirm){confirm.disabled=summaryBusy||!state.ok;confirm.textContent='填写完成，生成询价表';}
+      if(layoutSelect){layoutSelect.disabled=!categories.ready;layoutSelect.value=selectedLayout();}
+      if(status&&!state.ok&&state.reason&&record)status.textContent=(status.textContent?status.textContent+' · ':'')+state.reason;
+    }
+    async function generateSummary(){
+      if(summaryBusy)return {ok:false,busy:true};
+      if(!options.application){summaryTell('请在WPS内打开侧栏，才能生成分类汇总表。',true);return {ok:false};}
+      var files=summaryCategories();
+      if(!categoryVerdict().ready||!files.length){
+        summaryTell('请先在第4步生成并核实全部独立分类工作簿，再生成分类汇总表。',true);renderBrands();return {ok:false};}
+      summaryBusy=true;renderBrands();
+      try{
+        var directory=summaryDirectory(),layoutName=selectedLayout(),target=directory+'\\分类汇总表.xlsx';
+        // 同名文件已存在时另存时间戳新文件，绝不覆盖已生成的汇总表与已填内容。
+        var probe=await exportRequest('inspect',{target:target});
+        if(probe.exists)target=directory+'\\分类汇总表_'+stampText()+'.xlsx';
+        var plan=RfqBrandModel.summaryPlan(files,{directory:directory,inputKey:matchingKey(),layout:layoutName,
+          projectName:projectDisplayName()});
+        summaryIssues=plan.issues.slice();renderBrands();
+        if(!plan.ok){
+          summaryTell('分类汇总表未生成：'+summaryIssues.map(function(item){return item.title+'：'+item.message;}).join('；'),true);
+          return {ok:false};
+        }
+        // 相对链接必须在最终目录里的唯一相邻暂存生成，整目录搬移后链接仍然正确。
+        var prepared=await exportRequest('prepare',{target:target,adjacent:true});
+        var workbook=RfqBrandModel.buildSummary(plan,{});
+        await RfqBrandHost.summaryWrite(options.application,workbook,prepared.stagePath);
+        var published=await exportRequest('commit',{ticket:prepared.ticket});
+        await exportRequest('verify',{ticket:prepared.ticket,target:published.target,sha256:published.sha256});
+        var binding=RfqBrandModel.summaryBindingFor(published.target,workbook);
+        summaryReceipt=Object.assign({},binding,{sha256:published.sha256,bytes:published.bytes,directory:directory,
+          categoryDirectory:categoryReceipt.directory,reviewRevision:(reviewConfirmation()||{}).revision,
+          categoryBatch:categoryReceipt.batchId,
+          createdAt:new Date().toISOString(),status:'complete'});
+        await projects.save();
+        summaryTell('已生成并校验分类汇总表（'+summaryReceipt.categories.length+' 类，'+summaryLayoutLabel(layoutName)+
+          '）：'+summaryReceipt.path+'。请在黄色区域填写品牌与供应商。');
+        renderBrands();render();
+        return {ok:true,receipt:summaryReceipt};
+      }catch(error){summaryTell('分类汇总表未生成：'+error.message,true);return {ok:false};}
+      finally{summaryBusy=false;renderBrands();}
+    }
+    var summaryGenerateButton=summaryEl('brands-generate'),summaryOpenButton=summaryEl('brands-open'),
+      summaryConfirmButton=summaryEl('brands-confirm'),summaryLayoutSelect=summaryEl('brands-layout');
+    if(summaryGenerateButton)summaryGenerateButton.addEventListener('click',function(){
+      var regenerate=!!summaryReceipt;
+      if(regenerate&&!window.confirm('重新生成会另存新的分类汇总表文件，不覆盖已生成文件与已填内容，是否继续？'))return;
+      generateSummary().catch(function(error){summaryTell('分类汇总表未生成：'+error.message,true);});
+    });
+    if(summaryOpenButton)summaryOpenButton.addEventListener('click',function(){
+      if(!summaryReceipt){summaryTell('尚未生成分类汇总表。',true);return;}
+      try{
+        RfqBrandHost.openSummary(options.application,summaryReceipt.path);
+        summaryTell('已打开分类汇总表：'+summaryReceipt.path);
+      }catch(error){summaryTell('分类汇总表未打开：'+error.message,true);}
+    });
+    if(summaryConfirmButton)summaryConfirmButton.addEventListener('click',function(){
+      summaryTell('读取汇总表并生成询价表属于下一个开发包（R8/R9）：本包只完成双布局分类汇总表与名称链接，未读取填写内容。',true);
+    });
+    if(summaryLayoutSelect)summaryLayoutSelect.addEventListener('change',function(){
+      if(categoryReceipt)categoryReceipt.layout=summaryLayoutSelect.value;
+      if(categoryLayoutSelect)categoryLayoutSelect.value=summaryLayoutSelect.value;
+      renderBrands();
+      summaryTell('品牌填写布局已选择为“'+summaryLayoutLabel(summaryLayoutSelect.value)+'”，生成的分类汇总表将使用该布局。');
     });
     picker.disabled=!options.application||!window.__RFQ_IMPORT__;
     if(options.application&&!window.__RFQ_IMPORT__)tell('多文件导入需要启动最新开发服务并重新打开侧栏。');

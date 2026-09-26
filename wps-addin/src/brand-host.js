@@ -46,7 +46,34 @@
    if(handle.opened)try{opened.Close(false);}catch(_){}
   }
  }
- // 生成沿用内部清单已验证的独占发布路径：不覆盖已有文件、写入后重开逐值校验。
- function write(app,workbook,stagePath){return host.write(app,workbook,stagePath);}
- return {read:read,write:write,selectTarget:host.selectTarget,valuesOf:valuesOf};
+// 生成沿用内部清单已验证的独占发布路径：不覆盖已有文件、写入后重开逐值校验。
+function write(app,workbook,stagePath){return host.write(app,workbook,stagePath);}
+ // R7：分类汇总表按同一独占发布路径写入（暂存必须落在最终目录的相邻位置，名称超链接才能用相对地址）。
+ function summaryWrite(app,workbook,stagePath){return host.write(app,workbook,stagePath);}
+ // 汇总表生成后打开供填写：优先复用已打开的同路径工作簿，未打开则以可编辑方式打开并恢复宏安全值。
+ function openSummary(app,filePath){
+  if(!/^(?:[a-z]:[\\/]|\\\\)/i.test(String(filePath||''))||!/^.+\.xlsx$/i.test(String(filePath||'')))
+   throw Error('分类汇总表路径无效，未打开。');
+  if(!app||typeof app.Workbooks!=='object')throw Error('打开分类汇总表需要连接WPS。');
+  var security=app.AutomationSecurity,error=null,book=null;
+  if(typeof security!=='number')throw Error('不能读取宏安全设置，未打开分类汇总表。');
+  try{
+   for(var index=1;index<=app.Workbooks.Count;index++){
+    var open=app.Workbooks.Item(index);
+    if(open&&key(open.FullName)===key(filePath)){open.Activate();return {path:filePath,opened:true,reused:true};}
+   }
+   app.AutomationSecurity=3;
+   if(app.AutomationSecurity!==3)throw Error('无法禁用自动宏，未打开分类汇总表。');
+   book=app.Workbooks.Open(filePath,0,false);
+   if(!book||key(book.FullName)!==key(filePath))throw Error('WPS未返回指定分类汇总表。');
+   book.Activate();
+  }catch(problem){error=problem;}
+  finally{
+   try{app.AutomationSecurity=security;}catch(problem){error=Error('宏安全设置恢复失败：'+problem.message);}
+  }
+  if(error)throw error;
+  return {path:filePath,opened:true,reused:false};
+ }
+ return {read:read,write:write,selectTarget:host.selectTarget,valuesOf:valuesOf,
+  summaryWrite:summaryWrite,openSummary:openSummary};
 }));
