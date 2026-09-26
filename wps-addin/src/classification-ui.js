@@ -72,30 +72,42 @@
    });
    return memoryQueue;
   }
-  function persistMemory(){
-   if(!libraryReady())return;
+  // 保存习惯：成功/失败都更新侧栏状态。R5整表确认要等落盘结果，因此内部返回Promise（旧调用点忽略返回值）。
+  function persist(){
+   if(!libraryReady())return Promise.reject(Error('当前会话未启用本机分类库。'));
    unsavedMemory=true;renderMemory();memoryTell('正在保存分类习惯…');
-   saveMemory().then(function(){
+   return saveMemory().then(function(){
     unsavedMemory=false;renderMemory();
     memoryTell('分类习惯已保存到本机分类库（版本 '+libraryRevision+'）。');
     notifyMemory();
     render();
+    return true;
    }).catch(function(error){
     renderMemory();
     memoryTell('习惯未保存，可重试：'+error.message,true);
+    throw error;
    });
   }
+  function persistMemory(){return persist().catch(function(){return false;});}
   function retryMemory(){
-   if(!unsavedMemory)return;
+   if(!unsavedMemory)return Promise.resolve(false);
    memoryTell('正在重新保存分类习惯…');
-   saveMemory().then(function(){
-    unsavedMemory=false;renderMemory();
-    memoryTell('分类习惯已保存到本机分类库（版本 '+libraryRevision+'）。');
-    notifyMemory();
-    render();
-   }).catch(function(error){
-    renderMemory();memoryTell('习惯未保存，可重试：'+error.message,true);
+   return persist().catch(function(){return false;});
+  }
+  // R5：整表确认快照落盘后才学习。以projectId/rowId/decisionRevision记来源，改确认只撤销被改行的旧来源。
+  function learnConfirmations(items){
+   var list=items||[];
+   if(!list.length)return Promise.resolve(false);
+   list.forEach(function(entry){
+    if(!entry||!entry.decision||!entry.decision.categoryId||!entry.decision.rowId)return;
+    if(!entry.item||!entry.item.name)return;
+    var context={item:entry.item,projectId:projectId(),sourceProjectId:projectId(),rowId:entry.decision.rowId,
+     libraryVersion:entry.decision.libraryVersion};
+    if(entry.previousCategoryId&&entry.previousCategoryId!==entry.decision.categoryId)
+     memoryState=RfqCategoryMemory.releaseSource(memoryState,{categoryId:entry.previousCategoryId},context);
+    memoryState=RfqCategoryMemory.learn(memoryState,entry.decision,context);
    });
+   return persist();
   }
   function remember(row,rowId,previous,record){
    if(!libraryReady()||!record)return;
@@ -264,6 +276,9 @@
    classification:function(){return state;},
    snapshot:function(){return state;},
    memory:function(){return memoryState;},
+   learnConfirmations:learnConfirmations,
+   retryMemory:retryMemory,
+   memoryPending:function(){return unsavedMemory;},
     library:function(){return library;},
     ensureLibrary:function(){return loadLibrary();},
    rows:function(){return groups.map(function(group){return {rowId:group.id||group.scopeId};});},

@@ -94,6 +94,7 @@
    show();
    var panel=stepPanel(STEPS.filter(function(item){return item.id===stage;})[0]);
    if(panel&&typeof panel.scrollIntoView==='function')panel.scrollIntoView({block:'start'});
+   if(config&&typeof config.onStageChange==='function')config.onStageChange(stage);
    return true;
   }
   STEPS.forEach(function(step,index){

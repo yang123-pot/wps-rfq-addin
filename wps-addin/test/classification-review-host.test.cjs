@@ -128,3 +128,48 @@ test('打开成果表供用户编辑：临时禁宏、置前且不关闭，安�
   assert.throws(()=>host.openForEditing(app,'relative.xlsx'),/路径无效/);
   assert.throws(()=>host.openForEditing({AutomationSecurity:null,Workbooks:{Count:0}},binding.path),/宏安全设置/);
 });
+
+// R5：整表读回要能按自动建议重算“匹配情况”，因此绑定必须记下生成时的自动建议并把它当固定字段核对。
+test('绑定保存自动建议：冲突行记“待核对”，用户改动“自动建议”列会定位到第6列',()=>{
+  const {result,binding}=bound();
+  assert.equal(binding.fields[0].autoCategoryName,'水泵');
+  assert.equal(binding.fields[0].autoCategoryId,'pump');
+  const conflict=binding.fields.filter(field=>field.autoCategoryName==='待核对')[0];
+  assert.ok(conflict,'冲突行必须记录“待核对”');
+  assert.equal(conflict.autoCategoryId,null);
+  const sheet=model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'});
+  assert.deepEqual(host.readSheet(readerOf(sheet.values),binding).issues,[]);
+  const changed=host.readSheet(readerOf(sheet.values,grid=>{grid[3][5]='阀门';}),binding);
+  assert.equal(changed.issues.length,1);
+  assert.deepEqual([changed.issues[0].code,changed.issues[0].row,changed.issues[0].column],['field-changed',4,6]);
+  assert.match(changed.issues[0].message,/自动建议/);
+});
+
+test('定位问题单元格并原位刷新“匹配情况”：只写需要改的单元格，且不保存文件',()=>{
+  const {result,binding}=bound();
+  const sheet=model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'});
+  const writes=[],selects=[];
+  function cell(row,column){
+   return {get Value2(){return (sheet.values[row-1]||[])[column-1];},
+    set Value2(value){writes.push([row,column,value]);},Select(){selects.push([row,column]);}};
+  }
+  const sheetStub={Cells:{Item:cell},Activate(){}};
+  const book={FullName:binding.path,saves:0,Worksheets:{Item(name){return name===binding.sheet?sheetStub:undefined;}},
+   Activate(){},Save(){book.saves++;},Close(){}};
+  const app={AutomationSecurity:1,ActiveWorkbook:{FullName:'C:\\用户.xlsx',Activate(){}},
+   Workbooks:{Count:1,Item(){return book;}}};
+  const located=host.locate(app,binding,{row:10,column:8});
+  assert.deepEqual(located,{path:binding.path,sheet:binding.sheet,row:10,column:8});
+  assert.deepEqual(selects,[[10,8]],'必须选中具体问题单元格供用户修改');
+  assert.equal(app.AutomationSecurity,1,'宏安全值必须恢复');
+  const unchanged=host.refreshMatchColumn(app,binding,[{row:4,label:'匹配成功'}]);
+  assert.equal(unchanged.updated,0);
+  assert.deepEqual(writes,[]);
+  const refreshed=host.refreshMatchColumn(app,binding,[{row:4,label:'一致'},{row:10,label:'存在差异'}]);
+  assert.equal(refreshed.updated,2);
+  assert.deepEqual(writes,[[4,7,'一致'],[10,7,'存在差异']],'匹配情况固定在公开第7列');
+  assert.equal(book.saves,0,'只刷新显示，不保存文件，磁盘SHA与绑定仍可核');
+  assert.throws(()=>host.locate(app,binding,{row:0,column:8}),/行号/);
+  assert.throws(()=>host.refreshMatchColumn(app,Object.assign({},binding,{sheet:'不存在'}),[{row:4,label:'一致'}]),
+   /找不到工作表/);
+});

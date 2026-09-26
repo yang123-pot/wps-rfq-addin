@@ -6,6 +6,8 @@
     refreshButton=document.getElementById('refresh-projects'),message=document.getElementById('project-message'),
     status=document.getElementById('project-status'),list=document.getElementById('project-list');
   var current=null,busy=false,pendingId=null,lastReport=null;
+  // R5：整表审核确认快照与草稿。只有确认快照存在（且inputKey仍是本次内容）才把“表内审核”置为已确认。
+  var reviewConfirmation=null,reviewDraft=null,lastError=null;
   var STATE={ready:'已确认',stale:'已过期',missing:'未完成'};
   function tell(text,error){message.textContent=text;message.className=error?'error':'';}
   // 未保存项目也要有稳定身份，本机分类习惯按它记录确认来源；保存或打开其他项目前不重新生成。
@@ -35,8 +37,20 @@
     var pending=rows.filter(function(row){return !row||!decided[row.rowId];}).length;
     return {rows:rows,pending:pending};
   }
+  // 通过整表确认的行集合是“表内审核”的唯一依据；过渡期侧栏逐行确认不再代表该阶段完成。
+  function reviewVerdict(){
+    var confirmation=reviewConfirmation;
+    if(confirmation&&Array.isArray(confirmation.rows)&&confirmation.rows.length)
+      return {ready:true,detail:'整表已确认并保存快照（'+confirmation.rows.length+' 行）',rows:confirmation.rows};
+    return {ready:false,detail:reviewDraft?('审核草稿已保存（'+reviewDraft.counts.filled+' / '+reviewDraft.counts.rows+' 行已填），尚未整表确认')
+      :'尚未完成整表审核确认'};
+  }
+  function resolvedReviewVerdict(){
+    var verdicts=options.getStageVerdicts?options.getStageVerdicts():null;
+    return (verdicts&&verdicts.review)||reviewVerdict();
+  }
   function assessmentInputs(){
-    var progress=classificationProgress();
+    var progress=classificationProgress(),review=resolvedReviewVerdict();
     var verdicts=options.getStageVerdicts?options.getStageVerdicts():null;
     return {collection:options.getCollection(),mergeIdentical:options.mergeIdentical()===true,
       preview:options.getPreview?options.getPreview():null,
@@ -47,8 +61,7 @@
       header:options.getHeader?options.getHeader():null,
       matching:(verdicts&&verdicts.matching)||(progress.rows.length?{ready:true,detail:'自动分类建议已生成，尚未人工确认'}
         :{ready:false,detail:'尚未生成自动分类建议'}),
-      review:(verdicts&&verdicts.review)||(progress.rows.length?(progress.pending?{ready:false,detail:'还有'+progress.pending+'行未确认分类'}
-        :{ready:true,detail:'分类已确认（过渡期沿用侧栏逐行确认）'}):{ready:false,detail:'尚未生成自动分类建议'}),
+      review:review,
       categories:(verdicts&&verdicts.categories)||{ready:false,detail:'分类工作簿将在下一个开发包生成'},
       brands:options.getBrandVerdict?options.getBrandVerdict():null,
       inquiry:options.getGenerationVerdict?options.getGenerationVerdict():null,
@@ -60,6 +73,8 @@
   function collectFutureFields(project){
     project.mergeKey=options.getMergeConfirmation?options.getMergeConfirmation()||null:null;
     project.matching=options.getReviewBinding?options.getReviewBinding()||null:null;
+    project.review=reviewConfirmation;
+    project.reviewDraft=reviewDraft;
     project.classification=options.getClassification?options.getClassification():null;
     project.assignments=options.getAssignments?options.getAssignments():null;
     project.header=options.getHeader?options.getHeader():null;
@@ -70,6 +85,10 @@
   function restoreFutureFields(project){
     if(options.restoreMergeConfirmation)options.restoreMergeConfirmation(project.mergeKey||null);
     if(options.restoreReviewBinding)options.restoreReviewBinding(project.matching||null);
+    reviewConfirmation=project.review||null;
+    reviewDraft=project.reviewDraft||null;
+    if(options.restoreReviewConfirmation)options.restoreReviewConfirmation(reviewConfirmation);
+    if(options.restoreReviewDraft)options.restoreReviewDraft(reviewDraft);
     if(options.restoreAssignments)options.restoreAssignments(project.assignments||null);
     if(options.restoreHeader)options.restoreHeader(project.header||null);
     if(options.restoreGeneration)options.restoreGeneration(project.generation||null);
@@ -102,7 +121,8 @@
       return items;
     }catch(error){tell('读取项目列表失败。'+error.message,true);return [];}
   }
-  async function saveProject(){
+  // 保存项目记录：整表确认快照必须在这里先落盘，成功后才允许学习习惯。
+  async function persist(){
     if(busy)return null;
     var collection=options.getCollection();
     if(!collection.entries.length){tell('请先导入清单，再保存项目。',true);return null;}
@@ -117,15 +137,35 @@
       var expectedRevision=current?current.revision:0;
       var receipt=await request('save',{project:next,expectedRevision:expectedRevision});
       current=Object.assign({},next,{revision:Number(receipt.revision)});
-      pendingId=null;renderStatus();await listProjects();
-      tell('项目已保存到本机：'+current.projectId+'（版本 '+current.revision+'）。项目记录不上传。');
+      pendingId=null;lastError=null;renderStatus();await listProjects();
       return receipt;
     }catch(error){
+      lastError=error;
       if(error.status===409)tell('项目未被覆盖：该记录已被其他窗口保存。侧栏草稿保留，请重新打开最新记录后再保存。',true);
       else tell('项目未保存。'+error.message,true);
       return null;
     }
     finally{busy=false;if(options.onBusy)options.onBusy(false);}
+  }
+  async function saveProject(){
+    var receipt=await persist();
+    if(receipt)tell('项目已保存到本机：'+current.projectId+'（版本 '+current.revision+'）。项目记录不上传。');
+    return receipt;
+  }
+  // R5两条写入路径：草稿只存进度，确认快照才代表“整表一次确认”，两者都按项目乐观锁落盘。
+  async function commitReview(confirmation,extra){
+    var input=extra||{};
+    if(input.draft)reviewDraft=input.draft;
+    if(confirmation)reviewConfirmation=confirmation;
+    var receipt=await persist();
+    if(receipt)tell('整表审核确认已保存到项目记录（版本 '+current.revision+'）。');
+    return receipt;
+  }
+  async function commitReviewDraft(draft){
+    if(draft)reviewDraft=draft;
+    var receipt=await persist();
+    if(receipt)tell('审核草稿已保存到项目记录（版本 '+current.revision+'），尚未确认。');
+    return receipt;
   }
   async function openProject(projectId){
     if(busy)return false;
@@ -176,7 +216,9 @@
   refreshButton.addEventListener('click',listProjects);
   renderStatus();
   return {refresh:renderStatus,current:function(){return current;},identity:identity,reload:listProjects,
-   assessment:function(){return lastReport;}};
+   assessment:function(){return lastReport;},commitReview:commitReview,commitReviewDraft:commitReviewDraft,
+   reviewConfirmation:function(){return reviewConfirmation;},reviewDraft:function(){return reviewDraft;},
+   lastError:function(){return lastError;},save:saveProject};
  }
  window.RfqProjectUI={create:create};
 }());

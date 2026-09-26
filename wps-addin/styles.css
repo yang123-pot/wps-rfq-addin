@@ -45,5 +45,10 @@
 .stage-panel>.card:first-child,.stage-panel>section:first-child{margin-top:0}
 .stage-info{margin:6px 0 0}
 .stage-status{margin:6px 0 0}
+.stage-progress{height:8px;border-radius:4px;background:#e6ede7;margin:6px 0 8px;overflow:hidden}
+.stage-progress span{display:block;height:100%;border-radius:4px;background:#1d6f4a}
+.result-banner{border-radius:8px;background:#fff6e8;color:#8a5a1f;font-size:13px;font-weight:600;padding:12px 14px;margin:8px 0}
+.result-banner.is-done{background:#e6f2ea;color:#1d6f4a}
+#sheet-review-issues>li{font-size:12px}
 .aux>summary{cursor:pointer;font-size:12px}
 @media (max-width:360px){.workflow-step{flex:1 1 40px}.workflow-step-button .workflow-step-label{font-size:9px}}
