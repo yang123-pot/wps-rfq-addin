@@ -17,7 +17,7 @@
 - **真实能力**：旧流程实机走通注册/功能区、侧栏连接、两文件导入、合并确认、分类确认5/5及停摆后重建恢复。新表内整表审核、独立分类工作簿、横向品牌汇总与名称链接仍待开发；R1/R2只到模型、项目库与模拟宿主层，**仍无真实WPS新流程证据**。
 - **下一项**：从R6（独立分类工作簿，对应图04）开始；先完整阅读本文件、实际打开本包相关图（图04，必要时图03），再核对Git和代码。不要从旧版侧栏确认品牌路线继续。
 - **待定项**：历史32种类别的正式词表/迁入政策、另一WPS版本的隔离验证环境仍未确定；不影响用隔离合成分类库开发新流程。
-- **备份核对（R5本轮推送失败，待同步）**：R4结束点199dd7c已在远程。本轮R5提交e052bd4（及随后这条状态说明提交）在推送时失败：`git push origin feat/wps-phase1`报`schannel: failed to receive handshake, SSL/TLS connection failed`；同一错误在仓库已配置的本地代理`http://127.0.0.1:7897`、单次`-c 'http.https://github.com/.proxy='`直连、`-c http.sslBackend=openssl`（报`unexpected eof while reading`）下均出现；PowerShell`Invoke-WebRequest https://github.com`与`curl.exe`直连/走代理也同样TLS失败，说明是本机当前网络/TLS通道问题，不是仓库或提交内容问题。**本地提交已保留、未强推、未改动代理配置**；网络恢复后需执行`git push origin feat/wps-phase1`并核`git ls-remote origin refs/heads/feat/wps-phase1`等于本地HEAD。历史归档主提交2f04d5c的远程SHA为2f04d5cc18b1a06ac00eb34ecf1a08d60de9fb8d。
+- **备份核对（R5已同步）**：R5提交 `e052bd4`＋交接说明提交 `56fb479` 已推送，远程SHA核为 `56fb479a4dd081ff01c298c0699091ef16211807`（=本地HEAD，2026-09-26复核）。上一轮R4结束点199dd7c为同步前状态。本轮默认连接先失败（`schannel: failed to receive handshake, SSL/TLS connection failed`，`-c http.sslBackend=openssl`报`unexpected eof while reading`，PowerShell/curl直连与走代理同样失败），改用单次`git -c 'http.https://github.com/.proxy=' push origin feat/wps-phase1`成功，核对远程ref也使用同一单次参数。**未强推、未修改系统/用户/仓库代理配置**。历史归档主提交2f04d5c的远程SHA为2f04d5cc18b1a06ac00eb34ecf1a08d60de9fb8d。
 
 原交接共812行，已逐字节保存到[旧交接归档](docs/archive/handoff-before-workflow-v3-20260926.md)。归档包含已过期顺序和相互矛盾的阶段表述，**只作历史资料，不是当前执行命令**。
 
@@ -591,7 +591,7 @@ git rev-parse HEAD
 git ls-remote origin refs/heads/feat/wps-phase1
 ~~~
 
-网络路径按当前结果选择：历史仓库代理曾导致TLS失败，但本轮绕开代理直连发生连接重置/443超时，默认连接推送和远程核对成功。因此先用上面的普通命令；只有当前代理失败时，才尝试单次加 git -c 'http.https://github.com/.proxy='，不要把历史绕开办法写成永远必选，也不修改系统/用户代理。推送失败保留本地提交，记录原因和待同步，不声称已备份；实际核远程SHA后才报告同步。
+网络路径按当前结果选择：先执行上面列出的普通命令；若报TLS握手失败（本轮实测`schannel: failed to receive handshake`，`-c http.sslBackend=openssl`报`unexpected eof while reading`，PowerShell/curl直连与走代理同样失败），再对推送与`git ls-remote`各尝试一次单次参数`git -c 'http.https://github.com/.proxy='`（本轮R5即用此法成功）。**不改系统/用户/仓库代理配置**，不把单次参数写成永远必选，也不强推。推送失败保留本地提交，记录原因和待同步，不声称已备份；实际核远程SHA后才报告同步。
 
 ### 7.3 历史及本机证据
 
