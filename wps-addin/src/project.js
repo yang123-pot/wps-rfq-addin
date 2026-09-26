@@ -189,9 +189,12 @@
    review:{ready:reviewReady,detail:reviewReady?'来源问题已清零':(preview?(issues+'个待核对问题'):'尚未生成合并预览')},
    merge:{ready:mergeReady,detail:mergeReady?('已确认'+(mergeIdentical?'精确合并':'分别保留')+'预览'):(reviewReady?'本次预览尚未确认':'来源核对未完成')},
    classification:{ready:classificationReady,detail:classificationReady?('已确认'+rows.length+'行分类'):(mergeReady?('还有'+pending+'行未确认分类'):'合并预览未确认')},
-   brand:{ready:brandReady,detail:brandReady?'品牌、供应商与抬头已确认':(classificationReady?'品牌、范围或抬头未确认':'分类未全部确认')},
-   generation:{ready:generationReady,detail:generationReady?'询价表已生成并校验':(brandReady?'尚未生成总询价工作簿':'品牌与抬头未确认')},
-   split:{ready:splitReady,detail:splitReady?'拆分已完成并核对':(generationReady?'尚未完成拆分':'尚未生成总询价工作簿')},
+   brand:{ready:brandReady,detail:(brandVerdict&&brandVerdict.detail)||(brandReady?'品牌、供应商与抬头已确认':
+     (classificationReady?'品牌、范围或抬头未确认':'分类未全部确认'))},
+   generation:{ready:generationReady,detail:(generationVerdict&&generationVerdict.detail)||(generationReady?'询价表已生成并校验':
+     (brandReady?'尚未生成总询价工作簿':'品牌与抬头未确认'))},
+   split:{ready:splitReady,detail:(splitVerdict&&splitVerdict.detail)||(splitReady?'拆分已完成并核对':
+     (generationReady?'尚未完成拆分':'尚未生成总询价工作簿'))},
    mergeKey:mergeKey,mergeIdentical:mergeIdentical,brandKey:brandKey,generationKey:generationKey,rowCount:rows.length,pending:pending};
  }
  // 只把能证明完成的阶段置为ready；一旦上游断裂，从该阶段起取消ready并让下游过期。

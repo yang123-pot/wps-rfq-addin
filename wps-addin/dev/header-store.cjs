@@ -1,4 +1,5 @@
 const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto');
+const {writeFileAtomic}=require('./atomic-file.cjs');
 const {create:createHeader,validate:validateHeader}=require('../src/inquiry-header.js');
 const SCHEMA_VERSION=1,FILE_NAME='header-templates.json';
 function revisionConflict(){
@@ -69,18 +70,13 @@ function createHeaderStore({directory}={}){
    if(currentRevision!==request.expectedRevision)throw revisionConflict();
    const next={schemaVersion:SCHEMA_VERSION,revision:currentRevision+1,templates:templates,
     updatedAt:new Date().toISOString()};
-   await fs.mkdir(root,{recursive:true});
-   const temporary=path.join(root,'.'+FILE_NAME+'.tmp-'+crypto.randomBytes(6).toString('hex'));
    const text=JSON.stringify(next,null,2);
    try{
-    await fs.writeFile(temporary,text,{flag:'wx'});
-    const readback=await fs.readFile(temporary,'utf8');
-    if(readback!==text)throw Error('写入内容与抬头模板不一致。');
-    const verified=validatePackage(JSON.parse(readback));
-    if(!verified.ok)throw Error('写入校验失败：'+verified.errors.join('；'));
-    await fs.rename(temporary,target);
+    await writeFileAtomic(target,text,function(readback){
+     const verified=validatePackage(JSON.parse(readback));
+     if(!verified.ok)throw Error('写入校验失败：'+verified.errors.join('；'));
+    });
    }catch(error){
-    try{await fs.rm(temporary,{force:true});}catch(_){}
     throw Error('抬头模板保存失败，已保留上一版：'+error.message);
    }
    return {revision:next.revision,path:target,bytes:Buffer.byteLength(text),updatedAt:next.updatedAt};

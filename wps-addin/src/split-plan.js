@@ -29,6 +29,8 @@
   if(!sheets.length)conflicts.push({code:'no-inquiry-sheet',message:'没有kind=inquiry的询价页，不能拆分。'});
   if(generation&&model.inputKey&&generation.inputKey!==model.inputKey)
    conflicts.push({code:'generation-stale',message:'总询价工作簿与当前内容不一致，请重新生成后再拆分。'});
+  if(generation&&source.currentKey&&generation.inputKey!==source.currentKey)
+   conflicts.push({code:'current-key-stale',message:'总询价工作簿与当前内容不一致（来源、分类、品牌或抬头已变化），请重新生成后再拆分。'});
   if(!generation)conflicts.push({code:'no-generation',message:'请先生成并校验总询价工作簿。'});
   sheets.forEach(function(sheet,index){
    var name=baseName(sheet),fileId='file-'+text(sheet.sheetId||index),target=join(directory,name),issues=[];

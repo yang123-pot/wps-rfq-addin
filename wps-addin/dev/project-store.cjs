@@ -1,4 +1,5 @@
 const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto');
+const {writeFileAtomic}=require('./atomic-file.cjs');
 const {validate}=require('../src/project.js');
 const ID=/^[a-z0-9-]{8,64}$/;
 function createProjectStore({directory}){
@@ -11,19 +12,13 @@ function createProjectStore({directory}){
   const check=validate(project);
   if(!check.ok)throw Error('项目记录不完整或版本不支持：'+check.errors.join('；'));
   const target=fileOf(project.projectId);
-  await fs.mkdir(root,{recursive:true});
-  const temporary=path.join(root,'.'+project.projectId+'.tmp-'+crypto.randomBytes(6).toString('hex'));
   const text=JSON.stringify(project,null,2);
   try{
-   await fs.writeFile(temporary,text,{flag:'wx'});
-   const readback=await fs.readFile(temporary,'utf8');
-   if(readback!==text)throw Error('写入内容与项目记录不一致。');
-   const parsed=JSON.parse(readback);
-   const verified=validate(parsed);
-   if(!verified.ok)throw Error('写入校验失败：'+verified.errors.join('；'));
-   await fs.rename(temporary,target);
+   await writeFileAtomic(target,text,function(readback){
+    const verified=validate(JSON.parse(readback));
+    if(!verified.ok)throw Error('写入校验失败：'+verified.errors.join('；'));
+   });
   } catch(error){
-   try{await fs.rm(temporary,{force:true});}catch(_){}
    throw Error('项目保存失败，已保留上一版：'+error.message);
   }
   return {path:target,bytes:Buffer.byteLength(text)};

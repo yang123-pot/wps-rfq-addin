@@ -7,7 +7,7 @@
     batch=document.getElementById('batch-confirm'),write=document.getElementById('write-classification');
   var memoryStatus=document.getElementById('memory-status'),retry=document.getElementById('memory-retry');
   var library=null,state=RfqClassification.create(),groups=[],busy=false,selected={};
-  var memoryState=null,libraryRevision=0,unsavedMemory=false;
+  var memoryState=null,libraryRevision=0,unsavedMemory=false,memoryQueue=Promise.resolve();
   function tell(text,error){message.textContent=text;message.className=error?'error':'';}
   function memoryTell(text,error){if(!memoryStatus)return;memoryStatus.textContent=text;memoryStatus.className=error?'error':'note';}
   function projectId(){try{return options.getProjectId&&options.getProjectId()||null;}catch(_){return null;}}
@@ -60,13 +60,17 @@
   function saveMemory(){
    var token=window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token;
    if(!token||!libraryReady())return Promise.reject(Error('当前会话未启用本机分类库。'));
-   return fetch('/api/library/save',{method:'POST',headers:{'content-type':'application/json','x-rfq-import-token':token},
-    body:JSON.stringify({expectedRevision:libraryRevision,library:library,memory:memoryState})})
-    .then(function(response){return response.text().then(function(text){
-     var result;try{result=JSON.parse(text);}catch(_){result={};}
-     if(!response.ok)throw Error(result.error||('习惯保存失败（HTTP '+response.status+'）。'));
-     libraryRevision=Number.isSafeInteger(result.revision)?result.revision:libraryRevision+1;
-     return true;});});
+   // 连续确认会连续保存，必须排队：否则两次保存用同一个版本号，后一次会拿到409而丢掉习惯。
+   memoryQueue=memoryQueue.catch(function(){}).then(function(){
+    return fetch('/api/library/save',{method:'POST',headers:{'content-type':'application/json','x-rfq-import-token':token},
+     body:JSON.stringify({expectedRevision:libraryRevision,library:library,memory:memoryState})})
+     .then(function(response){return response.text().then(function(text){
+      var result;try{result=JSON.parse(text);}catch(_){result={};}
+      if(!response.ok)throw Error(result.error||('习惯保存失败（HTTP '+response.status+'）。'));
+      libraryRevision=Number.isSafeInteger(result.revision)?result.revision:libraryRevision+1;
+      return true;});});
+   });
+   return memoryQueue;
   }
   function persistMemory(){
    if(!libraryReady())return;

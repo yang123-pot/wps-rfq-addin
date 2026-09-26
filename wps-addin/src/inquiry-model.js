@@ -40,8 +40,9 @@
    var rows=brand.rowsOf(data,assignment.rowIds);
    var linked=brand.requireBrands(data,assignment.rowIds);
    if(!rows.length)throw Error('品牌分配没有对应材料行：'+assignment.assignmentId);
-   var sheetId='sheet-'+assignment.assignmentId,
-    sheetName=sanitize((byRowId[assignment.rowIds[0]]||{}).categoryName+'-'+linked[0].brand,used),
+   var firstRow=byRowId[assignment.rowIds[0]]||{},categoryName=text(firstRow.categoryName),
+    sheetId='sheet-'+assignment.assignmentId,
+    sheetName=sanitize(categoryName+'-'+linked[0].brand,used),
     values=header.rows(source.header,linked[0].supplier).concat([COLUMNS.slice()]);
    rows.forEach(function(row,index){
     values.push([String(index+1),row.codes.join('；'),row.name,row.feature,row.unit,row.quantity,
@@ -50,7 +51,7 @@
      row.sourceIds.join('、'),row.quantity,(row.sourceLabels||[]).join('；')]);
    });
    sheets.push({sheetId:sheetId,kind:INQUIRY,assignmentId:assignment.assignmentId,name:sheetName,
-    categoryId:assignment.categoryId,brand:linked[0].brand,supplier:linked[0].supplier,
+    categoryId:assignment.categoryId,categoryName:categoryName,brand:linked[0].brand,supplier:linked[0].supplier,
     values:guard(values,sheetName),layout:{titleRows:titleRows,headerRow:headerRow,columns:COLUMNS.slice(),
      widths:{'项目特征描述':46,'项目名称':22,'项目编码':16}}});
   });

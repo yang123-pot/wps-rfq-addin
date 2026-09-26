@@ -190,6 +190,7 @@
     data=RfqBrandModel.apply(data,pending.read);
     pending=null;render();
     tell('已按品牌表更新项目；如之后修改来源或分类，旧品牌表会标记过期。');
+    if(options.onChange)options.onChange();
    }catch(error){tell('品牌表未写入项目。'+error.message,true);}
   }
   coverage.addEventListener('change',function(){
@@ -202,6 +203,92 @@
    render();
   });
   generateButton.addEventListener('click',generate);
+  // C4：品牌参考表只用于查看既有品牌写法，不改变分类结果，也不覆盖已填品牌。
+  var referenceButton=document.getElementById('brand-reference'),referenceBlock=document.getElementById('reference-block'),
+    referenceSheet=document.getElementById('reference-sheet'),referenceHeaderRow=document.getElementById('reference-header-row'),
+    referenceCategory=document.getElementById('reference-category-column'),referenceBrand=document.getElementById('reference-brand-column'),
+    referenceNote=document.getElementById('reference-note-column'),referenceParse=document.getElementById('reference-parse'),
+    referenceClose=document.getElementById('reference-close'),referenceSearch=document.getElementById('reference-search'),
+    referenceMessage=document.getElementById('reference-message'),referenceList=document.getElementById('reference-list');
+  var referenceSnapshot=null,referenceParsed=null;
+  function referenceTell(text,error){if(!referenceMessage)return;referenceMessage.textContent=text;referenceMessage.className=error?'error':'';}
+  function fillColumns(){
+   if(!referenceSnapshot)return;
+   var mapping={sheet:referenceSheet.value,headerRow:Number(referenceHeaderRow.value)||1};
+   var header=[];
+   try{header=RfqBrandReference.headerOf(referenceSnapshot,mapping);}catch(_){header=[];}
+   [referenceCategory,referenceBrand,referenceNote].forEach(function(select,position){
+    if(!select)return;
+    var previous=select.value;
+    select.textContent='';
+    if(position===2){
+     var none=document.createElement('option');none.value='';none.textContent='（不使用）';select.appendChild(none);
+    }
+    header.forEach(function(item){
+     var option=document.createElement('option');option.value=String(item.column);
+     option.textContent=item.column+' · '+(item.label||'（空表头）');select.appendChild(option);
+    });
+    select.value=previous&&select.querySelector('option[value="'+previous+'"]')?previous:'';
+   });
+   if(referenceCategory&&!referenceCategory.value&&referenceCategory.options.length)referenceCategory.selectedIndex=0;
+   if(referenceBrand&&!referenceBrand.value&&referenceBrand.options.length>1)referenceBrand.selectedIndex=referenceBrand.options.length>1?1:0;
+  }
+  function listReference(){
+   if(!referenceList)return;
+   referenceList.textContent='';
+   if(!referenceParsed){referenceList.appendChild(node('li','还没有解析结果，请选择列映射后点“解析并查看”。','empty'));return;}
+   var rows=RfqBrandReference.search(referenceParsed,referenceSearch?referenceSearch.value:'');
+   rows.slice(0,80).forEach(function(row){
+    var li=node('li');li.setAttribute('data-reference-row',String(row.sheetRow));
+    li.appendChild(node('strong',row.category));
+    li.appendChild(node('p','品牌 '+(row.brand||'（空）')+' · 备注 '+(row.note||'（空）')+' · 原表第'+row.sheetRow+'行','source'));
+    referenceList.appendChild(li);
+   });
+   if(!rows.length)referenceList.appendChild(node('li','没有匹配的参考行。','empty'));
+   else if(rows.length>80)referenceList.appendChild(node('li','只显示前80行，共'+rows.length+'行，可用搜索缩小范围。','note'));
+  }
+  if(referenceButton)referenceButton.addEventListener('click',function(){
+   try{
+    var app=options.application;
+    if(!app)throw Error('请在WPS里连接后再导入品牌参考表。');
+    var selected=app.GetOpenFilename('品牌参考表 (*.xls;*.xlsx),*.xls;*.xlsx',1,'选择品牌参考表（只读查看，不改原件）',null,false);
+    if(selected===false||selected===null||selected===''){referenceTell('已取消选择，未读取任何文件。');return;}
+    if(typeof selected!=='string'||!/\.xlsx?$/i.test(selected))throw Error('请选择xls或xlsx文件。');
+    referenceSnapshot=RfqBrandReference.read(app,selected);
+    referenceParsed=null;
+    if(referenceSheet){
+     referenceSheet.textContent='';
+     RfqBrandReference.sheetNames(referenceSnapshot).forEach(function(name){
+      var option=document.createElement('option');option.value=name;option.textContent=name;referenceSheet.appendChild(option);});
+    }
+    if(referenceHeaderRow)referenceHeaderRow.value='1';
+    referenceBlock.hidden=false;
+    fillColumns();
+    referenceTell('已只读读取“'+referenceSnapshot.name+'”（'+referenceSnapshot.sheets.length+'张表）。请选择列映射后解析；原文件没有被修改。');
+    listReference();
+   }catch(error){referenceTell('品牌参考表未读取：'+error.message,true);}
+  });
+  [referenceSheet,referenceHeaderRow].forEach(function(element){
+   if(element)element.addEventListener('change',fillColumns);});
+  if(referenceParse)referenceParse.addEventListener('click',function(){
+   try{
+    if(!referenceSnapshot)throw Error('请先导入品牌参考表。');
+    referenceParsed=RfqBrandReference.parse(referenceSnapshot,{sheet:referenceSheet.value,
+     headerRow:Number(referenceHeaderRow.value)||1,categoryColumn:Number(referenceCategory.value)||0,
+     brandColumn:Number(referenceBrand.value)||0,
+     noteColumn:referenceNote&&referenceNote.value?Number(referenceNote.value):null});
+    referenceTell('已解析'+referenceParsed.rows.length+'行'+(referenceParsed.issues.length?
+     ('，另有'+referenceParsed.issues.length+'条提示：'+referenceParsed.issues.slice(0,2).map(function(item){return item.message;}).join('；')):'')+
+     '。参考表只用于查看，不会改动分类或已填品牌。',referenceParsed.issues.some(function(item){
+      return item.code==='empty-table'||item.code==='header-empty';}));
+    listReference();
+   }catch(error){referenceParsed=null;referenceTell('品牌参考表未解析：'+error.message,true);listReference();}
+  });
+  if(referenceSearch)referenceSearch.addEventListener('input',listReference);
+  if(referenceClose)referenceClose.addEventListener('click',function(){
+   referenceSnapshot=null;referenceParsed=null;referenceBlock.hidden=true;referenceMessage.textContent='';
+   if(referenceList)referenceList.textContent='';
+  });
   readButton.addEventListener('click',readBack);
   confirmReadButton.addEventListener('click',confirmRead);
   cancelReadButton.addEventListener('click',function(){pending=null;render();tell('已放弃本次读取，项目内容未改动。');});

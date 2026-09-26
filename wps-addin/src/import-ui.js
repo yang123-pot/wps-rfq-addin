@@ -19,9 +19,23 @@
       restoreMergeConfirmation:function(key){mergeConfirmedKey=typeof key==='string'&&key?key:null;},
       getAssignments:function(){return brandPanel?brandPanel.data():null;},
       restoreAssignments:function(value){if(brandPanel)brandPanel.restore(value);},
-      getBrandVerdict:function(){return brandPanel?brandPanel.verdict():null;},
+      getHeader:function(){return headerPanel?headerPanel.header():null;},
+      restoreHeader:function(value){if(headerPanel)headerPanel.restore(value);},
+      getBrandVerdict:function(){
+        var brand=brandPanel?brandPanel.verdict():null;
+        if(!brand||!brand.ready)return brand||{ready:false,detail:'尚未建立品牌行'};
+        var head=headerPanel?headerPanel.verdict():null;
+        if(!head||!head.ready)return head||{ready:false,detail:'询价抬头未填写'};
+        return {ready:true,detail:'品牌、供应商与抬头已确认'};
+      },
+      getGeneration:function(){return inquiryPanel?inquiryPanel.generation():null;},
+      restoreGeneration:function(value){if(inquiryPanel)inquiryPanel.restore(value);},
+      getGenerationVerdict:function(){return inquiryPanel?inquiryPanel.verdict():null;},
+      getSplit:function(){return splitPanel?splitPanel.receipt():null;},
+      restoreSplit:function(value){if(splitPanel)splitPanel.restore(value);},
+      getSplitVerdict:function(){return splitPanel?splitPanel.verdict():null;},
       onBusy:function(value){busy=value;options.onBusy(value);}});
-    var libraryPanel=null,brandPanel=null;
+    var libraryPanel=null,brandPanel=null,headerPanel=null,inquiryPanel=null,splitPanel=null;
     // 品牌与供应商面板的输入：当前清单、合并方式、来源校验结果、逐行分类确认与合并预览确认键。
     function brandContext(){
       var preview=collection.entries.length?RfqCollection.preview(collection,merge.checked):null;
@@ -36,6 +50,22 @@
       onBusy:function(value){busy=value;options.onBusy(value);}});
     libraryPanel=RfqLibraryUI.create({onChange:function(state){classifier.adopt(state);}});
     brandPanel=RfqBrandUI.create({application:options.application,context:brandContext,
+      onChange:function(){if(inquiryPanel)inquiryPanel.refresh();if(splitPanel)splitPanel.refresh();},
+      onBusy:function(value){busy=value;options.onBusy(value);}});
+    headerPanel=RfqHeaderUI.create({});
+    // 生成面板的输入：汇总表品牌数据、询价抬头、当前清单分组与分类确认，以及生成用内容键。
+    function deliveryContext(){
+      var ctx=brandContext();
+      ctx.assignments=brandPanel?brandPanel.data():null;
+      ctx.header=headerPanel?headerPanel.header():null;
+      var report=RfqProject.assess(ctx);
+      return {brandTable:ctx.assignments,header:ctx.header,
+        groups:ctx.preview?ctx.preview.groups:[],classification:ctx.classification,inputKey:report.generationKey};
+    }
+    inquiryPanel=RfqInquiryUI.create({application:options.application,context:deliveryContext,
+      onBusy:function(value){busy=value;options.onBusy(value);}});
+    splitPanel=RfqSplitUI.create({application:options.application,context:deliveryContext,
+      generation:function(){return inquiryPanel?inquiryPanel.generation():null;},
       onBusy:function(value){busy=value;options.onBusy(value);}});
     function tell(text,error){message.textContent=text;message.className=error?'error':'';}
     function restoreProject(project){
@@ -103,6 +133,9 @@
       exporter.refresh(result);
       classifier.refresh(result);
       if(brandPanel)brandPanel.refresh();
+      if(headerPanel)headerPanel.refresh();
+      if(inquiryPanel)inquiryPanel.refresh();
+      if(splitPanel)splitPanel.refresh();
       document.getElementById('merge-summary').textContent='原始 '+result.inputCount+' 项 → 预览 '+result.outputCount+' 项 · '+(merge.checked?'已选择精确合并':'按来源分别保留');
       var mergeConfirmed=mergeConfirmedKey===RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true});
       confirmMerge.disabled=busy||!result.canFinalize;
