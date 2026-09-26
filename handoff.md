@@ -18,7 +18,7 @@
 - **真实能力**：旧流程实机走通注册/功能区、侧栏连接、两文件导入、合并确认、分类确认5/5及停摆后重建恢复。横向品牌汇总与名称链接、总询价、拆分仍待开发；R1/R2/R5/R6只到模型、项目库与模拟宿主层，**仍无真实WPS新流程证据**。
 - **下一项**：从R7（双布局汇总与名称超链接，对应图05A/05B）开始；先完整阅读本文件、实际打开本包相关图（图05A/05B，必要时图04），再核对Git和代码。不要从旧版侧栏确认品牌路线继续。
 - **待定项**：历史32种类别的正式词表/迁入政策、另一WPS版本的隔离验证环境仍未确定；不影响用隔离合成分类库开发新流程。
-- **备份核对（R6见第7.1节与本节末）**：R5提交 `e052bd4`＋交接说明提交 `56fb479` 已推送，远程SHA核为 `56fb479a4dd081ff01c298c0699091ef16211807`（2026-09-26复核）。本轮默认连接先失败（`schannel: failed to receive handshake, SSL/TLS connection failed`，`-c http.sslBackend=openssl`报`unexpected eof while reading`，PowerShell/curl直连与走代理同样失败），改用单次`git -c 'http.https://github.com/.proxy=' push origin feat/wps-phase1`成功，核对远程ref也使用同一单次参数。**未强推、未修改系统/用户/仓库代理配置**。历史归档主提交2f04d5c的远程SHA为2f04d5cc18b1a06ac00eb34ecf1a08d60de9fb8d。
+- **备份核对（R6已同步）**：R6主提交 `12d33e9` 已推送，远程SHA核为 `12d33e93ab1569a63b73139facb63c21db18bb95`（=本地HEAD，2026-09-27复核）。上一轮R5结束点 `56fb479` 为同步前状态。本轮默认连接先失败（`schannel: failed to receive handshake, SSL/TLS connection failed`），改用单次`git -c 'http.https://github.com/.proxy=' push origin feat/wps-phase1`成功，核对远程ref也使用同一单次参数。**未强推、未修改系统/用户/仓库代理配置**。历史归档主提交2f04d5c的远程SHA为2f04d5cc18b1a06ac00eb34ecf1a08d60de9fb8d。
 
 原交接共812行，已逐字节保存到[旧交接归档](docs/archive/handoff-before-workflow-v3-20260926.md)。归档包含已过期顺序和相互矛盾的阶段表述，**只作历史资料，不是当前执行命令**。
 
