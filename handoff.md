@@ -11,6 +11,7 @@
 > 最新接续（2026-09-27 R12-C）：图03草稿、错误定位与内容恢复完成（源码包，未触碰真机）——新增 `classification-review-host.compareSnapshot` 与 `classification-review-model.fromSnapshot`，恢复审计在 SHA 之外按 rowId 比较业务内容：真实文件 H11“磁盘空/快照汽车充电桩”SHA 相同但比较报 1 处差异（旧口径 ok=true、新口径 ok=false，code `content-different`）；业务一致仅另存则登记物理校验刷新，业务不同保留双方并给出“选用现表内容/恢复项目草稿到新副本”（只写新副本、不覆盖打开簿），草稿保存不改 confirmedAt/学习，409 回滚内存确认。Node 340/340 通过；真机窗口与 playwright 仍不可用，未新增真机通过。`export-host`两项留R12-D、真机与浏览器项挂R12-J/L。下一包R12-D。
 > 最新接续（2026-09-27 R12-D）：汇总宿主打通与双布局补齐完成——B4字体阻塞定性为**写入次序**（`Hyperlinks.Add`会按宿主链接样式改写锚点；字体移到链接之后落地后，保存重开读回 `Color=12673797`/`ColorIndex=23`/下划线2 与获批色逐位一致），因此删除入场改动的“蓝色系”容差恢复精确比对；下拉删除 `Type===3` 兜底（真机可回读Formula1，只归一化引号/等号），错区域与只剩类型都拒绝；超链接读回改为从最终汇总目录解析完整目标（别处目录同名文件、搬走的暂存目录都拒绝）；预览草稿簿改用定义名归属标记证明所有权，同名同结构的用户簿不再被写入。图05A补 `A1:J1`＋`A2:A3/B2:B3/C2:C3/J2:J3`＋三组两列合并，图05B补 `A1:G1`＋`A2:G2`。真机侧用独立隐藏COM实例（未触碰用户会话）按export-host同一操作顺序生成两个汇总文件并**实测4个名称链接`Follow()`打开对应4个分类工作簿**，`openpyxl`独立读回合并/下拉/链接/字体/填充一致，真实窗口截图在 `outputs/wps-acceptance-20260927/R12-D/evidence/screens/`；Node **344/344**通过。Computer Use仍不可用，故文件非“插件界面点生成”，`export-host`本身由Node用例覆盖。另发现 `ui-brand`/`ui-category`/`ui-memory`/`ui-sheet-review` 四项浏览器检查在R12-C基线HEAD即失败（隔离副本复核与本包无关），挂R12-C收口。下一包R12-E。
 > 最新接续（2026-09-27 R12-E）：拆分待核对的内容证明完成，并追加真实宿主检验——删除“把首次观察SHA当预期”的来源混用：`sha256`只表示经核对成功，新增`observedSha256`只记观察值，`reconcile`只降级/标待核对、绝不提升成功，旧回执无`verifiedBy`保守降为待核对；新增`export-host.verifyExistingOutput(app,file,expectedSheet,inspectTarget)`，只读打开实际供应商文件逐值核公开值/工作表数量/隐藏列范围/必需合并抬头，核对前后各取一次实际SHA；UI待核对单列并提供“核对已有文件”，核对通过且`inputKey`/总簿SHA未变、目标SHA稳定才用带`expectedRevision`的save记`verifiedBy=content-check`，409/失败读回服务端回执保持待核对、原文件不覆盖；`prepare`新增`canVerify`并把批次绑定收紧到`inputKey`/总簿SHA。split **17/17**、全量Node **356/356**、`ui-split-check` **PASS**（本机`NODE_PATH`指向已有playwright＋系统Edge，模拟宿主仅替代WPS写入/打开接口）。**真实宿主追加**：隔离WPS（`workbooksAtStart=0`，未改用户会话）按export-host写入顺序生成真实供应商拆分文件并读回，8行×10列、6个多格合并逐值一致、无隐藏辅助列（`ok=true`，SHA 7795da93…），同名异内容件读回`F8 期望3 实际999`（`ok=false`）；用真实文件SHA跑“发布后未记账”入口：连续3次prepare与一次store重建始终待核对、`done=false`，显式内容核对后才记`content-check`成功、重建后跳过、真实异内容覆盖后重新待核对。该轮暴露并修复“单格合并`A5:A5`在真实WPS不生效被误判失败”（export-host跳过无意义单格合并，新增用例）。插件UI内点击的完整真机链路仍挂R12-J。下一包R12-F。
+> 最新接续（2026-09-27 R12-F）：公开输出审计按批准方案重建完成（源码包，未触碰真机）——`release-audit.cjs` schemaVersion=2，新增 `profile:'supplier'|'internal-total'` 与 `complete:true` 完整预期矩阵，逐格输出逐值/缺失/额外/数据类型/版式/隐藏页列/批注/超链接/公式差异；联系方式只有在清单声明的抬头位置且与预期值完全一致才放行，同一电话出现在隐藏列或无关格仍报`personalLeaks`；文本`=…`与真实公式分开。`audit-outputs.py` 用 openpyxl 独立读取实际xlsx，`audit(path, expected_manifest, profile)` 返回SHA、页/行/列数、公式数和逐值/版式/额外内容差异，CLI增加显式`--manifest`/`--profile`，无完整清单只报`scan-only`、不再报“逐值通过”。隔离污染件逐格报出K7电话/K8路径/K9 SHA/K10原价/H7公式/F8缺值/J7多值＋隐藏列11＋内部/隐藏页；R12-E真实供应商件按纯值清单核对 `ok=true`、8行×10列、公式0、SHA 7795da93…（与R12-E一致）。`node --test release-audit` **10/10**、python unittest **8/8**、全量Node **361/361**。证据与G/H清单格式见[R12-F证据](docs/wps-workflow-v3-r12f-evidence-20260927.md)；本包只读文件、未打开WPS。下一包R12-G。
 
 ## 0. 当前结论与接续入口
 
@@ -20,9 +21,9 @@
 - **确定须修**：拆分pending既存文件连续核对会未经内容验证变成功；未提交暂存清理会使已发布票据失效并可能删有效stage；旧公开审计误拒绝允许的抬头联系方式。另有汇总标题/跨行表头布局缺项。
 - **待核适配**：B4链接字体读回阻塞；下拉验证只看Type及链接尾部匹配过宽；候选预览归属识别待验。磁盘审核表H11空、确认快照有汽车充电桩，应先保护窗口编辑再核内容，不能把SHA一致当作审核已落盘。
 - **R1–R11**：主体代码/模拟验证已有，不等于全部满足真机出口。分项状态见7.1及方向核对矩阵；R12未完成，R13真实生命周期继续等待。
-- **本次验证**：全部8图分两批实际查看，SHA与manifest一致；R12-E后当前工作区Node **355/355**通过，split待核对内容证明已由R12-E覆盖（新增 `export-host.verifyExistingOutput` 与UI显式核对，`ui-split-check` PASS，模拟宿主）。旧公开审计误拒允许抬头联系方式（R12-F）仍未覆盖；没有新增WPS真机通过结论。
+- **本次验证**：全部8图分两批实际查看，SHA与manifest一致；R12-F后当前工作区Node **361/361**通过，公开审计已按批准方案区分内部总簿/供应商件、放行指定抬头联系方式并拒绝额外隐藏内容（隔离污染件逐格留证，Python独立读实际xlsx）。旧公开审计误拒允许抬头联系方式已修正；没有新增WPS真机通过结论。
 - **待定不变**：历史32类正式词表/迁入政策、另一WPS版本隔离环境。合成库不扩生产库，不把旧33表/7587条当作新链路验收。
-- **下一项**：R12-A（现场保护）、R12-B（暂存清理/发布票据）、R12-C（图03草稿/错误定位/内容恢复，含审核表H11“磁盘空/快照有汽车充电桩”）、R12-D（汇总字体/下拉/原生链接/预览候选与双布局；已用独立隐藏COM实例完成真实宿主测量与截图）与R12-E（拆分待核对的内容证明；观察SHA与经核对SHA分开、显式逐值核对后才记成功）已完成；下一包R12-F（公开输出审计，允许指定抬头联系方式、区分内部总簿与供应商件）。已有用户授权沿用；Computer Use仍不可用，R12-D的图05A/05B文件由真实WPS按export-host同一操作顺序生成、`export-host`由Node用例覆盖；R12-E只用模拟宿主跑UI检查，真机“发布后未记账”挂R12-J；不得把未勾选的依赖真机UI出口写成已通过。
+- **下一项**：R12-A（现场保护）、R12-B（暂存清理/发布票据）、R12-C（图03草稿/错误定位/内容恢复）、R12-D（汇总宿主与双布局）、R12-E（拆分待核对的内容证明）、R12-F（公开输出审计，允许指定抬头联系方式、区分内部总簿与供应商件）已完成；下一包R12-G（图05A→06→07分列真实链路与5文件）。已有用户授权沿用；Computer Use仍不可用，R12-D的图05A/05B文件由真实WPS按export-host同一操作顺序生成、`export-host`由Node用例覆盖；R12-E只用模拟宿主跑UI检查，真机“发布后未记账”挂R12-J；不得把未勾选的依赖真机UI出口写成已通过。
 
 原812行交接原样保存在[旧交接归档](docs/archive/handoff-before-workflow-v3-20260926.md)，只作历史资料。原R0–R13业务规格及详细步骤保留在本文件第2–6节，最新执行顺序和差额以本节链接为准。
 
@@ -618,10 +619,10 @@ node wps-addin/test/ui-project-check.cjs
 | R9 | 5询价对象、抬头/版式/快照代码已有 | 图06真实总簿及逐值/打印 |
 | R10 | 持久API/拆分/逐份UI已有 | 待核对自动成功缺陷＋图07/异常真机 |
 | R11 | 路径/SHA审计与重定位代码已有 | 业务内容一致性与5检查点真机恢复 |
-| R12 | 未完成；R12-A现场保护、R12-B暂存清理与发布票据、R12-C图03草稿/错误定位/内容恢复、R12-D汇总宿主与双布局、R12-E拆分待核对内容证明完成（D含真实宿主COM实测与截图；E观察SHA/经核对SHA分开、显式逐值核对后才记成功，含真实WPS写文件+读回比较与真实文件SHA下的待核对状态机、单格合并误判修复，Node 356/356） | 从0.2的R12-F继续至L；R12-B真机清理项、R12-C真机草稿/定位/排序筛选与4项浏览器检查遗留（`ui-brand`/`ui-category`/`ui-memory`/`ui-sheet-review`在R12-C基线即失败）挂后续包；R12-D插件UI内正式填报挂G/H；R12-E插件UI内点击的完整真机链路仍挂J；Computer Use仍阻塞，缺证据不结案 |
+| R12 | 未完成；R12-A现场保护、R12-B暂存清理与发布票据、R12-C图03草稿/错误定位/内容恢复、R12-D汇总宿主与双布局、R12-E拆分待核对内容证明、R12-F公开输出审计完成（D含真实宿主COM实测与截图；E观察SHA/经核对SHA分开、显式逐值核对后才记成功；F完整预期矩阵/区域白名单、指定抬头联系方式按位置+值放行、内部总簿与供应商件分流，Python独立读实际xlsx，隔离污染件逐格留证，Node 361/361） | 从0.2的R12-G继续至L；R12-B真机清理项、R12-C真机草稿/定位/排序筛选与4项浏览器检查遗留（`ui-brand`/`ui-category`/`ui-memory`/`ui-sheet-review`在R12-C基线即失败）挂后续包；R12-D插件UI内正式填报挂G/H；R12-E插件UI内点击的完整真机链路仍挂J；Computer Use仍阻塞，缺证据不结案 |
 | R13 | 安装身份/备份及说明准备已有 | 等待R12后真实生命周期/用户实操/发布核定 |
 
-下一包按0.2与详细计划执行。R12-A只做现场保护与接续检查点，没有新增真机通过或源码修复；R12-B已收敛4个入场修改（`export-files.cjs`/`server.cjs`/`import-ui.js`/`export-files.test.cjs`），`export-host.js`及其测试留R12-D；R12-C新增`compareSnapshot`/`fromSnapshot`、恢复审计的业务内容判定与草稿恢复提示，并用真实受保护文件留只读证据（H11 SHA相同、比较报差异、旧审计ok=true/新审计ok=false），Node 340/340；R12-D完成汇总写入次序/下拉来源/链接目标/预览归属与双布局，用独立隐藏COM实例实测链接并截图，Node 344/344；R12-E完成拆分待核对内容证明与UI显式核对，并用独立隔离WPS真机写/读回真实供应商拆分文件、跑真实文件SHA下的待核对状态机，Node 356/356、`ui-split-check` PASS。R12-E为本轮唯一的真实宿主补充；插件UI内点击的完整真机链路仍未做，四包不把模拟宿主或原生COM读回写成插件UI真机通过。
+下一包按0.2与详细计划执行。R12-A只做现场保护与接续检查点，没有新增真机通过或源码修复；R12-B已收敛4个入场修改（`export-files.cjs`/`server.cjs`/`import-ui.js`/`export-files.test.cjs`），`export-host.js`及其测试留R12-D；R12-C新增`compareSnapshot`/`fromSnapshot`、恢复审计的业务内容判定与草稿恢复提示，并用真实受保护文件留只读证据（H11 SHA相同、比较报差异、旧审计ok=true/新审计ok=false），Node 340/340；R12-D完成汇总写入次序/下拉来源/链接目标/预览归属与双布局，用独立隐藏COM实例实测链接并截图，Node 344/344；R12-E完成拆分待核对内容证明与UI显式核对，并用独立隔离WPS真机写/读回真实供应商拆分文件、跑真实文件SHA下的待核对状态机，Node 356/356、`ui-split-check` PASS；R12-F重建公开输出审计，Node 361/361、Python 8/8，并用隔离污染件逐格留证、按纯值清单只读核对R12-E真实供应商件。R12-D/E/F的真机补充与只读文件核对均未在插件UI内点按完成，五包不把模拟宿主、原生COM读回或文件只读审计写成插件UI真机通过。
 
 ### 7.2 每包Git备份
 
@@ -647,6 +648,7 @@ git ls-remote origin refs/heads/feat/wps-phase1
 - [R12–R13十四包提示词](docs/superpowers/plans/2026-09-27-r12-r13-14-package-prompts.md)：把剩余计划拆成14份可直接复制到新会话的逐包提示词（A–L、R13-A/B），每包一个会话；同目录同名`.docx`为WPS文档版，内容与Markdown一致，仅为便于复制分发。
 - [R12最新验收记录](docs/wps-workflow-v3-acceptance.md)：图03整表确认/图04实际文件、磁盘/快照差异及未完成项。下列旧R12阻塞和下午记录保留其发生时间，不作为最新进度。
 - [R12-E证据](docs/wps-workflow-v3-r12e-evidence-20260927.md)：拆分观察SHA与经核对SHA分开、`verifyExistingOutput`逐值核对、UI显式核对与409保持待核对；本机日志/审计JSON/模拟界面截图在`outputs/wps-acceptance-20260927/R12-E/`，不入Git。
+- [R12-F证据](docs/wps-workflow-v3-r12f-evidence-20260927.md)：公开输出审计完整预期矩阵与`profile`分流、指定抬头联系方式按位置+值放行、文本`=…`与公式分开、Python独立读实际xlsx与CLI `--manifest/--profile`，并给出R12-G/H预期清单格式；本机隔离夹具/污染件/日志/审计JSON在`outputs/wps-acceptance-20260927/R12-F/`，不入Git。
 
 - [旧handoff原样归档](docs/archive/handoff-before-workflow-v3-20260926.md)：历史任务和证据，旧执行顺序失效。
 - [本轮归档验证](docs/wps-workflow-plan-archive-verification-20260926.md)、[图片清单](docs/mockups/approved-20260926/manifest.json)。
