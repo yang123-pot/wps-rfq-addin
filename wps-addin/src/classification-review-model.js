@@ -170,6 +170,41 @@
     if(row.note)counts.notes++;return counts;},{rows:0,filled:0,empty:0,notes:0}),rows:rows}};
  }
  function decisionOf(row){return [text(row&&row.rowId),text(row&&row.categoryId),text(row&&row.note)].join('\u0000');}
+// R12-C：把项目里已保存的审核快照（整表确认或草稿）重建为可再次写入的成果表模型。
+// 用户可编辑的两列取快照，编码/来源等固定字段取绑定，避免“文件未保存”就丢掉人工决定或内部字段。
+function fromSnapshot(snapshot,binding,options){
+  var input=options||{},rows=((snapshot&&snapshot.rows)||[]);
+  if(!rows.length)throw Error('需要已保存的审核快照才能重建成果副本。');
+  var fields={};
+  ((binding&&binding.fields)||[]).forEach(function(field){fields[text(field.rowId)]=field;});
+  var categories=(((binding&&binding.categories)||input.categories)||[]).map(function(category){
+    return {id:text(category.id),name:text(category.name)};});
+  var nameOf={};categories.forEach(function(category){nameOf[category.id]=category.name;});
+  var libraryVersion=binding&&binding.libraryVersion!=null?text(binding.libraryVersion):null;
+  var list=rows.map(function(row,index){
+    var field=fields[text(row.rowId)]||{},categoryId=text(row.categoryId),
+      categoryName=text(row.categoryName)||nameOf[categoryId]||'',
+      autoCategoryId=field.autoCategoryId==null?null:text(field.autoCategoryId);
+    return {rowId:text(row.rowId),index:text(row.index||field.index||(index+1)),
+      name:row.name!=null?text(row.name):text(field.name),feature:row.feature!=null?text(row.feature):text(field.feature),
+      unit:row.unit!=null?text(row.unit):text(field.unit),
+      quantity:row.quantity!=null?text(row.quantity):text(field.quantity),
+      scopeId:text(field.scopeId),code:text(field.code),engineering:'',profession:'',
+      sourceIds:((field.sourceIds||[]).map(function(id){return text(id);})),libraryVersion:libraryVersion,
+      autoCategoryId:autoCategoryId,
+      autoCategoryName:field.autoCategoryName!=null?text(field.autoCategoryName):text(row.autoCategoryName),
+      matchState:matchLabel(autoCategoryId,categoryId),matchBasis:'',
+      finalCategoryId:categoryId,finalCategoryName:categoryName,reviewNote:text(row.note),
+      abnormal:!autoCategoryId&&categoryId!==library.DECISION};
+  });
+  return {schemaVersion:SCHEMA_VERSION,sheet:SHEET,columns:COLUMNS.slice(),rows:list,libraryVersion:libraryVersion,
+   categories:categories,
+   counts:{rows:list.length,
+    suggested:list.filter(function(row){return row.matchState===MATCH.consistent;}).length,
+    skip:list.filter(function(row){return row.finalCategoryId===library.DECISION;}).length,
+    conflict:list.filter(function(row){return !row.autoCategoryId;}).length,
+    none:0,pending:list.length}};
+}
  // 成果表绑定是否还能用于本次内容：来源/合并/分类库变化后必须重新生成，旧inputKey一律拒绝。
  function bindingState(binding,inputKey){
   if(!binding||typeof binding!=='object')
@@ -272,5 +307,5 @@
   MATCH:MATCH,MATCH_COLUMN:MATCH_COLUMN,FINAL_COLUMN:FINAL_COLUMN,NOTE_COLUMN:NOTE_COLUMN,AUTO_COLUMN:AUTO_COLUMN,
   BLOCKING_ISSUES:BLOCKING_ISSUES.slice(),autoLabel:autoLabel,matchLabel:matchLabel,
   validateRead:validateRead,confirmation:confirmation,draft:draft,sameRows:sameRows,changedRows:changedRows,
-  bindingState:bindingState};
+  bindingState:bindingState,fromSnapshot:fromSnapshot};
 }));

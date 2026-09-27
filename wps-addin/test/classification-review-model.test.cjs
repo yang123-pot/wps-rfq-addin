@@ -4,6 +4,7 @@ const collection=require('../src/collection.js');
 const model=require('../src/classification-review-model.js');
 const memory=require('../src/category-memory.js');
 const layout=require('../src/workbook-layout.js');
+const host=require('../src/classification-review-host.js');
 
 function built(){
   const col=sample.buildCollection();
@@ -266,4 +267,41 @@ test('成果表绑定有效性：缺表要先生成，旧inputKey必须重新生
   assert.equal(stale.code,'stale');
   assert.match(stale.message,/重新生成/);
   assert.equal(model.bindingState({},'ck2-0123456789abcdef').ok,true,'无键的旧绑定仍按现行内容校验');
+});
+
+// R12-C：把项目里已保存的审核快照（确认或草稿）写成新的成果副本，用户的人工决定不因文件未保存而丢失。
+test('R12-C：按已保存快照重建成果副本，类别/备注取快照、编码等固定字段取绑定，重建后可再整表读回',()=>{
+  const {result}=built();
+  const receipt={target:'C:\\out\\示例园区_分类审核成果.xlsx',sha256:'a'.repeat(64)};
+  const binding=host.bindingFor(receipt,result,{inputKey:'ck2-0123456789abcdef'});
+  const read=readResult(result,state=>{
+    const row=state.row('充电桩配电箱');
+    row.finalCategoryName='汽车充电桩';row.finalCategoryId='ev-charger';row.reviewNote='充电桩配套';
+  });
+  const snapshot=model.confirmation(model.validateRead(read,{categories:result.categories}).rows,
+    {projectId:'p-sample01',inputKey:'ck2-0123456789abcdef',binding:binding,
+     confirmedAt:'2026-09-27T10:01:15.871Z',revision:1});
+  const restored=model.fromSnapshot(snapshot,binding,{});
+  assert.equal(restored.rows.length,8,'重建副本必须保留整表行数');
+  const conflict=restored.rows.filter(row=>row.finalCategoryId==='ev-charger')[0];
+  assert.equal(conflict.finalCategoryName,'汽车充电桩','类别取已保存快照');
+  assert.equal(conflict.reviewNote,'充电桩配套','备注取已保存快照');
+  const field=binding.fields.filter(item=>item.rowId===conflict.rowId)[0];
+  assert.equal(conflict.code,field.code,'项目编码等固定字段来自绑定，不丢内部数据');
+  assert.equal(conflict.autoCategoryId,field.autoCategoryId,'自动建议作为固定字段保留');
+  const steel=restored.rows.filter(row=>row.finalCategoryId==='no-inquiry')[0];
+  assert.equal(steel.skipped===undefined,true);
+  assert.equal(steel.finalCategoryName,'无需询价','无需询价按快照保留');
+  const sheet=model.mainSheet(restored,{title:'示例园区_分类审核成果_恢复副本.xlsx'});
+  assert.deepEqual(sheet.values[model.HEADER_ROW-1],model.COLUMNS.concat(['','']),'第3行是公开表头');
+  const rowIndex=restored.rows.indexOf(conflict),line=sheet.values[model.FIRST_ROW+rowIndex-1];
+  assert.equal(line[7],'汽车充电桩');
+  assert.equal(line[8],'充电桩配套');
+  assert.equal(line[10],conflict.rowId,'K列仍写随行rowId');
+  const rebuilt=host.bindingFor({target:'C:\\out\\恢复副本.xlsx',sha256:'b'.repeat(64)},restored,{inputKey:'ck2-0123456789abcdef'});
+  const reader=(row,column)=>(sheet.values[row-1]||[])[column-1];
+  const back=host.readSheet(reader,rebuilt);
+  assert.deepEqual(back.issues,[],'重建的成果副本必须能被同一套读回校验通过');
+  assert.equal(host.compareSnapshot(back,snapshot).matches,true,'重建副本业务内容与快照一致');
+  assert.throws(()=>model.fromSnapshot({rows:[]},binding,{}),/快照/);
 });

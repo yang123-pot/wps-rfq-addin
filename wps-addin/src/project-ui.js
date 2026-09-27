@@ -159,6 +159,14 @@
     for(var index=0;index<list.length;index++){
       var item=list[index],actual=await inspectFile(item.path);
       checks[item.path]={exists:actual.exists===true,sha256:actual.sha256||null,error:actual.error||null};
+      // R12-C：审核成果表要在SHA之外核对业务内容。优先读同路径已打开簿（保留未保存修改）；
+      // 读不到只保留SHA核对，不阻断打开，也不把读不到解释成“内容已一致”。
+      if(item.stage==='review'&&actual.exists===true&&options.compareReviewContent){
+        try{
+          var content=await options.compareReviewContent(project);
+          if(content)checks[item.path].content=content;
+        }catch(error){/* 读不到成果表时仅按SHA核对 */}
+      }
     }
     var audit=RfqProjectRestore.audit(project,checks);
     applyRestoreAudit(project,audit);
@@ -214,16 +222,20 @@
   // R5两条写入路径：草稿只存进度，确认快照才代表“整表一次确认”，两者都按项目乐观锁落盘。
   async function commitReview(confirmation,extra){
     var input=extra||{};
+    var previousConfirmation=reviewConfirmation,previousDraft=reviewDraft;
     if(input.draft)reviewDraft=input.draft;
     if(confirmation)reviewConfirmation=confirmation;
     var receipt=await persist();
-    if(receipt)tell('整表审核确认已保存到项目记录（版本 '+current.revision+'）。');
+    if(!receipt){reviewConfirmation=previousConfirmation;reviewDraft=previousDraft;return null;}
+    tell('整表审核确认已保存到项目记录（版本 '+current.revision+'）。');
     return receipt;
   }
   async function commitReviewDraft(draft){
+    var previousDraft=reviewDraft;
     if(draft)reviewDraft=draft;
     var receipt=await persist();
-    if(receipt)tell('审核草稿已保存到项目记录（版本 '+current.revision+'），尚未确认。');
+    if(!receipt){reviewDraft=previousDraft;return null;}
+    tell('审核草稿已保存到项目记录（版本 '+current.revision+'），尚未确认。');
     return receipt;
   }
   async function openProject(projectId){
@@ -257,6 +269,15 @@
         loaded.classification||(loaded.carried&&loaded.carried.classification)||null);
       restoreFutureFields(loaded);
       var audit=await auditRestore(loaded);
+      // R12-C：业务内容与确认快照一致、仅另存/格式/排序造成SHA变化时不判外部改写，而是刷新物理校验。
+      var physicalRefreshed=0;
+      if(audit.ok&&audit.physicalRefresh&&audit.physicalRefresh.length&&loaded.matching){
+        audit.physicalRefresh.forEach(function(entry){if(entry.stage==='review')loaded.matching.sha256=entry.sha256;});
+        try{
+          var syncReceipt=await request('save',{project:loaded,expectedRevision:loaded.revision});
+          loaded.revision=Number(syncReceipt.revision);physicalRefreshed=audit.physicalRefresh.length;
+        }catch(error){/* 物理刷新写回失败不阻断打开，下次重开仍会再核内容 */}
+      }
       // 先按恢复后的合并确认键重算一次侧栏，再判阶段；否则会误判为“尚未生成自动分类建议”。
       if(options.afterRestore)options.afterRestore(loaded);
       current=syncStages(loaded);
@@ -267,6 +288,7 @@
       tell('已恢复项目'+loaded.projectId+'（版本 '+loaded.revision+'）。'+(upgradedFrom?'旧版项目'+upgradedFrom+'已保留，本次继续写入v2副本，需重新确认合并与整表审核。':'')+
         (rebuilt?'已按原件SHA校验重建'+rebuilt+'份工作副本。':'工作副本完整。')+
         (audit.ok?'各阶段持久文件已核对。':'有'+audit.issues.length+'项持久文件未核对通过，未恢复为已完成；缺失文件可尝试“重新定位项目文件”。')+
+        (physicalRefreshed?'审核成果表仅另存/格式变化，业务内容与确认快照一致，物理校验已更新。':'')+
         '原件不变，快照可用于继续核对。'+(recomputed?'阶段状态已按当前来源与确认内容重算，保存后写回项目记录。':''),
         !audit.ok);
       return true;

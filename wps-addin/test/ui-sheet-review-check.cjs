@@ -154,6 +154,11 @@ async function run(options={}){
   assert.match(await page.locator('#sheet-review-stats').innerText(),/8 行/);
   assert.match(await page.locator('#sheet-review-stats').innerText(),/1 处待修改/,'冲突行未填时整表未完成');
   assert.match(await page.locator('#stage-panel-review').innerText(),/不做逐行勾选确认/,'主流程不得要求逐行勾选');
+  // R12-C：业务内容与已存确认一致时，两个恢复动作默认隐藏；只有发现业务差异才出现。
+  assert.equal(await page.locator('#sheet-review-use-sheet').isHidden(),true);
+  assert.equal(await page.locator('#sheet-review-restore-copy').isHidden(),true);
+  assert.equal(await page.locator('#sheet-review-use-sheet').innerText(),'选用现表内容（按现表重新确认）');
+  assert.equal(await page.locator('#sheet-review-restore-copy').innerText(),'恢复项目草稿到新副本');
   // 整表不完整不放行，并定位到具体单元格；未确认不写项目、不学习。
   await page.locator('#sheet-review-confirm').click();
   await page.waitForFunction(()=>document.querySelector('#sheet-review-message').textContent.includes('整表未通过校验'));
@@ -232,6 +237,23 @@ async function run(options={}){
   await page.waitForFunction(()=>document.querySelector('#sheet-review-message').textContent.includes('未重复确认'));
   assert.equal((await projectRecord()).revision,revision,'重复确认不得新增项目版本');
   assert.equal(JSON.stringify((await store.load()).memory),memorySnapshot,'重复确认不得重复学习');
+  // R12-C：整表确认后再点“保存审核成果”只存草稿——不改confirmedAt、不新增确认版本、不学习；提示与已保存xlsx区分。
+  const beforeDraft=await projectRecord(),beforeDraftMemory=JSON.stringify((await store.load()).memory);
+  await page.evaluate(({row})=>{window.__setCell(row,9,'草稿备注');},{row:FAN_ROW});
+  await page.locator('#sheet-review-save').click();
+  await page.waitForFunction(()=>document.querySelector('#sheet-review-message').textContent.includes('审核草稿已保存'));
+  assert.match(await page.locator('#sheet-review-message').innerText(),/尚未确认、未学习、未生成分类工作簿/,
+   '草稿提示必须与“xlsx已保存”区分');
+  const afterDraft=await projectRecord();
+  assert.equal(afterDraft.review.confirmedAt,beforeDraft.review.confirmedAt,'草稿保存不得改动confirmedAt');
+  assert.equal(afterDraft.review.revision,beforeDraft.review.revision,'草稿保存不得新增确认版本');
+  assert.equal(JSON.stringify((await store.load()).memory),beforeDraftMemory,'草稿保存不得学习');
+  assert.equal(afterDraft.reviewDraft.state,'draft');
+  // 草稿改动尚未确认：与已存确认的业务差异必须显示，并给出两个恢复动作。
+  assert.match(await page.locator('#sheet-review-banner').innerText(),/不一致/);
+  assert.equal(await page.locator('#sheet-review-use-sheet').isVisible(),true);
+  assert.equal(await page.locator('#sheet-review-restore-copy').isVisible(),true);
+  await page.evaluate(({row})=>{window.__setCell(row,9,'');},{row:FAN_ROW});
   // 留证：确认后的侧栏（图03）与表内实际值（含按一致/存在差异刷新过的“匹配情况”列）。
   assert.match(await page.locator('#sheet-review-banner').innerText(),/整表已确认/);
   if(SHOT)await page.screenshot({path:SHOT,fullPage:true});
@@ -252,6 +274,22 @@ async function run(options={}){
   assert.equal(reconfirmed.review.revision,2);
   assert.equal(reconfirmed.review.rows.filter(row=>row.categoryId==='valve').length,3);
   assert.equal(reconfirmed.review.rows.filter(row=>row.categoryId==='fan').length,1);
+  // R12-C：项目保存冲突(409)——保留表内最新值与已存快照，不覆盖、不学习，并回滚为已存确认。
+  const reviewFile=await projectFile(),conflictBase=await projectRecord();
+  const memoryBefore409=JSON.stringify((await store.load()).memory);
+  const bumped=JSON.parse(JSON.stringify(conflictBase));bumped.revision=conflictBase.revision+5;
+  await fs.writeFile(reviewFile,JSON.stringify(bumped,null,2));
+  await page.evaluate(({row})=>{window.__setCell(row,8,'水泵');},{row:FAN_ROW});
+  await page.locator('#sheet-review-confirm').click();
+  await page.waitForFunction(()=>/项目未被覆盖|整表确认未保存/.test(document.querySelector('#sheet-review-message').textContent));
+  assert.equal(await page.evaluate(({row})=>String(window.__reviewSnapshot().cells[row+':8']),{row:FAN_ROW}),'水泵',
+   '409时表内最新值必须保留');
+  assert.match(await page.locator('#sheet-review-banner').innerText(),/不一致/,'409必须回滚为已存确认并提示内容不一致');
+  assert.equal((await projectRecord()).review.confirmedAt,conflictBase.review.confirmedAt,'409不得覆盖已存快照');
+  assert.equal(JSON.stringify((await store.load()).memory),memoryBefore409,'409不得学习');
+  // 复原文件版本与表内值，供后续步骤继续。
+  await fs.writeFile(reviewFile,JSON.stringify(conflictBase,null,2));
+  await page.evaluate(({row})=>{window.__setCell(row,8,'阀门');},{row:FAN_ROW});
   // 恢复已确认项目只读回分类，不重复学习、不改写记忆文件。
   const memoryBeforeRestore=await fs.readFile(path.join(root,'library','library-state.json'),'utf8');
   await page.reload();

@@ -22,6 +22,12 @@
       getReviewBinding:function(){return reviewBinding;},
       restoreReviewBinding:function(value){reviewBinding=value||null;return reviewBinding;},
       setReviewBinding:function(value){reviewBinding=value||null;},
+      // R12-C：项目重开时在SHA之外按业务内容核对审核成果表，优先读同路径已打开簿的未保存修改。
+      compareReviewContent:function(project){
+        if(!options.application||!project||!project.matching||!project.review)return null;
+        return RfqClassificationReviewHost.compareSnapshot(
+          RfqClassificationReviewHost.readBack(options.application,project.matching),project.review);
+      },
       getCategories:function(){return categoryReceipt;},
       restoreCategories:function(value){categoryReceipt=value||null;return categoryReceipt;},
       getClassificationRows:function(){return classifier.rows();},
@@ -410,7 +416,7 @@
     if(options.restoreReviewBinding)reviewBinding=options.restoreReviewBinding()||null;
     // R5：表内审核→整表一次确认→学习。主按钮读回绑定成果簿全部行（含筛选隐藏行），按rowId校验材料与类别；
     // 空分类/未知分类/损坏行返回工作表＋单元格并定位。确认快照先落盘，落盘成功才学习，失败不回滚确认。
-    var sheetReviewBusy=false,lastReviewRead=null;
+    var sheetReviewBusy=false,lastReviewRead=null,reviewDivergence=null;
     function sheetEl(id){return document.getElementById(id);}
     function sheetTell(text,error){var box=sheetEl('sheet-review-message');if(box){box.textContent=text;box.className=error?'error':'';}}
     function columnName(column){return Number.isSafeInteger(column)&&column>0&&column<=26?String.fromCharCode(64+column):'';}
@@ -424,6 +430,23 @@
       if(!state.ok)throw Error(state.message);
       if(!options.application)throw Error('请在WPS内打开侧栏，才能读回审核成果表。');
       return RfqClassificationReviewHost.readBack(options.application,reviewBinding);
+    }
+    // R12-C：现表（打开簿/磁盘）与项目已保存的审核快照是否业务一致。
+    // SHA相同不代表内容一致：H11磁盘空、快照汽车充电桩时必须在侧栏报出并给出恢复动作。
+    function detectReviewDivergence(read){
+      var confirmation=reviewConfirmation();
+      if(confirmation&&confirmation.inputKey===matchingKey()){
+        var against=RfqClassificationReviewHost.compareSnapshot(read,confirmation);
+        if(against&&against.matches===false)
+          return {kind:'confirmation',label:'整表确认快照',snapshot:confirmation,result:against};
+      }
+      var draft=projects.reviewDraft?projects.reviewDraft():null;
+      if(draft){
+        var againstDraft=RfqClassificationReviewHost.compareSnapshot(read,draft);
+        if(againstDraft&&againstDraft.matches===false)
+          return {kind:'draft',label:'审核草稿',snapshot:draft,result:againstDraft};
+      }
+      return null;
     }
     function renderReviewIssues(errors){
       var list=sheetEl('sheet-review-issues');if(!list)return;
@@ -453,7 +476,8 @@
     function renderSheetReview(){
       var banner=sheetEl('sheet-review-banner'),progress=sheetEl('sheet-review-progress'),stats=sheetEl('sheet-review-stats'),
         status=sheetEl('sheet-review-status'),confirm=sheetEl('sheet-review-confirm'),save=sheetEl('sheet-review-save'),
-        retry=sheetEl('sheet-review-memory-retry');
+        retry=sheetEl('sheet-review-memory-retry'),useSheet=sheetEl('sheet-review-use-sheet'),
+        restoreCopy=sheetEl('sheet-review-restore-copy');
       if(!banner)return;
       var confirmation=reviewConfirmation(),draft=projects.reviewDraft?projects.reviewDraft():null;
       var ready=!!reviewBinding&&selectionConfirmed(),fresh=reviewFresh();
@@ -493,6 +517,20 @@
       }
       if(confirm)confirm.disabled=sheetReviewBusy||!ready;
       if(save)save.disabled=sheetReviewBusy||!ready;
+      // R12-C：SHA一致但业务内容与项目已保存的审核快照不同，给出双方并保留两种恢复动作，不静默覆盖/学习。
+      if(useSheet)useSheet.hidden=!(ready&&reviewDivergence);
+      if(restoreCopy)restoreCopy.hidden=!(ready&&reviewDivergence);
+      if(ready&&reviewDivergence){
+        var diff=reviewDivergence.result,differences=diff.differences||[];
+        if(reviewDivergence.kind==='confirmation'){
+          banner.textContent='成果表内容与已保存确认不一致';
+          banner.className='result-banner';
+        }
+        stats.textContent='项目保存的'+reviewDivergence.label+'与当前成果表（'+
+          (diff.source==='open'?'打开簿内容':'磁盘内容')+'）有 '+differences.length+' 处业务差异，SHA一致也不能当作已一致。';
+        status.textContent='请选择：选用现表内容（按现表重新整表确认）或恢复项目草稿到新副本（把项目保存的审核写进新副本，不覆盖当前簿）。'+
+          (differences[0]?'例：'+differences[0].message:'');
+      }
       if(retry){
         var pending=classifier&&classifier.memoryPending?classifier.memoryPending():false;
         retry.hidden=!pending;
@@ -500,12 +538,14 @@
     }
     function refreshReviewRead(silent){
       if(!sheetEl('sheet-review-banner'))return;
-      if(!reviewBinding||!selectionConfirmed()){lastReviewRead=null;renderSheetReview();return;}
+      if(!reviewBinding||!selectionConfirmed()){lastReviewRead=null;reviewDivergence=null;renderSheetReview();return;}
       try{
-        lastReviewRead=RfqClassificationReviewModel.validateRead(readReviewSheet(),{categories:reviewBinding.categories});
+        var read=readReviewSheet();
+        lastReviewRead=RfqClassificationReviewModel.validateRead(read,{categories:reviewBinding.categories});
+        reviewDivergence=detectReviewDivergence(read);
         if(!silent&&!lastReviewRead.ok)renderReviewIssues(lastReviewRead.errors);
       }catch(error){
-        lastReviewRead=null;
+        lastReviewRead=null;reviewDivergence=null;
         if(!silent)sheetTell('未能读回成果表：'+error.message,true);
       }
       renderSheetReview();
@@ -531,9 +571,11 @@
         if(!receipt){
           var reason=projects.lastError&&projects.lastError();
           sheetTell('审核草稿未保存：'+(reason?reason.message:'项目记录写入失败。'),true);
+          refreshReviewRead(true);
           return;
         }
         refreshMatchDisplay(checked);
+        reviewDivergence=detectReviewDivergence(read);
         renderReviewIssues(checked.errors);
         sheetTell('审核草稿已保存（'+result.draft.counts.filled+' / '+result.draft.counts.rows+
           ' 行已填），尚未确认、未学习、未生成分类工作簿。'+(checked.ok?'':('还有 '+checked.errors.length+' 处待修改。')));
@@ -572,9 +614,11 @@
         if(!receipt){
           var reason=projects.lastError&&projects.lastError();
           sheetTell('整表确认未保存：'+(reason?reason.message:'项目记录写入失败。')+'（未学习、未放行）',true);
+          refreshReviewRead(true);
           return;
         }
         var refreshed=refreshMatchDisplay(checked);
+        reviewDivergence=detectReviewDivergence(read);
         renderReviewIssues([]);
         renderSheetReview();
         var items=checked.rows.map(function(row){
@@ -603,9 +647,49 @@
       finally{sheetReviewBusy=false;renderSheetReview();}
     }
     var sheetConfirmButton=sheetEl('sheet-review-confirm'),sheetSaveButton=sheetEl('sheet-review-save'),
-      sheetRetryButton=sheetEl('sheet-review-memory-retry');
+      sheetRetryButton=sheetEl('sheet-review-memory-retry'),sheetUseSheetButton=sheetEl('sheet-review-use-sheet'),
+      sheetRestoreCopyButton=sheetEl('sheet-review-restore-copy');
     if(sheetConfirmButton)sheetConfirmButton.addEventListener('click',confirmSheetReview);
     if(sheetSaveButton)sheetSaveButton.addEventListener('click',saveReviewDraft);
+    // R12-C：以现表为准——按当前成果表内容重新整表一次确认（复用主流程确认，不新增阶段）。
+    if(sheetUseSheetButton)sheetUseSheetButton.addEventListener('click',function(){
+      if(sheetReviewBusy)return;
+      sheetTell('正在按当前成果表内容整表确认…');
+      confirmSheetReview();
+    });
+    // R12-C：把项目保存的审核快照写成新的成果副本，绝不覆盖当前打开的簿；成功后再把绑定切到新副本。
+    if(sheetRestoreCopyButton)sheetRestoreCopyButton.addEventListener('click',async function(){
+      if(sheetReviewBusy)return;
+      var draft=projects.reviewDraft?projects.reviewDraft():null,confirmation=reviewConfirmation();
+      var snapshot=(reviewDivergence&&reviewDivergence.snapshot)||confirmation||draft;
+      if(!snapshot||!snapshot.rows||!snapshot.rows.length){sheetTell('没有可恢复的审核快照。',true);return;}
+      if(!reviewBinding){sheetTell('缺少审核成果表绑定，无法恢复副本。',true);return;}
+      var prepared=null,published=false;
+      try{
+        var restoredModel=RfqClassificationReviewModel.fromSnapshot(snapshot,reviewBinding,{});
+        var name=String(reviewTargetName()).replace(/\.xlsx$/i,'')+'_恢复副本.xlsx';
+        var selection=await pickReviewTarget(name);
+        if(!selection||!selection.target){sheetTell('已取消恢复副本，当前内容不变。');return;}
+        if(RfqProjectRestore&&RfqProjectRestore.key&&RfqProjectRestore.key(selection.target)===RfqProjectRestore.key(reviewBinding.path)){
+          sheetTell('恢复副本不能写到当前成果表本身，请另选文件名。',true);return;}
+        sheetReviewBusy=true;renderSheetReview();
+        sheetTell('正在把项目保存的审核内容写成新副本…');
+        prepared=await exportRequest('prepare',{target:selection.target,adjacent:true});
+        await RfqClassificationReviewHost.write(options.application,restoredModel,prepared.stagePath,{title:name});
+        var receipt=await exportRequest('commit',{ticket:prepared.ticket});
+        published=true;
+        await exportRequest('verify',{ticket:prepared.ticket,target:receipt.target,sha256:receipt.sha256});
+        reviewBinding=RfqClassificationReviewHost.bindingFor(receipt,restoredModel,{inputKey:matchingKey(),title:name});
+        if(options.setReviewBinding)options.setReviewBinding(reviewBinding);
+        sheetTell('已把项目保存的审核内容写成新副本（未覆盖原成果表）：'+receipt.target+'。请核对后整表一次确认。');
+        try{RfqClassificationReviewHost.openForEditing(options.application,receipt.target);}catch(_){}
+        refreshReviewRead(true);
+      }catch(error){sheetTell('恢复副本未完成：'+error.message,true);}
+      finally{
+        if(prepared&&!published){try{await exportRequest('discard',{ticket:prepared.ticket});}catch(_){}}
+        sheetReviewBusy=false;renderSheetReview();
+      }
+    });
     if(sheetRetryButton)sheetRetryButton.addEventListener('click',function(){
       sheetTell('正在重新保存分类习惯…');
       classifier.retryMemory().then(function(ok){

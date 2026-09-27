@@ -106,6 +106,65 @@
 - 入场 6 个修改中，`export-host.js` 与 `export-host.test.cjs`（预览簿恢复、链接字体顺序/回读容差）**保持未提交**，留给 R12-D。
 - **下一包：** R12-C（图03 草稿、错误定位与内容恢复，含 H11“磁盘空/快照有汽车充电桩”差异）。
 
+## R12-C 图03草稿、错误定位与内容恢复（2026-09-27，源码包，未触碰真机）
+
+**基线/包提交：** 分支 `feat/wps-phase1`，开工 HEAD `678dc1bc0ec494ac46ff65095d8a71e89346ebd1`（R12-B 源码提交）。本包只改源码/测试与文档，包提交为紧随其后的 `fix/feat: R12-C…` 提交，远程 SHA 以推送结果为准。工作区**仍保留** `wps-addin/src/export-host.js`、`wps-addin/test/export-host.test.cjs` 两个 R12-D 修改，本包未暂存、未清理。
+
+**对应图：** 图03（在表格中修改，整表一次确认），本次实际打开查看：浅黄“最终分类”下拉、主按钮“审核完成，生成分类工作簿”、辅助“保存审核成果”、空/未知分类定位到具体单元格。
+
+**入口问题（R12-A 已核）：** 磁盘审核成果表 H11 为空、项目确认快照为“汽车充电桩”，两者 SHA 相同。旧审计只看 SHA，会把业务差异判成“内容已一致”，掩盖人工决定没有落盘。
+
+### 1. 失败测试先行（修改前 7 例失败）
+
+新增用例先在入口版本失败，失败原因是行为缺失而非环境或拼写：
+
+| 新用例 | 修改前失败现象 |
+| --- | --- |
+| `R12-C比较：磁盘空分类与确认快照不一致必须报出` | `host.compareSnapshot is not a function` |
+| `R12-C比较：按rowId比较，排序/筛选不影响` | 同上 |
+| `R12-C比较：固定字段、备注、缺行与多余行都按rowId给出差异` | 同上 |
+| `R12-C：按已保存快照重建成果副本` | `model.fromSnapshot is not a function` |
+| `R12-C：SHA相同但业务内容与确认快照不同，不得恢复为已一致` | `audit.ok` 仍为 `true`（未识别业务差异） |
+| `R12-C：业务一致但仅另存/格式变化，登记物理刷新` | `audit.ok` 为 `false`（把仅另存误判外部改写） |
+| `R12-C：磁盘审核内容与确认快照不一致（workflow-v3 集成）` | `reviewHost.compareSnapshot is not a function` |
+
+### 2. 修正内容
+
+- `classification-review-host.js` 新增 `compareSnapshot(readResult,snapshot) -> {matches,differences,source,counts}`：按 `rowId` 比较固定字段（项目名称/规格/单位/工程量）、最终分类与审核备注；行序（排序/筛选）不影响结论；缺行/多余行单独报出。`readBack` 结果标注 `source`（`open`=同路径已打开簿 / `disk`=磁盘），保证优先读用户未保存修改。
+- `classification-review-model.js` 新增 `fromSnapshot(snapshot,binding)`：把项目里保存的审核快照（确认或草稿）重建为可再次写入的成果表模型，用户可编辑两列取快照、编码/来源/自动建议等固定字段取绑定，不丢内部数据。
+- `project-restore.js` `audit(project,checks)` 增加业务内容判定：`checks[].content` 为 `compareSnapshot` 结果。**SHA相同但业务不同** → `content-different`（附完整差异，区分“磁盘内容/打开簿内容”），`review` 不恢复 ready、不可靠换目录冒充一致；**业务一致但仅另存/格式导致 SHA 改变** → 不判外部改写，登记 `physicalRefresh` 供更新物理校验并写回；固定字段被改动仍按原规则拒绝。
+- `project-ui.js`：重开项目时对审核成果表在 SHA 之外按业务内容核对（`compareReviewContent`，优先同路径已打开簿）；`content-different` 进 `blocks.review` 并在状态区列明双方；`physicalRefresh` 更新 `matching.sha256` 后写回项目记录。`commitReview/commitReviewDraft` 保存失败（含 409）**回滚内存中的确认/草稿**，不再出现“内存已确认、磁盘未保存”。
+- `import-ui.js`：表内审核面板检测“现表 vs 项目已保存审核快照”的业务差异，命中时把横幅改为“成果表内容与已保存确认不一致”，并显示两个既有辅助动作：**“选用现表内容（按现表重新确认）”**（复用主流程整表确认）与**“恢复项目草稿到新副本”**（用 `fromSnapshot` 重建后经 prepare/write/commit/verify 写到**新副本**，绝不覆盖当前打开的簿）。不新增主流程确认阶段，仍为整表一次确认。
+- `taskpane.html`：在表内审核面板补充上述两个按钮（默认隐藏，仅在发现业务差异时出现）。
+
+### 3. 真实文件证据（本机 `outputs/wps-acceptance-20260927/R12-C/`，只读）
+
+用**真实项目记录**（受保护副本 `R12-A/protected/p-mujmyjx0-16kom40i.json`，revision=6）与**真实磁盘审核成果表**（只读读出8行）跑实际比较与审计逻辑：
+
+| 结论 | 值 |
+| --- | --- |
+| 磁盘审核成果表 SHA256 | `d9355c4be1a0b6dbfb315cc7e40b5cba2b6e8af0c38de02dfe52259f8e9ced5f` |
+| 项目记录 matching.sha256 | `d9355c4be1a0b6dbfb315cc7e40b5cba2b6e8af0c38de02dfe52259f8e9ced5f`（SHA一致） |
+| `compareSnapshot`（新） | `matches=false`，1 处差异：`充电桩配电箱` 最终分类 确认快照“汽车充电桩” / 现表“（空）” |
+| `audit`（新，含业务内容） | `ok=false`，`blocks.review=审核成果表（磁盘内容）的业务内容与项目确认快照不一致…`，code `content-different`，不可重新定位 |
+| `audit`（旧口径，仅 SHA） | `ok=true`（这正是本包修复的“SHA一致掩盖业务差异”） |
+
+原始脚本与报告：`read-review-disk.py`（openpyxl 只读）、`compare-h11.cjs`、`review-disk-rows.json`、`h11-compare-report.json`。**未改动任何 xlsx、项目记录或分类工作簿。**
+
+### 4. 回归与验证
+
+- 新增/扩展用例：`classification-review-host.test.cjs`（3）、`classification-review-model.test.cjs`（1）、`project-restore-audit.test.cjs`（2）、`workflow-v3.test.cjs`（1）、新增 `project-ui-review-content.test.cjs`（4，用最小DOM/网络替身直接驱动 `project-ui.js`，覆盖：内容不同不 ready、仅另存刷新物理校验并写回、409 回滚确认/草稿、草稿保存不改 confirmedAt）。
+- review/project 相关：`node --test`（model/host/project-restore/project-restore-audit/project-ui/workflow-v3）→ **41 pass / 0 fail**（日志 `node-review-project.log`）。
+- 全量：`node --test wps-addin/test/*.test.cjs` → **340 pass / 0 fail**（R12-B 329 ＋ 本包 11，日志 `node-full.log`）。
+- `test/ui-sheet-review-check.cjs`、`test/ui-project-restore-check.cjs` 已补 R12-C 断言（草稿不改确认/不学习、409 保留表内值与已存快照、内容差异提示与动作、restore 审计按业务内容阻断），但**本机无 playwright 模块**（`Cannot find module 'playwright'`，见 `ui-sheet-review-attempt.log`、`ui-project-restore-attempt.log`），两个脚本本次**未执行**；脚本已通过 `node --check`。
+
+### 5. 未完成与下一包
+
+- **未做真机 WPS 操作**，本包不得勾选任何依赖真机的出口：真机改分类/备注后点“保存审核成果”的 `draft` 落盘与 `confirmedAt`/学习/分类簿 SHA 不变、错误副本逐项定位、排序筛选读回8行、保存关闭重开草稿与确认检查点，均**挂 R12-J**（文件故障与恢复）或按 R12-L 全量回归；仅环境阻塞，尚未新增真机通过。
+- 浏览器 UI 检查受本机缺 playwright 限制，未执行；源码已同步更新断言，待有浏览器运行时复跑。
+- `export-host.js` 与 `export-host.test.cjs`（R12-D）保持未提交，留 R12-D。
+- **下一包：** R12-D（汇总字体/下拉/原生链接/预览候选修复与双布局细节）。
+
 ## 已核实的图03与图04证据
 
 WPS 版本：12.1.0.29161。所有样本、截图、项目和审计 JSON 留在 `outputs/wps-acceptance-20260927/r12/`，不纳 Git。

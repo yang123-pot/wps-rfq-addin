@@ -25,6 +25,11 @@
   return {stage:stage,path:text(path),sha256:sha==null?null:text(sha),label:label||stage,
    state:state||null,fileId:fileId||null};
  }
+ // R12-C：把业务内容差异压成一句人话，供侧栏提示；完整差异留在issue.differences里。
+ function describeDifferences(list){
+  var items=(list||[]).slice(0,3).map(function(item){return item&&item.message?item.message:'';}).filter(Boolean);
+  return items.join('；')+((list||[]).length>3?'；其余'+((list||[]).length-3)+'处':'');
+ }
  // 项目恢复前要核对的全部持久文件：审核成果、分类工作簿、汇总表、总询价簿和拆分回执中的目标。
  function requirements(project){
   var out=[],matching=project&&project.matching,categories=project&&project.categories,
@@ -41,7 +46,7 @@
   return out;
 }
  function audit(project,checks){
-  var checkMap=checks||{},items=requirements(project),blocks={},issues=[],missing=[];
+  var checkMap=checks||{},items=requirements(project),blocks={},issues=[],missing=[],physicalRefresh=[];
   items.forEach(function(item){
    if(item.state&&item.state!=='succeeded'&&item.stage==='split')
     issues.push({stage:item.stage,code:'not-succeeded',path:item.path,label:item.label,
@@ -57,15 +62,30 @@
      message:item.label+'缺少可核对的SHA256，不能恢复为已完成。'});
     return;
    }
-   if(!actual.sha256||text(actual.sha256).toLowerCase()!==text(item.sha256).toLowerCase())
-    issues.push({stage:item.stage,code:'changed',path:item.path,label:item.label,
-     message:item.label+'内容已被外部修改，不能沿用旧成功记录：'+item.path});
+   var content=item.stage==='review'&&actual.content?actual.content:null,
+    shaMatches=!!actual.sha256&&text(actual.sha256).toLowerCase()===text(item.sha256).toLowerCase();
+   // 业务内容优先：SHA相同但磁盘/打开簿内容与确认快照不同，必须报出，不能用物理一致掩盖业务差异。
+   if(content&&content.matches===false)
+    issues.push({stage:item.stage,code:'content-different',path:item.path,label:item.label,
+     differences:((content.differences||[]).slice()),
+     source:content.source||null,
+     message:item.label+'（'+(content.source==='open'?'打开簿内容':'磁盘内容')+
+      '）的业务内容与项目确认快照不一致（SHA'+(shaMatches?'相同':'不同')+
+      '也不能当作已一致）：'+describeDifferences(content.differences)});
+   if(!shaMatches){
+    if(content&&content.matches===true)
+     // 仅另存/格式/排序造成的物理变化，业务内容仍与确认快照一致：登记物理校验刷新，不判外部改写。
+     physicalRefresh.push({stage:item.stage,path:item.path,label:item.label,sha256:text(actual.sha256).toLowerCase()});
+    else
+     issues.push({stage:item.stage,code:'changed',path:item.path,label:item.label,
+      message:item.label+'内容已被外部修改，不能沿用旧成功记录：'+item.path});
+   }
   });
   issues.forEach(function(issue){if(!blocks[issue.stage])blocks[issue.stage]=issue.message;});
   var root=commonRoot(project),relocatable=missing.length>0&&!!root&&issues.every(function(issue){
    return issue.code==='missing';});
   return {schemaVersion:SCHEMA_VERSION,ok:issues.length===0,issues:issues,blocks:blocks,
-   commonRoot:root,relocatable:relocatable,requirements:items};
+   physicalRefresh:physicalRefresh,commonRoot:root,relocatable:relocatable,requirements:items};
  }
  function commonRoot(project){
   var paths=requirements(project).map(function(item){return item.path;}).filter(absolute);

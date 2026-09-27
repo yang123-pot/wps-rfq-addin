@@ -192,6 +192,49 @@ test('R8：品牌组进入询价/拆分业务键但不进入品牌阶段键，�
   assert.deepEqual(STAGES.map(function (stage) { return project.stageState(invalidated, stage); }),
     ['ready', 'ready', 'ready', 'ready', 'missing', 'stale', 'stale']);
 });
+
+// R12-C：跨模块确认图03的H11矛盾——磁盘审核成果表为空、项目确认快照为“汽车充电桩”时，
+// 比较与恢复审计都必须报业务不一致，SHA相同不能掩盖；只有内容一致才判为一致。
+test('R12-C：磁盘审核内容与确认快照不一致时，比较与恢复审计都不得判为已一致', () => {
+  const review = require('../src/classification-review-model.js');
+  const reviewHost = require('../src/classification-review-host.js');
+  const restore = require('../src/project-restore.js');
+  const input = mergeInput(true);
+  const result = review.build(input.preview.groups, { library: sample.library, memory: sample.createMemory(),
+    projectId: newId('c') });
+  const receipt = { target: 'C:\\成果\\示例园区_分类审核成果.xlsx', sha256: 'a'.repeat(64) };
+  const binding = reviewHost.bindingFor(receipt, result, { inputKey: input.mergeConfirmedKey });
+  const readRows = result.rows.map(function (row, index) {
+    const category = binding.categories.filter(function (item) { return item.name === row.finalCategoryName; })[0];
+    return { rowId: row.rowId, row: review.FIRST_ROW + index, index: String(row.index), name: row.name,
+      feature: row.feature, unit: row.unit, quantity: row.quantity, autoCategoryName: review.autoLabel(row),
+      autoCategoryId: row.autoCategoryId, finalCategoryName: row.finalCategoryName, reviewNote: '',
+      finalCategoryId: category ? category.id : '' };
+  });
+  const conflictId = result.rows.filter(function (row) { return row.autoCategoryId == null; })[0].rowId;
+  const decided = readRows.map(function (row) {
+    return row.rowId === conflictId ? Object.assign({}, row, { finalCategoryName: '汽车充电桩',
+      finalCategoryId: 'ev-charger', reviewNote: '充电桩配套' }) : row; });
+  const checked = review.validateRead({ rows: decided, issues: [] }, { categories: binding.categories });
+  const snapshot = review.confirmation(checked.rows, { projectId: newId('c'), inputKey: input.mergeConfirmedKey,
+    binding: binding, confirmedAt: '2026-09-27T10:01:15.871Z', revision: 1 });
+  // 磁盘仍是生成态（H11为空），SHA与收据相同，物理一致但业务不同。
+  const difference = reviewHost.compareSnapshot({ rows: readRows, issues: [] }, snapshot);
+  assert.equal(difference.matches, false);
+  assert.equal(difference.differences.filter(function (item) { return item.rowId === conflictId; }).length >= 1, true);
+  const record = { schemaVersion: 2, projectId: newId('c'), revision: 6, mergeIdentical: true, sources: [],
+    matching: binding, review: snapshot, stages: {} };
+  const checks = {};
+  restore.requirements(record).forEach(function (item) { checks[item.path] = { exists: true, sha256: item.sha256 }; });
+  checks[binding.path].content = difference;
+  const audit = restore.audit(record, checks);
+  assert.equal(audit.ok, false, 'SHA相同但业务不同时不得恢复ready');
+  assert.match(audit.blocks.review, /业务内容/);
+  // 业务内容一致（含表内排序变化）时才算一致。
+  const same = reviewHost.compareSnapshot({ rows: decided.slice().reverse(), issues: [] }, snapshot);
+  assert.equal(same.matches, true);
+});
+
 test('v1项目保留原文件；继续时新建v2副本并记录fromProjectId', () => {
   const legacy = legacyV1Record();
   const legacyText = JSON.stringify(legacy);

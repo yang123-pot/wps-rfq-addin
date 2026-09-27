@@ -173,3 +173,81 @@ test('定位问题单元格并原位刷新“匹配情况”：只写需要改�
   assert.throws(()=>host.refreshMatchColumn(app,Object.assign({},binding,{sheet:'不存在'}),[{row:4,label:'一致'}]),
    /找不到工作表/);
 });
+
+// R12-C：把磁盘/打开簿的读回结果与项目确认快照按rowId比较业务内容。
+// SHA只能证明物理字节，业务内容必须逐行对照；磁盘空分类与快照“汽车充电桩”绝不能被当成“内容已一致”。
+function conflictRowId(result){
+  return result.rows.filter(function(row){return row.autoCategoryId==null;})[0].rowId;
+}
+function withDecision(read,rowId,changes){
+  return {rows:read.rows.map(function(row){
+    return row.rowId===rowId?Object.assign({},row,changes):row;
+  }),issues:(read.issues||[]).slice()};
+}
+function snapshotFrom(result,binding,decisions){
+  const edited=withDecision(host.readSheet(readerOf(
+    model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'}).values),binding),decisions.rowId,decisions.changes);
+  const checked=model.validateRead(edited,{categories:binding.categories});
+  return model.confirmation(checked.rows,{projectId:'p-sample01',inputKey:binding.inputKey,binding:binding,
+    confirmedAt:'2026-09-27T10:01:15.871Z',revision:1});
+}
+
+test('R12-C比较：磁盘空分类与确认快照不一致必须报出（H11空/快照汽车充电桩）',()=>{
+  const {result,binding}=bound();
+  const rowId=conflictRowId(result);
+  const disk=host.readSheet(readerOf(model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'}).values),binding);
+  assert.equal(disk.rows.filter(function(row){return row.rowId===rowId;})[0].finalCategoryName,'',
+    '磁盘成果表该行最终分类为空（表内编辑未保存）');
+  const snapshot=snapshotFrom(result,binding,{rowId:rowId,
+    changes:{finalCategoryName:'汽车充电桩',finalCategoryId:'ev-charger',reviewNote:'充电桩配套'}});
+  const diff=host.compareSnapshot(disk,snapshot);
+  assert.equal(diff.matches,false,'磁盘为空、快照为汽车充电桩时必须判为业务不一致');
+  const category=diff.differences.filter(function(item){return item.rowId===rowId&&item.field==='categoryId';})[0];
+  assert.ok(category,'必须给出最终分类差异');
+  assert.equal(category.expected,'汽车充电桩');
+  assert.equal(category.actual,'');
+  assert.match(category.message,/最终分类/);
+  assert.match(category.message,/汽车充电桩/);
+  const note=diff.differences.filter(function(item){return item.rowId===rowId&&item.field==='note';})[0];
+  assert.ok(note,'备注差异也要报出');
+});
+
+test('R12-C比较：按rowId比较，排序/筛选不影响；内容一致才算一致',()=>{
+  const {result,binding}=bound();
+  const rowId=conflictRowId(result);
+  const snapshot=snapshotFrom(result,binding,{rowId:rowId,
+    changes:{finalCategoryName:'汽车充电桩',finalCategoryId:'ev-charger',reviewNote:'充电桩配套'}});
+  const edited=withDecision(host.readSheet(readerOf(
+    model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'}).values),binding),rowId,
+    {finalCategoryName:'汽车充电桩',finalCategoryId:'ev-charger',reviewNote:'充电桩配套'});
+  const same=host.compareSnapshot(edited,snapshot);
+  assert.equal(same.matches,true,'内容一致时必须判为一致');
+  assert.deepEqual(same.differences,[]);
+  const reversed=host.compareSnapshot({rows:edited.rows.slice().reverse(),issues:[]},snapshot);
+  assert.equal(reversed.matches,true,'读回顺序（排序/筛选）不得改变结论');
+  assert.equal(host.compareSnapshot({rows:edited.rows.map(function(row){
+    return Object.assign({},row,{reviewNote:row.reviewNote});}),issues:[]},snapshot).matches,true);
+});
+
+test('R12-C比较：固定字段、备注、缺行与多余行都按rowId给出差异',()=>{
+  const {result,binding}=bound();
+  const rowId=conflictRowId(result);
+  const snapshot=snapshotFrom(result,binding,{rowId:rowId,
+    changes:{finalCategoryName:'汽车充电桩',finalCategoryId:'ev-charger',reviewNote:'充电桩配套'}});
+  const base=withDecision(host.readSheet(readerOf(
+    model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'}).values),binding),rowId,
+    {finalCategoryName:'汽车充电桩',finalCategoryId:'ev-charger',reviewNote:'充电桩配套'});
+  const quantityChanged=host.compareSnapshot({rows:base.rows.map(function(row,index){
+    return index?row:Object.assign({},row,{quantity:'ZZ'});}),issues:[]},snapshot);
+  assert.equal(quantityChanged.matches,false);
+  assert.equal(quantityChanged.differences[0].field,'quantity');
+  assert.equal(quantityChanged.differences[0].code,'field-changed');
+  const noteChanged=host.compareSnapshot({rows:base.rows.map(function(row){
+    return row.rowId===rowId?Object.assign({},row,{reviewNote:'改了备注'}):row;}),issues:[]},snapshot);
+  assert.equal(noteChanged.differences.filter(function(item){return item.field==='note';}).length,1);
+  const missing=host.compareSnapshot({rows:base.rows.filter(function(row){return row.rowId!==rowId;}),issues:[]},snapshot);
+  assert.equal(missing.differences.filter(function(item){return item.code==='row-missing';}).length,1);
+  const extra=host.compareSnapshot({rows:base.rows.concat([{rowId:'row-foreign',name:'外来行',finalCategoryName:'水泵',
+    finalCategoryId:'pump',reviewNote:''}]),issues:[]},snapshot);
+  assert.equal(extra.differences.filter(function(item){return item.code==='row-extra';}).length,1);
+});

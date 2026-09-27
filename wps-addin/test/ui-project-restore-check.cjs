@@ -76,11 +76,29 @@ async function run(){
     restoreSummary:function(value){live.summary=value;},restoreBrands:function(value){live.brands=value;},
     restoreAssignments:function(){},restoreHeader:function(){},restoreGeneration:function(value){live.generation=value;},
     restoreSplit:function(value){live.split=value;},getReviewBinding:function(){return live.matching;},
+    compareReviewContent:function(){return window.__reviewContent||null;},
     getCategories:function(){return live.categories;},getSummary:function(){return live.summary;},
     getBrands:function(){return live.brands;},getGeneration:function(){return live.generation;},getSplit:function(){return live.split;},
     onBusy:function(){}});
    window.RfqPathPicker.open=function(options){options.onConfirm([args.newRoot]);return {close(){}};};
   },{oldRoot:OLD_ROOT,newRoot:NEW_ROOT,shas:{review:SHA('a'),category:SHA('b'),summary:SHA('c'),generation:SHA('d'),split:SHA('e')}});
+  // R12-C：审核成果表SHA与记录一致、但业务内容与确认快照不同（图03 H11磁盘空/快照汽车充电桩）时，
+  // 不得把“表内审核”恢复为已确认；必须报出业务差异、区分磁盘内容，且不能靠换目录冒充一致。
+  await page.evaluate(function(args){
+   const map={};map[args.oldRoot+'\\示例园区_分类审核成果.xlsx']={exists:true,sha256:args.shas.review};
+   window.__inspect=map;
+   window.__reviewContent={matches:false,source:'disk',differences:[{rowId:'r-ev',code:'category-changed',
+    field:'categoryId',label:'最终分类',expected:'汽车充电桩',actual:'',
+    message:'“充电桩配电箱”的“最终分类”不一致：确认快照“汽车充电桩”，现表“（空）”'}]};
+  },{oldRoot:OLD_ROOT,shas:{review:SHA('a')}});
+  await page.evaluate(function(){return window.__projectPanel.open('p-restore-ui-01');});
+  const r12cAudit=await page.evaluate(function(){return window.__projectPanel.restoreAudit();});
+  assert.match(r12cAudit.blocks.review,/业务内容/,'SHA相同但业务不同时必须报业务差异');
+  assert.match(r12cAudit.blocks.review,/磁盘内容/,'必须区分磁盘SHA与业务内容');
+  assert.equal(r12cAudit.issues.filter(function(item){return item.code==='content-different';}).length,1);
+  assert.equal(await page.evaluate(function(){return window.__projectPanel.assessment().review.ready;}),false,
+   '业务内容不一致不得把表内审核恢复为ready');
+  await page.evaluate(function(){window.__reviewContent={matches:true,source:'disk',differences:[]};});
   // 先模拟汇总表被外部改写：可以打开项目继续看填写内容，但品牌/询价/拆分不得恢复ready。
   await page.evaluate(function(args){
    const map={};map[args.oldRoot+'\\示例园区_分类审核成果.xlsx']={exists:true,sha256:args.shas.review};

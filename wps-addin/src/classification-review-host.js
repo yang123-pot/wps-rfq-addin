@@ -105,6 +105,70 @@
   });
   return {rows:rows,issues:issues};
  }
+ // R12-C：把读回结果（磁盘/打开簿）与项目保存的审核快照按rowId比较业务内容。
+ // SHA只证明物理字节；空分类/类别不同/备注不同/缺行多行都必须报出，绝不用“SHA一致”掩盖业务差异。
+ var FIXED_COMPARE=[['name','项目名称'],['feature','规格'],['unit','单位'],['quantity','工程量']];
+ function compareCategoryId(row){
+  if(!row)return '';
+  if(row.categoryId!=null)return text(row.categoryId);
+  if(row.finalCategoryId!=null)return text(row.finalCategoryId);
+  return '';
+ }
+ function compareCategoryName(row){
+  if(!row)return '';
+  if(row.categoryName!=null&&row.categoryName!=='')return text(row.categoryName);
+  if(row.finalCategoryName!=null)return text(row.finalCategoryName);
+  return '';
+ }
+ function compareNote(row){
+  if(!row)return '';
+  if(row.note!=null)return text(row.note);
+  if(row.reviewNote!=null)return text(row.reviewNote);
+  return '';
+ }
+ // 按rowId逐行业务比较：固定字段、最终分类、审核备注；行序（排序/筛选）不影响结论。
+ function compareSnapshot(readResult,snapshot){
+  var readRows=(readResult&&readResult.rows)||[],snapRows=(snapshot&&snapshot.rows)||[],
+   byId={},seen={},differences=[];
+  readRows.forEach(function(row){var id=text(row&&row.rowId);if(id)byId[id]=row;});
+  snapRows.forEach(function(row){
+   var rowId=text(row&&row.rowId);
+   if(!rowId)return;
+   seen[rowId]=true;
+   var actual=byId[rowId],expectedName=text(row&&row.name);
+   if(!actual){
+    differences.push({rowId:rowId,code:'row-missing',field:null,label:'材料行',expected:expectedName,actual:null,
+     message:'成果表缺少确认快照中的材料行：'+expectedName+' / '+text(row&&row.feature)});
+    return;
+   }
+   FIXED_COMPARE.forEach(function(pair){
+    var expected=text(row&&row[pair[0]]),actualValue=text(actual[pair[0]]);
+    if(expected===actualValue)return;
+    differences.push({rowId:rowId,code:'field-changed',field:pair[0],label:pair[1],expected:expected,actual:actualValue,
+     message:'“'+expectedName+'”的“'+pair[1]+'”业务内容不一致：确认快照“'+expected+'”，现表“'+actualValue+'”'});
+   });
+   var expectedId=compareCategoryId(row),actualId=compareCategoryId(actual);
+   if(expectedId!==actualId)
+    differences.push({rowId:rowId,code:'category-changed',field:'categoryId',label:'最终分类',
+     expected:compareCategoryName(row),actual:compareCategoryName(actual),
+     message:'“'+expectedName+'”的“最终分类”不一致：确认快照“'+(compareCategoryName(row)||'（空）')+
+      '”，现表“'+(compareCategoryName(actual)||'（空）')+'”'});
+   var expectedNote=compareNote(row),actualNote=compareNote(actual);
+   if(expectedNote!==actualNote)
+    differences.push({rowId:rowId,code:'note-changed',field:'note',label:'审核备注',expected:expectedNote,actual:actualNote,
+     message:'“'+expectedName+'”的“审核备注”不一致：确认快照“'+expectedNote+'”，现表“'+actualNote+'”'});
+  });
+  readRows.forEach(function(row){
+   var id=text(row&&row.rowId);
+   if(id&&!seen[id])
+    differences.push({rowId:id,code:'row-extra',field:null,label:'材料行',expected:null,actual:text(row&&row.name),
+     message:'成果表出现不属于确认快照的材料行：'+text(row&&row.name)});
+  });
+  var changed={};differences.forEach(function(item){changed[item.rowId]=true;});
+  return {matches:differences.length===0,differences:differences,
+   source:(readResult&&readResult.source)||null,
+   counts:{snapshot:snapRows.length,read:readRows.length,different:Object.keys(changed).length}};
+ }
  // 读表优先用同路径已打开簿及其最新修改；只关闭插件自己打开的簿，并恢复宏安全值与活动工作簿。
  function readBack(app,binding){
   validateBinding(binding);
@@ -116,6 +180,7 @@
     var sheet=book.Worksheets.Item(binding.sheet);
     if(!sheet)throw Error('成果表里找不到工作表：'+binding.sheet);
     result=readSheet(function(row,column){return sheet.Cells.Item(row,column).Value2;},binding);
+    result.source='open';
    }else{
     app.AutomationSecurity=3;
     if(app.AutomationSecurity!==3)throw Error('无法禁用自动宏，未读取成果表。');
@@ -124,6 +189,7 @@
     var target=opened.Worksheets.Item(binding.sheet);
     if(!target)throw Error('成果表里找不到工作表：'+binding.sheet);
     result=readSheet(function(row,column){return target.Cells.Item(row,column).Value2;},binding);
+    result.source='disk';
    }
   }catch(problem){error=problem;}
   finally{
@@ -213,5 +279,5 @@
   selectTarget:function(app,suggested){return exportHost.selectTarget(app,suggested);},
   workbookFor:function(result,options){return model.workbook(result,options||{});},
   write:write,openForEditing:openForEditing,bindingFor:bindingFor,readSheet:readSheet,readBack:readBack,
-  validateBinding:validateBinding,locate:locate,refreshMatchColumn:refreshMatchColumn};
+  validateBinding:validateBinding,locate:locate,refreshMatchColumn:refreshMatchColumn,compareSnapshot:compareSnapshot};
 }));
