@@ -52,6 +52,105 @@ test('相邻暂存失败时保留临时文件便于排查，且不会创建中�
  assert.ok(await fs.stat(p.stagePath),'失败时保留暂存文件供排查');
  assert.equal(await fs.stat(path.join(root,'staging')).then(()=>true,()=>false),false,'相邻模式不建中心暂存目录');
 });
+// R12真机遗留观察①：生成失败/取消必须在成果目录里清掉本次点号暂存，已发布的成功不得被"丢弃"。
+test('失败或取消后discard清掉本次相邻暂存，已发布则拒绝丢弃',async t=>{
+ const {store,target}=await fixture(t);
+ const aborted=await store.prepare(target,{adjacent:true});
+ await fs.writeFile(aborted.stagePath,zip);
+ assert.deepEqual(await store.discard(aborted.ticket),{discarded:true});
+ assert.equal(await fs.stat(aborted.stagePath).then(()=>true,()=>false),false,'取消后不得留下点号临时文件');
+ assert.deepEqual(await store.discard('unknown'),{discarded:false,reason:'unknown-ticket'});
+ const done=await store.prepare(target,{adjacent:true});
+ await fs.writeFile(done.stagePath,zip);
+ const result=await store.commit(done.ticket);
+ assert.deepEqual(await store.discard(done.ticket),{discarded:false,reason:'already-published'});
+ assert.deepEqual(await fs.readFile(target),zip);
+ assert.equal(result.bytes,zip.length);
+});
+// R12-B复现①：discard先删票据再判published，会让已经发布的成果在discard后verify失败，清理因此可能误伤成功成果。
+test('published discard preserves verification',async t=>{
+ const {store,target}=await fixture(t),p=await store.prepare(target,{adjacent:true});
+ await fs.writeFile(p.stagePath,zip);const result=await store.commit(p.ticket);
+ assert.deepEqual(await store.discard(p.ticket),{discarded:false,reason:'already-published'},'已发布票据必须被判为already-published');
+ assert.deepEqual(await store.verify(p.ticket,target,result.sha256),{target,sha256:result.sha256},'discard后已发布票据仍必须能verify');
+ assert.deepEqual(await fs.readFile(target),zip,'已发布成果不得被清理破坏');
+});
+// R12-B复现②：陈旧清理只按mtime会删掉11分钟前写入、但仍在1小时有效票据内的活跃暂存，破坏后续发布。
+test('stale sweep preserves active ticket',async t=>{
+ const {store,target,root}=await fixture(t),active=await store.prepare(target,{adjacent:true});
+ await fs.writeFile(active.stagePath,zip);
+ const elevenMinutesAgo=new Date(Date.now()-11*60*1000);
+ await fs.utimes(active.stagePath,elevenMinutesAgo,elevenMinutesAgo);
+ await store.prepare(path.join(root,'另一份.xlsx'),{adjacent:true});
+ assert.equal(await fs.stat(active.stagePath).then(()=>true,()=>false),true,'1小时内有效票据的活跃暂存不得因mtime较旧被清理');
+ const result=await store.commit(active.ticket);
+ assert.deepEqual(await fs.readFile(target),zip,'活跃暂存仍在时必须能正常独占发布');
+ assert.deepEqual(await store.verify(active.ticket,target,result.sha256),{target,sha256:result.sha256});
+});
+// R12-B：正在提交（busy）的票据不得被discard删掉暂存，否则会破坏独占发布与幂等结果。
+test('busy discard keeps the in-flight stage',async t=>{
+ const {store,target}=await fixture(t),p=await store.prepare(target,{adjacent:true});
+ await fs.writeFile(p.stagePath,zip);
+ const committing=store.commit(p.ticket);
+ assert.deepEqual(await store.discard(p.ticket),{discarded:false,reason:'busy'},'提交中的票据必须被判为busy且不清暂存');
+ const result=await committing;
+ assert.deepEqual(await fs.readFile(target),zip,'busy时未清理，提交仍应成功独占发布');
+ assert.deepEqual(await store.verify(p.ticket,target,result.sha256),{target,sha256:result.sha256});
+});
+// R12-B：清理只认真实登记过所有权的暂存；用户同名文件与无所有权证明的同名残留一律不动，并如实报告。
+test('cleanup preserves user files and reports unowned same-name residue',async t=>{
+ const {store,target,root}=await fixture(t);
+ const residue=path.join(root,'.清单.xlsx.tmp-0123456789ab.xlsx');
+ const old=new Date(Date.now()-2*3600000);
+ await fs.writeFile(residue,zip);await fs.utimes(residue,old,old);
+ const prepared=await store.prepare(target,{adjacent:true});
+ assert.equal(await fs.stat(residue).then(()=>true,()=>false),true,'无所有权证明的同名残留必须保守保留');
+ assert.ok(prepared.staleCleanup&&prepared.staleCleanup.preserved>=1,'保守保留的残留要报告，而不是静默删除或静默忽略');
+ assert.deepEqual(await fs.readFile(residue),zip,'用户同名残留内容不得被改写');
+ await fs.writeFile(target,'用户自己放的同名文件','utf8');
+ await assert.rejects(store.prepare(target,{adjacent:true}),/存在/,'目标已存在必须继续拒绝');
+ assert.equal(await fs.readFile(target,'utf8'),'用户自己放的同名文件','用户同名文件不得被覆盖');
+});
+// R12-B：只有本进程登记过所有权、票据已失效（>1小时）且足够陈旧的残留才清理；服务重启后无登记不得靠mtime删除。
+test('只有登记过所有权且票据失效的陈旧暂存才被清理，服务重启后同名残留保守保留',async t=>{
+ const {store,target,root}=await fixture(t),real=Date.now();
+ t.mock.timers.enable({apis:['Date'],now:real});
+ const abandoned=await store.prepare(target,{adjacent:true});
+ await fs.writeFile(abandoned.stagePath,zip);
+ const elevenMinutesAgo=new Date(real-11*60*1000);
+ await fs.utimes(abandoned.stagePath,elevenMinutesAgo,elevenMinutesAgo);
+ t.mock.timers.setTime(real+61*60*1000);
+ const next=await store.prepare(target,{adjacent:true});
+ assert.equal(await fs.stat(abandoned.stagePath).then(()=>true,()=>false),false,'本进程登记过且票据失效的陈旧暂存应被清理');
+ assert.ok(next.staleCleanup&&next.staleCleanup.removed>=1,'真实清理要计数');
+ const restarted=createExportStore({directory:path.join(root,'staging')});
+ const leftover=path.join(root,'.清单.xlsx.tmp-fedcba987654.xlsx');
+ await fs.writeFile(leftover,zip);await fs.utimes(leftover,elevenMinutesAgo,elevenMinutesAgo);
+ const afterRestart=await restarted.prepare(target,{adjacent:true});
+ assert.equal(await fs.stat(leftover).then(()=>true,()=>false),true,'服务重启后无所有权证明的同名残留不得靠mtime删除');
+ assert.ok(afterRestart.staleCleanup&&afterRestart.staleCleanup.preserved>=1,'重启后保守保留的残留要报告');
+});
+// R12-B：清理只看同目标的暂存；其他目标的点号暂存和不匹配插件命名规则的普通文件一律不动。
+test('cleanup never touches other-target stages or non-matching plain files',async t=>{
+ const {store,target,root}=await fixture(t);
+ const other=path.join(root,'.另一份.xlsx.tmp-0123456789ab.xlsx');
+ const plain=path.join(root,'清单.xlsx.tmp-0123456789ab.xlsx');
+ const old=new Date(Date.now()-3600000);
+ for(const file of [other,plain]){await fs.writeFile(file,zip);await fs.utimes(file,old,old);}
+ await store.prepare(target,{adjacent:true});
+ assert.equal(await fs.stat(other).then(()=>true,()=>false),true,'其他目标名的暂存不得清理');
+ assert.equal(await fs.stat(plain).then(()=>true,()=>false),true,'不匹配插件命名规则的普通文件不得清理');
+});
+// R12-B：写入失败（目录在prepare后被移除）必须拒绝，不产生半成品，也不影响已发布成果。
+test('write failure keeps the stage unpublished and never leaves a half-written target',async t=>{
+ const {store,target,root}=await fixture(t),folder=path.join(root,'成果批次'),nested=path.join(folder,'水泵.xlsx');
+ const p=await store.prepare(nested,{createParent:true,adjacent:true});
+ await fs.writeFile(p.stagePath,zip);
+ await fs.rm(folder,{recursive:true,force:true});
+ await assert.rejects(store.commit(p.ticket),/写入失败|暂存|ENOENT/,'目标目录不可用时必须拒绝写入');
+ assert.equal(await fs.stat(nested).then(()=>true,()=>false),false,'失败时不得留下半成品目标');
+ assert.deepEqual(await store.discard(p.ticket),{discarded:true},'未发布票据可被安全清理');
+});
 // R6：分类工作簿目录（成果批次/分类工作簿）由插件按需创建，仍然禁止覆盖已有目标。
 test('createParent只在显式要求时创建目标目录，已有目标仍然拒绝覆盖',async t=>{
  const {store,root}=await fixture(t),folder=path.join(root,'成果批次','分类工作簿'),target=path.join(folder,'水泵.xlsx');

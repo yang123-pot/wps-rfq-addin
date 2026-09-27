@@ -67,6 +67,45 @@
 - **唯一阻塞：** 真实 WPS 窗口控制在本运行时不可用（仅环境阻塞），因此**尚未新增任何真机通过**；图03 草稿/错误定位、图05–07、异常与四项目仍挂账。
 - **下一包：** R12-B（收敛暂存清理与发布票据，改 `export-files.cjs`/`server.cjs`/`import-ui.js` 及对应测试，可先于真机独立完成）；其后 R12-C 处理本节第 4 条的 H11 草稿差异与内容恢复。
 
+## R12-B 收敛暂存清理与发布票据（2026-09-27，源码包，未触碰真机）
+
+**基线/包提交：** 分支 `feat/wps-phase1`，开工 HEAD `62b215421a6bfd6bae19913e8a00a0ab7ad44a7d`（R12-A 文档提交）。本包只改源码与测试，包提交为紧随 `62b2154` 的源码提交，远程 SHA 以推送结果为准。工作区**仍保留** `wps-addin/src/export-host.js`、`wps-addin/test/export-host.test.cjs` 两个 R12-D 修改，本包未暂存、未清理。
+
+**对应图：** 图04（独立分类工作簿）、图05A（分类汇总表）、图07（一键拆分）。本次实际打开查看：成功成果（分类簿/汇总表/拆分件）不得被暂存清理破坏，已有文件不得覆盖。
+
+### 1. 复现转失败测试（修改前实测 11 pass / 5 fail）
+
+复现输入 `outputs/wps-plan-audit-20260927/reproductions.json`（副本与 SHA 见本机 `R12-B/reproductions.sha256.txt`，SHA256 `4866b86b469a236ff6f09b758294130194106787443bae2527aa98f344410353`）。新增用例先在入口版本上失败，失败原因是行为缺陷而非环境或拼写：
+
+| 新用例 | 修改前失败现象 |
+| --- | --- |
+| `published discard preserves verification` | `discard` 先删票据再判已发布，`commit→discard→verify` 抛“另存会话已失效” |
+| `stale sweep preserves active ticket` | 11 分钟 mtime 的有效暂存被按 mtime 删除（1 小时内票据所有权被 mtime 覆盖） |
+| `busy discard keeps the in-flight stage` | 提交中的票据被 `discard` 删掉暂存，返回 `{discarded:true}` |
+| `cleanup ... unowned same-name residue` | 无所有权证明的用户同名残留被直接删除 |
+| export-server 用例 | HTTP 路由层复现“已发布票据 discard 后 verify 失败（400）” |
+
+### 2. 修正内容
+
+- `discard(ticket)` 改为结构化状态顺序：`unknown-ticket` → `already-published`（**保留票据**，`verify` 仍可用）→ `busy`（保留暂存）→ 仅清理未发布且不活跃的本次暂存；清理删不掉时返回 `{discarded:false,reason:'cleanup-failed'}`，**不虚报“文件已删除”**。
+- 陈旧清理改为 `sweepStaleStages(parent,base,active)`：接收活跃路径集合；删除必须同时满足命名匹配、**本进程登记过所有权**、无活跃票据、足够陈旧。服务重启后内存登记丢失，同命名残留一律**保守保留并计数上报**（`prepare` 返回 `staleCleanup`），不再只按 10 分钟 mtime 删除。
+- `commit` 已发布并校验后清理暂存失败只忽略，不影响成功回执；残留交陈旧清理兜底。
+- 调用处复核：仅 `import-ui.js` 的两处相邻暂存（生成审核成果表、生成分类汇总表）调用 `discard`，均以 `prepared&&!published` 守卫；即使发布响应丢失，服务端票据已是 `already-published`，仍保留已发布成果。成功但回执/项目保存失败时 `published` 已置位，不会清理已发布文件。
+
+### 3. 验证与证据
+
+- `node --test wps-addin/test/export-files.test.cjs wps-addin/test/export-server.test.cjs` → **17 pass / 0 fail**。
+- `node --test wps-addin/test/*.test.cjs` → **329 pass / 0 fail**（基线 322＋本包 7 例）。
+- 负例保持拒绝覆盖：目标已存在、prepare 后被抢占（竞争创建）、prepare 后目录不可用的写入失败三例均拒绝且不产生半成品，用户同名文件内容不变。
+- 原始命令/日志/SHA 在本机 `outputs/wps-acceptance-20260927/R12-B/`（`pre-fix-failing.log`、`export-files-after.log`、`node-full-after.log`、`README.md`），按 `.gitignore` 不入 Git。
+
+### 4. 未完成与下一包
+
+- **未做真机 WPS 操作**，本包不得勾选任何依赖真机的出口：宿主占用导致删不掉暂存、服务重启后残留的保守保留/报告、真实成果目录清理行为均**挂到 R12-J**（文件故障与恢复）。
+- 未跑浏览器 UI 检查：本机无 `playwright` 模块（`MODULE_NOT_FOUND`），按计划并入 R12-L 全量回归。
+- 入场 6 个修改中，`export-host.js` 与 `export-host.test.cjs`（预览簿恢复、链接字体顺序/回读容差）**保持未提交**，留给 R12-D。
+- **下一包：** R12-C（图03 草稿、错误定位与内容恢复，含 H11“磁盘空/快照有汽车充电桩”差异）。
+
 ## 已核实的图03与图04证据
 
 WPS 版本：12.1.0.29161。所有样本、截图、项目和审计 JSON 留在 `outputs/wps-acceptance-20260927/r12/`，不纳 Git。

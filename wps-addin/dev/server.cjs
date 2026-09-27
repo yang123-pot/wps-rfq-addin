@@ -46,7 +46,7 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         (req.headers.origin && req.headers.origin !== origin)) return reply(403, 'Local origin required');
     let url;
     try { url = new URL(req.url, origin); } catch (_) { return reply(400, 'Invalid URL'); }
-    if (['/api/import/prepare','/api/export/prepare','/api/export/commit','/api/export/verify','/api/export/inspect'].includes(url.pathname)) {
+    if (['/api/import/prepare','/api/export/prepare','/api/export/commit','/api/export/verify','/api/export/inspect','/api/export/discard'].includes(url.pathname)) {
       const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');
       if (!importDirectory) return json(404,{error:'当前服务未启用文件导入，请启动最新开发服务。'});
       if (req.method !== 'POST') return json(405,{error:'POST required'});
@@ -65,6 +65,7 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         if(url.pathname==='/api/export/commit')return json(200,await exports.commit(data.ticket));
         if(url.pathname==='/api/export/verify')return json(200,await exports.verify(data.ticket,data.target,data.sha256));
         if(url.pathname==='/api/export/inspect')return json(200,await exports.inspect(data.target,data.sha256));
+        if(url.pathname==='/api/export/discard')return json(200,await exports.discard(data.ticket));
         const files=await prepareFiles(data.paths,{directory:importDirectory,existing:data.existing});
         return json(200,{files});
       } catch(error) {return json(400,{error:error.message});}

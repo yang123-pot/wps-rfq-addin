@@ -357,6 +357,7 @@
     }
     async function generateReview(){
       if(reviewBusy)return;
+      var prepared=null,published=false;
       try{
         if(!selectionConfirmed())throw Error('请先确认合并选择，再生成成果表。');
         reviewModel=buildReview();
@@ -371,12 +372,13 @@
         requireCurrent();
         reviewBusy=true;renderReview();
         reviewTell('正在写入并重新打开校验成果表…');
-        var prepared=await exportRequest('prepare',{target:selection.target,adjacent:true});
+        prepared=await exportRequest('prepare',{target:selection.target,adjacent:true});
         requireCurrent();
         // 宿主写入通常同步完成；这里await一层，保证任何异步实现（含测试夹具）先落地再发布。
         await RfqClassificationReviewHost.write(options.application,plannedModel,prepared.stagePath,{title:name});
         requireCurrent();
         var receipt=await exportRequest('commit',{ticket:prepared.ticket});
+        published=true;
         await exportRequest('verify',{ticket:prepared.ticket,target:receipt.target,sha256:receipt.sha256});
         requireCurrent();
         reviewBinding=RfqClassificationReviewHost.bindingFor(receipt,plannedModel,{inputKey:plannedKey,title:name});
@@ -390,7 +392,11 @@
           reviewTell('审核成果表已生成并校验：'+receipt.target+'，但未能自动打开（'+openError.message+'）。可点“打开成果表审核”重试。');
         }
       }catch(error){reviewTell('审核成果表未生成。'+error.message,true);}
-      finally{reviewBusy=false;renderReview();}
+      finally{
+        // 未发布就失败/被取消时清掉本次相邻暂存，避免在用户成果目录留下点号临时文件。
+        if(prepared&&!published){try{await exportRequest('discard',{ticket:prepared.ticket});}catch(_){}}
+        reviewBusy=false;renderReview();
+      }
     }
     var generateButton=reviewEl('classification-review-generate'),openButton=reviewEl('classification-review-open');
     if(generateButton)generateButton.addEventListener('click',generateReview);
@@ -1050,6 +1056,7 @@
       if(!categoryVerdict().ready||!files.length){
         summaryTell('请先在第4步生成并核实全部独立分类工作簿，再生成分类汇总表。',true);renderBrands();return {ok:false};}
       summaryBusy=true;renderBrands();
+      var prepared=null,published=null;
       try{
         var directory=summaryDirectory(),layoutName=selectedLayout(),target=directory+'\\分类汇总表.xlsx';
         // 同名文件已存在时另存时间戳新文件，绝不覆盖已生成的汇总表与已填内容。
@@ -1063,10 +1070,10 @@
           return {ok:false};
         }
         // 相对链接必须在最终目录里的唯一相邻暂存生成，整目录搬移后链接仍然正确。
-        var prepared=await exportRequest('prepare',{target:target,adjacent:true});
+        prepared=await exportRequest('prepare',{target:target,adjacent:true});
         var workbook=RfqBrandModel.buildSummary(plan,{});
         await RfqBrandHost.summaryWrite(options.application,workbook,prepared.stagePath);
-        var published=await exportRequest('commit',{ticket:prepared.ticket});
+        published=await exportRequest('commit',{ticket:prepared.ticket});
         await exportRequest('verify',{ticket:prepared.ticket,target:published.target,sha256:published.sha256});
         var binding=RfqBrandModel.summaryBindingFor(published.target,workbook);
         summaryReceipt=Object.assign({},binding,{sha256:published.sha256,bytes:published.bytes,directory:directory,
@@ -1081,7 +1088,11 @@
         renderBrands();render();
         return {ok:true,receipt:summaryReceipt};
       }catch(error){summaryTell('分类汇总表未生成：'+error.message,true);return {ok:false};}
-      finally{summaryBusy=false;renderBrands();}
+      finally{
+        // 未发布就失败/被取消时清掉本次相邻暂存，避免分类工作簿目录里留下点号临时文件。
+        if(prepared&&!published){try{await exportRequest('discard',{ticket:prepared.ticket});}catch(_){}}
+        summaryBusy=false;renderBrands();
+      }
     }
     var summaryGenerateButton=summaryEl('brands-generate'),summaryOpenButton=summaryEl('brands-open'),
       summaryConfirmButton=summaryEl('brands-confirm'),summaryLayoutSelect=summaryEl('brands-layout');

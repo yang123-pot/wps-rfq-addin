@@ -21,3 +21,25 @@ test('export endpoints require the local session and publish only server-issued 
  assert.equal((await request('prepare',{target:p.target})).status,400);
  assert.equal((await request('commit',{ticket:'bad',stagePath:p.target})).status,400);
 });
+test('export discard endpoint releases only unpublished tickets and keeps published verification',async t=>{
+ const folder=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-export-discard-')),server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(folder,'private')});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{await new Promise(r=>server.close(r));await fs.rm(folder,{recursive:true,force:true});});
+ const origin='http://127.0.0.1:'+server.address().port,html=await(await fetch(origin+'/taskpane.html')).text();
+ const token=JSON.parse(html.match(/window\.__RFQ_IMPORT__=(\{[^;]+\});/)[1]).token;
+ const headers={'content-type':'application/json','x-rfq-import-token':token};
+ const request=(route,data,h=headers)=>fetch(origin+'/api/export/'+route,{method:'POST',headers:h,body:JSON.stringify(data)});
+ const abandoned=await(await request('prepare',{target:path.join(folder,'放弃.xlsx'),adjacent:true})).json();
+ await fs.writeFile(abandoned.stagePath,Buffer.from([0x50,0x4b,3,4,1,2]));
+ assert.equal((await request('discard',{ticket:abandoned.ticket},{})).status,403);
+ const discarded=await(await request('discard',{ticket:abandoned.ticket})).json();
+ assert.deepEqual(discarded,{discarded:true});
+ assert.equal(await fs.stat(abandoned.stagePath).then(()=>true,()=>false),false,'未发布票据的相邻暂存应被清理');
+ assert.equal((await request('verify',{ticket:abandoned.ticket,target:abandoned.target,sha256:'0'.repeat(64)})).status,400,'已清理票据不得再verify');
+ assert.deepEqual(await(await request('discard',{ticket:'unknown'})).json(),{discarded:false,reason:'unknown-ticket'});
+ const published=await(await request('prepare',{target:path.join(folder,'已发布.xlsx'),adjacent:true})).json();
+ await fs.writeFile(published.stagePath,Buffer.from([0x50,0x4b,3,4,1,2]));
+ const receipt=await(await request('commit',{ticket:published.ticket})).json();
+ assert.deepEqual(await(await request('discard',{ticket:published.ticket})).json(),{discarded:false,reason:'already-published'});
+ assert.equal((await request('verify',{ticket:published.ticket,target:receipt.target,sha256:receipt.sha256})).status,200,'已发布票据discard后仍可verify');
+ assert.deepEqual(await fs.readFile(receipt.target),Buffer.from([0x50,0x4b,3,4,1,2]));
+});
