@@ -25,6 +25,14 @@
 .rfq-picker-status.error{color:#9a542d}
 .rfq-picker-summary{margin:4px 0 0}
 .rfq-picker-foot{margin-top:8px}.rfq-picker-foot button{font-size:12px}
+.rfq-split-result{position:fixed;inset:0;background:#1a2a2155;display:flex;align-items:center;justify-content:center;z-index:2147483600;padding:12px}
+.rfq-split-result-panel{background:#fff;border-radius:10px;width:100%;max-width:760px;padding:16px;box-shadow:0 8px 30px #1c31272e;overflow:auto;max-height:90vh}
+.rfq-split-result-panel h2{font-size:16px;margin:0 0 6px}
+.rfq-split-result-list{list-style:none;padding:0;margin:10px 0}
+.rfq-split-result-list>li{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #e6ede7;padding:9px 0;font-size:12px}
+.rfq-split-result-list strong{overflow-wrap:anywhere}
+.rfq-split-result-list .is-done{color:#1d6f4a;white-space:nowrap}
+.rfq-split-result-list .is-failed{color:#9a542d;white-space:nowrap}
 .workflow h2{font-size:13px;margin:0 0 6px}
 .workflow-nav{display:flex;flex-wrap:wrap;gap:4px;list-style:none;margin:0;padding:0}
 .workflow-step{flex:1 1 44px;min-width:0}

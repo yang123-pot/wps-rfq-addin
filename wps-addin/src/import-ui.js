@@ -117,6 +117,8 @@
       onBusy:function(value){busy=value;options.onBusy(value);}});
     splitPanel=RfqSplitUI.create({application:options.application,context:deliveryContext,
       generation:function(){return inquiryPanel?inquiryPanel.generation():null;},
+      projectId:function(){return projects.identity();},
+      onReceipt:function(){if(projects&&projects.save)projects.save();},
       onBusy:function(value){busy=value;options.onBusy(value);}});
     function tell(text,error){message.textContent=text;message.className=error?'error':'';}
     function restoreProject(project){

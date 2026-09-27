@@ -31,6 +31,10 @@
    conflicts.push({code:'generation-stale',message:'总询价工作簿与当前内容不一致，请重新生成后再拆分。'});
   if(generation&&source.currentKey&&generation.inputKey!==source.currentKey)
    conflicts.push({code:'current-key-stale',message:'总询价工作簿与当前内容不一致（来源、分类、品牌或抬头已变化），请重新生成后再拆分。'});
+ if(generation&&(!/^[a-f\d]{64}$/i.test(String(generation.sha256||''))))
+   conflicts.push({code:'generation-sha-missing',message:'总询价工作簿缺少可核对的SHA256，请重新生成。'});
+ if(generation&&generation.target&&!/^.+\.xlsx$/i.test(String(generation.target)))
+   conflicts.push({code:'generation-target-invalid',message:'总询价工作簿路径无效，请重新生成。'});
   if(!generation)conflicts.push({code:'no-generation',message:'请先生成并校验总询价工作簿。'});
   sheets.forEach(function(sheet,index){
    var name=baseName(sheet),fileId='file-'+text(sheet.sheetId||index),target=join(directory,name),issues=[];
@@ -45,14 +49,16 @@
    var key=target.toLowerCase();
    if(seen[key])conflicts.push({code:'duplicate-target',message:'文件名重复（不区分大小写），请先区分品牌或供应商：'+name});
    seen[key]=true;
+   var headerRow=sheet.layout&&sheet.layout.metadata&&Number.isSafeInteger(sheet.layout.metadata.headerRow)?
+    sheet.layout.metadata.headerRow:(sheet.headerRow||0);
    files.push({fileId:fileId,sheetId:sheet.sheetId,assignmentId:sheet.assignmentId,categoryName:sheet.categoryName,
-    brand:sheet.brand,supplier:sheet.supplier,name:name,target:target,materialRows:sheet.values.length-(sheet.layout?sheet.layout.headerRow:0),
-    issues:issues});
+    brand:sheet.brand,brandLabel:sheet.brandLabel,supplier:sheet.supplier,sheetName:sheet.name,name:name,target:target,
+    materialRows:sheet.values.length-headerRow,hasLayout:!!sheet.layout,issues:issues});
   });
   files.forEach(function(file){file.issues.forEach(function(issue){
    if(issue.code!=='illegal-character')conflicts.push({code:issue.code,fileId:file.fileId,message:issue.message});});});
-  return {schemaVersion:SCHEMA_VERSION,inputKey:text(model.inputKey),directory:directory,files:files,conflicts:conflicts,
-   canPublish:conflicts.length===0&&files.length>0};
+ return {schemaVersion:SCHEMA_VERSION,inputKey:text(model.inputKey),generationSha256:text(generation&&generation.sha256||''),
+  directory:directory,files:files,conflicts:conflicts,canPublish:conflicts.length===0&&files.length>0};
  }
  // 发布前仍要复核目标是否存在：预检通过不等于可以覆盖。
  function checkTargets(plan,existing){

@@ -8,13 +8,16 @@ function model(){
    values:[['x'],['序号'],['1']],layout:{headerRow:2}},
   {sheetId:'sheet-x',kind:'internal',name:'内部追溯',values:[['x']]}]};
 }
-const generation={inputKey:'ck1-split',sheetIds:['sheet-a','sheet-b']};
+const generation={inputKey:'ck1-split',sheetIds:['sheet-a','sheet-b'],target:'C:\\out\\示例园区_询价总表.xlsx',
+ sha256:'a'.repeat(64)};
 test('one inquiry sheet becomes one file and internal sheets are never split out',()=>{
  const built=plan.build({model:model(),generation:generation,targetDirectory:'C:\\out\\项目询价'});
  assert.equal(built.files.length,2,'只按kind=inquiry取页，不按页名猜');
  assert.deepEqual(built.files.map(file=>file.name),['水阀门_供应商A.xlsx','水阀门_供应商B.xlsx']);
  assert.equal(built.files[0].target,'C:\\out\\项目询价\\水阀门_供应商A.xlsx');
  assert.equal(built.files[0].sheetId,'sheet-a');
+ assert.equal(built.files[0].hasLayout,true,'拆分计划保留询价页版式标记');
+ assert.equal(built.generationSha256,generation.sha256,'计划记录总簿SHA，发布前可再次核对');
  assert.equal(built.canPublish,true);
  assert.deepEqual(built.conflicts,[]);
  assert.equal(plan.build({model:model(),generation:generation,targetDirectory:'C:/out'}).files[0].target,'C:/out/水阀门_供应商A.xlsx');
@@ -27,7 +30,7 @@ test('duplicate names, missing generation and stale content are blocked before p
  assert.equal(clash.canPublish,false);
  assert.match(clash.conflicts.map(item=>item.message).join('；'),/文件名重复/);
  assert.match(plan.build({model:model(),targetDirectory:'C:\\out'}).conflicts.map(item=>item.code).join('；'),/no-generation/);
- assert.match(plan.build({model:model(),generation:{inputKey:'ck1-别的'},targetDirectory:'C:\\out'})
+ assert.match(plan.build({model:model(),generation:Object.assign({},generation,{inputKey:'ck1-别的'}),targetDirectory:'C:\\out'})
   .conflicts.map(item=>item.code).join('；'),/generation-stale/);
  assert.match(plan.build({model:model(),generation:generation,targetDirectory:''}).conflicts.map(item=>item.code).join('；'),/no-directory/);
 });

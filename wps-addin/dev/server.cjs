@@ -8,6 +8,7 @@ const {createExportStore} = require('./export-files.cjs');
 const {createProjectStore} = require('./project-store.cjs');
 const {createLibraryStore} = require('./library-store.cjs');
 const {createHeaderStore} = require('./header-store.cjs');
+const {createSplitStore} = require('./split-store.cjs');
 const {listDirectory} = require('./fs-list.cjs');
 
 const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.css', '/src/host.js',
@@ -25,7 +26,7 @@ const TYPES = {'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=
   '.html':'text/html; charset=utf-8','.xml':'application/xml; charset=utf-8','.svg':'image/svg+xml',
   '.json':'application/json; charset=utf-8'};
 
-function createServer({root, probeConfig = null, reportPath = null, importDirectory = null, projectDirectory = null, libraryDirectory = null, headerDirectory = null}) {
+function createServer({root, probeConfig = null, reportPath = null, importDirectory = null, projectDirectory = null, libraryDirectory = null, headerDirectory = null, splitDirectory = null}) {
   const reports = [];
   let writes = Promise.resolve();
   const importToken = crypto.randomBytes(32).toString('hex');
@@ -33,6 +34,7 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
   const projects = createProjectStore({directory: projectDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'projects')});
   const libraries = createLibraryStore({directory: libraryDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'library')});
   const headers = createHeaderStore({directory: headerDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'headers')});
+  const splits = createSplitStore({directory: splitDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'splits')});
   let importing = false;
   const server = http.createServer(async (req, res) => {
     const origin = 'http://127.0.0.1:' + server.address().port;
@@ -86,6 +88,25 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
           return json(200,await restoreCopy(data.source,{directory:importDirectory}));
         }
         return json(200,{projects:await projects.list()});
+      } catch(error) {
+        if(error.code==='REVISION_CONFLICT')return json(409,{error:error.message});
+        return json(400,{error:error.message});
+      }
+    }
+    if (['/api/split/prepare','/api/split/load','/api/split/save'].includes(url.pathname)) {
+      const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');
+      if (req.method !== 'POST') return json(405,{error:'POST required'});
+      if (req.headers['x-rfq-import-token'] !== importToken ||
+          !/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) return json(403,{error:'拆分回执会话失效，请重新打开侧栏。'});
+      try {
+        let size=0; const chunks=[];
+        for await (const chunk of req) { size+=chunk.length; if(size<=33554432)chunks.push(chunk); }
+        if(size>33554432)return json(413,{error:'拆分请求过大，未保存。'});
+        let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'拆分请求无效。'});}
+        if(!data||Array.isArray(data))return json(400,{error:'拆分请求无效。'});
+        if(url.pathname==='/api/split/prepare')return json(200,await splits.prepare(data));
+        if(url.pathname==='/api/split/load')return json(200,{receipt:await splits.load(data.projectId,data.batchId)});
+        return json(200,await splits.save(data.receipt,{expectedRevision:data.expectedRevision}));
       } catch(error) {
         if(error.code==='REVISION_CONFLICT')return json(409,{error:error.message});
         return json(400,{error:error.message});
@@ -231,7 +252,8 @@ async function main() {
   const libraryDirectory=path.resolve(arg('--library-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','library')));
   const projectDirectory=path.resolve(arg('--project-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','projects')));
   const headerDirectory=path.resolve(arg('--header-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','headers')));
-  const server = createServer({root:path.resolve(__dirname,'..'),probeConfig,reportPath:reportPath && path.resolve(reportPath),importDirectory,libraryDirectory,projectDirectory,headerDirectory});
+  const splitDirectory=path.resolve(arg('--split-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','splits')));
+  const server = createServer({root:path.resolve(__dirname,'..'),probeConfig,reportPath:reportPath && path.resolve(reportPath),importDirectory,libraryDirectory,projectDirectory,headerDirectory,splitDirectory});
   server.on('error', error => { console.error(error.message); process.exitCode = 1; });
   server.listen(port, '127.0.0.1', () => console.log('WPS add-in ready: http://127.0.0.1:' + port + (probeConfig ? ' (probe enabled)' : '')));
 }
