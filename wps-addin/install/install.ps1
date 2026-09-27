@@ -46,8 +46,7 @@ if (-not $xml.DocumentElement) { throw 'publish.xml没有根节点，已停止�
 $ours = @($xml.DocumentElement.ChildNodes | Where-Object {
   $_ -is [System.Xml.XmlElement] -and (
     ($_.GetAttribute('name') -eq $pluginGuid) -or
-    ($_.GetAttribute('guid') -eq $pluginGuid) -or
-    ($_.GetAttribute('url') -like "*:$Port/*")
+    ($_.GetAttribute('guid') -eq $pluginGuid)
   )
 })
 foreach ($node in $ours) { [void]$xml.DocumentElement.RemoveChild($node) }
@@ -68,12 +67,28 @@ Write-Step "已写入本插件节点：$pluginUrl"
 
 $release = @('main.js','ribbon.xml','taskpane.html','styles.css','package.json','rules','src','dev','assets')
 if (-not (Test-Path -LiteralPath $AppDir)) { New-Item -ItemType Directory -Path $AppDir -Force | Out-Null }
-foreach ($item in $release) {
-  $from = Join-Path $SourceDir $item
-  if (-not (Test-Path -LiteralPath $from)) { continue }
-  $to = Join-Path $AppDir $item
-  if (Test-Path -LiteralPath $to) { Remove-Item -LiteralPath $to -Recurse -Force }
-  Copy-Item -LiteralPath $from -Destination $to -Recurse -Force
+$codeBackup = $null
+if (Test-Path -LiteralPath (Join-Path $AppDir 'main.js')) {
+  $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+  $codeBackup = "$AppDir.bak-$stamp"
+  Copy-Item -LiteralPath $AppDir -Destination $codeBackup -Recurse -Force
+  Write-Step "已备份旧程序目录：$codeBackup"
+}
+try {
+  foreach ($item in $release) {
+    $from = Join-Path $SourceDir $item
+    if (-not (Test-Path -LiteralPath $from)) { continue }
+    $to = Join-Path $AppDir $item
+    if (Test-Path -LiteralPath $to) { Remove-Item -LiteralPath $to -Recurse -Force }
+    Copy-Item -LiteralPath $from -Destination $to -Recurse -Force
+  }
+} catch {
+  if ($codeBackup -and (Test-Path -LiteralPath $codeBackup)) {
+    if (Test-Path -LiteralPath $AppDir) { Remove-Item -LiteralPath $AppDir -Recurse -Force }
+    Copy-Item -LiteralPath $codeBackup -Destination $AppDir -Recurse -Force
+    Write-Step "发布复制失败，已回退旧程序目录：$codeBackup"
+  }
+  throw
 }
 Get-ChildItem -LiteralPath $AppDir -Recurse -File | Where-Object { $excluded -contains $_.Name } | ForEach-Object {
   Remove-Item -LiteralPath $_.FullName -Force

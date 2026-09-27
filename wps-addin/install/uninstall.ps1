@@ -47,8 +47,7 @@ if (Test-Path -LiteralPath $PublishPath) {
   $ours = @($xml.DocumentElement.ChildNodes | Where-Object {
     $_ -is [System.Xml.XmlElement] -and (
       ($_.GetAttribute('name') -eq $pluginGuid) -or
-      ($_.GetAttribute('guid') -eq $pluginGuid) -or
-      ($_.GetAttribute('url') -like "*:$Port/*")
+      ($_.GetAttribute('guid') -eq $pluginGuid)
     )
   })
   foreach ($node in $ours) { [void]$xml.DocumentElement.RemoveChild($node) }

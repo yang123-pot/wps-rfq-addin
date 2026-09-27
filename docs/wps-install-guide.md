@@ -1,6 +1,6 @@
-# WPS询价插件安装与卸载说明（2026-09-26）
+# WPS询价插件安装、升级与卸载说明（2026-09-27）
 
-脚本位于仓库`wps-addin/install/`：`install.ps1`、`start.ps1`、`uninstall.ps1`。全部是用户级操作，不需要管理员权限，也不修改WPS或Windows的安全设置。
+安装脚本位于 `wps-addin/install/`：`install.ps1`、`start.ps1`、`uninstall.ps1`。全部为用户级操作，不需要管理员权限，也不修改WPS或Windows安全设置。
 
 ## 一、安装
 
@@ -8,44 +8,64 @@
 pwsh -File wps-addin\install\install.ps1
 ```
 
-默认行为：
+脚本会：
 
-1. 备份WPS的`publish.xml`为`publish.xml.bak-时间戳`；
-2. **只增改本插件节点**（name/guid=`WpsRfqAddin`），其他插件节点原样保留；重复执行只会得到一个本插件节点；
-3. 把发布文件复制到`%LOCALAPPDATA%\WpsRfqAddin\app`，并**剔除探针与诊断脚本**（`host-probe.js`、`pane-diagnostics.js`、`acceptance-probe.js`）；
-4. 以隐藏窗口启动本机服务，只监听`127.0.0.1:38891`；端口已被本插件占用时不重复启动，被其他程序占用时报告原因而不结束陌生进程；
-5. 做健康检查（`/health`返回`wps-rfq-addin`）。
+1. 备份WPS的 `publish.xml` 为 `publish.xml.bak-时间戳`。
+2. 只按 `name/guid=WpsRfqAddin` 匹配本插件；同端口的其他加载项不会被删除或改写。
+3. 重复执行只保留一个本插件节点。
+4. 覆盖程序目录前，把旧目录备份为 `app.bak-时间戳`；复制失败时尝试回退旧代码。
+5. 复制 `main.js`、`ribbon.xml`、`taskpane.html`、`styles.css`、`package.json`、`rules`、`src`、`dev`、`assets` 到 `%LOCALAPPDATA%\WpsRfqAddin\app`。
+6. 从发布目录剔除探针和诊断脚本：`host-probe.js`、`pane-diagnostics.js`、`acceptance-probe.js`。
+7. 以隐藏窗口启动本机服务，只监听 `127.0.0.1:38891`；服务只提供插件资源和本机项目/库/回执接口。
+
+安装后请重启WPS表格，再从“项目询价”功能区打开侧栏。
 
 可覆盖参数：`-SourceDir`、`-AppDir`、`-PublishPath`、`-DataRoot`、`-Port`、`-SkipService`、`-SkipHealthCheck`。
 
-安装后请**重启WPS表格**，再从“项目询价”功能区打开侧栏。
-
-## 二、日常启动
+## 二、启动与健康检查
 
 ```powershell
 pwsh -File wps-addin\install\start.ps1
+Invoke-RestMethod http://127.0.0.1:38891/health
 ```
 
-单实例：已在运行时只报告状态；端口被其他程序占用时说明原因，不抢端口。
+期望返回：`service=wps-rfq-addin`。服务未启动时，WPS侧栏只显示连接失败，不会调用云端接口。
 
-## 三、卸载
+## 三、升级
+
+1. 先确认项目/库/模板数据在 `%LOCALAPPDATA%\WpsRfqAddin`，本项目的数据目录不随程序目录覆盖而删除。
+2. 更新代码后重新运行 `install.ps1`。
+3. 脚本先备份 `publish.xml` 和旧程序目录，再覆盖发布文件；失败时保留错误并尝试回退旧程序目录。
+4. 重启WPS，打开项目。R11会先核对审核表、分类簿、汇总表、总询价簿和拆分回执的真实路径/SHA；不通过时不会显示为已完成。
+
+## 四、卸载
 
 ```powershell
 pwsh -File wps-addin\install\uninstall.ps1
 ```
 
-1. 只停止本插件服务进程（先读pid文件，再核对命令行含`server.cjs`；命令行不符则不终止）；
-2. 从`publish.xml`里只移除本插件节点，其他插件节点不动（同样先备份）；
-3. **默认保留**`%LOCALAPPDATA%\WpsRfqAddin`下的项目、分类库、抬头模板与导入副本，并打印位置；
-4. 需要连程序目录一起删除时加`-RemoveAppDir`（只允许删除预期路径`...\WpsRfqAddin\app`）。
+1. 只停止本插件服务进程：先读 `%LOCALAPPDATA%\WpsRfqAddin\server.pid`，再核对命令行包含 `server.cjs`；命令行不符时不终止。
+2. 备份并更新 `publish.xml`，只移除本插件身份节点，其他插件原样保留。
+3. 默认保留程序目录和全部用户数据，便于重新安装/回退。
+4. 只有显式加 `-RemoveAppDir` 才删除预期的 `%LOCALAPPDATA%\WpsRfqAddin\app`。
 
-## 四、升级与回退
+用户数据位置：
 
-1. 升级：先备份`WpsRfqAddin`目录，再覆盖代码并重新执行`install.ps1`；
-2. 回退：`publish.xml.bak-*`是注册回退点，`WpsRfqAddin`目录是数据备份；回退代码后重新安装即可；
-3. 旧程序遇到未来的数据版本会拒绝读写并保留原文件，不会覆盖。
+- 项目：`projects`
+- 分类库与习惯：`library`
+- 抬头模板：`headers`
+- 导入副本：`imports`
+- 拆分回执：`splits`
 
-## 五、已知限制（安装相关）
+## 五、回退
 
-- 支持版本尚未定论：本机只在WPS表格`12.1.0.29161`上实测过，28043等版本需要隔离环境验证；
-- 安装脚本已用合成`publish.xml`在临时目录真实执行验证（其他插件节点保留、卸载保留数据）；**本机真实WPS上的安装、重启、升级、回退、卸载流程还没有执行**，属于待验收项。
+- 注册回退点：`publish.xml.bak-*`。
+- 代码回退点：`%LOCALAPPDATA%\WpsRfqAddin\app.bak-*`。
+- 数据保留：`%LOCALAPPDATA%\WpsRfqAddin` 下的项目、库、模板、导入副本和拆分回执不被默认卸载删除。
+- 回退代码后重新执行安装脚本即可；旧版本遇到未知数据版本会拒绝读写并保留文件。
+
+## 六、当前实测边界
+
+- 安装/卸载身份隔离、同端口其他插件保留、重复安装、程序目录备份和用户数据保留已在本机临时 `publish.xml` 上真实执行验证。
+- 真实WPS中的“安装→重启→打开项目→升级→回退→卸载→重装恢复”尚未完成。当前阻塞是Computer Use认证错误：`unsupported Codex auth method: apikey`，导致无法合规操作WPS窗口。
+- 支持版本只登记已实际验证的范围：WPS表格 `12.1.0.29161`。其他版本需要隔离验证后再加入支持清单。
