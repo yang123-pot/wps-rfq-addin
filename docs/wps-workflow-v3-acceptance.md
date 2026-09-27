@@ -1,8 +1,71 @@
 # R12 真实 WPS 验收记录（未完成）
 
-更新：2026-09-27 20:41（北京时间）。本次接续从 `d7e6ad6e9ef9923d47937072d16548b3218f8e79`、`feat/wps-phase1` 开始，远程配置为 `yang123-pot/wps-rfq-addin`。
+更新：2026-09-27 21:35（北京时间）。R12-A 接续从 `a63d0a26976cfca0732a14c3f9668314549cd25d`、`feat/wps-phase1` 开始，远程配置为 `yang123-pot/wps-rfq-addin`。最早的 20:41 记录从 `d7e6ad6e9ef9923d47937072d16548b3218f8e79` 开始，历史段落保留其发生时间。
 
 本次操作者为 Codex：完整阅读 handoff/AGENTS、查看获批图03/04，核对现有截图、探针、项目文件和真实 xlsx；**本次没有成功读取或操作实时 WPS 窗口，也没有新增真机通过步骤**。以下历史真机结果来自本机 17:55–18:04 已有证据，文件审计在本次重新执行，不把旧操作写成本次操作。
+
+## R12-A 现场保护与接续检查点（2026-09-27 21:35）
+
+**基线/包提交：** 分支 `feat/wps-phase1`，开工 HEAD `a63d0a26976cfca0732a14c3f9668314549cd25d`（提示词记录的 `63dde1e9126df2b09fd51bf8c7b1db0ec93d9451` 已在其后追加一次仅文档提交 `a63d0a2`；handoff 记录的代码基线 `e6f8ff2` 未变）。本包只动文档，包提交为紧随 `a63d0a2` 的 `docs: R12-A…` 提交，远程 SHA 以推送结果为准。工作区仍保留 6 个入场修改且**未被本包暂存或清理**。
+
+**对应图：** 图03（表内审核、整表一次确认）、图04（独立分类工作簿），本次实际打开查看。
+
+### 1. 入场 6 个修改的接手包
+
+| 文件 | 接手包 | 修改内容 |
+| --- | --- | --- |
+| `wps-addin/dev/export-files.cjs` | R12-B | 相邻暂存 `discard`／按 mtime 兜底清理陈旧点号暂存 |
+| `wps-addin/dev/server.cjs` | R12-B | `/api/export/discard` 路由 |
+| `wps-addin/src/import-ui.js` | R12-B | 生成失败/取消后清理本次暂存 |
+| `wps-addin/test/export-files.test.cjs` | R12-B | discard／陈旧清理用例 |
+| `wps-addin/src/export-host.js` | R12-D | 原生链接字体落地顺序与蓝系回读容差、预览草稿簿按 PluginStorage 找回 |
+| `wps-addin/test/export-host.test.cjs` | R12-D | 链接样式与预览复用用例 |
+
+6 个文件保持原样；R12-B 只处理其中 B 的 4 个，D 的 2 个留到 R12-D 通过后再提交。
+
+### 2. Computer Use 与真实 WPS 窗口
+
+- **结论：本会话仍无法读取真实 WPS 窗口，属环境阻塞。** `cua.getState()` 返回 `{"apps":[],"browsers":[],"errors":["Browsers: Error: unsupported Codex auth method: apikey"]}`，并抛出 `unsupported Codex auth method: apikey`；本会话暴露的 `cua` 只有浏览器方法（`getState`／`browsers`／`getBrowser`／`createBrowserTab`／`getTab`／`listBrowsers`／`listTabs`），没有 `listApps`／`getApp`／`computer`，即**原生窗口控制在本运行时不提供**。
+- 未绕过授权边界，未重复索要用户已给出的授权；依赖窗口的动作（读取实际打开工作簿的未保存编辑）在 R12-A 不执行，独立源码包可继续。
+- WPS 现场：版本 `12.1.0.29161`（`et.exe`/`wps.exe` FileVersion 一致）在运行，但当前只有 `2026-09-27-r12-r13-14-package-prompts.docx - WPS Office`，WPS 命令行中没有已打开的 xlsx；`r12/output/` 无 `~$` 锁文件。→ 没有待保护的未保存表内编辑，磁盘审核成果表即当前版本。
+
+### 3. 现场保护与 SHA
+
+保护副本写到本机 `outputs/wps-acceptance-20260927/R12-A/protected/`（**不改动、不删除、不重命名原成果**），清单与 SHA 见同目录 `../evidence/protection-manifest.json`，`allCopiesMatch=true`：
+
+| 用途 | 源（原样保留） | SHA256 |
+| --- | --- | --- |
+| 审核成果表（图03） | `r12/output/示例园区_分类审核成果.xlsx` | `d9355c4be1a0b6dbfb315cc7e40b5cba2b6e8af0c38de02dfe52259f8e9ced5f` |
+| 分类工作簿（图04） | `r12/output/分类工作簿/水泵.xlsx` | `8c99f43542fd566f96bc44e4a76e6318fe6a2da5daffe46c75192ff435403c48` |
+| 分类工作簿（图04） | `r12/output/分类工作簿/阀门.xlsx` | `cfcc972f21d5c28fb31725845221f9d14587aa29c416f6bb089b5848955a9226` |
+| 分类工作簿（图04） | `r12/output/分类工作簿/风机.xlsx` | `ca15ae2812c35bd28746a4efc486d835292e7bca5883c7ec3ad84805fdc82fa5` |
+| 分类工作簿（图04） | `r12/output/分类工作簿/汽车充电桩.xlsx` | `50e9f1dd63b5f0708f32dbcf4aa5299073aaa528d4612854360ffee33b5d10a5` |
+| 项目记录 | `r12/projects/p-mujmyjx0-16kom40i.json` | `4522a6716d871ae3a5eccd047060d40f2122302703d3cda69c1cc5fb87068231` |
+
+审核成果表磁盘 SHA 仍是收据值，未发生“用户另存导致 SHA 改变”，因此不需要保留两个版本。
+
+### 4. 磁盘核对：H11 与 rowId 绑定（只读）
+
+脚本 `outputs/wps-acceptance-20260927/R12-A/audit-r12a.py`，结果 `../evidence/disk-audit-r12a.json`：
+
+- 项目 `p-mujmyjx0-16kom40i` revision=6、schemaVersion=2；阶段 import/matching/review/categories=ready，brands/inquiry/split=missing；确认快照 `confirmedAt=2026-09-27T10:01:15.871Z`、inputKey `ck2-721d17bd7b34fb51`、8 行。
+- **K11 rowId 与快照一致**：`["f:/材料软件开发/outputs/wps-acceptance-20260926/r12/inputs/机电清单.xlsx","机电安装",10]`，对应材料=充电桩配电箱/充电桩配套；8 行 rowId 绑定全部一致。
+- **H11 磁盘为空，确认快照为“汽车充电桩”**：延续本条已有的磁盘/快照差异，不能把 SHA 一致解释为审核编辑已落盘。归 R12-C 做内容比较与恢复；R12-A **不重新确认、不重建、不覆盖**。
+
+### 5. 4 个分类工作簿仍与记录快照一致（只读；未重新生成）
+
+水泵2／阀门2／风机2／汽车充电桩1 行；公开 10 列顺序、材料逐值（名称/特征/单位/数量/rowId）、品牌与报价单价/金额为空均通过；公式数 0；4 文件 SHA 与项目记录逐份一致；`r12/output` 下无点号暂存残留。→ R12-A 的分类主路径输入可信，不重做已验收的分类文件生成。
+
+### 6. 隔离服务
+
+开工时 `http://127.0.0.1:38891/health` 连接被拒（未监听）。按 handoff 既有隔离参数以 probe 模式启动（**新文件名**，未覆盖 17:55–18:04 的 `report-20260927c.json` 与两个停摆存档）：`--report …/r12/evidence/report-20260927-r12a.json`、`--probe-output …/r12/probe-output-r12a.xlsx`、`--import-directory …/r12/imports`、`--library-directory …/r12/library`、`--project-directory …/r12/projects`、`--header-directory …/r12/headers`、`--split-directory …/r12/splits`。健康返回 `200 {"service":"wps-rfq-addin","version":"0.1.0","mode":"probe"}`，pid 30828；未导入生产库。
+
+### 7. 回归与出口
+
+- `node --test wps-addin/test/*.test.cjs` → **322/322 通过**（日志 `R12-A/evidence/node-r12a.log`）。仅证明工作区基线，不改源码、不代表真机通过。
+- **现场是否可继续：** 可继续。旧证据未被覆盖，保护副本 SHA 全部一致，分类 4 簿输入可信。
+- **唯一阻塞：** 真实 WPS 窗口控制在本运行时不可用（仅环境阻塞），因此**尚未新增任何真机通过**；图03 草稿/错误定位、图05–07、异常与四项目仍挂账。
+- **下一包：** R12-B（收敛暂存清理与发布票据，改 `export-files.cjs`/`server.cjs`/`import-ui.js` 及对应测试，可先于真机独立完成）；其后 R12-C 处理本节第 4 条的 H11 草稿差异与内容恢复。
 
 ## 已核实的图03与图04证据
 
