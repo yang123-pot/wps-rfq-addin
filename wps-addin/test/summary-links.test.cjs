@@ -68,7 +68,8 @@ test('分列布局（图05A）：一类一行、两行表头、黄色填写区�
  assert.equal([1,2,3,4].every(index=>visibleRow(workbook,index+3).slice(3,9).every(value=>value==='')),true,
   '品牌与供应商初始必须空白，等人工填写');
  assert.deepEqual(sheet.values.slice(1).map(row=>row.length===13),sheet.values.slice(1).map(()=>true),'等宽矩阵供版式使用');
- assert.deepEqual(spec.merges.map(addr),['D2:E2','F2:G2','H2:I2'],'三组品牌供应商表头合并');
+ assert.deepEqual(spec.merges.map(addr),['A1:J1','A2:A3','B2:B3','C2:C3','J2:J3','D2:E2','F2:G2','H2:I2'],
+  '图05A：标题跨公开列，序号/名称/材料条数/询价生成方式跨两行，三组品牌供应商各跨两列');
  assert.deepEqual(spec.fills.map(addr),
   ['A2:J2','A3:J3','D4:E7','F4:G7','H4:I7'],'表头浅色＋D:I黄色填写区');
  assert.deepEqual(spec.hyperlinks.map(link=>[addr(link),link.address,link.display]),
@@ -102,7 +103,7 @@ test('同格布局（图05B）：单行表头、单格三组、方式下拉；�
   [['1','水泵','2'],['2','阀门','2'],['3','风机','2'],['4','汽车充电桩','1']]);
  assert.equal([1,2,3,4].every(index=>visibleRow(combined,index+4).slice(3,6).every(value=>value==='')),true,
   '同格单格初始必须空白');
- assert.deepEqual(spec.merges,[],'同格布局无需合并表头');
+ assert.deepEqual(spec.merges.map(addr),['A1:G1','A2:G2'],'图05B：标题与项目名称行跨公开列合并；三组各占一列不合并');
  assert.deepEqual(spec.fills.map(addr),['A4:G4','D5:D8','E5:E8','F5:F8'],'三组单列黄色填写区');
  assert.deepEqual(spec.validations.map(rule=>[addr(rule),rule.listRange]),[['G5:G8','$J$1:$J$2']]);
  assert.deepEqual(spec.columns.filter(column=>column.hidden).map(column=>column.index),[8,9,10]);
@@ -136,6 +137,54 @@ test('绑定：保存布局/数据区域/稳定类别ID/文件绑定/内容键�
  assert.match(model.validateSummaryBinding(Object.assign({},binding,{categories:[]})).errors.join('；'),/类别清单/);
 });
 
+// R12-D：两种布局的表头合并必须按图05A/05B，且不能跨到隐藏辅助列、不能吞公开字段。
+test('R12-D汇总layout：分列/同格标题与跨行表头按图合并，不含隐藏辅助列、不吞公开字段',()=>{
+ const separated=built('separated').workbook.sheets[0],combined=built('combined').workbook.sheets[0];
+ assert.deepEqual(separated.layout.merges.map(addr),
+  ['A1:J1','A2:A3','B2:B3','C2:C3','J2:J3','D2:E2','F2:G2','H2:I2'],'图05A表头合并');
+ assert.deepEqual(combined.layout.merges.map(addr),['A1:G1','A2:G2'],'图05B表头合并');
+ [separated,combined].forEach(sheet=>{
+  sheet.layout.merges.forEach(merge=>{
+   const lastRow=merge.row+(merge.rowSpan||1)-1,lastColumn=merge.column+(merge.columnSpan||1)-1;
+   assert.ok(lastColumn<=sheet.layout.columns.length-3,'合并不得跨到隐藏的类别ID/相对链接/选项列');
+   assert.equal(merge.column>=1,true);
+   assert.ok(lastRow<=sheet.layout.metadata.lastRow,'合并不得压到数据行');
+  });
+ });
+ // 公开字段一个都不能被合并吞掉：分列三组各占两列，同格三组各占一列。
+ assert.deepEqual(separated.layout.merges.filter(merge=>merge.row===2&&merge.columnSpan===2).map(merge=>merge.column),[4,6,8]);
+ assert.equal(combined.layout.merges.some(merge=>merge.row===4),false,'同格表头行不合并');
+ // 首数据行与黄色填写区保持图05A/05B口径。
+ assert.equal(separated.layout.metadata.firstRow,4);
+ assert.equal(combined.layout.metadata.firstRow,5);
+ assert.deepEqual(separated.layout.fills.map(addr),['A2:J2','A3:J3','D4:E7','F4:G7','H4:I7']);
+ assert.deepEqual(combined.layout.fills.map(addr),['A4:G4','D5:D8','E5:E8','F5:F8']);
+});
+
+// 五类失效之一：同名链接指错目录。相对链接必须解析到完整目标，尾部文件名相同不算同一个。
+test('R12-D链接目标：另一目录同名文件与搬走的暂存目录都拒绝，等价相对/绝对写法通过',()=>{
+ const {workbook}=built('separated');
+ const stage='C:\\out\\示例园区\\.分类汇总表.tmp-r12d.xlsx';
+ const cases=[
+  ['分类工作簿\\水泵.xlsx',true,'原样相对地址'],
+  ['C:\\out\\示例园区\\分类工作簿\\水泵.xlsx',true,'WPS解析后的同一绝对目标'],
+  ['C:/out/示例园区/分类工作簿/../分类工作簿/水泵.xlsx',true,'同一目标的规范化形式'],
+  ['C:\\别的目录\\分类工作簿\\水泵.xlsx',false,'另一目录的同名文件'],
+  ['..\\别的目录\\分类工作簿\\水泵.xlsx',false,'相对指到别处'],
+  ['C:\\out\\示例园区\\分类工作簿\\水泵（副本）.xlsx',false,'同目录不同文件']];
+ cases.forEach(([stored,ok,label])=>{
+  // 只改写“水泵”这一条链接，其余三条仍是原样相对地址，才能单独验证目标解析。
+  const fixture=summaryApp({rewriteLinkAddress:(address,current)=>
+   String(address)==='分类工作簿\\水泵.xlsx'?stored:current});
+  if(ok)host.summaryWrite(fixture.app,workbook,stage);
+  else assert.throws(()=>host.summaryWrite(fixture.app,workbook,stage),/超链接地址读回不一致/,label+'必须拒绝');
+ });
+ // 暂存不落在汇总自己的目录（相对链接会指向别处）同样拒绝，避免发布到最终位置才失效。
+ const moved=summaryApp();
+ assert.throws(()=>host.summaryWrite(moved.app,workbook,'C:\\out\\别的项目\\.分类汇总表.tmp-r12d.xlsx'),
+  /超链接地址读回不一致/,'从最终汇总目录解析后才能确认链接目标');
+});
+
 // 模拟宿主：只实现export-host真正用到的API（含原生超链接/下拉/字体/隐藏列），验证逐值写入与重开读回。
 function summaryApp(options){
  const settings=options||{},ranges=new Map(),widths=new Map(),heights=new Map(),links=new Map(),merges=new Map();
@@ -166,7 +215,8 @@ function summaryApp(options){
     // WPS可能把相对地址解析成绝对地址；读回要能同时接受两者。
     const stored=settings.resolveLinks&&!/^(?:[a-z]:[\\/]|\\\\)/i.test(address)
      ? 'C:\\out\\示例园区\\'+String(address).replace(/\\/g,'\\') : address;
-    list.push({Address:stored,SubAddress:subAddress,ScreenTip:screenTip,TextToDisplay:display});}}};
+    const final=settings.rewriteLinkAddress?settings.rewriteLinkAddress(address,stored):stored;
+    list.push({Address:final,SubAddress:subAddress,ScreenTip:screenTip,TextToDisplay:display});}}};
   return sheet;
  }
  function makeBook(){

@@ -4,7 +4,12 @@ const model={sheets:[{name:'清单',values:[['编码','量'],['000123','12345678
 function fixture(failure){
  let active,closed=0,added=0,opened=0,saved=false;const previous={FullName:'C:\\user.xlsx',Activate(){active=this;},Close(){assert.fail('user book closed');}};active=previous;
  function sheet(){const ranges=new Map();return {Name:'Sheet',Range(address){if(!ranges.has(address))ranges.set(address,{Font:{},Rows:{autoFitCount:0,AutoFit(){this.autoFitCount++;}},get Value2(){return this.value;},set Value2(v){if(failure==='write')throw Error('write failed');assert.equal(this.NumberFormat,'@');this.value=v.map(r=>r.slice());},HasFormula:false});return ranges.get(address);}};}
- const sheets=[sheet()];const book={FullName:'Book1',Worksheets:{get Count(){return sheets.length;},Item(i){return typeof i==='number'?sheets[i-1]:sheets.find(s=>s.Name===i);},Add(){const s=sheet();sheets.push(s);return s;}},SaveAs(file,format){assert.equal(file,stage);assert.equal(format,51);if(failure==='save')throw Error('save failed');this.FullName=file;saved=true;},Close(save){assert.equal(save,false);closed++;},Activate(){active=this;}};
+ const sheets=[sheet()];const names=new Map();
+ // 真机实测WPS支持工作簿级定义名（Names.Add/Item/RefersTo 且随保存重开保留），预览草稿簿以此作归属标记。
+ const book={FullName:'Book1',Names:{get Count(){return names.size;},
+   Add(name,refersTo){if(names.has(name))throw Error('duplicate name');names.set(name,{Name:name,RefersTo:refersTo});},
+   Item(name){if(!names.has(name))throw Error('name missing');return names.get(name);}},
+  Worksheets:{get Count(){return sheets.length;},Item(i){return typeof i==='number'?sheets[i-1]:sheets.find(s=>s.Name===i);},Add(){const s=sheet();sheets.push(s);return s;}},SaveAs(file,format){assert.equal(file,stage);assert.equal(format,51);if(failure==='save')throw Error('save failed');this.FullName=file;saved=true;},Close(save){assert.equal(save,false);closed++;},Activate(){active=this;}};
  const app={AutomationSecurity:1,FileSystem:{Exists:()=>false},get ActiveWorkbook(){return active;},Workbooks:{Count:1,Item(){return previous;},Add(){added++;active=book;return book;},Open(file,links,readonly){opened++;assert.ok(saved);assert.equal(file,stage);assert.equal(links,0);assert.equal(readonly,true);assert.equal(app.AutomationSecurity,3);if(failure==='reopen')throw Error('reopen failed');if(failure==='corrupt')sheets[0].Range('A1:B3').value[1][0]='123';if(failure==='formula')sheets[0].Range('A1:B3').HasFormula=true;active=book;return book;}}};
  return {app,previous,sheets,get closed(){return closed;},get added(){return added;},get opened(){return opened;}};
 }
@@ -56,6 +61,84 @@ test('导入预览只创建自有工作簿、不保存原件；改选择更新�
  assert.equal(next.added,1,'用户另存后的预览不再被刷新覆盖');
  assert.equal(book.FullName,'C:\\user-saved-preview.xlsx');
 });
+// R12真机遗留观察②：侧栏重建会丢掉内存句柄，必须靠PluginStorage＋草稿簿归属标记找回同一个草稿簿，
+// 不能每次导入都新开预览，也不能仅凭“名字＋表形状”就把用户自己新建的同名同结构工作簿当成插件草稿。
+function previewStorage(){
+ const store=new Map();
+ return {store,PluginStorage:{getItem:key=>store.has(key)?store.get(key):null,
+  setItem:(key,value)=>{store.set(key,String(value));},removeItem:key=>{store.delete(key);}}};
+}
+function shapeSheet(sheet){sheet.UsedRange={UnMerge(){},Clear(){}};return sheet;}
+test('侧栏重建后导入预览复用插件自建且未另存的预览簿',()=>{
+ const storage=previewStorage();
+ const h=fixture();
+ h.app.PluginStorage=storage.PluginStorage;
+ const first=host.showPreview(h.app,model);
+ assert.equal(h.added,1);
+ const book=first.book;
+ assert.equal(book.FullName,'Book1');
+ assert.equal(storage.store.get('rfq.preview.book'),'Book1','创建后在PluginStorage记住草稿簿名字');
+ const token=book.Names.Item('RFQ_PREVIEW_TOKEN').RefersTo.replace(/^="?|"$/g,'');
+ assert.match(token,/rfq-preview-/,'草稿簿里写入归属标记');
+ assert.equal(storage.store.get('rfq.preview.token'),token,'PluginStorage与草稿簿保存同一个归属标记');
+ for(const sheet of h.sheets)shapeSheet(sheet);
+ // 模拟侧栏重建：内存句柄丢失，但草稿簿仍在宿主里打开，PluginStorage留有名字与标记。
+ h.app.Workbooks.Count=2;h.app.Workbooks.Item=i=>i===1?h.previous:book;
+ const again=host.showPreview(h.app,model,null);
+ assert.equal(again.book,book,'重建后必须复用同一预览工作簿');
+ assert.equal(h.added,1,'重建后不得再新开预览工作簿');
+ // 用户另存后不再算插件草稿，必须另建，绝不覆盖用户文件。
+ book.FullName='C:\\user-saved-preview.xlsx';
+ const next=fixture();h.app.Workbooks.Add=()=>next.app.Workbooks.Add();
+ host.showPreview(h.app,model,null);
+ assert.equal(next.added,1,'用户另存后的预览不得被复用覆盖');
+ assert.equal(book.FullName,'C:\\user-saved-preview.xlsx');
+});
+test('预览归属证明：同名同结构但不是插件草稿的工作簿一律不写入',()=>{
+ // 场景A：插件草稿被用户另存后关闭，用户又新建/打开一个同名同结构的工作簿（没有归属标记）。
+ const h=fixture(),storage=previewStorage();
+ h.app.PluginStorage=storage.PluginStorage;
+ const made=host.showPreview(h.app,model);
+ assert.equal(h.added,1);
+ made.book.FullName='C:\\user-saved.xlsx';
+ const userBook=h.previous;
+ userBook.FullName='Book1';// 用户工作簿恰好也是未另存草稿、名字相同
+ userBook.Worksheets={get Count(){return model.sheets.length;},
+  Item(i){return {Name:model.sheets[i-1].name,UsedRange:{UnMerge(){},Clear(){}}}}};
+ h.app.Workbooks.Count=1;h.app.Workbooks.Item=()=>userBook;
+ const replacement=fixture();
+ h.app.Workbooks.Add=()=>replacement.app.Workbooks.Add();
+ const result=host.showPreview(h.app,model,null);
+ assert.equal(result.book,replacement.app.ActiveWorkbook,'没有归属标记的同名同结构工作簿不得被复用');
+ assert.equal(replacement.added,1);
+ assert.equal(userBook.FullName,'Book1','用户工作簿未被改写');
+ assert.equal(userBook.Worksheets.Count,model.sheets.length);
+ // 场景B：同名同结构但归属标记与PluginStorage不一致（用户自己写了同名定义名）也必须另建。
+ const h2=fixture(),storage2=previewStorage();
+ h2.app.PluginStorage=storage2.PluginStorage;
+ const draft2=host.showPreview(h2.app,model).book;
+ draft2.Names.Item('RFQ_PREVIEW_TOKEN').RefersTo='="rfq-preview-000000-0"';// 同名标记，但不是本次记忆的标记
+ h2.app.Workbooks.Count=1;h2.app.Workbooks.Item=()=>draft2;
+ const replacement2=fixture();
+ h2.app.Workbooks.Add=()=>replacement2.app.Workbooks.Add();
+ host.showPreview(h2.app,model,null);
+ assert.equal(replacement2.added,1,'标记不一致时不得复用别人的工作簿');
+ // 场景C：宿主不支持定义名/标记被剥掉时，即使记忆里有名字和标记也宁可新开，不冒写用户工作簿的风险。
+ const h3=fixture(),storage3=previewStorage();
+ h3.app.PluginStorage=storage3.PluginStorage;
+ storage3.PluginStorage.setItem('rfq.preview.book','Book1');
+ storage3.PluginStorage.setItem('rfq.preview.token','rfq-preview-manual-1');
+ const userBook3=h3.previous;
+ userBook3.FullName='Book1';
+ userBook3.Worksheets={get Count(){return model.sheets.length;},
+  Item(i){return {Name:model.sheets[i-1].name,UsedRange:{UnMerge(){},Clear(){}}}}};
+ h3.app.Workbooks.Count=1;h3.app.Workbooks.Item=()=>userBook3;
+ const replacement3=fixture();
+ h3.app.Workbooks.Add=()=>replacement3.app.Workbooks.Add();
+ host.showPreview(h3.app,model,null);
+ assert.equal(replacement3.added,1,'无法证明归属时必须新开预览');
+ assert.equal(userBook3.FullName,'Book1','拿不到归属证明时绝不改写用户工作簿');
+});
 
 // R2：版式、原生超链接与区域下拉的模拟宿主。只模拟本包真正用到的API。
 function layoutFixture(overrides){
@@ -74,8 +157,11 @@ function layoutFixture(overrides){
     Add(type,style,operator,formula1){if(options.validationFails)throw Error('validation failed');
      if(options.validationIgnore)return;
      this.Type=type;
-     // 实测WPS表格会把区域引用的等号去掉后再回读Formula1，模拟宿主差异。
-     this.Formula1=options.validationEchoBare?String(formula1).replace(/^=/,''):formula1;
+     // 实测WPS 12.1.0.29161 会把区域引用的引号/等号归一化后再回读：写 ='表'!$A$1 回读 =表!$A$1。
+     if(options.validationWrongRegion)this.Formula1="='别的选项'!$Z$1:$Z$9";// 类型仍是3，来源却是别的区域
+     else if(options.validationTypeOnly)this.Formula1=null;// 只落下拉类型，读不回来源
+     else if(options.validationEchoWps)this.Formula1=String(formula1).replace(/^=/,'').replace(/'/g,'');
+     else this.Formula1=options.validationEchoBare?String(formula1).replace(/^=/,''):formula1;
      validations[anchorKey({__address:address})]=this.Formula1;},
     Delete(){this.Formula1=null;this.Type=null;}},
    get Hyperlinks(){return hyperlinkView(anchorKey({__address:address}));}};
@@ -102,8 +188,11 @@ function layoutFixture(overrides){
    sheet.Hyperlinks={Add(anchor,address,subAddress,screenTip,display){
     if(options.linkAddThrows)throw Error('link unsupported');
     if(options.dropLink)return;
+    // 实测WPS 12.1.0.29161 在落地原生链接时会把锚点改写成宿主“链接”样式（纯蓝16711680／下划线2）。
+    if(options.linkRestylesFont)anchor.Font.Color=16711680; // #0000FF 按WPS的BGR整数
+    const stored=options.rewriteLinkAddress?options.rewriteLinkAddress(address):address;
     const list=links[anchorKey(anchor)]||(links[anchorKey(anchor)]=[]);
-    list.push({Address:address,SubAddress:subAddress,ScreenTip:screenTip,TextToDisplay:display});
+    list.push({Address:stored,SubAddress:subAddress,ScreenTip:screenTip,TextToDisplay:display});
    }};
   }
   return sheet;
@@ -122,7 +211,13 @@ function layoutFixture(overrides){
  const app={AutomationSecurity:1,FileSystem:{Exists:()=>false},ActiveWindow:{FreezePanes:false,get Frozen(){return this.FreezePanes;}},
   get ActiveWorkbook(){return app._active;},Workbooks:{Count:1,Item(){return previous;},
    Add(){app._active=book;const s=newSheet();sheets.push(s);return book;},
-   Open(file){app._active=book;return book;}}};
+   Open(file){
+    app._active=book;
+    // 模拟宿主保存/重开时把原生链接字体统一成自带链接色的行为。
+    if(options.reopenLinkColor!=null)Object.keys(links).forEach(function(address){
+     rangeFor(address).Font.Color=options.reopenLinkColor;
+     rangeFor(address+':'+address).Font.Color=options.reopenLinkColor;});
+    return book;}}};
  app._active=previous;
  // Range()缓存必须按地址记忆住合并/填充/下拉状态，才能被读回校验。
  return {app,book,ranges,get sheets(){return sheets;},get saved(){return saved;},merges,fills,validations,links,columnWidths,rowHeights,
@@ -230,6 +325,54 @@ test('版式读回缺失或宿主缺API时明确报错，不产出“看起来�
   /merge failed|合并/,'合并失败必须停止');
 });
 
+// R12真机（WPS 12.1.0.29161 隔离COM实例实测）：Hyperlinks.Add 会把锚点改成宿主链接样式
+// （Color 16711680／ColorIndex 5／下划线2）；把获批字体放到链接之后落地，保存重开读回与获批色完全一致
+// （#0563C1→12673797／ColorIndex 23，相对地址仍读回“分类工作簿\水泵.xlsx”）。故障是写入次序，不是回读或主题色，
+// 因此保持精确比对：宿主若在重开时改回自带链接蓝，属于无法核实的版式，必须停下而不是靠容差放行。
+test('原生链接锚点字体：链接之后落地获批蓝色，重开读回必须与获批色完全一致',()=>{
+ const layoutModule=require('../src/workbook-layout.js');
+ const values=layoutModule.equalize([['分类汇总表'],['项目名称：示例园区'],
+  ['序号','名称','材料条数','品牌与供应商一','品牌','供应商','品牌与供应商二','品牌','供应商','询价生成方式'],
+  ['1','水泵','2','','','','','','','合成一份']],10);
+ const spec=layoutModule.build({columns:values[2].map(function(_,i){return {index:i+1};}),headerRows:[3],
+  hyperlinks:[{row:4,column:2,address:'分类工作簿\\水泵.xlsx',display:'水泵',relative:true}],
+  fonts:[layoutModule.linkFont(4,2)]},{rowCount:values.length,columnCount:10});
+ const sheetOf=function(name){return {sheets:[{name:name,values:values,layout:spec}]};};
+ const ordered=layoutFixture({linkRestylesFont:true});
+ host.write(ordered.app,sheetOf('分类汇总表'),'C:\\temp\\rfq-layout.xlsx');
+ assert.equal(ordered.sheets[0].Range('B4:B4').Font.Color,layoutModule.toColor('#0563C1'),
+  '字体必须在原生链接之后落地，否则会被宿主链接样式覆盖');
+ assert.equal(ordered.sheets[0].Range('B4:B4').Font.Underline,2,'蓝色下划线仍然落地');
+ const rejected=layoutFixture({linkRestylesFont:true,reopenLinkColor:16711680});
+ assert.throws(function(){host.write(rejected.app,sheetOf('分类汇总表'),'C:\\temp\\rfq-layout.xlsx');},
+  /字体颜色读回不一致：B4:B4/,'宿主重开改写锚点色必须停下，不产出“看起来像”的文件');
+});
+
+// 五类失效之一：下拉“类型对、来源错”。Type=3 只说明单元格是下拉，不能证明选项源正确。
+test('下拉来源必须读回一致：Type=3指错区域、只剩类型都拒绝，等价写法仍通过',()=>{
+ const layoutModule=require('../src/workbook-layout.js');
+ const values=layoutModule.equalize([['清单'],
+  ['序号','项目编码','项目名称','项目特征描述','单位','工程量','品牌','报价单价','金额','备注'],
+  ['1','FM-001','阀门','DN50','个','20','通达','','','']],10);
+ const spec=layoutModule.build({columns:values[1].map(function(_,i){return {index:i+1};}),headerRows:[2],
+  validations:[layoutModule.listValidation(3,7,1,1,'内部选项','$A$1:$A$5')],metadata:{profile:'category-detail'}},
+  {rowCount:values.length,columnCount:10});
+ const book=function(){return {sheets:[{name:'材料明细',values:values,layout:spec}]};};
+ // Type=3 却指到别的选项区域：必须拒绝，不能因为“有下拉”就放行。
+ const wrong=layoutFixture({validationWrongRegion:true});
+ assert.throws(function(){host.write(wrong.app,book(),'C:\\temp\\rfq-layout.xlsx');},
+  /下拉未生效.*G3:G3.*实际.*别的选项/,'类型为3但来源是别的区域必须拒绝');
+ assert.equal(wrong.saved,false,'错误来源不得保存文件');
+ // 宿主只落下拉类型、读不回来源：不能仅凭Type=3宣布通过。
+ const typeOnly=layoutFixture({validationTypeOnly:true});
+ assert.throws(function(){host.write(typeOnly.app,book(),'C:\\temp\\rfq-layout.xlsx');},
+  /下拉未生效.*G3:G3.*实际空.*类型3/,'只凭类型为3不能宣布下拉正确');
+ assert.equal(typeOnly.saved,false);
+ // 真正等价的WPS回读写法（去掉引号与等号）继续通过。
+ const equivalent=layoutFixture({validationEchoWps:true});
+ host.write(equivalent.app,book(),'C:\\temp\\rfq-layout.xlsx');
+ assert.equal(equivalent.saved,true,'WPS归一化后的等价区域引用必须通过');
+});
 test('无layout的旧模型仍按原行为写出，版式校验拦住越界区域',()=>{
  const layoutModule=require('../src/workbook-layout.js');
  const legacy={sheets:[{name:'清单',values:[['编码','量'],['000123','0.3']]}]};

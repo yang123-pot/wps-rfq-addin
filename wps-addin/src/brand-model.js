@@ -266,10 +266,16 @@
    if(spec.name==='combined')fills.push(layout.inputFill(spec.firstRow,group[0],plan.categories.length,1));
    else fills.push(layout.inputFill(spec.firstRow,group[0],plan.categories.length,2));
   });
+  // 图05A/05B表头合并：标题与项目名称行只跨公开列（绝不跨隐藏辅助列），
+  // 分列布局把序号/名称/材料条数/询价生成方式跨两行，三组品牌供应商各跨两列；同格布局三组各占一列不合并。
   if(spec.subHeaderRow){
-   merges.push({row:spec.headerRow,column:spec.groups[0][0],columnSpan:2});
-   merges.push({row:spec.headerRow,column:spec.groups[1][0],columnSpan:2});
-   merges.push({row:spec.headerRow,column:spec.groups[2][0],columnSpan:2});
+   merges.push({row:spec.titleRow,column:1,columnSpan:spec.width});
+   [1,2,3,spec.modeColumn].forEach(function(column){
+    merges.push({row:spec.headerRow,column:column,rowSpan:2,columnSpan:1});});
+   spec.groups.forEach(function(group){merges.push({row:spec.headerRow,column:group[0],columnSpan:2});});
+  }else{
+   merges.push({row:spec.titleRow,column:1,columnSpan:spec.width});
+   if(spec.projectRow)merges.push({row:spec.projectRow,column:1,columnSpan:spec.width});
   }
   plan.categories.forEach(function(entry,index){
    var row=spec.firstRow+index;

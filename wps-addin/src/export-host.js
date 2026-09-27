@@ -67,14 +67,6 @@
       if(!range.Interior)throw Error('当前WPS不支持单元格填充API（Range.Interior），未按获批版式输出“'+sheet.Name+'”。');
       range.Interior.Color=layout.toColor(fill.color);
     });
-    // 字体样式（名称超链接的蓝色下划线等）：只在模型显式给出颜色/加粗/下划线时落地。
-    (spec.fonts||[]).forEach(function(font){
-      var range=sheet.Range(address(font));
-      if(!range.Font)throw Error('当前WPS不支持字体样式API（Range.Font），未按获批版式输出“'+sheet.Name+'”。');
-      if(font.color!=null)range.Font.Color=layout.toColor(font.color);
-      if(font.bold!=null)range.Font.Bold=font.bold===true;
-      if(font.underline!=null)range.Font.Underline=font.underline===true?2:0;
-    });
     if(spec.freeze){
       var window=app.ActiveWindow;
       if(!window||typeof window.FreezePanes==='undefined')
@@ -94,6 +86,15 @@
       if(anchor.Hyperlinks&&typeof anchor.Hyperlinks.Count==='number'&&anchor.Hyperlinks.Count<1)
         throw Error('“'+sheet.Name+'”超链接未生效：'+address(link));
     });
+    // 字体样式（名称超链接的蓝色下划线等）：必须在原生链接之后落地。
+    // 实测WPS表格在Hyperlinks.Add时会按宿主“链接”样式改写该单元格字体，先设颜色会被覆盖，读回就成了宿主链接色。
+    (spec.fonts||[]).forEach(function(font){
+      var range=sheet.Range(address(font));
+      if(!range.Font)throw Error('当前WPS不支持字体样式API（Range.Font），未按获批版式输出“'+sheet.Name+'”。');
+      if(font.color!=null)range.Font.Color=layout.toColor(font.color);
+      if(font.bold!=null)range.Font.Bold=font.bold===true;
+      if(font.underline!=null)range.Font.Underline=font.underline===true?2:0;
+    });
     (spec.validations||[]).forEach(function(rule){
       var range=sheet.Range(address(rule));
       if(!range.Validation||typeof range.Validation.Add!=='function')
@@ -109,9 +110,13 @@
         range.Validation.InCellDropdown=rule.inCellDropdown!==false;
         range.Validation.IgnoreBlank=rule.allowBlank!==false;
       }
-      var applied=formulaMatches(range.Validation.Formula1,formula)||Number(range.Validation.Type)===3;
+      // 真机实测：WPS 12.1.0.29161 会把区域引用的单引号/等号写法归一化后原样回读，因此必须读回等价区域。
+      // 类型为 3 只说明“这里是下拉”，不能证明来源正确；指到别的区域同样要拒绝，不能靠类型放行。
+      var typeOk=range.Validation.Type==null||Number(range.Validation.Type)===3;
+      var applied=typeOk&&formulaMatches(range.Validation.Formula1,formula);
       if(!applied)throw Error('“'+sheet.Name+'”分类下拉未生效：'+address(rule)+
-        '（期望'+formula+'，实际'+String(range.Validation.Formula1==null||range.Validation.Formula1===''?'空':range.Validation.Formula1)+'）');
+        '（期望'+formula+'，实际'+String(range.Validation.Formula1==null||range.Validation.Formula1===''?'空':range.Validation.Formula1)+
+        '，类型'+String(range.Validation.Type)+'）');
     });
     if(spec.print){
       var pageSetup=sheet.PageSetup;
@@ -121,7 +126,30 @@
     }
   }
   // 重开后的版式读回：只核对能证明“公开值＋必要版式”的关键项。
-  function verifyLayout(app,book,model){
+  // 宿主相对链接必须从最终汇总目录解析出完整目标；只比尾部文件名会把别处的同名文件当成同一个。
+  function pathParts(value){return String(value==null?'':value).replace(/[\\/]+/g,'\\').split('\\').filter(function(part){return part!=='';});}
+  function normalizeTarget(value){
+    var parts=pathParts(value),stack=[],index,part;
+    for(index=0;index<parts.length;index++){
+      part=parts[index];
+      if(part==='.')continue;
+      if(part==='..'){if(stack.length>1)stack.pop();continue;}
+      stack.push(part);
+    }
+    return stack.join('\\').toLowerCase();
+  }
+  function dirName(value){var parts=pathParts(value);parts.pop();return parts.join('\\');}
+  function resolveTarget(baseDirectory,address){
+    var value=String(address==null?'':address);
+    if(/^(?:[a-z]:[\\/]|\\\\)/i.test(value))return normalizeTarget(value);
+    return normalizeTarget(baseDirectory+'\\'+value);
+  }
+  function verifyLayout(app,book,model,stagePath){
+    // 相对链接要按“这份工作簿最终落盘的目录”解析；模型声明的 directory 是汇总表最终目录，
+    // 实际读回地址按暂存文件当前所在目录解析，两者都归一到完整目标再比对。
+    var actualBase=dirName(stagePath);
+    var finalBase=(model&&typeof model.directory==='string'&&/^(?:[a-z]:[\\/]|\\\\)/i.test(model.directory))
+      ?model.directory:actualBase;
     model.sheets.forEach(function(s){
       var spec=s.layout;
       if(!spec)return;
@@ -148,8 +176,11 @@
         var range=sheet.Range(address(font)),target=range.Font||{};
         if(font.underline===true&&!target.Underline)
           throw Error('“'+s.name+'”下划线读回缺失：'+address(font));
+        // 真机实测：先在锚点上落地获批蓝色再建原生链接会被宿主链接样式覆盖；把字体放到链接之后写，
+        // 保存重开读回与获批色完全一致（#0563C1→12673797）。因此这里保持精确比对，不靠“蓝色系”容差放行。
         if(font.color!=null&&target.Color!=null&&Number(target.Color)!==Number(layout.toColor(font.color)))
-          throw Error('“'+s.name+'”字体颜色读回不一致：'+address(font));
+          throw Error('“'+s.name+'”字体颜色读回不一致：'+address(font)+
+            '（期望'+font.color+'/'+Number(layout.toColor(font.color))+'，实际'+String(target.Color)+'）');
       });
       (spec.hyperlinks||[]).forEach(function(link){
         var anchor=sheet.Range(address(link));
@@ -158,13 +189,17 @@
         if(Number(count)<1)throw Error('“'+s.name+'”超链接读回缺失：'+address(link));
         var actual=anchor.Hyperlinks.Item(1).Address;
         // 相对链接按目录整体搬移仍可用：读回可能是原样相对路径，也可能是WPS解析后的绝对路径。
-        if(key(actual)!==key(link.address)&&key(actual).slice(-key(link.address).length)!==key(link.address))
-          throw Error('“'+s.name+'”超链接地址读回不一致：期望'+link.address+'，实际'+String(actual));
+        // 但两者都要从本文件所在目录解析成完整目标再比对，别处目录的同名文件不能蒙混通过。
+        var expected=resolveTarget(finalBase,link.address),resolved=resolveTarget(actualBase,actual);
+        if(resolved!==expected)
+          throw Error('“'+s.name+'”超链接地址读回不一致：期望'+link.address+'（目标'+expected+
+            '），实际'+String(actual)+'（目标'+resolved+'）');
       });
       (spec.validations||[]).forEach(function(rule){
         var range=sheet.Range(address(rule));
         var formula="='"+String(rule.listSheet).replace(/'/g,"''")+"'!"+rule.listRange;
-        if(!formulaMatches(range.Validation&&range.Validation.Formula1,formula)&&Number(range.Validation&&range.Validation.Type)!==3)
+        var typeOk=!!(range.Validation&&(range.Validation.Type==null||Number(range.Validation.Type)===3));
+        if(!(typeOk&&formulaMatches(range.Validation&&range.Validation.Formula1,formula)))
           throw Error('“'+s.name+'”分类下拉读回不一致：'+address(rule));
       });
     });
@@ -197,7 +232,7 @@
       app.AutomationSecurity=3;if(app.AutomationSecurity!==3)throw Error('无法禁用自动宏，未重新打开暂存文件。');
       var candidate=app.Workbooks.Open(stagePath,0,true);
       if(!candidate||key(candidate.FullName)!==key(stagePath))throw Error('WPS未返回指定暂存文件。');
-      reopened=candidate;verify(reopened,model);verifyLayout(app,reopened,model);
+      reopened=candidate;verify(reopened,model);verifyLayout(app,reopened,model,stagePath);
     }catch(e){error=e;}
     finally{
       try{if(reopened)reopened.Close(false);if(created)created.Close(false);}catch(e){error=Error('输出工作簿清理失败：'+e.message);}
@@ -207,15 +242,84 @@
     if(error)throw error;
   }
   // 图01预览只占用插件自己新建且尚未另存的工作簿；绝不把当前活动簿当预览目标。
+  // 草稿簿身份：未另存时宿主给的FullName就是名字本身，不含路径分隔符；一旦另存就不再属于插件预览。
+  function previewIdentity(book){
+    try{
+      var full=book&&book.FullName;
+      if(typeof full!=='string'||!full||full.indexOf('\\')>=0||full.indexOf('/')>=0)return null;
+      return full;
+    }catch(_){return null;}
+  }
+  function previewShapeMatches(book,model){
+    try{
+      if(!book||book.Worksheets.Count!==model.sheets.length)return false;
+      for(var n=0;n<model.sheets.length;n++)if(book.Worksheets.Item(n+1).Name!==model.sheets[n].name)return false;
+      return true;
+    }catch(_){return false;}
+  }
+  // 预览草稿簿归属证明：只靠“名字＋表形状”无法区分用户自己新建的同名同结构工作簿，
+  // 所以在插件自建草稿里写一个工作簿级定义名作标记；只有标记与PluginStorage一致才允许复用，
+  // 宿主不支持定义名时宁可新开，也不冒写用户工作簿的风险。
+  var PREVIEW_MARK='RFQ_PREVIEW_TOKEN';
+  function previewTokenOf(book){
+    try{
+      var names=book&&book.Names;
+      if(!names||typeof names.Item!=='function')return null;
+      var entry=names.Item(PREVIEW_MARK);
+      var match=String((entry&&entry.RefersTo)==null?'':entry.RefersTo).match(/rfq-preview-[a-z0-9-]+/i);
+      return match?match[0]:null;
+    }catch(_){return null;}
+  }
+  function createPreviewToken(){return 'rfq-preview-'+Date.now().toString(36)+'-'+Math.floor(Math.random()*1679616).toString(36);}
+  function stampPreview(book){
+    var existing=previewTokenOf(book);
+    if(existing)return existing;
+    var token=createPreviewToken();
+    try{book.Names.Add(PREVIEW_MARK,'="'+token+'"');}catch(_){return null;}
+    return previewTokenOf(book)===token?token:null;
+  }
+  function storedPreview(app){
+    try{
+      return {name:app.PluginStorage.getItem('rfq.preview.book')||null,
+        token:app.PluginStorage.getItem('rfq.preview.token')||null};
+    }catch(_){return {name:null,token:null};}
+  }
+  function rememberPreview(app,book){
+    var name=previewIdentity(book),token=name?stampPreview(book):null;
+    try{
+      if(name&&token){
+        app.PluginStorage.setItem('rfq.preview.book',name);
+        app.PluginStorage.setItem('rfq.preview.token',token);
+      }else if(typeof app.PluginStorage.removeItem==='function'){
+        app.PluginStorage.removeItem('rfq.preview.book');app.PluginStorage.removeItem('rfq.preview.token');
+      }
+    }catch(_){/* 存储不可用时保持旧行为 */}
+  }
+  // 侧栏重建/刷新会丢掉内存句柄：按名字、工作表形状和归属标记三者同时命中才找回同一个草稿簿。
+  function findStoredPreview(app,model){
+    var stored=storedPreview(app);
+    if(!stored.name||!stored.token)return null;
+    for(var n=1;n<=app.Workbooks.Count;n++){
+      var candidate=app.Workbooks.Item(n);
+      try{
+        if(previewIdentity(candidate)!==stored.name)continue;
+        if(!previewShapeMatches(candidate,model))continue;
+        if(previewTokenOf(candidate)!==stored.token)continue;
+        return candidate;
+      }catch(_){continue;}
+    }
+    return null;
+  }
   function showPreview(app,model,handle){
     var book=null,previous=app.ActiveWorkbook;
     if(handle&&handle.book){
       try{
-        if(handle.book.FullName===handle.name&&handle.book.Worksheets.Count===model.sheets.length){
+        if(handle.book.FullName===handle.name&&previewShapeMatches(handle.book,model)){
           for(var n=1;n<=app.Workbooks.Count;n++)if(app.Workbooks.Item(n)===handle.book)book=handle.book;
         }
       }catch(_){book=null;}
     }
+    if(!book)book=findStoredPreview(app,model);
     var reused=!!book;
     if(!book)book=app.Workbooks.Add(-4167);
     try{
@@ -233,6 +337,7 @@
       });
       verify(book,model);
       var first=book.Worksheets.Item(1);if(typeof first.Activate==='function')first.Activate();
+      rememberPreview(app,book);
       return {book:book,name:book.FullName};
     }catch(error){
       // 新建失败簿由插件负责清理；已有预览保持打开，避免丢失用户可能的另存操作。
