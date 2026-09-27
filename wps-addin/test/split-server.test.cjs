@@ -7,6 +7,16 @@ async function closeServer(server){
  if(typeof server.closeAllConnections==='function')server.closeAllConnections();
  await done;
 }
+async function reattach(context,server){
+ await closeServer(context.server);
+ context.server=server;
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const origin='http://127.0.0.1:'+server.address().port,html=await(await fetch(origin+'/taskpane.html')).text();
+ const token=JSON.parse(html.match(/window\.__RFQ_IMPORT__=(\{[^;]+\});/)[1]).token;
+ context.request=(route,data,h)=>fetch(origin+'/api/split/'+route,{method:'POST',
+  headers:h||{'content-type':'application/json','x-rfq-import-token':token},body:JSON.stringify(data||{})});
+ return context;
+}
 function model(){
  return {inputKey:'ck1-split-server',schemaVersion:1,sheets:[
   {sheetId:'sheet-a',kind:'inquiry',categoryName:'水泵',brand:'青源',supplier:'华川设备',
@@ -102,4 +112,69 @@ test('a pre-existing target with no receipt is blocked, and split API keeps the 
  assert.match(blocked.plan.conflicts.map(item=>item.code).join('；'),/target-exists/);
  assert.equal((await context.request('load',{projectId:'p-split-0004',batchId:'b-split-0004'},
   {'content-type':'application/json'})).status,403);
+});
+// R12-E：发布响应丢失后，目标已存在但回执仍是pending；连续prepare与一次服务重启都只能待核对，不能凭空成功。
+test('R12-E unrecorded target stays needs-verification across repeated prepare and restart',async t=>{
+ const context=await setup(t),projectId='p-split-unrecorded',batchId='b-split-unrecorded',
+  payload=()=>({projectId,batchId,generation:generation(context),currentKey:'ck1-split-server',targetDirectory:context.outputDirectory});
+ const first=await(await context.request('prepare',payload())).json();
+ const fileA=first.plan.files[0],bytes=Buffer.from('published but receipt write lost');
+ await fs.writeFile(fileA.target,bytes);
+ for(let round=1;round<=3;round++){
+  const again=await(await context.request('prepare',payload())).json(),state=again.receipt.files.filter(file=>file.fileId===fileA.fileId)[0];
+  assert.equal(state.state,'needs-verification','第'+round+'次prepare仍必须待核对');
+  assert.equal(state.sha256,null,'观察到的SHA不能写进经核对的SHA');
+  assert.equal(state.observedSha256,digest(bytes),'观察SHA与经核对SHA分开记录');
+  assert.equal(again.summary.done,false,'未做内容核对前不得报done');
+  assert.equal(again.canPublish,false,'待核对文件不得被当成成功发布');
+  assert.equal(again.canVerify,true,'允许发起显式内容核对');
+ }
+ await reattach(context,createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(context.root,'private'),
+  splitDirectory:path.join(context.root,'splits')}));
+ const afterRestart=await(await context.request('prepare',payload())).json(),restarted=afterRestart.receipt.files.filter(file=>file.fileId===fileA.fileId)[0];
+ assert.equal(restarted.state,'needs-verification');
+ assert.equal(restarted.sha256,null);
+ assert.equal(afterRestart.summary.done,false);
+});
+// R12-E：save遇到409时，服务端回执保持待核对，不能因为一次“核对通过”的写入就宣布成功。
+test('R12-E save 409 keeps the unrecorded target unverified',async t=>{
+ const context=await setup(t),projectId='p-split-409',batchId='b-split-409',
+  payload=()=>({projectId,batchId,generation:generation(context),currentKey:'ck1-split-server',targetDirectory:context.outputDirectory}),
+  state=require('../src/split-state.js');
+ const first=await(await context.request('prepare',payload())).json(),fileA=first.plan.files[0];
+ const bytes=Buffer.from('unrecorded but content matches nothing yet');
+ await fs.writeFile(fileA.target,bytes);
+ const prepared=await(await context.request('prepare',payload())).json();
+ assert.equal(prepared.receipt.files.filter(file=>file.fileId===fileA.fileId)[0].state,'needs-verification');
+ const claimed=state.mark(prepared.receipt,fileA.fileId,'succeeded',digest(bytes),{proof:'content-check'});
+ const conflict=await context.request('save',{receipt:claimed,expectedRevision:Math.max(0,prepared.revision-1)});
+ assert.equal(conflict.status,409,'陈旧版本号必须冲突');
+ const loaded=await(await context.request('load',{projectId,batchId})).json(),
+  persisted=loaded.receipt.files.filter(file=>file.fileId===fileA.fileId)[0];
+ assert.equal(persisted.state,'needs-verification','409后磁盘回执仍是待核对');
+ assert.equal(persisted.sha256,null);
+ assert.equal(loaded.receipt.revision,prepared.revision);
+});
+// R12-E：总簿或来源内容键变化使旧批次失效，旧成功件不得被沿用。
+test('R12-E changed total workbook or inputKey never reuses an old success record',async t=>{
+ const context=await setup(t),projectId='p-split-stale',batchId='b-split-stale',
+  payload=()=>({projectId,batchId,generation:generation(context),currentKey:'ck1-split-server',targetDirectory:context.outputDirectory}),
+  state=require('../src/split-state.js');
+ const first=await(await context.request('prepare',payload())).json(),fileA=first.plan.files[0];
+ await fs.writeFile(fileA.target,context.bytes);
+ const success=state.mark(first.receipt,fileA.fileId,'succeeded',digest(context.bytes),{proof:'content-check'});
+ await context.request('save',{receipt:success,expectedRevision:first.revision});
+ // 内容键变化：同一批次不能静默换来源。
+ const changedModel=model();changedModel.inputKey='ck2-changed';
+ const changed=await context.request('prepare',{projectId,batchId,currentKey:'ck2-changed',targetDirectory:context.outputDirectory,
+  generation:{inputKey:'ck2-changed',target:context.generationTarget,sha256:digest(context.bytes),sheetIds:['sheet-a','sheet-b'],
+   modelSnapshot:changedModel}});
+ assert.equal(changed.status,400,'来源键变化必须阻断该批次');
+ assert.match(await changed.text(),/不一致|重新生成/);
+ // 总簿SHA变化：即使来源键没变，也不能沿用旧成功。
+ await fs.writeFile(context.generationTarget,Buffer.from('外部改写后的总表'));
+ const rewritten=await(await context.request('prepare',payload())).json();
+ assert.equal(rewritten.canPublish,false);
+ assert.equal(rewritten.summary.done,false);
+ assert.match(rewritten.plan.conflicts.map(item=>item.code).join('；'),/generation-sha-mismatch|不一致/);
 });

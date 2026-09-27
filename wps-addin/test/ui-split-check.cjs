@@ -7,6 +7,11 @@ const inquiryModel=require('../src/inquiry-model.js');
 const SPLIT_NAMES=sample.expectations.splitFiles.slice();
 const SHOT=process.env.RFQ_UI_SPLIT_SCREENSHOT,EVIDENCE=process.env.RFQ_UI_SPLIT_EVIDENCE;
 function digest(bytes){return crypto.createHash('sha256').update(bytes).digest('hex');}
+function columnName(index){let name='';for(;index>0;index=Math.floor((index-1)/26))name=String.fromCharCode(65+(index-1)%26)+name;return name;}
+function mergeAddresses(layout){
+ return ((layout&&layout.merges)||[]).map(function(item){
+  return columnName(item.column)+item.row+':'+columnName(item.column+(item.columnSpan||1)-1)+(item.row+(item.rowSpan||1)-1);});
+}
 function generationFixture(){
  const preview=collection.preview(sample.buildCollection(),true);
  const categoryByMaterial={'水泵':'pump','阀门':'valve','送风机':'fan','排风机':'fan','充电桩配电箱':'ev-charger','钢索':'no-inquiry'};
@@ -43,7 +48,27 @@ async function run(){
    const emptySheet={Name:'Sheet1',UsedRange:{Row:1,Column:1,Rows:{Count:1},Columns:{Count:1},Value2:[[1]]}};
    const previous={Name:'用户文件.xlsx',FullName:'C:\\用户文件.xlsx',Worksheets:{Count:1,Item(){return emptySheet;}},
     Activate(){window.Application.ActiveWorkbook=this;}};
-   window.Application={ActiveWorkbook:previous,AutomationSecurity:1,Workbooks:{Count:1,Item(){return previous;}},
+   window.__existingBooks={};window.__openCalls=[];window.__closedOwned=0;
+   window.Application={ActiveWorkbook:previous,AutomationSecurity:1,Workbooks:{Count:1,Item(){return previous;},
+    Open(file,links,readonly){
+     window.__openCalls.push({file:file,links:links,readonly:readonly,security:window.Application.AutomationSecurity});
+     const spec=window.__existingBooks[String(file).toLowerCase()];
+     if(!spec)throw Error('模拟宿主未登记已有文件：'+file);
+     const merges={};(spec.merges||[]).forEach(function(address){merges[address]=true;});
+     function rangeFor(address){
+      return {HasFormula:false,get MergeCells(){return merges[address]===true;},
+       get Value2(){return spec.values.map(function(row){return row.slice();});},
+       Font:{},Interior:{},Validation:{Type:null,Formula1:null},Hyperlinks:{Count:0},
+       Rows:{AutoFit(){}},Merge(){merges[address]=true;}};
+     }
+     const sheet={Name:spec.name,Range:rangeFor,Columns:{Item(i){return {Hidden:(spec.hidden||[]).indexOf(i)>=0};}}};
+     const book={FullName:file,Worksheets:{get Count(){return 1;},
+       Item(i){return typeof i==='number'?sheet:(sheet.Name===i?sheet:undefined);}},
+      Close(save){if(save)throw Error('核对已有文件必须只读关闭');window.__closedOwned++;
+       window.Application.ActiveWorkbook=previous;},
+      Activate(){window.Application.ActiveWorkbook=book;}};
+     return book;
+    }},
     GetSaveAsFilename(){throw Error('R10不得调用系统另存对话框');},GetOpenFilename(){throw Error('R10不得调用系统打开对话框');}};
    window.__splitWrites=[];window.__receipts=[];window.__openedFolder='';
   });
@@ -111,18 +136,64 @@ async function run(){
   assert.equal(receiptCount>0,true,'每次回执变化都请求项目记录保存');
   const receiptFiles=await fs.readdir(splitDirectory);
   assert.equal(receiptFiles.length,1,'按项目＋批次只写一份回执');
+  // 关闭/重开结果窗口不改变状态：回执在服务端，多次refresh后逐文件状态必须一致。
+  const doneStates=await page.evaluate(function(){return window.__splitPanel.receipt().files.map(function(file){
+   return file.fileId+':'+file.state+':'+file.verifiedBy;});});
+  const writesBeforeReopen=await page.evaluate(function(){return window.__splitWrites.length;});
+  await page.evaluate(function(){document.getElementById('split-run').click();});
+  await page.waitForFunction(function(){return !!document.querySelector('.rfq-split-result');});
+  await page.locator('.rfq-split-result button').click();
+  await page.evaluate(function(){window.__splitPanel.refresh();});
+  await page.waitForFunction(function(){return /完成 5/.test(document.getElementById('split-status').textContent);});
+  const afterReopen=await page.evaluate(function(){return window.__splitPanel.receipt().files.map(function(file){
+   return file.fileId+':'+file.state+':'+file.verifiedBy;});});
+  assert.deepEqual(afterReopen,doneStates,'关闭/重开结果窗口和refresh都不改变逐文件状态');
+  assert.equal(await page.evaluate(function(){return window.__splitWrites.length;}),writesBeforeReopen,
+   '重开结果窗口不重复写已成功文件');
   // 外部改写已成功文件：刷新后必须转待核对，不能沿用旧成功，也不能直接重试覆盖。
-  await fs.writeFile(path.join(outputDirectory,SPLIT_NAMES[0]),'外部改写');
+  const firstTarget=path.join(outputDirectory,SPLIT_NAMES[0]);
+  await fs.writeFile(firstTarget,'外部改写');
+  const externalBytes=await fs.readFile(firstTarget);
   await page.evaluate(function(){window.__splitPanel.refresh();});
   await page.waitForFunction(function(){return /待核对 1/.test(document.getElementById('split-status').textContent);});
   if(EVIDENCE)await fs.writeFile(path.join(EVIDENCE,'split-blocked.json'),JSON.stringify(
    await page.evaluate(function(){return {message:document.getElementById('split-message').textContent,
     status:document.getElementById('split-status').textContent,runDisabled:document.getElementById('split-run').disabled,
     retryDisabled:document.getElementById('split-retry').disabled};}),null,2));
-  assert.equal(await page.locator('#split-run').isDisabled(),true);
-  assert.equal(await page.locator('#split-retry').isDisabled(),true);
+  assert.equal(await page.locator('#split-run').isDisabled(),true,'待核对存在时一键拆分不发布');
+  assert.equal(await page.locator('#split-retry').isDisabled(),false,'显式核对入口必须可用');
+  // 同名异内容：逐值核对不通过时保持待核对，且绝不覆盖原文件。
+  const expectedSheet=fixture.model.sheets.filter(function(sheet){return sheet.name==='水泵_青源';})[0];
+  const wrongValues=expectedSheet.values.map(function(row,index){
+   return index===expectedSheet.values.length-1?row.map(function(value,column){return column===5?'999':value;}):row.slice();});
+  await page.evaluate(function(args){
+   window.__existingBooks[args.target.toLowerCase()]={name:args.name,values:args.values,merges:args.merges,hidden:[]};
+  },{target:firstTarget,name:expectedSheet.name,values:wrongValues,merges:mergeAddresses(expectedSheet.layout)});
+  await page.evaluate(function(){document.getElementById('split-retry').click();});
+  await page.waitForFunction(function(){return /待核对1份/.test(document.getElementById('split-message').textContent)&&
+   (window.__openCalls||[]).length>0;});
+  assert.equal(await page.evaluate(function(){return window.__splitPanel.receipt().files[0].state;}),'needs-verification');
+  assert.equal(await page.evaluate(function(){return window.__splitPanel.receipt().files[0].verifiedBy;}),null);
+  assert.deepEqual(await fs.readFile(firstTarget),externalBytes,'核对不通过时原文件保持不变');
+  // 内容逐值一致且SHA稳定：显式核对通过后才记为成功（verifiedBy=content-check）。
+  await page.evaluate(function(args){
+   window.__existingBooks[args.target.toLowerCase()]={name:args.name,values:args.values,merges:args.merges,hidden:[]};
+  },{target:firstTarget,name:expectedSheet.name,values:expectedSheet.values,merges:mergeAddresses(expectedSheet.layout)});
+  await page.evaluate(function(){document.getElementById('split-retry').click();});
+  await page.waitForFunction(function(){return /完成5份，失败0份/.test(document.getElementById('split-message').textContent)&&
+   !/待核对/.test(document.getElementById('split-status').textContent);});
+  const verified=await page.evaluate(function(){return window.__splitPanel.receipt().files[0];});
+  assert.equal(verified.state,'succeeded');
+  assert.equal(verified.verifiedBy,'content-check','只有显式内容核对才把已有文件记成功');
+  assert.equal(verified.sha256,digest(externalBytes),'记录的是核对时的实际SHA');
+  if(EVIDENCE)await fs.writeFile(path.join(EVIDENCE,'split-verified.json'),JSON.stringify(
+   await page.evaluate(function(){return {message:document.getElementById('split-message').textContent,
+    status:document.getElementById('split-status').textContent,receipt:window.__splitPanel.receipt(),
+    openCalls:window.__openCalls,closedOwned:window.__closedOwned};}),null,2));
+  assert.equal(await page.evaluate(function(){return window.__closedOwned>=2;}),true,'核对打开的文件只读关闭');
   assert.deepEqual(errors,[]);
-  console.log('PASS(R10): 图07一键拆分——5份独立询价文件与图07文件名一致，逐份重开核/SHA回执、失败只续作未完成、外部改写转待核对不覆盖，分类簿/汇总表保留，打开输出文件夹指向实际目录。');
+  console.log('PASS(R12-E): 图07一键拆分——5份独立询价文件且失败只续作；待核对文件重复刷新/重启不自动成功，'+
+   '同名异内容保持待核对且不覆盖，显式逐值核对通过后才按实际SHA记成功；分类簿/汇总表保留，打开输出文件夹指向实际目录。');
  }finally{
   await browser.close();
   await new Promise(resolve=>{server.close(resolve);if(typeof server.closeAllConnections==='function')server.closeAllConnections();});

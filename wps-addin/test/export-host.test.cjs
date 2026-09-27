@@ -451,6 +451,80 @@ test('宿主完全没有落下拉时明确报出期望与实际，不产出文�
  assert.equal(h.saved,false,'下拉未落地时不得保存文件');
 });
 
+// R12-E：拆分待核对必须有内容证明。verifyExistingOutput 打开实际供应商文件，逐值核公开值/工作表范围/必需版式和抬头，
+// 并在核对前后各取一次实际SHA；只有全通过且SHA没有在核对过程中变化才返回ok。
+function verifyFixture(options){
+ const opts=options||{},
+  values=(opts.values||[['示例园区 水泵询价表','','','','','','','','',''],
+   ['项目名称：示例园区','','','','','单位名称：示例建设公司','','','',''],
+   ['序号','项目编码','项目名称','项目特征描述','单位','工程量','品牌','报价单价','金额','备注'],
+   ['1','FM-001','水泵','DN50','台','2','青源','','','']]).map(function(row){return row.slice();}),
+  target=opts.target||'C:\\out\\水泵_青源.xlsx',h=layoutFixture();
+ h.book.Worksheets.Add();
+ h.sheets[0].Name=opts.sheetName||'水泵_青源';
+ h.sheets[0].Range('A1:J'+values.length).Value2=values;
+ h.sheets[0].Range('A1:J1').Merge();
+ if(opts.extraSheet)h.book.Worksheets.Add();
+ if(opts.hiddenAuxiliary)h.sheets[0].Columns.Item(11).Hidden=true;
+ const opened=[];
+ h.app.Workbooks.Open=function(file,links,readonly){
+  opened.push({file:file,links:links,readonly:readonly,security:h.app.AutomationSecurity});
+  h.app._active=h.book;return h.book;};
+ return Object.assign(h,{target:target,opened:opened,expected:{name:opts.sheetName||'水泵_青源',values:values,
+  layout:{columns:[1,2,3,4,5,6,7,8,9,10].map(function(index){return {index:index};}),
+   merges:[{row:1,column:1,columnSpan:10}],metadata:{profile:'inquiry-sheet'}}}});
+}
+test('R12-E verifyExistingOutput只认内容逐值一致的已有文件，核对前后SHA必须稳定',async()=>{
+ const h=verifyFixture(),shaBefore='1'.repeat(64);
+ const result=await host.verifyExistingOutput(h.app,{fileId:'file-a',target:h.target},h.expected,
+  function(){return Promise.resolve({target:h.target,exists:true,sha256:shaBefore,bytes:100});});
+ assert.equal(result.ok,true);
+ assert.equal(result.sha256,shaBefore);
+ assert.deepEqual(result.mismatches,[]);
+ assert.deepEqual(result.layoutIssues,[]);
+ assert.deepEqual(h.opened.map(function(item){return item.file;}),[h.target],'按目标实际路径只读打开');
+ assert.equal(h.opened[0].readonly,true);
+ assert.equal(h.opened[0].security,3,'核对期间临时禁宏');
+ assert.equal(h.app.AutomationSecurity,1,'核对后恢复宏安全设置');
+ assert.equal(h.closed,1,'只关闭插件自己打开的文件');
+});
+test('R12-E verifyExistingOutput拒绝同名异内容，不把外部文件当成功',async()=>{
+ const h=verifyFixture();
+ h.sheets[0].Range('A1:J4').Value2=h.expected.values.map(function(row,index){
+  return index===3?row.map(function(value,column){return column===5?'999':value;}):row.slice();});
+ const result=await host.verifyExistingOutput(h.app,{fileId:'file-a',target:h.target},h.expected,
+  function(){return Promise.resolve({target:h.target,exists:true,sha256:'2'.repeat(64),bytes:100});});
+ assert.equal(result.ok,false);
+ assert.match(result.mismatches.join('；'),/工程量|公开值|不一致/);
+ assert.equal(h.closed,1);
+});
+test('R12-E verifyExistingOutput拒绝隐藏辅助列与内部工作表',async()=>{
+ const target='C:\\out\\水泵_青源.xlsx',inspect=function(){return Promise.resolve({target:target,exists:true,sha256:'3'.repeat(64),bytes:100});};
+ const hidden=verifyFixture({hiddenAuxiliary:true});
+ const hiddenResult=await host.verifyExistingOutput(hidden.app,{fileId:'file-a',target:hidden.target},hidden.expected,inspect);
+ assert.equal(hiddenResult.ok,false);
+ assert.match(hiddenResult.layoutIssues.join('；'),/隐藏/,'供应商件不允许隐藏追溯列');
+ const extra=verifyFixture({extraSheet:true});
+ const extraResult=await host.verifyExistingOutput(extra.app,{fileId:'file-a',target:extra.target},extra.expected,inspect);
+ assert.equal(extraResult.ok,false);
+ assert.match(extraResult.mismatches.join('；'),/工作表/,'供应商件不允许内部工作表');
+});
+test('R12-E verifyExistingOutput在核对过程中目标SHA改变时拒绝成功',async()=>{
+ const h=verifyFixture();let calls=0;
+ const result=await host.verifyExistingOutput(h.app,{fileId:'file-a',target:h.target},h.expected,
+  function(){return Promise.resolve({target:h.target,exists:true,bytes:100,sha256:calls++===0?'4'.repeat(64):'5'.repeat(64)});});
+ assert.equal(result.ok,false);
+ assert.match(result.mismatches.join('；'),/SHA|变化/);
+});
+test('R12-E verifyExistingOutput对缺失目标直接保守拒绝，不打开工作簿',async()=>{
+ const h=verifyFixture();
+ const result=await host.verifyExistingOutput(h.app,{fileId:'file-a',target:h.target},h.expected,
+  function(){return Promise.resolve({target:h.target,exists:false,sha256:null,bytes:0});});
+ assert.equal(result.ok,false);
+ assert.equal(result.sha256,null);
+ assert.equal(h.opened.length,0);
+});
+
 // R12实机（2026-09-27）：WPS表格把隐藏列的ColumnWidth读回0，随行rowId隐藏列不能因此判失败。
 test('隐藏辅助列按Hidden判定，不因隐藏列宽读回0而阻断',()=>{
  const layoutModule=require('../src/workbook-layout.js');

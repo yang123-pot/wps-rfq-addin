@@ -346,5 +346,119 @@
       throw error;
     }
   }
-  return {selectTarget:selectTarget,write:write,showPreview:showPreview,address:address};
+  // R12-E：拆分待核对的内容证明。打开已有供应商文件，逐值核公开值、工作表/隐藏列范围、必需合并与抬头，
+  // 并在核对前后各取一次本机实际SHA；只读核对，绝不覆盖或改写外部文件，也不把“首次观察SHA”当证明。
+  function findOpenBook(app,target){
+    for(var n=1;n<=app.Workbooks.Count;n++){
+      var candidate=app.Workbooks.Item(n);
+      try{if(key(candidate.FullName)===key(target))return candidate;}catch(_){}
+    }
+    return null;
+  }
+  function readPublicValues(sheet,rowCount,columnCount){
+    var values=[];
+    for(var start=0;start<rowCount;start+=500){
+      var length=Math.min(500,rowCount-start),
+        requestedAddress='A'+(start+1)+':'+columnName(columnCount)+(start+length),
+        range=sheet.Range(requestedAddress);
+      if(range.HasFormula!==false)throw Error('“'+sheet.Name+'”公开值区域检测到公式或无法确认公式状态。');
+      var actual=range.Value2;
+      if(!Array.isArray(actual)||actual.length!==length)
+        throw Error('“'+sheet.Name+'”公开值读回行数不一致['+requestedAddress+']（期望'+length+'行，实际'+
+         (Array.isArray(actual)?actual.length:'非二维区域')+'）。');
+      for(var r=0;r<length;r++){
+        var row=actual[r];
+        if(!Array.isArray(row)||row.length<columnCount)throw Error('“'+sheet.Name+'”公开值读回列数不足。');
+        values.push(row.slice(0,columnCount));
+      }
+    }
+    return values;
+  }
+  function comparePublicValues(sheet,expectedValues){
+    var mismatches=[],columnCount=expectedValues[0].length,
+      actual=readPublicValues(sheet,expectedValues.length,columnCount);
+    for(var r=0;r<expectedValues.length&&mismatches.length<5;r++)for(var c=0;c<columnCount;c++){
+      var want=expectedValues[r][c]==null?'':String(expectedValues[r][c]),
+        cell=actual[r]?actual[r][c]:null,got=cell==null?'':String(cell);
+      if(got!==want){mismatches.push('公开值不一致：'+columnName(c+1)+(r+1)+'期望“'+want+'”，实际“'+got+'”。');break;}
+    }
+    return mismatches;
+  }
+  function verifyExistingOutput(app,file,expectedSheet,inspectTarget){
+    if(!app||!app.Workbooks)return Promise.reject(Error('当前WPS不支持打开工作簿核对已有文件。'));
+    if(!file||typeof file.target!=='string'||!file.target)return Promise.reject(Error('缺少待核对的目标路径。'));
+    if(!expectedSheet||!Array.isArray(expectedSheet.values)||!expectedSheet.values.length)
+      return Promise.reject(Error('缺少冻结的询价页快照，不能核对内容。'));
+    if(typeof inspectTarget!=='function')return Promise.reject(Error('缺少本机文件核验接口，不能核对内容。'));
+    var target=file.target,mismatches=[],layoutIssues=[];
+    return Promise.resolve().then(function(){return inspectTarget(target);}).then(function(before){
+      if(!before||before.exists!==true)
+        return {ok:false,sha256:null,mismatches:['目标文件不存在，不能核对为成功。'],layoutIssues:[]};
+      var beforeSha=before.sha256?String(before.sha256).toLowerCase():null;
+      if(!/^[a-f\d]{64}$/i.test(String(beforeSha||'')))
+        return {ok:false,sha256:null,mismatches:['无法取得目标文件的实际SHA256，不能核对内容。'],layoutIssues:[]};
+      var book=null,opened=false,previous=app.ActiveWorkbook,security=app.AutomationSecurity,error=null;
+      try{
+        book=findOpenBook(app,target);
+        if(!book){
+          if(typeof app.AutomationSecurity==='number')app.AutomationSecurity=3;
+          book=app.Workbooks.Open(target,0,true);opened=true;
+        }
+        if(!book)throw Error('WPS未返回待核对的目标工作簿。');
+        var count=null;
+        try{count=Number(book.Worksheets.Count);}catch(_){count=null;}
+        if(count!==1)mismatches.push('工作表数量应为1张，实际'+String(count)+'张；供应商件不能带内部/隐藏页。');
+        var expectedName=String(expectedSheet.name||''),sheet=null;
+        try{sheet=book.Worksheets.Item(expectedName);}catch(_){sheet=null;}
+        if(!sheet)mismatches.push('找不到期望的公开工作表：'+expectedName+'。');
+        if(sheet){
+          try{mismatches=mismatches.concat(comparePublicValues(sheet,expectedSheet.values));}
+          catch(readError){mismatches.push(readError.message);}
+          var spec=expectedSheet.layout||{};
+          if(typeof sheet.Columns==='object'&&typeof sheet.Columns.Item==='function'){
+            (spec.columns||[]).forEach(function(column,position){
+              var index=column.index||position+1,actualColumn=sheet.Columns.Item(index);
+              if(column.hidden===true){
+                if(actualColumn.Hidden!==true)layoutIssues.push('隐藏辅助列未生效：第'+index+'列。');
+              }else if(actualColumn.Hidden===true)layoutIssues.push('公开列被隐藏：第'+index+'列。');
+            });
+            var publicColumns=expectedSheet.values[0].length;
+            for(var index=publicColumns+1;index<=publicColumns+8;index++){
+              var extra=sheet.Columns.Item(index);
+              if(extra&&extra.Hidden===true){layoutIssues.push('公开列范围外存在隐藏辅助列：第'+index+'列。');break;}
+            }
+          }
+          (spec.merges||[]).forEach(function(merge){
+            var range=sheet.Range(address(merge));
+            if(range.MergeCells!==true)layoutIssues.push('必需合并未生效：'+address(merge)+'。');
+          });
+          try{
+            var used=sheet.UsedRange;
+            if(used&&used.Columns&&Number.isFinite(Number(used.Columns.Count))&&
+             Number(used.Columns.Count)>expectedSheet.values[0].length)
+              layoutIssues.push('存在公开列范围外的额外列（UsedRange '+String(used.Columns.Count)+' 列）。');
+          }catch(_){}
+        }
+      }catch(e){error=e;}
+      finally{
+        try{if(book&&opened)book.Close(false);}catch(closeError){if(!error)error=closeError;}
+        try{app.AutomationSecurity=security;}catch(_){}
+        try{if(previous)previous.Activate();}catch(_){}
+      }
+      if(error)return {ok:false,sha256:beforeSha,
+        mismatches:mismatches.concat(['打开或读取已有文件失败：'+error.message]),layoutIssues:layoutIssues};
+      return inspectTarget(target).then(function(after){
+        var afterSha=after&&after.sha256?String(after.sha256).toLowerCase():null;
+        if(!after||after.exists!==true||!/^[a-f\d]{64}$/i.test(String(afterSha||'')))
+          return {ok:false,sha256:beforeSha,mismatches:mismatches.concat(['核对后无法再次取得目标文件SHA256。']),
+           layoutIssues:layoutIssues};
+        if(afterSha!==beforeSha)
+          mismatches.push('目标文件在核对过程中被改写（SHA256发生变化），需要重新核对。');
+        return {ok:mismatches.length===0&&layoutIssues.length===0,sha256:afterSha,
+         mismatches:mismatches,layoutIssues:layoutIssues};
+      });
+    });
+  }
+  return {selectTarget:selectTarget,write:write,showPreview:showPreview,address:address,
+   verifyExistingOutput:verifyExistingOutput};
 }));

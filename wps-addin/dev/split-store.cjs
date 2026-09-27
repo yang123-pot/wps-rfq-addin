@@ -5,7 +5,7 @@ const state=require('../src/split-state.js');
 const planModel=require('../src/split-plan.js');
 const SCHEMA_VERSION=state.SCHEMA_VERSION,STATES=state.STATES,ID_PATTERN=state.ID_PATTERN;
 const validate=state.validate,summarize=state.summarize,create=state.create,mark=state.mark,
- reconcile=state.reconcile,pending=state.pending,blocked=state.blocked;
+ demoteUnproven=state.demoteUnproven,reconcile=state.reconcile,pending=state.pending,blocked=state.blocked;
 function digest(bytes){return crypto.createHash('sha256').update(bytes).digest('hex');}
 function revisionConflict(){
  const error=Error('拆分回执版本冲突：已被其他窗口更新，请重新读取回执后再保存。');
@@ -34,7 +34,8 @@ function createSplitStore({directory}={}){
   catch(error){throw Error('拆分回执已损坏，原文件未改动：'+error.message);}
   const check=validate(parsed);
   if(!check.ok)throw Error('拆分回执不完整或版本不支持：'+check.errors.join('；'));
-  return parsed;
+  // 旧回执里没有内容核对证明的succeeded保守降为待核对，避免“曾经记过成功”被直接沿用。
+  return demoteUnproven(parsed);
  }
  async function load(projectId,batchId){return readRecord(fileOf(projectId,batchId));}
  function save(receipt,options){
@@ -82,7 +83,10 @@ function createSplitStore({directory}={}){
  function alignReceipt(receipt,built){
   const byId={};
   receipt.files.forEach(function(file){byId[file.fileId]=file;});
-  return built.files.every(function(file){
+ // 回执必须绑定同一份来源内容键和同一版总询价工作簿；内容键/总簿变化一律另起批次，不沿用旧成功记录。
+ return String(receipt.inputKey||'')===String(built.inputKey||'')&&
+  String(receipt.generationSha256||'').toLowerCase()===String(built.generationSha256||'').toLowerCase()&&
+  built.files.every(function(file){
    const current=byId[file.fileId];
    return current&&String(current.target).toLowerCase()===String(file.target).toLowerCase();
   })&&receipt.files.length===built.files.length&&
@@ -137,11 +141,15 @@ function createSplitStore({directory}={}){
   }
   const summary=summarize(receipt);
   const canPublish=checkedPlan.canPublish&&summary.needsVerification.length===0;
-  return {plan:checkedPlan,receipt:receipt,revision:receipt.revision,canPublish:canPublish,summary:summary};
+  // 待核对文件不允许被当成成功发布，但必须允许用户对已有文件发起显式内容核对（核对通过才记账成功）。
+  const canVerify=checkedPlan.canPublish&&summary.needsVerification.length>0;
+  return {plan:checkedPlan,receipt:receipt,revision:receipt.revision,canPublish:canPublish,
+   canVerify:canVerify,summary:summary};
  }
  return {directory:root,fileNameFor:receiptKey,load:load,save:save,prepare:prepare,
   inspectTarget:inspectTarget};
 }
 module.exports={SCHEMA_VERSION:SCHEMA_VERSION,STATES:STATES,ID_PATTERN:ID_PATTERN,
  fileNameFor:receiptKey,validate:validate,summarize:summarize,create:create,mark:mark,
- reconcile:reconcile,pending:pending,blocked:blocked,createSplitStore:createSplitStore};
+ demoteUnproven:demoteUnproven,reconcile:reconcile,pending:pending,blocked:blocked,
+ createSplitStore:createSplitStore};

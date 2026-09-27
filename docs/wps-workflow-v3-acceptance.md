@@ -182,6 +182,18 @@
 
 **未完成：** 插件UI内的正式填报生成与图05A→06→07链路留 R12-G/H；本包不动 `export-host` 以外的R12-E/F范围。下一包 R12-E。
 
+## R12-E 拆分待核对状态与内容证明（2026-09-27，源码包，未触碰真机）
+
+**基线/包提交：** 分支 `feat/wps-phase1`，开工 HEAD `822cd1f4d103feb35f3526455f711187d241ca4a`（R12-D），入场工作区干净；完整证据见[R12-E证据](wps-workflow-v3-r12e-evidence-20260927.md)。
+
+**对应图：** 图07（开工前实际打开查看）。**入口缺陷：** `reconcile` 把 `pending` 文件的首次观察SHA写进 `file.sha256`，下一次核对 `actual===expected` 就提升成功——连续刷新/重启两次即可在没有任何内容核对的情况下凭空完成。
+
+**修正：** 观察SHA（`observedSha256`）与经核对SHA（`sha256`）分开；`reconcile` 只标记待核对，成功只能由真实发布写回或显式内容核对（`mark(...,{proof})`）落地；旧回执无 `verifiedBy` 保守降为待核对；`prepare` 收紧 `inputKey`/总簿SHA绑定并新增 `canVerify`。新增 `export-host.verifyExistingOutput(app,file,expectedSheet,inspectTarget)`：只读打开实际文件，逐值核公开值、工作表数量、隐藏列范围、必需合并/抬头，并核核对前后SHA；UI 把待核对单列并提供“核对已有文件”，通过且来源键/SHA未变才用带 `expectedRevision` 的 `save` 记成功，409/失败保持待核对、原文件不覆盖。
+
+**验证：** split plan/store/server **17/17**；全量 Node **355/355**（R12-D 344＋本包11）；`ui-split-check` **PASS**（本机 `NODE_PATH` 指向已有 playwright 模块＋系统 Edge，模拟宿主只替代WPS写入/打开接口）。证据在本机 `outputs/wps-acceptance-20260927/R12-E/`（日志、`split-blocked/verified/result.json`、模拟界面截图）。
+
+**未完成：** 未做真机WPS操作；真实“发布后未记账/响应丢失”、外部改写后逐值核对与真机清理**挂 R12-J**，插件UI内正式生成与真实xlsx读回挂 R12-G/H。`ui-brand`/`ui-category`/`ui-memory`/`ui-sheet-review` 四项浏览器检查仍为 R12-C 遗留失败。R12 仍未完成；下一包 R12-F。
+
 ## 已核实的图03与图04证据
 
 WPS 版本：12.1.0.29161。所有样本、截图、项目和审计 JSON 留在 `outputs/wps-acceptance-20260927/r12/`，不纳 Git。

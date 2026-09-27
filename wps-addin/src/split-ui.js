@@ -92,6 +92,18 @@
     previewList.appendChild(li);
    });
    if(!files.length)previewList.appendChild(node('li','没有可拆分的询价页。','empty'));
+   // 待核对单独列出：这些目标已经存在但还没有内容证明，重复刷新/重启都不会变成成功。
+   var blockedFiles=record&&record.files?record.files.filter(function(item){return item.state==='needs-verification';}):[];
+   if(blockedFiles.length){
+    var block=node('li',null,'review-note');block.setAttribute('data-split-blocked','');
+    block.appendChild(node('strong','待核对（需逐值核对已有文件，原文件不覆盖）：'));
+    blockedFiles.forEach(function(item){
+     var file=files.filter(function(candidate){return candidate.fileId===item.fileId;})[0]||{};
+     block.appendChild(node('span',(file.name||item.fileId)+' —— '+(item.error||'需要核对实际内容')+
+      '（'+String(item.target)+'）','source'));
+    });
+    previewList.appendChild(block);
+   }
    (built&&built.conflicts||[]).forEach(function(conflict){
     var li=node('li',null,'review-note');li.appendChild(node('strong','冲突：'));li.appendChild(node('span',conflict.message));
     previewList.appendChild(li);
@@ -122,8 +134,10 @@
    }
    if(runButton)runButton.disabled=busy||preparing||!current||!directory||!prepared||!prepared.canPublish;
    if(retryButton){
-    retryButton.disabled=busy||preparing||!current||!directory||!prepared||!prepared.canPublish||!retryable.length;
-    retryButton.textContent=retryable.length?('重试未完成（'+retryable.length+'）'):'重试未完成';
+    var actionAllowed=!!prepared&&(prepared.canPublish===true||prepared.canVerify===true);
+    retryButton.disabled=busy||preparing||!current||!directory||!actionAllowed||(!retryable.length&&!blocked.length);
+    retryButton.textContent=blocked.length?('核对已有文件（待核对'+blocked.length+' · 未完成'+retryable.length+'）'):
+     (retryable.length?('重试未完成（'+retryable.length+'）'):'重试未完成');
    }
    if(openButton)openButton.disabled=busy||!directory;
    renderPreview(effective,record&&recordMatchesPlan(record,effective)?record:null);
@@ -152,6 +166,9 @@
       notifyReceipt(receipt,{saved:true,prepared:true});
      }
      prepareError=prepared.conflicts&&prepared.conflicts.length?prepared.conflicts[0].message:'';
+     var pendingVerify=RfqSplitState.summarize(result.receipt||receipt).needsVerification;
+     if(prepared.canVerify&&pendingVerify.length&&!busy)
+      tell('有 '+pendingVerify.length+' 份文件已存在但未记账，请点“核对已有文件”逐值核对；核对不通过保留原文件、不覆盖。',true);
     }else prepareError='拆分准备返回不完整。';
     return prepared;
    }catch(error){
@@ -171,8 +188,8 @@
     return receipt;
    });
   }
-  async function refreshReceiptAfterFailure(next,fileId,detail){
-   var local=RfqSplitState.mark(next,fileId,'needs-verification',detail);
+  async function refreshReceiptAfterFailure(next,fileId,detail,observedSha256){
+   var local=RfqSplitState.mark(next,fileId,'needs-verification',detail,{observedSha256:observedSha256});
    try{
     var loaded=await splitRequest('load',{projectId:projectId(),batchId:batchId});
     if(loaded&&loaded.receipt){receipt=loaded.receipt;revision=Number(loaded.receipt.revision)||0;return saveReceipt(local);}
@@ -182,8 +199,20 @@
   function sheetWorkbook(sheet){
    return {mode:'inquiry',inputKey:'',sheets:[{name:sheet.name,values:sheet.values,layout:sheet.layout}]};
   }
-  function fileExists(path){
-   return exportRequest('inspect',{target:path}).then(function(result){return !!(result&&result.exists);},function(){return false;});
+  function inspectFile(path){
+   return exportRequest('inspect',{target:path}).then(function(result){return result||{target:path,exists:false,sha256:null};},
+    function(){return {target:path,exists:false,sha256:null};});
+  }
+  // 保存核对结果失败（含409）时，先读回服务端真实回执；绝不用内存里的成功覆盖服务端。
+  async function reloadAfterSaveFailure(local,fileId,detail,observedSha256){
+   try{
+    var loaded=await splitRequest('load',{projectId:projectId(),batchId:batchId});
+    if(loaded&&loaded.receipt){receipt=loaded.receipt;revision=Number(loaded.receipt.revision)||0;
+     batchId=receipt.batchId||batchId;}
+   }catch(_){}
+   receipt=RfqSplitState.mark(receipt,fileId,'needs-verification',detail,{observedSha256:observedSha256});
+   notifyReceipt(receipt,{saved:false});
+   return receipt;
   }
   async function publish(file,sheet){
    var preparedFile=await exportRequest('prepare',{target:file.target});
@@ -240,18 +269,68 @@
    }
    throw Error('当前WPS版本不支持直接打开文件夹，请按上方路径手动打开：'+directory);
   }
+  // 显式内容核对：已有但未记账的文件先按冻结快照逐值核对，核对通过且SHA稳定才用带expectedRevision的save记账成功；
+  // 不一致或保存冲突保留原文件并继续待核对，绝不覆盖、也不因重复刷新自动成功。
+  async function verifyBlocked(plan,items){
+   var report=[];
+   for(var index=0;index<items.length;index++){
+    var item=items[index],file=plan.files.filter(function(candidate){return candidate.fileId===item.fileId;})[0];
+    if(!file)continue;
+    if(!receiptMatches()){report.push('来源或总簿已变化，停止核对。');break;}
+    tell('正在核对已有文件 '+(index+1)+' / '+items.length+'：'+file.name);
+    await new Promise(function(resolve){setTimeout(resolve,0);});
+    var outcome;
+    try{
+     var sheet=findSheet(file);
+     if(!sheet)throw Error('冻结快照里找不到对应询价页，无法核对。');
+     outcome=await RfqExportHost.verifyExistingOutput(options.application,file,sheet,inspectFile);
+    }catch(error){outcome={ok:false,sha256:null,mismatches:[error.message],layoutIssues:[]};}
+    if(!receiptMatches()){report.push('核对期间来源或总簿已变化，未记账成功。');break;}
+    if(outcome.ok){
+     var again=await inspectFile(file.target);
+     if(!again||again.exists!==true||String(again.sha256||'').toLowerCase()!==String(outcome.sha256||'').toLowerCase())
+      outcome={ok:false,sha256:null,mismatches:['目标文件在核对后再次检查时已变化，未记账成功。'],layoutIssues:[]};
+    }
+    if(outcome.ok){
+     receipt=RfqSplitState.mark(receipt,file.fileId,'succeeded',outcome.sha256,{proof:'content-check'});
+     try{await saveReceipt(receipt);}
+     catch(saveError){
+      report.push(file.name+'：核对通过但回执未记账（'+saveError.message+'），保持待核对。');
+      receipt=await reloadAfterSaveFailure(receipt,file.fileId,
+       '内容核对通过但回执未记账：'+saveError.message,outcome.sha256);
+     }
+    }else{
+     var detail='待核对：'+((outcome.mismatches||[]).concat(outcome.layoutIssues||[]).join('；')||
+      '实际内容与冻结快照不一致')+'。原文件保留在 '+file.target+'，不覆盖。';
+     receipt=RfqSplitState.mark(receipt,file.fileId,'needs-verification',detail,{observedSha256:outcome.sha256});
+     try{await saveReceipt(receipt);}catch(saveError){
+      receipt=await reloadAfterSaveFailure(receipt,file.fileId,detail,outcome.sha256);
+     }
+     report.push(file.name+'：'+detail);
+    }
+    render();
+   }
+   return report;
+  }
   async function execute(){
    if(busy)return;
    if(!directory){tell('请先选择拆分输出目录。',true);return;}
    await syncPlan();
-   if(!prepared||!prepared.canPublish){tell('还有冲突未解决，未开始拆分：'+((prepared&&prepared.conflicts||[]).map(function(item){return item.message;}).join('；')||prepareError||'请检查总询价工作簿、输出目录和已有文件。'),true);return;}
+   if(!prepared||(prepared.canPublish!==true&&prepared.canVerify!==true)){
+    tell('还有冲突未解决，未开始拆分：'+((prepared&&prepared.conflicts||[]).map(function(item){return item.message;}).join('；')||
+     prepareError||'请检查总询价工作簿、输出目录和已有文件。'),true);return;}
    var plan=prepared.plan,record=receipt;
    if(!record){tell('拆分回执尚未建立，未开始拆分。',true);return;}
-   var todo=RfqSplitState.pending(record);
-   var blocked=RfqSplitState.blocked(record);
-   if(!todo.length){tell(blocked.length?'有文件已存在但未记账或已被外部修改，请核对后再处理。':'所有文件都已成功，无需重做。',blocked.length>0);showResult(plan,record);return;}
+   var blocked=RfqSplitState.blocked(record),todo=RfqSplitState.pending(record);
+   if(!blocked.length&&!todo.length){
+    tell('所有文件都已成功并核对通过，无需重做。',false);showResult(plan,record);return;}
    busy=true;if(options.onBusy)options.onBusy(true);render();
    try{
+    if(blocked.length){
+     var verifyReport=await verifyBlocked(plan,blocked);
+     if(verifyReport.length)tell('已有文件核对结果：'+verifyReport.join('；'),true);
+    }
+    record=receipt;todo=RfqSplitState.pending(record);
     for(var index=0;index<todo.length;index++){
      var item=todo[index],file=plan.files.filter(function(candidate){return candidate.fileId===item.fileId;})[0];
      if(!file)continue;
@@ -264,23 +343,26 @@
       record=RfqSplitState.mark(record,file.fileId,'succeeded',sha);
       try{await saveReceipt(record);}
       catch(saveError){
-       record=await refreshReceiptAfterFailure(record,file.fileId,'文件已发布但回执未记账：'+saveError.message);
+       record=await refreshReceiptAfterFailure(record,file.fileId,'文件已发布但回执未记账：'+saveError.message,sha);
       }
      }catch(error){
-      var exists=await fileExists(file.target);
-      var detail=exists?('文件已存在但未完成记账：'+error.message):error.message;
-      record=RfqSplitState.mark(record,file.fileId,exists?'needs-verification':'failed',detail);
+      var seen=await inspectFile(file.target);
+      var detail=seen.exists?('文件已存在但未完成记账：'+error.message):error.message;
+      record=RfqSplitState.mark(record,file.fileId,seen.exists?'needs-verification':'failed',detail,
+       {observedSha256:seen.exists?seen.sha256:null});
       try{await saveReceipt(record);}catch(saveError){
-       record=await refreshReceiptAfterFailure(record,file.fileId,'回执保存失败：'+saveError.message);
+       record=await refreshReceiptAfterFailure(record,file.fileId,'回执保存失败：'+saveError.message,
+        seen.exists?seen.sha256:null);
       }
      }
      render();
     }
     await syncPlan();
-    var summary=receipt?RfqSplitState.summarize(receipt):{succeeded:[],failed:[]};
+    var summary=receipt?RfqSplitState.summarize(receipt):{succeeded:[],failed:[],needsVerification:[]};
     tell('拆分完成'+summary.succeeded.length+'份，失败'+summary.failed.length+'份'+
       (summary.needsVerification.length?('，待核对'+summary.needsVerification.length+'份'):'')+
-      (summary.failed.length||summary.needsVerification.length?'；失败项可重试，待核对项请先处理已有文件或更换输出目录。':'。'),
+      (summary.failed.length||summary.needsVerification.length?
+       '；待核对项已列出原文件位置，逐值核对通过才记账成功，原文件不覆盖。':'。'),
       !!(summary.failed.length||summary.needsVerification.length));
     if(receipt)showResult(plan,receipt);
    }finally{busy=false;if(options.onBusy)options.onBusy(false);render();}
@@ -301,9 +383,9 @@
   return {refresh:function(){syncPlan();},receipt:function(){return receipt;},
    restore:function(value){
     if(value&&value.projectId&&value.batchId&&Array.isArray(value.files)){
-     receipt=value;revision=Number(value.revision)||0;batchId=value.batchId;
-     directory=value.outputDirectory||value.directory||'';
-     notifiedReceipt=receiptFingerprint(value);
+     receipt=RfqSplitState.demoteUnproven(value);revision=Number(receipt.revision)||0;batchId=receipt.batchId;
+     directory=receipt.outputDirectory||receipt.directory||'';
+     notifiedReceipt=receiptFingerprint(receipt);
     }
     syncPlan();
    },
