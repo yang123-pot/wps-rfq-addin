@@ -4,12 +4,40 @@
  function create(options){
   var saveButton=document.getElementById('save-project'),openButton=document.getElementById('open-project'),
     refreshButton=document.getElementById('refresh-projects'),message=document.getElementById('project-message'),
-    status=document.getElementById('project-status'),list=document.getElementById('project-list');
+    status=document.getElementById('project-status'),list=document.getElementById('project-list'),
+    relocateButton=document.getElementById('relocate-project');
   var current=null,busy=false,pendingId=null,lastReport=null;
   // R5：整表审核确认快照与草稿。只有确认快照存在（且inputKey仍是本次内容）才把“表内审核”置为已确认。
   var reviewConfirmation=null,reviewDraft=null,lastError=null;
+  var restoreBlocks={},restoreAudit=null,restoreRecord=null;
   var STATE={ready:'已确认',stale:'已过期',missing:'未完成'};
   function tell(text,error){message.textContent=text;message.className=error?'error':'';}
+  function bindingSnapshot(stage){
+   try{
+    if(stage==='review')return {matching:options.getReviewBinding?options.getReviewBinding():null,
+      review:reviewConfirmation,reviewDraft:reviewDraft};
+    if(stage==='categories')return options.getCategories?options.getCategories():null;
+    if(stage==='brands')return {summary:options.getSummary?options.getSummary():null,
+      brands:options.getBrands?options.getBrands():null};
+    if(stage==='inquiry')return options.getGeneration?options.getGeneration():null;
+    if(stage==='split')return options.getSplit?options.getSplit():null;
+   }catch(_){return null;}
+   return null;
+  }
+  function blockDetail(stage){
+   var block=restoreBlocks[stage];
+   if(!block)return null;
+   if(block.fingerprint!==JSON.stringify(bindingSnapshot(stage))){delete restoreBlocks[stage];return null;}
+   return block.detail;
+  }
+  function gated(stage,verdict){var detail=blockDetail(stage);return detail?{ready:false,detail:detail}:verdict;}
+  function applyRestoreAudit(project,audit){
+   restoreAudit=audit||null;restoreRecord=project||null;restoreBlocks={};
+   ((audit&&audit.blocks)?Object.keys(audit.blocks):[]).forEach(function(stage){
+    restoreBlocks[stage]={detail:audit.blocks[stage],fingerprint:JSON.stringify(bindingSnapshot(stage))};
+   });
+   if(relocateButton)relocateButton.hidden=!(audit&&audit.relocatable);
+  }
   // 未保存项目也要有稳定身份，本机分类习惯按它记录确认来源；保存或打开其他项目前不重新生成。
   function identity(){
     if(current&&current.projectId)return current.projectId;
@@ -25,6 +53,9 @@
   function renderStatus(){
     if(!current){status.textContent='尚未保存项目记录。导入清单后可保存，重启WPS后再打开恢复。';return;}
     status.textContent='项目 '+current.projectId+' · 版本 '+current.revision+' · '+(current.mergeIdentical?'精确合并':'分别保留')+'\n'+stageText(current);
+    if(restoreAudit&&restoreAudit.issues.length)
+      status.textContent+='\n恢复核对：'+restoreAudit.issues.slice(0,3).map(function(issue){return issue.message;}).join('；')+
+        (restoreAudit.issues.length>3?'；其余'+(restoreAudit.issues.length-3)+'项请重新定位或重做对应阶段':'');
   }
   // 阶段只按当前真实内容判定：导入集合、来源问题、本次预览确认、逐行分类确认，以及后续阶段的明确结论。
   // R1过渡期：侧栏仍是旧的逐行分类/品牌/生成面板，这里把已有结论映射到v2的matching/review/brands/inquiry/split；
@@ -52,6 +83,8 @@
   function assessmentInputs(){
     var progress=classificationProgress(),review=resolvedReviewVerdict();
     var verdicts=options.getStageVerdicts?options.getStageVerdicts():null;
+    var matching=(verdicts&&verdicts.matching)||(progress.rows.length?{ready:true,detail:'自动分类建议已生成，尚未人工确认'}
+      :{ready:false,detail:'尚未生成自动分类建议'});
     return {collection:options.getCollection(),mergeIdentical:options.mergeIdentical()===true,
       preview:options.getPreview?options.getPreview():null,
       mergeConfirmedKey:options.getMergeConfirmation?options.getMergeConfirmation():null,
@@ -59,13 +92,12 @@
       rows:progress.rows,
       assignments:options.getAssignments?options.getAssignments():null,
       header:options.getHeader?options.getHeader():null,
-      matching:(verdicts&&verdicts.matching)||(progress.rows.length?{ready:true,detail:'自动分类建议已生成，尚未人工确认'}
-        :{ready:false,detail:'尚未生成自动分类建议'}),
-      review:review,
-      categories:(verdicts&&verdicts.categories)||{ready:false,detail:'分类工作簿将在下一个开发包生成'},
-      brands:options.getBrandVerdict?options.getBrandVerdict():null,
-      inquiry:options.getGenerationVerdict?options.getGenerationVerdict():null,
-      split:options.getSplitVerdict?options.getSplitVerdict():null};
+      matching:matching,
+      review:gated('review',review),
+      categories:gated('categories',(verdicts&&verdicts.categories)||{ready:false,detail:'分类工作簿将在下一个开发包生成'}),
+      brands:gated('brands',options.getBrandVerdict?options.getBrandVerdict():null),
+      inquiry:gated('inquiry',options.getGenerationVerdict?options.getGenerationVerdict():null),
+      split:gated('split',options.getSplitVerdict?options.getSplitVerdict():null)};
   }
   // 未来字段与项目一起保存；对应功能未接入时保持缺失，不拿空对象冒充已完成。
   // R1过渡期：旧侧栏的分类/品牌/生成面板仍沿用v1字段名暂存，R4–R9会替换为
@@ -110,6 +142,27 @@
     var result=await response.json();
     if(!response.ok){var error=Error(result.error||'项目请求失败。');error.status=response.status;throw error;}
     return result;
+  }
+  async function serviceRequest(route,data){
+    var response=await fetch(route,{method:'POST',
+      headers:{'content-type':'application/json','x-rfq-import-token':window.__RFQ_IMPORT__.token},body:JSON.stringify(data||{})});
+    var result=await response.json();
+    if(!response.ok){var error=Error(result.error||'恢复核对请求失败。');error.status=response.status;throw error;}
+    return result;
+  }
+  async function inspectFile(path){
+    try{return await serviceRequest('/api/export/inspect',{target:path});}
+    catch(error){return {target:path,exists:false,sha256:null,error:error.message};}
+  }
+  async function auditRestore(project){
+    var list=RfqProjectRestore&&RfqProjectRestore.requirements?RfqProjectRestore.requirements(project):[],checks={};
+    for(var index=0;index<list.length;index++){
+      var item=list[index],actual=await inspectFile(item.path);
+      checks[item.path]={exists:actual.exists===true,sha256:actual.sha256||null,error:actual.error||null};
+    }
+    var audit=RfqProjectRestore.audit(project,checks);
+    applyRestoreAudit(project,audit);
+    return audit;
   }
   async function listProjects(){
     try{
@@ -203,6 +256,7 @@
       if(options.restoreClassification)options.restoreClassification(
         loaded.classification||(loaded.carried&&loaded.carried.classification)||null);
       restoreFutureFields(loaded);
+      var audit=await auditRestore(loaded);
       // 先按恢复后的合并确认键重算一次侧栏，再判阶段；否则会误判为“尚未生成自动分类建议”。
       if(options.afterRestore)options.afterRestore(loaded);
       current=syncStages(loaded);
@@ -212,19 +266,55 @@
       var recomputed=JSON.stringify(current.stages)!==JSON.stringify(loaded.stages);
       tell('已恢复项目'+loaded.projectId+'（版本 '+loaded.revision+'）。'+(upgradedFrom?'旧版项目'+upgradedFrom+'已保留，本次继续写入v2副本，需重新确认合并与整表审核。':'')+
         (rebuilt?'已按原件SHA校验重建'+rebuilt+'份工作副本。':'工作副本完整。')+
-        '原件不变，快照可用于继续核对。'+(recomputed?'阶段状态已按当前来源与确认内容重算，保存后写回项目记录。':''));
+        (audit.ok?'各阶段持久文件已核对。':'有'+audit.issues.length+'项持久文件未核对通过，未恢复为已完成；缺失文件可尝试“重新定位项目文件”。')+
+        '原件不变，快照可用于继续核对。'+(recomputed?'阶段状态已按当前来源与确认内容重算，保存后写回项目记录。':''),
+        !audit.ok);
       return true;
     }catch(error){tell('项目未打开。'+error.message,true);return false;}
     finally{busy=false;if(options.onBusy)options.onBusy(false);}
   }
+  async function relocateProject(){
+    if(busy||!restoreRecord||!restoreAudit||!restoreAudit.relocatable)return;
+    if(!window.RfqPathPicker){tell('当前侧栏不支持目录选择，请重新打开侧栏。',true);return;}
+    var fromRoot=restoreAudit.commonRoot;
+    RfqPathPicker.open({mode:'directory',startPath:fromRoot,title:'选择搬移后的项目根目录',
+      confirmLabel:'核验并重新定位',
+      onConfirm:async function(paths){
+        var target=paths&&paths[0];
+        if(!target)return;
+        busy=true;if(options.onBusy)options.onBusy(true);
+        try{
+          var relocated=RfqProjectRestore.relocate(restoreRecord,{fromRoot:fromRoot,toRoot:target});
+          var audit=await auditRestore(relocated);
+          if(!audit.ok)throw Error('重新定位后仍有文件未核对通过：'+audit.issues.map(function(issue){return issue.message;}).join('；'));
+          var receipt=await request('save',{project:relocated,expectedRevision:restoreRecord.revision});
+          relocated.revision=Number(receipt.revision);
+          if(!options.restore||options.restore(relocated)===false)throw Error('项目内容无法恢复到侧栏。');
+          if(options.restoreClassification)options.restoreClassification(
+            relocated.classification||(relocated.carried&&relocated.carried.classification)||null);
+          restoreFutureFields(relocated);
+          restoreRecord=relocated;restoreAudit=audit;restoreBlocks={};
+          if(relocateButton)relocateButton.hidden=true;
+          if(options.afterRestore)options.afterRestore(relocated);
+          current=syncStages(relocated);
+          if(options.afterRestore)options.afterRestore(relocated);
+          pendingId=null;renderStatus();
+          tell('项目文件已重新定位并逐项核对通过：'+target+'。');
+        }catch(error){tell('重新定位未完成：'+error.message,true);}
+        finally{busy=false;if(options.onBusy)options.onBusy(false);}
+      },
+      onError:function(text){tell(text,true);}});
+  }
   saveButton.addEventListener('click',saveProject);
   openButton.addEventListener('click',listProjects);
   refreshButton.addEventListener('click',listProjects);
+  if(relocateButton)relocateButton.addEventListener('click',relocateProject);
   renderStatus();
   return {refresh:renderStatus,current:function(){return current;},identity:identity,reload:listProjects,
    assessment:function(){return lastReport;},commitReview:commitReview,commitReviewDraft:commitReviewDraft,
    reviewConfirmation:function(){return reviewConfirmation;},reviewDraft:function(){return reviewDraft;},
-   lastError:function(){return lastError;},save:saveProject};
+   lastError:function(){return lastError;},save:saveProject,open:openProject,
+   restoreAudit:function(){return restoreAudit;}};
  }
  window.RfqProjectUI={create:create};
 }());

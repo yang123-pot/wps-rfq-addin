@@ -16,7 +16,7 @@ const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.cs
   '/src/import-host.js', '/src/collection.js', '/src/import-ui.js', '/src/export-model.js',
   '/src/workbook-layout.js', '/src/workflow-ui.js', '/src/export-host.js', '/src/export-ui.js', '/src/project.js', '/src/project-ui.js',
   '/src/project-host.js', '/src/category-library.js', '/src/classify.js', '/src/classification.js',
-  '/src/classification-review-model.js', '/src/classification-review-host.js', '/src/classification-ui.js', '/src/category-memory.js', '/src/library-ui.js', '/rules/defaults.json',
+  '/src/classification-review-model.js', '/src/classification-review-host.js', '/src/classification-ui.js', '/src/category-memory.js', '/src/library-ui.js', '/src/project-restore.js', '/rules/defaults.json',
   '/src/category-workbooks.js',
   '/src/brand-table.js', '/src/brand-model.js', '/src/brand-host.js', '/src/brand-ui.js', '/src/decimal.js',
   '/src/brand-reference.js', '/src/inquiry-header.js', '/src/inquiry-model.js', '/src/split-plan.js',
