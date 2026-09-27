@@ -20,7 +20,7 @@
 - **真实能力**：旧流程实机走通注册/功能区、侧栏连接、两文件导入、合并确认、分类确认5/5及停摆后重建恢复。分类汇总表（R7）与汇总表读回、多品牌关系与联动（R8）已在模型/侧栏层落地，总询价、拆分仍待开发；R1/R2/R5/R6/R7/R8只到模型、项目库与模拟宿主层，**仍无真实WPS新流程证据**。
 - **下一项**：从R9（总询价、合成/分表及版式，对应图06）开始；先完整阅读本文件、实际打开本包相关图（图06，必要时图05A/05B），再核对Git和代码。品牌唯一来源为汇总表读回（R8 `brands`/`deliveryContext.brandGroups`），改品牌须回汇总表修改并重新读回；不要从旧版侧栏确认品牌路线继续。
 - **待定项**：历史32种类别的正式词表/迁入政策、另一WPS版本的隔离验证环境仍未确定；不影响用隔离合成分类库开发新流程。
-- **备份核对（R8待同步）**：上一同步点＝R7交接提交 `e4b2a79`（远程`refs/heads/feat/wps-phase1`，2026-09-27复核）。R8主提交 `46e4f42` **已本地创建但尚未推送**：本轮普通`git push origin feat/wps-phase1`报`schannel: failed to receive handshake`；单次参数`git -c 'http.https://github.com/.proxy=' push`直连3次分别报`Recv failure: Connection was reset`与`Failed to connect to github.com port 443`；经本机`http://127.0.0.1:7897`代理schannel报握手失败、`-c http.sslBackend=openssl`报`unexpected eof while reading`。**未强推、未修改系统/用户/仓库代理配置**，本地提交保留待网络恢复后补推并核远程SHA。历史归档主提交2f04d5c的远程SHA为2f04d5cc18b1a06ac00eb34ecf1a08d60de9fb8d。
+- **备份核对（R8已同步）**：R8主提交 `46e4f42` 与交接提交 `f5399e3` 已推送，远程`refs/heads/feat/wps-phase1`核为 `f5399e3cbcde4318f3b751403447d7199af1590a`（=本地HEAD，2026-09-27复核）。上一同步点=R7交接 `e4b2a79`。本轮先因本机代理`http://127.0.0.1:7897`上游中断而推送失败（普通push报`schannel: failed to receive handshake`；直连`-c 'http.https://github.com/.proxy='`报`Connection was reset`/`Failed to connect to github.com port 443`；代理openssl报`unexpected eof while reading`），网络恢复后按单次参数`git -c http.proxy=http://127.0.0.1:7897 push origin feat/wps-phase1`成功（`e4b2a79..f5399e3`），核对远程ref同样使用该单次参数成功。**未强推、未修改系统/用户/仓库代理配置**。历史归档主提交2f04d5c的远程SHA为2f04d5cc18b1a06ac00eb34ecf1a08d60de9fb8d。
 
 原交接共812行，已逐字节保存到[旧交接归档](docs/archive/handoff-before-workflow-v3-20260926.md)。归档包含已过期顺序和相互矛盾的阶段表述，**只作历史资料，不是当前执行命令**。
 
