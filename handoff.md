@@ -637,7 +637,7 @@ git ls-remote origin refs/heads/feat/wps-phase1
 
 - [2026-09-27整体方向核对](docs/wps-workflow-v3-direction-audit-20260927.md)：R0–R13详细步骤、8图、确定缺陷/待核风险及本轮322测试边界。
 - [剩余详细实施计划](docs/superpowers/plans/2026-09-27-wps-phase1-completion.md)：当前接续包/文件/接口/验证/真机出口；取代旧0.2顺序。
-- [R12–R13十四包提示词](docs/superpowers/plans/2026-09-27-r12-r13-14-package-prompts.md)：把剩余计划拆成14份可直接复制到新会话的逐包提示词（A–L、R13-A/B），每包一个会话。
+- [R12–R13十四包提示词](docs/superpowers/plans/2026-09-27-r12-r13-14-package-prompts.md)：把剩余计划拆成14份可直接复制到新会话的逐包提示词（A–L、R13-A/B），每包一个会话；同目录同名`.docx`为WPS文档版，内容与Markdown一致，仅为便于复制分发。
 - [R12最新验收记录](docs/wps-workflow-v3-acceptance.md)：图03整表确认/图04实际文件、磁盘/快照差异及未完成项。下列旧R12阻塞和下午记录保留其发生时间，不作为最新进度。
 
 - [旧handoff原样归档](docs/archive/handoff-before-workflow-v3-20260926.md)：历史任务和证据，旧执行顺序失效。

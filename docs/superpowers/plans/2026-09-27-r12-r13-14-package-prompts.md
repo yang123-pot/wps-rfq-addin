@@ -16,7 +16,7 @@
 开工前必须完成（不得跳过）：
 1. 完整读 F:\材料软件开发\handoff.md 全文，再读 F:\材料软件开发\AGENTS.md；本包唯一执行依据是 F:\材料软件开发\docs\superpowers\plans\2026-09-27-wps-phase1-completion.md 的「R12-A」一节，并连同其中「全局约束」「优先检查的五类失效」「统一证据格式与提交检查」一起遵守。
 2. 实际打开并查看本包对应效果图：docs/mockups/approved-20260926/03-sheet-review.png、docs/mockups/approved-20260926/04-category-workbooks.png。只读文件名或文字说明不算看图；确需看全8图时分两批，不在同一会话为多个工作包反复打开全部8图。
-3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。当前 HEAD 为 1be9271f698f409fbff73c17bff0c8ede06db75e，handoff 记录的代码基线为 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改（wps-addin/dev/export-files.cjs、wps-addin/dev/server.cjs、wps-addin/src/export-host.js、wps-addin/src/import-ui.js、wps-addin/test/export-files.test.cjs、wps-addin/test/export-host.test.cjs），一律原样保留，禁止清理工作树或整体提交。
+3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。以本会话实际 git 结果为准（拆分本提示词时为 63dde1e9126df2b09fd51bf8c7b1db0ec93d9451），handoff 记录的代码基线为 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改（wps-addin/dev/export-files.cjs、wps-addin/dev/server.cjs、wps-addin/src/export-host.js、wps-addin/src/import-ui.js、wps-addin/test/export-files.test.cjs、wps-addin/test/export-host.test.cjs），一律原样保留，禁止清理工作树或整体提交。
 
 本包范围：
 - 依赖/对应图：现有证据；图03、04。
@@ -53,7 +53,7 @@
 开工前必须完成（不得跳过）：
 1. 完整读 F:\材料软件开发\handoff.md 全文，再读 F:\材料软件开发\AGENTS.md；本包唯一执行依据是 F:\材料软件开发\docs\superpowers\plans\2026-09-27-wps-phase1-completion.md 的「R12-B」一节，并连同其中「全局约束」「优先检查的五类失效」「统一证据格式与提交检查」一起遵守。
 2. 实际打开并查看本包对应效果图：docs/mockups/approved-20260926/04-category-workbooks.png、docs/mockups/approved-20260926/05a-summary-separated.png、docs/mockups/approved-20260926/07-split-files.png。只读文件名或文字说明不算看图。
-3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。当前 HEAD 为 1be9271f698f409fbff73c17bff0c8ede06db75e，handoff 记录的代码基线为 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改（wps-addin/dev/export-files.cjs、wps-addin/dev/server.cjs、wps-addin/src/export-host.js、wps-addin/src/import-ui.js、wps-addin/test/export-files.test.cjs、wps-addin/test/export-host.test.cjs），一律原样保留，禁止清理工作树或整体提交。其中本包负责 export-files.cjs、server.cjs、import-ui.js、export-files.test.cjs（export-host 及其测试留给 R12-D）。
+3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。以本会话实际 git 结果为准（拆分本提示词时为 63dde1e9126df2b09fd51bf8c7b1db0ec93d9451），handoff 记录的代码基线为 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改（wps-addin/dev/export-files.cjs、wps-addin/dev/server.cjs、wps-addin/src/export-host.js、wps-addin/src/import-ui.js、wps-addin/test/export-files.test.cjs、wps-addin/test/export-host.test.cjs），一律原样保留，禁止清理工作树或整体提交。其中本包负责 export-files.cjs、server.cjs、import-ui.js、export-files.test.cjs（export-host 及其测试留给 R12-D）。
 4. 先确认 R12-A 状态；若 A 未完成，按计划允许的方式继续独立源码包，但不得虚填依赖真机的出口。
 
 本包范围：对应图04/05A/07。修改 wps-addin/dev/export-files.cjs、wps-addin/dev/server.cjs、wps-addin/src/import-ui.js、wps-addin/test/export-files.test.cjs，必要时 wps-addin/test/export-server.test.cjs。
@@ -89,7 +89,7 @@
 开工前必须完成（不得跳过）：
 1. 完整读 F:\材料软件开发\handoff.md 全文，再读 F:\材料软件开发\AGENTS.md；本包唯一执行依据是 F:\材料软件开发\docs\superpowers\plans\2026-09-27-wps-phase1-completion.md 的「R12-C」一节，并连同其中「全局约束」「优先检查的五类失效」「统一证据格式与提交检查」一起遵守。
 2. 实际打开并查看本包对应效果图：docs/mockups/approved-20260926/03-sheet-review.png。只读文件名或文字说明不算看图。
-3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。当前 HEAD 为 1be9271f698f409fbff73c17bff0c8ede06db75e，代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改（wps-addin/dev/export-files.cjs、wps-addin/dev/server.cjs、wps-addin/src/export-host.js、wps-addin/src/import-ui.js、wps-addin/test/export-files.test.cjs、wps-addin/test/export-host.test.cjs），一律原样保留，禁止清理工作树或整体提交。
+3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。以本会话实际 git 结果为准（拆分本提示词时为 63dde1e9126df2b09fd51bf8c7b1db0ec93d9451），代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改（wps-addin/dev/export-files.cjs、wps-addin/dev/server.cjs、wps-addin/src/export-host.js、wps-addin/src/import-ui.js、wps-addin/test/export-files.test.cjs、wps-addin/test/export-host.test.cjs），一律原样保留，禁止清理工作树或整体提交。
 4. 先确认 R12-A 现场保护已完成（H11 磁盘空/确认快照有汽车充电桩的差异是本包输入）；A 未完成则先按计划处理依赖，不得虚填真机出口。
 
 本包范围：依赖 R12-A；对应图03。修改 wps-addin/src/classification-review-model.js、src/classification-review-host.js、src/import-ui.js、src/project-restore.js、src/project-ui.js，必要时 taskpane.html；对应 model/host、project-restore-audit、workflow-v3 测试及 test/ui-sheet-review-check.cjs、test/ui-project-restore-check.cjs。
@@ -127,7 +127,7 @@
 开工前必须完成（不得跳过）：
 1. 完整读 F:\材料软件开发\handoff.md 全文，再读 F:\材料软件开发\AGENTS.md；本包唯一执行依据是 F:\材料软件开发\docs\superpowers\plans\2026-09-27-wps-phase1-completion.md 的「R12-D」一节，并连同其中「全局约束」「优先检查的五类失效」「统一证据格式与提交检查」一起遵守。
 2. 实际打开并查看本包对应效果图：docs/mockups/approved-20260926/05a-summary-separated.png、05b-summary-combined.png；预览部分只看 01-import-merge.png。只读文件名或文字说明不算看图。
-3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。当前 HEAD 为 1be9271f698f409fbff73c17bff0c8ede06db75e，代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改（wps-addin/dev/export-files.cjs、wps-addin/dev/server.cjs、wps-addin/src/export-host.js、wps-addin/src/import-ui.js、wps-addin/test/export-files.test.cjs、wps-addin/test/export-host.test.cjs），一律原样保留，禁止清理工作树或整体提交。其中 export-host.js 与 test/export-host.test.cjs 属于本包，须在本包验证通过后才提交。
+3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。以本会话实际 git 结果为准（拆分本提示词时为 63dde1e9126df2b09fd51bf8c7b1db0ec93d9451），代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改（wps-addin/dev/export-files.cjs、wps-addin/dev/server.cjs、wps-addin/src/export-host.js、wps-addin/src/import-ui.js、wps-addin/test/export-files.test.cjs、wps-addin/test/export-host.test.cjs），一律原样保留，禁止清理工作树或整体提交。其中 export-host.js 与 test/export-host.test.cjs 属于本包，须在本包验证通过后才提交。
 4. 确认 R12-A、R12-B 已完成；未完成则按计划处理依赖，不得虚填依赖真机的出口。
 
 本包范围：依赖 A、B；对应图05A/05B（预览仅看图01）。修改 wps-addin/src/export-host.js、src/brand-model.js；wps-addin/test/export-host.test.cjs、test/summary-links.test.cjs、test/brand-model.test.cjs、test/import-preview-model.test.cjs，必要时 test/ui-workflow-check.cjs。
@@ -165,7 +165,7 @@
 开工前必须完成（不得跳过）：
 1. 完整读 F:\材料软件开发\handoff.md 全文，再读 F:\材料软件开发\AGENTS.md；本包唯一执行依据是 F:\材料软件开发\docs\superpowers\plans\2026-09-27-wps-phase1-completion.md 的「R12-E」一节，并连同其中「全局约束」「优先检查的五类失效」「统一证据格式与提交检查」一起遵守。
 2. 实际打开并查看本包对应效果图：docs/mockups/approved-20260926/07-split-files.png。只读文件名或文字说明不算看图。
-3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。当前 HEAD 为 1be9271f698f409fbff73c17bff0c8ede06db75e，代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改（wps-addin/dev/export-files.cjs、wps-addin/dev/server.cjs、wps-addin/src/export-host.js、wps-addin/src/import-ui.js、wps-addin/test/export-files.test.cjs、wps-addin/test/export-host.test.cjs），一律原样保留，禁止清理工作树或整体提交。必要时本包会触及 src/export-host.js（R12-D 已负责其提交）。
+3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。以本会话实际 git 结果为准（拆分本提示词时为 63dde1e9126df2b09fd51bf8c7b1db0ec93d9451），代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改（wps-addin/dev/export-files.cjs、wps-addin/dev/server.cjs、wps-addin/src/export-host.js、wps-addin/src/import-ui.js、wps-addin/test/export-files.test.cjs、wps-addin/test/export-host.test.cjs），一律原样保留，禁止清理工作树或整体提交。必要时本包会触及 src/export-host.js（R12-D 已负责其提交）。
 4. 确认依赖包状态；未完成则按计划处理依赖，不得虚填真机出口。
 
 本包范围：对应图07。修改 wps-addin/src/split-state.js、src/split-ui.js、dev/split-store.cjs，必要时 src/export-host.js；wps-addin/test/split-store.test.cjs、test/split-server.test.cjs、test/ui-split-check.cjs。
@@ -201,7 +201,7 @@
 开工前必须完成（不得跳过）：
 1. 完整读 F:\材料软件开发\handoff.md 全文，再读 F:\材料软件开发\AGENTS.md；本包唯一执行依据是 F:\材料软件开发\docs\superpowers\plans\2026-09-27-wps-phase1-completion.md 的「R12-F」一节，并连同其中「全局约束」「优先检查的五类失效」「统一证据格式与提交检查」一起遵守。
 2. 实际打开并查看本包对应效果图：docs/mockups/approved-20260926/06-inquiry-linkage.png、docs/mockups/approved-20260926/07-split-files.png。只读文件名或文字说明不算看图。
-3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。当前 HEAD 为 1be9271f698f409fbff73c17bff0c8ede06db75e，代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改（wps-addin/dev/export-files.cjs、wps-addin/dev/server.cjs、wps-addin/src/export-host.js、wps-addin/src/import-ui.js、wps-addin/test/export-files.test.cjs、wps-addin/test/export-host.test.cjs），一律原样保留，禁止清理工作树或整体提交。
+3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。以本会话实际 git 结果为准（拆分本提示词时为 63dde1e9126df2b09fd51bf8c7b1db0ec93d9451），代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改（wps-addin/dev/export-files.cjs、wps-addin/dev/server.cjs、wps-addin/src/export-host.js、wps-addin/src/import-ui.js、wps-addin/test/export-files.test.cjs、wps-addin/test/export-host.test.cjs），一律原样保留，禁止清理工作树或整体提交。
 4. 确认依赖包状态；未完成则按计划处理依赖，不得虚填真机出口。
 
 本包范围：对应图06/07。修改 wps-addin/dev/release-audit.cjs、dev/audit-outputs.py、test/release-audit.test.cjs；新增 wps-addin/test/test_audit_outputs.py（只读扫描的测试，临时夹具不入 Git）。
@@ -237,7 +237,7 @@
 开工前必须完成（不得跳过）：
 1. 完整读 F:\材料软件开发\handoff.md 全文，再读 F:\材料软件开发\AGENTS.md；本包唯一执行依据是 F:\材料软件开发\docs\superpowers\plans\2026-09-27-wps-phase1-completion.md 的「R12-G」一节，并连同其中「全局约束」「优先检查的五类失效」「统一证据格式与提交检查」一起遵守。
 2. 实际打开并查看本包对应效果图：docs/mockups/approved-20260926/05a-summary-separated.png、06-inquiry-linkage.png、07-split-files.png。只读文件名或文字说明不算看图。
-3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。当前 HEAD 为 1be9271f698f409fbff73c17bff0c8ede06db75e，代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
+3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。以本会话实际 git 结果为准（拆分本提示词时为 63dde1e9126df2b09fd51bf8c7b1db0ec93d9451），代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
 4. 确认依赖 R12-C/D/E/F 已完成；未完成则按计划处理依赖，不得虚填真机出口。
 
 本包范围：依赖 C/D/E/F；对应图05A、06、07。文件为验收文档/handoff；若暴露源码问题，先记录复现，按所属修复包解决再继续，不改变批准效果。
@@ -276,7 +276,7 @@
 开工前必须完成（不得跳过）：
 1. 完整读 F:\材料软件开发\handoff.md 全文，再读 F:\材料软件开发\AGENTS.md；本包唯一执行依据是 F:\材料软件开发\docs\superpowers\plans\2026-09-27-wps-phase1-completion.md 的「R12-H」一节，并连同其中「全局约束」「统一证据格式与提交检查」一起遵守。
 2. 实际打开并查看本包对应效果图：docs/mockups/approved-20260926/05b-summary-combined.png、06-inquiry-linkage.png、07-split-files.png。只读文件名或文字说明不算看图。
-3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。当前 HEAD 为 1be9271f698f409fbff73c17bff0c8ede06db75e，代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
+3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。以本会话实际 git 结果为准（拆分本提示词时为 63dde1e9126df2b09fd51bf8c7b1db0ec93d9451），代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
 4. 确认依赖 R12-G 已完成；未完成不得开始本包真实验收。
 
 本包范围：依赖 G；对应图05B、06、07。文件为验收文档/handoff；本机独立批次。
@@ -310,7 +310,7 @@
 开工前必须完成（不得跳过）：
 1. 完整读 F:\材料软件开发\handoff.md 全文，再读 F:\材料软件开发\AGENTS.md；本包唯一执行依据是 F:\材料软件开发\docs\superpowers\plans\2026-09-27-wps-phase1-completion.md 的「R12-I」一节，并连同其中「全局约束」「统一证据格式与提交检查」一起遵守。
 2. 实际打开并查看本包对应效果图：按子场景看 docs/mockups/approved-20260926/01-import-merge.png、03-sheet-review.png、05a-summary-separated.png（或 05b-summary-combined.png）、06-inquiry-linkage.png。只读文件名或文字说明不算看图。
-3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。当前 HEAD 为 1be9271f698f409fbff73c17bff0c8ede06db75e，代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
+3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。以本会话实际 git 结果为准（拆分本提示词时为 63dde1e9126df2b09fd51bf8c7b1db0ec93d9451），代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
 4. 确认依赖 R12-G/H 已完成；未完成不得开始本包真实验收。
 
 本包范围：依赖 G/H；按子场景看图01、03、05A/05B、06。文件：wps-addin/test/fixtures/workflow-v3-sample.cjs 及受影响测试仅在缺覆盖时补；真机材料/项目在 outputs，验收文档/handoff 入库。
@@ -346,7 +346,7 @@
 开工前必须完成（不得跳过）：
 1. 完整读 F:\材料软件开发\handoff.md 全文，再读 F:\材料软件开发\AGENTS.md；本包唯一执行依据是 F:\材料软件开发\docs\superpowers\plans\2026-09-27-wps-phase1-completion.md 的「R12-J」一节，并连同其中「全局约束」「优先检查的五类失效」「统一证据格式与提交检查」一起遵守。
 2. 按触发阶段实际打开本包对应效果图：docs/mockups/approved-20260926/03-sheet-review.png 至 07-split-files.png 中与所测阶段直接相关的图，不反复全开8图。只读文件名或文字说明不算看图。
-3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。当前 HEAD 为 1be9271f698f409fbff73c17bff0c8ede06db75e，代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
+3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。以本会话实际 git 结果为准（拆分本提示词时为 63dde1e9126df2b09fd51bf8c7b1db0ec93d9451），代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
 4. 确认依赖 R12-B 至 R12-I 状态；未完成项如实挂账，不得虚填。
 
 本包范围：依赖 B–I；对应图03–07（按触发阶段）。文件：必要修复限定在触发的 export/category/project/split 模块及对应测试；验收文档/handoff。
@@ -386,7 +386,7 @@
 开工前必须完成（不得跳过）：
 1. 完整读 F:\材料软件开发\handoff.md 全文，再读 F:\材料软件开发\AGENTS.md；本包唯一执行依据是 F:\材料软件开发\docs\superpowers\plans\2026-09-27-wps-phase1-completion.md 的「R12-K」一节，并连同其中「全局约束」「统一证据格式与提交检查」一起遵守。
 2. 实际打开并查看本包对应效果图：docs/mockups/approved-20260926/01-import-merge.png、07-split-files.png，并对照现有七步导航。只读文件名或文字说明不算看图。
-3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。当前 HEAD 为 1be9271f698f409fbff73c17bff0c8ede06db75e，代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
+3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。以本会话实际 git 结果为准（拆分本提示词时为 63dde1e9126df2b09fd51bf8c7b1db0ec93d9451），代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
 4. 确认依赖包状态；未完成则按计划处理依赖，不得虚填真机出口。
 
 本包范围：对应图01/07及现有七步导航。修改 wps-addin/ribbon.xml、main.js、src/taskpane.js，必要时 src/workflow-ui.js、dev/server.cjs 资源白名单；计划新增 src/ribbon-navigation.js、test/ribbon-navigation.test.cjs，扩展 test/ribbon-recovery.test.cjs、test/ui-workflow-check.cjs。若无需新模块便能清晰完成，保持现有文件边界并更新本包清单。
@@ -421,7 +421,7 @@
 开工前必须完成（不得跳过）：
 1. 完整读 F:\材料软件开发\handoff.md 全文，再读 F:\材料软件开发\AGENTS.md；本包唯一执行依据是 F:\材料软件开发\docs\superpowers\plans\2026-09-27-wps-phase1-completion.md 的「R12-L」一节，并连同其中「全局约束」「统一证据格式与提交检查」一起遵守。
 2. 分两批实际打开全部8张效果图并逐项核对：docs/mockups/approved-20260926/01-import-merge.png、02-classification-result.png、03-sheet-review.png、04-category-workbooks.png、05a-summary-separated.png、05b-summary-combined.png、06-inquiry-linkage.png、07-split-files.png。只读文件名或文字说明不算看图。
-3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。当前 HEAD 为 1be9271f698f409fbff73c17bff0c8ede06db75e，代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
+3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。以本会话实际 git 结果为准（拆分本提示词时为 63dde1e9126df2b09fd51bf8c7b1db0ec93d9451），代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
 4. 确认依赖 R12-A 至 R12-K 通过；未通过项不得勾完成。
 
 本包范围：依赖 A–K；对应全部8图（分两批）。文件：docs/wps-workflow-v3-acceptance.md、docs/wps-phase1-release-checklist.md、handoff.md；真实项目资料仅本机。
@@ -458,7 +458,7 @@
 开工前必须完成（不得跳过）：
 1. 完整读 F:\材料软件开发\handoff.md 全文，再读 F:\材料软件开发\AGENTS.md；本包唯一执行依据是 F:\材料软件开发\docs\superpowers\plans\2026-09-27-wps-phase1-completion.md 的「R13-A」一节，并连同其中「全局约束」「统一证据格式与提交检查」一起遵守。
 2. 按需实际打开七步流程对应效果图，安装说明使用 R12 真实截图；如用于核对界面则打开 docs/mockups/approved-20260926/ 下对应图，只读文件名或文字说明不算看图。
-3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。当前 HEAD 为 1be9271f698f409fbff73c17bff0c8ede06db75e，代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
+3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。以本会话实际 git 结果为准（拆分本提示词时为 63dde1e9126df2b09fd51bf8c7b1db0ec93d9451），代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
 4. 确认依赖 R12-L 已完成；未完成不得开始本包。
 
 本包范围：依赖 R12-L 完成。文件：wps-addin/install/install.ps1、wps-addin/install/start.ps1、wps-addin/install/uninstall.ps1、wps-addin/dev/register.ps1、wps-addin/test/install.test.cjs、test/register.test.cjs 及 docs/wps-workflow-v3-r13-evidence.md；不创建第二套安装器。
@@ -494,7 +494,7 @@
 开工前必须完成（不得跳过）：
 1. 完整读 F:\材料软件开发\handoff.md 全文，再读 F:\材料软件开发\AGENTS.md；本包唯一执行依据是 F:\材料软件开发\docs\superpowers\plans\2026-09-27-wps-phase1-completion.md 的「R13-B」一节，并连同其中「全局约束」「统一证据格式与提交检查」一起遵守。
 2. 实际打开全部8张效果图（分两批）用于核对手册表述与真实截图：docs/mockups/approved-20260926/01-import-merge.png 至 07-split-files.png。只读文件名或文字说明不算看图。
-3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。当前 HEAD 为 1be9271f698f409fbff73c17bff0c8ede06db75e，代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
+3. 核对 Git 现场：git branch --show-current（应为 feat/wps-phase1）、git rev-parse HEAD、git log --oneline -5、git status --short。以本会话实际 git 结果为准（拆分本提示词时为 63dde1e9126df2b09fd51bf8c7b1db0ec93d9451），代码基线 e6f8ff2698a638b5d7492307e88ec851e723c148；工作区保留 6 个未提交修改，一律原样保留，禁止清理工作树或整体提交。
 4. 确认依赖 R13-A 已完成；未完成不得开始本包。
 
 本包范围：依赖 R13-A。文件：docs/wps-user-guide.md、docs/wps-install-guide.md、docs/wps-phase1-release-checklist.md、docs/wps-workflow-v3-r13-evidence.md、handoff.md；按扫描结果调整既有发布脚本，不引入本机配置。
