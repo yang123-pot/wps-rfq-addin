@@ -162,72 +162,11 @@ async function legacyBrandFlow(){
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已恢复项目'));
   assert.equal(await page.locator('#brand-categories input[aria-label="品牌"]').inputValue(),'品牌甲','恢复项目后品牌与表路径要一致');
   assert.match(await page.locator('#brand-status').innerText(),/品牌表已生成：/);
-  // D2：按品牌与抬头生成总询价工作簿，品牌列来自汇总表，报价单价与金额留空。
-  const inquiryTarget=path.join(root,'项目询价.xlsx');
-  await page.evaluate(target=>{
-   window.__writtenModels=[];
-   window.RfqBrandHost.selectTarget=()=>target;
-   window.RfqBrandHost.write=async(app,model,stagePath)=>{
-    window.__writtenModels.push(model);await window.__writeBrandFixture(stagePath);};
-  },inquiryTarget);
-  await page.locator('#inquiry-generate').click();
-  await page.waitForFunction(()=>document.querySelector('#inquiry-message').textContent.includes('询价工作簿已生成'));
-  assert.match(await page.locator('#inquiry-status').innerText(),/询价页 1 张/);
-  assert.match(await page.locator('#inquiry-preview').innerText(),/品牌 品牌甲/);
-  const written=await page.evaluate(()=>window.__writtenModels[window.__writtenModels.length-1]);
-  assert.deepEqual(written.sheets[0].values[6].slice(0,10),
-   ['序号','项目编码','项目名称','项目特征描述','单位','工程量','品牌','报价单价','金额','备注'],'对外列必须与白名单一致');
-  assert.equal(written.sheets[0].values[7][6],'品牌甲','询价表品牌必须来自汇总表');
-  assert.equal(written.sheets[0].values[7][7],'','报价单价留空');
-  assert.equal(written.sheets[0].values[7][8],'','金额留空');
-  assert.deepEqual(written.sheets.slice(1).map(sheet=>sheet.name),['内部追溯','处理记录'],'内部资料只留在内部页');
-  await page.locator('#save-project').click();
-  await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
-  assert.match(await page.locator('#inquiry-status').innerText(),/已生成：/,'询价工作簿必须真实生成并校验');
-  assert.match(await page.locator('#project-status').innerText(),/询价表：未完成（品牌汇总未完成）/,
-   '阶段未实现前不得因旧生成记录误报完成');
-
-  // E2：一个询价页拆成一个文件，成功后写回执；输出目录必须先存在。
-  const splitDirectory=path.join(root,'拆分');
-  await fs.mkdir(splitDirectory,{recursive:true});
-  await page.evaluate(target=>{window.__saveAs=target;},path.join(splitDirectory,'水阀门_供应商A.xlsx'));
-  await page.locator('#split-directory').click();
-  await page.waitForFunction(()=>document.querySelector('#split-status').textContent.includes('计划 1 个文件'));
-  assert.match(await page.locator('#split-preview').innerText(),/水阀门_供应商A\.xlsx/);
-  assert.match(await page.locator('#split-preview').innerText(),/品牌 品牌甲|品牌甲/);
-  await page.locator('#split-run').click();
-  await page.waitForFunction(()=>document.querySelector('#split-message').textContent.includes('拆分完成'));
-  assert.match(await page.locator('#split-status').innerText(),/完成 1/);
-  const splitFile=path.join(splitDirectory,'水阀门_供应商A.xlsx');
-  assert.equal(require('node:fs').existsSync(splitFile),true,'拆分文件必须真实存在');
-  await page.locator('#save-project').click();
-  await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
-  assert.match(await page.locator('#split-status').innerText(),/完成 1/,'拆分必须真实完成并核对');
-  const afterSplit=JSON.parse(await fs.readFile(path.join(root,'projects',(await fs.readdir(path.join(root,'projects')))[0]),'utf8'));
-  assert.equal(afterSplit.split.files.length,1);
-  assert.equal(afterSplit.split.files[0].state,'succeeded');
-  assert.match(afterSplit.split.files[0].sha256,/^[a-f0-9]{64}$/);
-  assert.equal(afterSplit.generation.target,inquiryTarget,'生成记录必须保存目标文件与内容键');
-  assert.match(afterSplit.generation.inputKey,/^ck2-[0-9a-f]{16}$/);
-
-  // 品牌变化后旧生成文件必须过期，拆分也不能继续沿用。
-  await page.evaluate(()=>{
-   window.RfqBrandHost.read=function(app,binding){
-    const assignmentId=Object.keys(binding.rowMap)[0];
-    return {path:binding.path,sheet:binding.sheet,inputKey:binding.inputKey,
-     assignments:[{assignmentId:assignmentId,categoryId:'water-valve',brand:'品牌乙',supplier:'供应商A',note:''}],rowCount:1};
-   };
-  });
-  await page.locator('#brand-read').click();
-  await page.waitForFunction(()=>!document.querySelector('#brand-preview').hidden);
-  await page.locator('#brand-confirm-read').click();
-  await page.waitForFunction(()=>document.querySelector('#inquiry-status').textContent.includes('过期'));
-  await page.locator('#save-project').click();
-  await page.waitForFunction(()=>document.querySelector('#project-status').textContent.includes('旧生成文件已过期'));
-  assert.match(await page.locator('#split-status').innerText(),/冲突 1：.*(不一致|重新生成)/,'过期后必须阻断旧拆分计划并说明原因');
-  assert.equal(await page.locator('#split-run').isDisabled(),true,'过期计划不得再执行发布');
+  // D2/E2（旧过渡期面板的总询价生成与一键拆分）已随R9迁到主流程第6/7步：
+  // 第6步总询价工作簿由R9的 ui-inquiry-check.cjs 覆盖（品牌只认汇总表读回、改品牌后旧生成过期）；
+  // 第7步一键拆分由R10的 ui-split-check.cjs 覆盖。这里只保留过渡期面板自身可操作性，不再用旧侧栏品牌路线冒充正式流程。
   assert.deepEqual(errors,[]);
-  console.log('PASS(过渡期面板): 品牌表按类别自动生成与人工填品牌、抬头必填、询价表按白名单生成且品牌来自汇总表、报价与金额留空、拆分一份一文件并写回执、品牌变化后旧生成文件与拆分计划立即阻断。');
+  console.log('PASS(过渡期面板): 品牌表按类别自动生成与人工填品牌、抬头四项必填、项目保存重开恢复一致；总询价生成与拆分已迁到第6/7步（见 ui-inquiry-check.cjs 与 R10）。');
  }finally{await browser.close();await new Promise(r=>server.close(r));await fs.rm(root,{recursive:true,force:true});}
 }
 
@@ -482,6 +421,9 @@ async function summaryFlow(){
    {file:separatedPath,values:fillSummaryGrid(separated,SUMMARY_FILLS)});
   await page.locator('#brands-confirm').click();
   await page.waitForFunction(()=>/已读回并校验汇总表/.test(document.querySelector('#brands-message').textContent));
+  // R9：第5步主按钮读回成功后进入第6步“询价表”（图05→06）；回第5步继续核对。
+  await page.waitForFunction(()=>document.querySelector('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage')==='inquiry');
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="brands"]').click();
   assert.match(await page.locator('#brands-message').innerText(),/预计 5 份询价表/);
   assert.match(await page.locator('#brands-banner').innerText(),/品牌与供应商已读回（4 类）/);
   const readSeparated=await projectRecord();
@@ -503,6 +445,7 @@ async function summaryFlow(){
    {file:separatedPath,values:fillSummaryGrid(separated,SUMMARY_FILLS)});
   await page.locator('#brands-confirm').click();
   await page.waitForFunction(()=>/已读回并校验汇总表/.test(document.querySelector('#brands-message').textContent));
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="brands"]').click();
   assert.match(await page.locator('#project-status').textContent(),/品牌汇总：已确认/);
   assert.equal(errors.length,0);
   await waitIdle();

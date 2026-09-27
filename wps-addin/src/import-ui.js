@@ -91,19 +91,29 @@
     brandPanel=RfqBrandUI.create({application:options.application,context:brandContext,
       onChange:function(){if(inquiryPanel)inquiryPanel.refresh();if(splitPanel)splitPanel.refresh();},
       onBusy:function(value){busy=value;options.onBusy(value);}});
-    headerPanel=RfqHeaderUI.create({});
-    // 生成面板的输入：汇总表品牌数据、询价抬头、当前清单分组与分类确认，以及生成用内容键。
+    headerPanel=RfqHeaderUI.create({onChange:function(){
+      if(inquiryPanel)inquiryPanel.refresh();if(splitPanel)splitPanel.refresh();}});
+    // 生成面板的输入：汇总表读回的品牌组、询价抬头、当前清单分组与分类确认，以及生成用内容键。
+    // 品牌/供应商的唯一来源是分类汇总表读回（R8），侧栏不再二次编辑；抬头变化同样进入生成内容键。
     function deliveryContext(){
       var ctx=brandContext();
-      ctx.assignments=brandPanel?brandPanel.data():null;
       ctx.header=headerPanel?headerPanel.header():null;
+      // R8/R9：询价与拆分只取当前有效的汇总读回品牌组；未读回或已过期时为空，不沿用旧品牌。
+      ctx.brands=currentBrandGroups();
       var report=RfqProject.assess(ctx);
-      return {brandTable:ctx.assignments,header:ctx.header,
-        groups:ctx.preview?ctx.preview.groups:[],classification:ctx.classification,inputKey:report.generationKey,
-        // R8：询价/拆分只取当前有效的汇总读回品牌组；未读回或已过期时为null，不沿用旧品牌。
-        brandGroups:currentBrandGroups(),brands:summaryVerdict()};
+      // 询价对象按稳定rowId归类：以R5整表确认快照为准（不是侧栏过渡期的逐行确认），避免改过冲突行后仍按旧建议。
+      var confirmation=reviewConfirmation();
+      return {brands:ctx.brands,groups:ctx.preview?ctx.preview.groups:[],
+        classification:{decisions:(confirmation&&confirmation.rows)||[]},
+        header:ctx.header,inputKey:report.generationKey,projectName:projectDisplayName(),
+        summary:summaryVerdict(),summaryPath:summaryReceipt?summaryReceipt.path:null};
     }
+    // R9：生成成功后把生成记录落盘，让“询价表”阶段按真实内容置为已确认。
+    function afterInquiryGeneration(){render();if(projects&&projects.save)projects.save();}
     inquiryPanel=RfqInquiryUI.create({application:options.application,context:deliveryContext,
+      onGeneration:afterInquiryGeneration,
+      onNext:function(){if(workflow)workflow.goTo('split');},
+      onBack:function(){if(workflow)workflow.goTo('brands');},
       onBusy:function(value){busy=value;options.onBusy(value);}});
     splitPanel=RfqSplitUI.create({application:options.application,context:deliveryContext,
       generation:function(){return inquiryPanel?inquiryPanel.generation():null;},
@@ -1081,6 +1091,8 @@
         summaryTell('已读回并校验汇总表：'+summaryRead.categories.length+' 类有效，预计 '+summaryRead.expectedSheets+
           ' 份询价表（'+RfqBrandModel.summaryCountsText(summaryRead.categories)+'）。品牌取自汇总表，改品牌请回汇总表修改并重新读回。');
         renderBrands();render();
+        // 图05A→06：读回通过后进入第6步生成总询价工作簿（品牌唯一来源即本次读回结果）。
+        if(workflow)workflow.goTo('inquiry');
         return {ok:true,read:summaryRead};
       }catch(error){summaryTell('汇总表未读回：'+error.message,true);return {ok:false};}
       finally{summaryBusy=false;renderBrands();}

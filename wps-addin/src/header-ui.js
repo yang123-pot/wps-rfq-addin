@@ -13,7 +13,9 @@
    inputs[field.key]=document.getElementById('header-'+field.key);
    if(!inputs[field.key])return;
    inputs[field.key].addEventListener('change',function(){
-    draft[field.key]=inputs[field.key].value;render();});
+    draft[field.key]=inputs[field.key].value;render();
+    // 抬头是询价生成的内容键之一：变化后要立即让询价/拆分面板按最新内容重算可用性。
+    if(options.onChange)options.onChange(draft);});
   });
   function tell(text,error){message.textContent=text;message.className=error?'error':'';}
   function request(action,payload){
@@ -80,7 +82,8 @@
    var found=templates.filter(function(template){return template.templateId===chosen;})[0];
    if(!found){tell('模板已不存在，请重新加载。',true);return;}
    draft=RfqInquiryHeader.normalize(found.header);
-   render();tell('已应用模板“'+found.name+'”（只改了本页草稿，没改已保存项目）。');
+   render();if(options.onChange)options.onChange(draft);
+   tell('已应用模板“'+found.name+'”（只改了本页草稿，没改已保存项目）。');
   });}catch(_){}
   try{deleteTemplate.addEventListener('click',function(){
    var chosen=templateSelect&&templateSelect.value;
@@ -90,7 +93,8 @@
   render();
   if(window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token)loadTemplates();
   return {refresh:render,templates:function(){return templates;},header:function(){return draft;},
-   restore:function(value){draft=RfqInquiryHeader.normalize(value||RfqInquiryHeader.create());render();},
+   restore:function(value){draft=RfqInquiryHeader.normalize(value||RfqInquiryHeader.create());render();
+    if(options.onChange)options.onChange(draft);},
    verdict:function(){
     var check=RfqInquiryHeader.validate(draft);
     return {ready:check.ok,detail:check.ok?'抬头已填写完整':('抬头未填写完整：'+check.errors[0])};

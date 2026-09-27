@@ -1,55 +1,93 @@
 (function(){
  'use strict';
+ // R9（图06）：第6步“品牌与供应商带入询价表”。品牌唯一来源是分类汇总表读回结果；
+ // 主按钮生成总询价工作簿，辅助“返回汇总表修改”，主流程进入第7步拆分。
  function node(tag,text,className){var element=document.createElement(tag);if(text!=null)element.textContent=text;if(className)element.className=className;return element;}
+ function fileName(path){return String(path||'').split(/[\\/]/).pop()||'';}
  function create(options){
   options=options||{};
-  var message=document.getElementById('inquiry-message'),status=document.getElementById('inquiry-status'),
-    previewList=document.getElementById('inquiry-preview'),generateButton=document.getElementById('inquiry-generate');
+  var banner=document.getElementById('inquiry-banner'),progress=document.getElementById('inquiry-progress'),
+    stats=document.getElementById('inquiry-stats'),status=document.getElementById('inquiry-status'),
+    message=document.getElementById('inquiry-message'),workbook=document.getElementById('inquiry-workbook'),
+    previewList=document.getElementById('inquiry-preview'),generateButton=document.getElementById('inquiry-generate'),
+    nextButton=document.getElementById('inquiry-next'),backButton=document.getElementById('inquiry-back');
   var generation=null,busy=false;
-  function tell(text,error){message.textContent=text;message.className=error?'error':'';}
+  function tell(text,error){if(!message)return;message.textContent=text;message.className=error?'error':'';}
   function context(){return options.context?options.context():null;}
   function draft(){
    var ctx=context();
-   if(!ctx||!ctx.brandTable||!ctx.header)return null;
-   return {brandTable:ctx.brandTable,header:ctx.header,groups:ctx.groups,classification:ctx.classification,
-    inputKey:ctx.inputKey};
+   if(!ctx||!ctx.brands||!ctx.header)return null;
+   return {brands:ctx.brands,groups:ctx.groups||[],classification:ctx.classification,
+    header:ctx.header,inputKey:ctx.inputKey,projectName:ctx.projectName||''};
   }
   function buildModel(){
    var input=draft();
-   if(!input)throw Error('请先完成分类与品牌，并填写询价抬头。');
+   if(!input)throw Error('请先完成品牌汇总（读回分类汇总表）并填写询价抬头。');
    var model=RfqInquiryModel.build(input);
    model.inputKey=input.inputKey;
    return model;
   }
-  function stale(){
-   var ctx=context();
-   return !generation||!ctx||RfqInquiryModel.isCurrent(generation,ctx.inputKey)===false;
+  function isCurrent(){var ctx=context();return !!generation&&!!ctx&&RfqInquiryModel.isCurrent(generation,ctx.inputKey);}
+  function suggestedName(){
+   var ctx=context(),name=ctx&&ctx.projectName?String(ctx.projectName):'项目';
+   return name.replace(/[\\\/:\*\?"<>\|]/g,'_')+'_询价总表.xlsx';
   }
+  function brandsReady(){var ctx=context();return !!(ctx&&ctx.brands&&ctx.brands.length);}
+  function headerCheck(){var ctx=context();return RfqInquiryHeader.validate(ctx&&ctx.header);}
+  // 图06侧栏：当前操作的工作簿、预计输出与每类方式、返回汇总表修改、进入拆分。
   function render(){
-   var ctx=context();
-   var model=null,error=null;
-   if(ctx&&ctx.brandTable&&ctx.header){
-    try{model=buildModel();}catch(problem){error=problem.message;}
+   var ctx=context(),model=null,error=null,ready=brandsReady(),header=headerCheck();
+   if(ready&&header.ok){try{model=buildModel();}catch(problem){error=problem.message;}}
+   var current=isCurrent();
+   if(!ready){
+    banner.textContent='尚未完成品牌汇总';banner.className='result-banner';
+    progress.textContent='当前进度 6 / 7 · 等待第5步在分类汇总表内填写品牌与供应商并读回';
+    stats.textContent='品牌与供应商取自分类汇总表读回结果，不在侧栏二次编辑。';
+    status.textContent='在“品牌汇总”生成汇总表、填写品牌供应商后点“填写完成，生成询价表”读回。';
+   }else if(!header.ok){
+    banner.textContent='询价抬头未填齐';banner.className='result-banner';
+    progress.textContent='当前进度 6 / 7 · 品牌已读回，等待填写询价抬头';
+    stats.textContent='抬头包含项目名称、单位名称、材料经办人、联系方式（必填）与原公司地址（可选）。';
+    status.textContent='还缺：'+header.errors.join('；')+'。请在“辅助功能 → 询价抬头”里填写。';
+   }else if(error){
+    banner.textContent='询价表还不能生成';banner.className='result-banner';
+    progress.textContent='当前进度 6 / 7 · 品牌或抬头与当前清单不一致';
+    stats.textContent=RfqInquiryHeader.summary(ctx.header);
+    status.textContent=error;
+   }else if(!generation){
+    banner.textContent='尚未生成总询价工作簿';banner.className='result-banner';
+    progress.textContent='当前进度 6 / 7 · 品牌与抬头已就绪，等待生成总询价工作簿';
+    stats.textContent='预计输出 '+model.sheetCount+' 份询价表（'+RfqInquiryModel.countsText(model)+'）· 报价单价与金额留空。';
+    status.textContent=RfqInquiryHeader.summary(ctx.header);
+   }else if(!current){
+    banner.textContent='总询价工作簿已过期';banner.className='result-banner';
+    progress.textContent='当前进度 6 / 7 · 品牌、抬头或分类已变化，需要重新生成总询价工作簿';
+    stats.textContent='上次生成：'+fileName(generation.target)+'（'+generation.sheetIds.length+' 张询价页），不再作为当前依据。';
+    status.textContent='修改汇总表或抬头后必须重新生成；旧文件保留，拆分不再沿用。';
+   }else{
+    banner.textContent='询价表已生成并校验';banner.className='result-banner is-done';
+    progress.textContent='当前进度 6 / 7 · 总询价工作簿已生成，可进入第7步拆分';
+    stats.textContent='共 '+generation.sheetIds.length+' 份询价表（'+RfqInquiryModel.countsText(model)+'）· 报价单价与金额留空。';
+    status.textContent='实际文件：'+generation.target+'（SHA '+String(generation.sha256||'').slice(0,12)+'…）';
    }
-   if(error){status.textContent='还不能生成询价表：'+error;generateButton.disabled=true;}
-   else if(!model){status.textContent='先完成导入、来源核对、合并确认、分类确认、品牌读取与抬头填写，再生成询价表。';generateButton.disabled=true;}
-   else{
-    status.textContent='抬头 '+RfqInquiryHeader.summary(ctx.header)+' · 询价页 '+model.sheets.length+' 张 · 材料行 '+model.rowCount+
-     (generation?(RfqInquiryModel.isCurrent(generation,ctx.inputKey)?' · 已生成：'+generation.target:' · 旧生成文件已过期，需要重新生成'):' · 尚未生成');
-    generateButton.disabled=busy||!options.application;
-   }
-   previewList.textContent='';
-   if(model){
-    model.sheets.forEach(function(sheet){
+   if(workbook)workbook.textContent=generation?fileName(generation.target):('尚未生成（预计文件名：'+suggestedName()+'）');
+   if(previewList){
+    previewList.textContent='';
+    if(model)model.sheets.forEach(function(sheet){
      var li=node('li');li.setAttribute('data-inquiry-sheet',sheet.sheetId);
      li.appendChild(node('strong',sheet.name));
-     li.appendChild(node('p','品牌 '+(sheet.brand||'（空）')+' · 供应商 '+(sheet.supplier||'（空）')+
-      ' · 材料 '+Math.max(0,sheet.values.length-(sheet.layout?sheet.layout.headerRow:0))+' 行 · 表头第'+
-      ((sheet.layout?sheet.layout.headerRow:0)+1)+'行','source'));
+     li.appendChild(node('p','方式：'+RfqInquiryModel.modeLabel(sheet.mode)+' · 材料 '+sheet.rowIds.length+' 行 · 品牌 '+
+      (sheet.brandLabel||'（空）')+' · 供应商 '+(sheet.groups||[]).map(function(group){return group.supplier;}).join('、'),'source'));
      previewList.appendChild(li);
     });
-    if(!model.sheets.length)previewList.appendChild(node('li','全部材料都是“无需询价”，无需生成询价表。','empty'));
-   } else previewList.appendChild(node('li','还没有可预览的询价页。','empty'));
+    if(!model)previewList.appendChild(node('li','品牌或抬头就绪后可预览询价页。','empty'));
+   }
+   if(generateButton){
+    generateButton.disabled=busy||!ready||!header.ok||!!error||!options.application;
+    generateButton.textContent=generation?'重新生成总询价工作簿':'生成总询价工作簿';
+   }
+   if(nextButton)nextButton.disabled=busy||!current;
+   if(backButton)backButton.disabled=busy;
   }
   function requests(action,payload){
    var token=window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token;
@@ -66,16 +104,16 @@
    var model,book,prepared=null,target=null;
    try{
     model=buildModel();
-    if(!model.sheets.length){tell('全部材料都是“无需询价”，没有需要生成的询价表。');return;}
     book=RfqInquiryModel.workbook(model,new Date().toISOString());
    }catch(error){tell(error.message,true);return;}
-   target=RfqBrandHost.selectTarget(options.application,'项目询价_'+model.sheets.length+'张表.xlsx');
+   target=RfqBrandHost.selectTarget(options.application,suggestedName());
    if(!target){tell('已取消选择保存位置，原文件未改动。');return;}
    try{
     busy=true;if(options.onBusy)options.onBusy(true);render();
     tell('正在准备新文件…');
     prepared=await requests('prepare',{target:target});
-    if(!prepared||typeof prepared.ticket!=='string'||typeof prepared.stagePath!=='string')throw Error('生成会话信息不完整，未写入。');
+    if(!prepared||typeof prepared.ticket!=='string'||typeof prepared.stagePath!=='string')
+     throw Error('生成会话信息不完整，未写入。');
     tell('正在写入并重新打开校验…');
     await new Promise(function(resolve){setTimeout(resolve,0);});
     await RfqBrandHost.write(options.application,book,prepared.stagePath);
@@ -85,20 +123,29 @@
     catch(error){if(error.status&&error.status<500)throw error;result=await requests('commit',{ticket:prepared.ticket});}
     if(!result||result.target!==prepared.target||!/^[a-f\d]{64}$/i.test(result.sha256))
      throw Error('未取得有效保存回执，请检查目标文件。');
+    // 发布后再核一次真实文件SHA，与分类工作簿/汇总表同一口径。
+    await requests('verify',{ticket:prepared.ticket,target:result.target,sha256:result.sha256});
     generation=RfqInquiryModel.record(model,{target:result.target,sha256:result.sha256,generatedAt:new Date().toISOString()});
     if(options.onGeneration)options.onGeneration(generation);
-    tell('询价工作簿已生成并校验：'+result.target+'（'+model.sheets.length+'张询价页，报价单价与金额留空）。');
+    tell('总询价工作簿已生成并校验：'+result.target+'（'+model.sheets.length+' 张询价页，报价单价与金额留空）。品牌取自汇总表，改品牌请回汇总表修改并重新生成。');
    }catch(error){tell('询价表未确认成功。'+error.message+(prepared?' 请检查目标位置：'+prepared.target:''),true);}
    finally{busy=false;if(options.onBusy)options.onBusy(false);render();}
   }
-  if(generateButton)generateButton.addEventListener('click',generate);
+  if(generateButton)generateButton.addEventListener('click',function(){generate();});
+  if(nextButton)nextButton.addEventListener('click',function(){
+   if(!isCurrent()){tell('请先生成并校验总询价工作簿，再进入拆分。',true);return;}
+   if(options.onNext)options.onNext();
+  });
+  if(backButton)backButton.addEventListener('click',function(){
+   if(options.onBack)options.onBack();
+  });
   render();
   return {refresh:render,generation:function(){return generation;},restore:function(value){generation=value||null;render();},
+   model:function(){try{return buildModel();}catch(_){return null;}},
    verdict:function(){
-    var ctx=context();
     if(!generation)return {ready:false,detail:'尚未生成总询价工作簿'};
-    if(!ctx||!RfqInquiryModel.isCurrent(generation,ctx.inputKey))return {ready:false,detail:'旧生成文件已过期，需要重新生成'};
-    return {ready:true,detail:'询价表已生成并校验'};
+    if(!isCurrent())return {ready:false,detail:'旧生成文件已过期，需要重新生成'};
+    return {ready:true,detail:'询价表已生成并校验（'+generation.sheetIds.length+' 张询价页）'};
    }};
  }
  window.RfqInquiryUI={create:create};

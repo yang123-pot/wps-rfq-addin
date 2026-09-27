@@ -222,3 +222,34 @@ test('publishing stops before creating a workbook when the staging file already 
  assert.throws(()=>host.write(h.app,model,stage),/已存在/);
  assert.deepEqual(h.written,[]);
 });
+
+// R9：图06总询价工作簿——真实询价模型（模型→workbook→host）经版式写入并读回核验。
+test('R9 inquiry workbook keeps the 图06 layout: title merge, header fill, freeze, print repeat row',()=>{
+ const layoutModule=require('../src/workbook-layout.js'),inquiry=require('../src/inquiry-model.js');
+ const groups=[
+  {id:'row-1',scopeId:'C:/copies/a.xlsx',name:'阀门',feature:'DN50',unit:'个',quantity:'20',
+   sources:[{id:'s1',code:'FM-001'}],sourceLabels:['示例园区—给排水']},
+  {id:'row-2',scopeId:'C:/copies/a.xlsx',name:'阀门',feature:'DN65',unit:'个',quantity:'12',
+   sources:[{id:'s2',code:'FM-002'}],sourceLabels:['示例园区—给排水']}];
+ const classification={schemaVersion:1,revision:1,decisions:[
+  {rowId:'row-1',categoryId:'valve',categoryName:'阀门',skip:false},
+  {rowId:'row-2',categoryId:'valve',categoryName:'阀门',skip:false}]};
+ const model=inquiry.build({brands:[{categoryId:'valve',categoryName:'阀门',rowCount:2,mode:'synthesize',
+   groups:[{brand:'通达',supplier:'正通商贸'},{brand:'海岳',supplier:'安合设备'}]}],
+  groups:groups,classification:classification,inputKey:'ck2-inquiry-layout',
+  header:{projectName:'示例园区',company:'示例建设公司',contact:'测试员',phone:'示例联系方式',address:''}});
+ const book=inquiry.workbook(model,'2026-09-27T00:00:00.000Z');
+ const h=layoutFixture();
+ host.write(h.app,book,'C:\\temp\\rfq-inquiry.xlsx');
+ const sheet=h.sheets[0];
+ assert.deepEqual(sheet.Range('A1:J9').Value2,model.sheets[0].values,'公开值逐格写回且与模型一致');
+ assert.equal(sheet.Range('A1:J1').MergeCells,true,'标题合并成整行');
+ assert.equal(sheet.Columns.Item(4).ColumnWidth,46,'项目特征描述列加宽以便长特征换行');
+ assert.equal(sheet.Rows.Item(7).Font.Bold,true,'材料表头行加粗');
+ assert.equal(sheet.Range('A7:J7').Interior.Color,layoutModule.toColor('#DCE6F1'),'表头浅色填充');
+ assert.equal(sheet.PageSetup.PrintTitleRows,'$7:$7','打印重复表头');
+ assert.equal(sheet.PageSetup.PrintArea,'A1:J9','打印区域覆盖标题到末行');
+ assert.equal(h.app.ActiveWindow.FreezePanes,true,'冻结表头以上');
+ assert.deepEqual(book.sheets.slice(1).map(s=>s.name),['内部追溯','处理记录'],'内部页留在总表内，不进入公开询价页');
+ assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx','用户工作簿保持活动');
+});
