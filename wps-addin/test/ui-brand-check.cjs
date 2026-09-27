@@ -5,171 +5,7 @@ const sample=require('./fixtures/workflow-v3-sample.cjs');
 const collection=require('../src/collection.js');
 const reviewModel=require('../src/classification-review-model.js');
 const brandModel=require('../src/brand-model.js');
-// 上面这段是R1–R6过渡期侧栏品牌面板的回归用例；下面summaryFlow是R7（图05A/05B）的分类汇总表用例。
-async function legacyBrandFlow(){
- const root=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-ui-brand-')),files=[path.join(root,'测试一.xlsx')];
- await fs.writeFile(files[0],'first file');
- const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(root,'copies'),
-  projectDirectory:path.join(root,'projects'),libraryDirectory:path.join(root,'library'),headerDirectory:path.join(root,'headers')});
- await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const browser=await chromium.launch({channel:'msedge',headless:true,args:['--explicitly-allowed-ports='+server.address().port]});
- let brandTarget=path.join(root,'分类品牌表.xlsx');
- try{
-  const page=await browser.newPage({viewport:{width:420,height:900}}),errors=[];
-  page.on('pageerror',e=>errors.push(e.message));
-  page.on('dialog',dialog=>dialog.accept());
-  await page.addInitScript(({files,root})=>{
-   window.__copies=[];
-   window.__root=String(root).replace(/\\/g,'/').toLowerCase()+'/';
-   const nativeFetch=window.fetch;
-   window.fetch=async function(...args){
-    const response=await nativeFetch(...args);
-    if(String(args[0])==='/api/import/prepare'&&response.ok){
-     const data=await response.clone().json();
-     if(Array.isArray(data.files))window.__copies=data.files;
-    }
-    return response;
-   };
-   const materialRows={
-    '测试一.xlsx':[['工程名称：测试楼','','','',''],['项目编码','项目名称','项目特征描述','单位','工程量'],
-     ['001','水龙头','DN15','个','1'],['002','电动排烟阀手动开启钢索','','套','2']]
-   };
-   function sheetFor(path,name){
-    window.__books=window.__books||{};
-    window.__books[path]=window.__books[path]||{};
-    if(!window.__books[path][name]){
-     const original=(window.__copies.filter(item=>item.copyPath===path)[0]||{}).originalName;
-     window.__books[path][name]={values:(materialRows[original]||[]).map(row=>row.slice())};
-    }
-    const store=window.__books[path][name];
-    return {Name:name,UsedRange:{Row:1,Column:1,Rows:{Count:store.values.length},Columns:{Count:5},Value2:store.values}};
-   }
-   function bookFor(path){return {FullName:path,
-    Worksheets:{Count:1,Item(name){return sheetFor(path,typeof name==='string'?name:'给排水');}},
-    Activate(){app.ActiveWorkbook=this;},Close(){}};}
-   const previous={Name:'用户文件.xlsx',FullName:'C:\\用户文件.xlsx',Activate(){app.ActiveWorkbook=this;}};
-   const app={ActiveWorkbook:previous,AutomationSecurity:1,GetOpenFilename(){return window.__files;},
-    GetSaveAsFilename(){return window.__saveAs;},
-    Workbooks:{Count:1,Item(){return previous;},Open(file){
-     if(files.includes(file))throw Error('original was opened');
-     return bookFor(file);
-    }}};
-   window.Application=app;window.__files=files;
-  },{files,root});
-  await page.exposeFunction('__writeBrandFixture',async file=>{await fs.writeFile(file,Buffer.from([0x50,0x4b,3,4,1,2]));});
-  const origin='http://127.0.0.1:'+server.address().port;
-  await page.goto(origin+'/taskpane.html');
-  await page.locator('#aux-section > summary').click();
-  assert.match(await page.locator('#brand-status').innerText(),/先完成导入/,'分类未完成前不得建立品牌表');
-  await page.locator('#import-files').click();
-  await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===1);
-  await page.locator('#confirm-merge').click();
-  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次选择已确认'));
-  await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 2'));
-  await page.waitForFunction(()=>document.querySelector('#brand-status').textContent.includes('分类'));
-  const rows=page.locator('#classification-list > li');
-  await rows.nth(0).locator('button').first().click();
-  await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 1'));
-  await page.locator('#classification-list > li').nth(1).locator('button').first().click();
-  await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 0'));
-  await page.waitForFunction(()=>document.querySelector('#brand-status').textContent.includes('尚未生成分类品牌表'));
-  assert.match(await page.locator('#brand-categories').innerText(),/水阀门/,'按类别自动生成品牌行');
-  assert.doesNotMatch(await page.locator('#brand-categories').innerText(),/无需询价/,'无需询价行不进入品牌表');
-  assert.equal(await page.locator('#brand-categories [data-assignment-id]').count(),1);
-  assert.match(await page.locator('#brand-status').innerText(),/品牌为空/,'没填品牌时品牌阶段不能完成');
-  assert.equal(await page.locator('#brand-generate').isDisabled(),false,'结构通过即可生成待填写汇总表');
-
-  await page.evaluate(target=>{
-   window.RfqBrandHost.selectTarget=()=>target;
-   window.RfqBrandHost.write=async(app,model,stagePath)=>{window.__brandModel=model;await window.__writeBrandFixture(stagePath);};
-  },brandTarget);
-  await page.locator('#brand-generate').click();
-  await page.waitForFunction(()=>document.querySelector('#brand-message').textContent.includes('分类品牌表已生成'));
-  assert.match(await page.locator('#brand-status').innerText(),/品牌表已生成：/,'生成后要记录品牌表路径');
-  const model=await page.evaluate(()=>window.__brandModel);
-  assert.deepEqual(model.sheets[0].values[1],['分配标识','类别','材料条目数','品牌','供应商','备注','材料行标识']);
-  assert.equal(model.sheets[0].values[2][3],'','生成的汇总表品牌列必须是空的，等人工填写');
-  assert.equal(model.sheets[0].values[2][4],'','供应商留到询价拆分步骤再补');
-  const notes=model.sheets[2].values.map(row=>row[1]).join('；');
-  assert.match(notes,/只能修改品牌、供应商、备注/,'汇总表要说明填写范围');
-  assert.match(notes,/品牌列的唯一来源/,'汇总表要说明品牌与询价表联动');
-
-  await page.evaluate(()=>{
-   window.__readBinding=null;window.__readFails=null;
-   window.RfqBrandHost.read=function(app,binding){
-    window.__readBinding=binding;
-    if(window.__readFails)throw Error(window.__readFails);
-    const assignmentId=Object.keys(binding.rowMap)[0];
-    return {path:binding.path,sheet:binding.sheet,inputKey:binding.inputKey,
-     assignments:[{assignmentId:assignmentId,categoryId:'water-valve',brand:'品牌甲',supplier:'供应商A',note:'人工填写的品牌'}],rowCount:1};
-   };
-  });
-  await page.locator('#brand-read').click();
-  await page.waitForFunction(()=>!document.querySelector('#brand-preview').hidden);
-  assert.match(await page.locator('#brand-preview-list').innerText(),/品牌：“”→“品牌甲”/,'读取后必须先给出逐项预览');
-  assert.match(await page.locator('#brand-message').innerText(),/确认写入项目/);
-  await page.locator('#brand-confirm-read').click();
-  await page.waitForFunction(()=>document.querySelector('#brand-message').textContent.includes('已按品牌表更新项目'));
-  assert.equal(await page.locator('#brand-categories input[aria-label="品牌"]').inputValue(),'品牌甲');
-  assert.match(await page.locator('#brand-status').innerText(),/品牌已填写完整/);
-  const binding=await page.evaluate(()=>window.__readBinding);
-  assert.equal(binding.path,brandTarget);
-  assert.match(String(binding.inputKey),/^ck2-[0-9a-f]{16}$/,'读回必须带生成时的内容键');
-  assert.equal(Object.keys(binding.rowMap).length,1,'绑定必须按分配标识记录映射');
-
-  await page.evaluate(()=>{window.__readFails='品牌表第3行的类别被改动（应为“水阀门”），不能读回。';});
-  await page.locator('#brand-read').click();
-  await page.waitForFunction(()=>document.querySelector('#brand-message').textContent.includes('类别被改动'));
-  assert.equal(await page.locator('#brand-categories input[aria-label="品牌"]').inputValue(),'品牌甲','读取失败不得改动项目里的品牌');
-  assert.match(await page.locator('#brand-message').innerText(),/品牌表未读取成功/);
-
-  await page.locator('#brand-coverage').selectOption('material-subsets');
-  await page.locator('#save-project').click();
-  await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
-  assert.match(await page.locator('#project-status').innerText(),/品牌汇总：未完成/,
-   'R7起品牌汇总阶段只认分类汇总表；过渡期侧栏面板填好品牌也不代表该阶段完成');
-  await page.evaluate(()=>{
-   const values={'header-company':'测试安装工程有限公司','header-address':'测试市测试路1号',
-    'header-phone':'010-12345678','header-projectName':'测试楼项目','header-contact':'测试员'};
-   Object.keys(values).forEach(id=>{
-    const input=document.getElementById(id);input.value=values[id];
-    input.dispatchEvent(new Event('change',{bubbles:true}));});
-  });
-  await page.waitForFunction(()=>document.querySelector('#header-status').textContent.includes('抬头已齐全'));
-  await page.locator('#header-save-template').click();
-  await page.waitForFunction(()=>document.querySelector('#header-message').textContent.includes('请先填写模板名称'));
-  await page.locator('#header-template-name').fill('本项目抬头');
-  await page.locator('#header-save-template').click();
-  await page.waitForFunction(()=>document.querySelector('#header-message').textContent.includes('已保存本机抬头模板'));
-  assert.equal(await page.locator('#header-template-select option').count(),2,'保存后模板下拉里应出现该模板');
-  await page.locator('#save-project').click();
-  await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
-  assert.match(await page.locator('#brand-status').innerText(),/品牌已填写完整/,'人工填好品牌后品牌面板必须显示已完整');
-  assert.match(await page.locator('#project-status').innerText(),/分类工作簿：未完成/,
-   '分类工作簿尚未实现时，品牌汇总不得被误报为已完成');
-  assert.match(await page.locator('#project-status').innerText(),/询价表：未完成/);
-  const saved=JSON.parse(await fs.readFile(path.join(root,'projects',(await fs.readdir(path.join(root,'projects')))[0]),'utf8'));
-  assert.equal(saved.assignments.assignments[0].brand,'品牌甲','项目记录必须保存人工填写的品牌');
-  assert.equal(saved.assignments.binding.path,brandTarget);
-  assert.equal(saved.schemaVersion,2,'项目记录必须写入v2结构');
-  assert.equal(saved.stages.categories.state,'missing','未实现的分类工作簿阶段必须保持未完成');
-  assert.equal(saved.stages.brands.state,'missing','分类工作簿未完成时品牌汇总不得误报完成');
-  await page.reload();
-  await page.locator('#aux-section > summary').click();
-  await page.locator('#open-project').click();
-  await page.waitForFunction(()=>document.querySelectorAll('#project-list > li button').length>=1);
-  await page.locator('#project-list > li button').first().click();
-  await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已恢复项目'));
-  assert.equal(await page.locator('#brand-categories input[aria-label="品牌"]').inputValue(),'品牌甲','恢复项目后品牌与表路径要一致');
-  assert.match(await page.locator('#brand-status').innerText(),/品牌表已生成：/);
-  // D2/E2（旧过渡期面板的总询价生成与一键拆分）已随R9迁到主流程第6/7步：
-  // 第6步总询价工作簿由R9的 ui-inquiry-check.cjs 覆盖（品牌只认汇总表读回、改品牌后旧生成过期）；
-  // 第7步一键拆分由R10的 ui-split-check.cjs 覆盖。这里只保留过渡期面板自身可操作性，不再用旧侧栏品牌路线冒充正式流程。
-  assert.deepEqual(errors,[]);
-  console.log('PASS(过渡期面板): 品牌表按类别自动生成与人工填品牌、抬头四项必填、项目保存重开恢复一致；总询价生成与拆分已迁到第6/7步（见 ui-inquiry-check.cjs 与 R10）。');
- }finally{await browser.close();await new Promise(r=>server.close(r));await fs.rm(root,{recursive:true,force:true});}
-}
-
+// 旧侧栏品牌路线已移除；保留原件保护、固定字段校验、双布局读回与保存恢复验证。
 // R7（图05A/05B）：分类汇总表一类一行、双布局、名称指向独立分类工作簿。模拟WPS宿主写入，
 // 相邻暂存/独占发布/项目与分类库走真实服务端；汇总表按第6.1节合成样例4类2/2/2/1行核对。
 const DRAIN=[['工程名称：示例园区','','','',''],['项目编码','项目名称','项目特征描述','单位','工程量'],
@@ -338,6 +174,21 @@ async function summaryFlow(){
    await fs.writeFile(path.join(SUMMARY_EVIDENCE,name),JSON.stringify(value,null,2));
   };
   await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html');
+  await page.locator('#aux-section > summary').click();
+  await page.evaluate(()=>{
+   const values={'header-company':'测试安装工程有限公司','header-address':'测试市测试路1号',
+    'header-phone':'010-12345678','header-projectName':'测试楼项目','header-contact':'测试员'};
+   Object.keys(values).forEach(id=>{
+    const input=document.getElementById(id);input.value=values[id];
+    input.dispatchEvent(new Event('change',{bubbles:true}));});
+  });
+  await page.waitForFunction(()=>document.querySelector('#header-status').textContent.includes('抬头已齐全'));
+  await page.locator('#header-save-template').click();
+  await page.waitForFunction(()=>document.querySelector('#header-message').textContent.includes('请先填写模板名称'));
+  await page.locator('#header-template-name').fill('本项目抬头');
+  await page.locator('#header-save-template').click();
+  await page.waitForFunction(()=>document.querySelector('#header-message').textContent.includes('已保存本机抬头模板'));
+  assert.equal(await page.locator('#header-template-select option').count(),2,'保存后模板下拉里应出现该模板');
   // 图01→图04：导入、合并确认、整表确认（含改选汽车充电桩）、生成4份独立分类工作簿。
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
@@ -500,4 +351,4 @@ async function summaryFlow(){
   console.log('PASS(R7+R8): 图05A/05B分类汇总表——一类一行、双布局可用、4名称链接指向正确独立分类工作簿；R8按稳定类别ID读回、半组定位单元格、多品牌按组保留、预计5份、双布局等价并随项目保存恢复。');
 }finally{await browser.close();await new Promise(r=>server.close(r));await fs.rm(root,{recursive:true,force:true});}
 }
-(async()=>{await legacyBrandFlow();await summaryFlow();})().catch(e=>{console.error(e);process.exitCode=1;});
+(async()=>{await summaryFlow();})().catch(e=>{console.error(e);process.exitCode=1;});

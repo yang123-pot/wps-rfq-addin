@@ -205,6 +205,24 @@
   });
   generateButton.addEventListener('click',generate);
   // C4：品牌参考表只用于查看既有品牌写法，不改变分类结果，也不覆盖已填品牌。
+  createReference(options);
+  readButton.addEventListener('click',readBack);
+  confirmReadButton.addEventListener('click',confirmRead);
+  cancelReadButton.addEventListener('click',function(){pending=null;render();tell('已放弃本次读取，项目内容未改动。');});
+  render();
+  return {refresh:function(){sync();render();},data:function(){return data;},verdict:function(){
+    if(!data)return {ready:false,detail:'尚未建立品牌行'};
+    var ctx=context();
+    if(!ctx||!ctx.preview)return {ready:false,detail:'清单或来源核对未完成'};
+    var check=RfqBrandTable.validateBrands(data,requiredIds(ctx));
+    if(!check.ok)return {ready:false,detail:check.errors[0]};
+    if(!data.binding)return {ready:false,detail:'尚未生成分类品牌表'};
+    var current=report();
+    if(!current||data.binding.inputKey!==current.brandKey)return {ready:false,detail:'来源或分类已变化，品牌表已过期'};
+    return {ready:true,detail:'品牌与供应商已确认'};
+   },restore:function(value){data=value||null;pending=null;render();}};
+ }
+ function createReference(options){
   var referenceButton=document.getElementById('brand-reference'),referenceBlock=document.getElementById('reference-block'),
     referenceSheet=document.getElementById('reference-sheet'),referenceHeaderRow=document.getElementById('reference-header-row'),
     referenceCategory=document.getElementById('reference-category-column'),referenceBrand=document.getElementById('reference-brand-column'),
@@ -290,21 +308,6 @@
    referenceSnapshot=null;referenceParsed=null;referenceBlock.hidden=true;referenceMessage.textContent='';
    if(referenceList)referenceList.textContent='';
   });
-  readButton.addEventListener('click',readBack);
-  confirmReadButton.addEventListener('click',confirmRead);
-  cancelReadButton.addEventListener('click',function(){pending=null;render();tell('已放弃本次读取，项目内容未改动。');});
-  render();
-  return {refresh:function(){sync();render();},data:function(){return data;},verdict:function(){
-    if(!data)return {ready:false,detail:'尚未建立品牌行'};
-    var ctx=context();
-    if(!ctx||!ctx.preview)return {ready:false,detail:'清单或来源核对未完成'};
-    var check=RfqBrandTable.validateBrands(data,requiredIds(ctx));
-    if(!check.ok)return {ready:false,detail:check.errors[0]};
-    if(!data.binding)return {ready:false,detail:'尚未生成分类品牌表'};
-    var current=report();
-    if(!current||data.binding.inputKey!==current.brandKey)return {ready:false,detail:'来源或分类已变化，品牌表已过期'};
-    return {ready:true,detail:'品牌与供应商已确认'};
-   },restore:function(value){data=value||null;pending=null;render();}};
  }
- window.RfqBrandUI={create:create};
+ window.RfqBrandUI={create:create,createReference:createReference};
 }());

@@ -40,6 +40,23 @@ test('unsafe or already opened staging path fails before adding a workbook',()=>
  h.previous.FullName=stage;assert.throws(()=>host.write(h.app,model,stage),/已打开/);assert.equal(h.added,0);
 });
 
+test('导入预览只创建自有工作簿、不保存原件；改选择更新同一自有簿，已另存则另建',()=>{
+ const h=fixture();
+ const handle=host.showPreview(h.app,model);
+ assert.equal(h.added,1);assert.equal(h.closed,0);assert.equal(h.opened,0);
+ assert.notEqual(h.app.ActiveWorkbook,h.previous);
+ const book=h.app.ActiveWorkbook;
+ h.app.Workbooks.Count=2;h.app.Workbooks.Item=i=>i===1?h.previous:book;
+ for(const sheet of h.sheets)sheet.UsedRange={UnMerge(){},Clear(){}};
+ const result=host.showPreview(h.app,{sheets:model.sheets.map(s=>({...s,values:[s.values[0]]}))},handle);
+ assert.equal(result.book,book);assert.equal(h.added,1,'更新预览不产生重复工作簿');
+ book.FullName='C:\\user-saved-preview.xlsx';
+ const next=fixture();h.app.Workbooks.Add=()=>next.app.Workbooks.Add();
+ host.showPreview(h.app,model,handle);
+ assert.equal(next.added,1,'用户另存后的预览不再被刷新覆盖');
+ assert.equal(book.FullName,'C:\\user-saved-preview.xlsx');
+});
+
 // R2：版式、原生超链接与区域下拉的模拟宿主。只模拟本包真正用到的API。
 function layoutFixture(overrides){
  const options=overrides||{},stage='C:\\temp\\rfq-layout.xlsx';

@@ -5,6 +5,7 @@
   function create(options){
     var collection=RfqCollection.create(),selected=null,page=0,busy=false;
     var mergeConfirmedKey=null;
+    var importPreviewHandle=null,importPreviewKey=null;
     var picker=document.getElementById('import-files'),message=document.getElementById('import-message');
     var merge=document.getElementById('merge-identical');merge.checked=false;
     var mergeSeparate=document.getElementById('merge-separate');
@@ -87,10 +88,14 @@
       onMemoryChange:function(state){if(libraryPanel)libraryPanel.adoptMemory(state);},
       onChange:function(){if(brandPanel)brandPanel.refresh();},
       onBusy:function(value){busy=value;options.onBusy(value);}});
-    libraryPanel=RfqLibraryUI.create({onChange:function(state){classifier.adopt(state);}});
-    brandPanel=RfqBrandUI.create({application:options.application,context:brandContext,
-      onChange:function(){if(inquiryPanel)inquiryPanel.refresh();if(splitPanel)splitPanel.refresh();},
-      onBusy:function(value){busy=value;options.onBusy(value);}});
+    libraryPanel=RfqLibraryUI.create({onChange:function(state){
+      if(classifier.adopt(state)){
+        render();
+        if(reviewBinding)reviewTell('分类库已更新，当前自动建议已刷新。已有成果表和人工确认保持原内容；需要采用新建议时请重新生成成果表。');
+      }
+    }});
+    // 旧品牌编辑/预览确认不再接入页面；品牌参考保持只读独立入口。
+    RfqBrandUI.createReference({application:options.application});
     headerPanel=RfqHeaderUI.create({onChange:function(){
       if(inquiryPanel)inquiryPanel.refresh();if(splitPanel)splitPanel.refresh();}});
     // 生成面板的输入：汇总表读回的品牌组、询价抬头、当前清单分组与分类确认，以及生成用内容键。
@@ -214,6 +219,7 @@
         result.issues.length+' 个待核对问题仍阻断后续处理；请在上方选择文件逐项核对。')+
         (mergeConfirmed?' 本次选择已确认，可继续自动分类。':' 确认选择后才能进入自动分类。');
       syncMergeChoices();
+      syncImportPreview(false);
       var groups=document.getElementById('merge-list');groups.textContent='';
       result.groups.slice(page*20,(page+1)*20).forEach(function(g){
         var li=node('li');li.appendChild(node('strong',g.name||'名称待补'));
@@ -239,11 +245,25 @@
     merge.addEventListener('change',function(){chooseMode(merge.checked);tell(merge.checked?'已选择“合并完全相同项”，下方预览按精确合并更新；确认后才进入自动分类。':'已选择“分别保留清单”，不做合并；确认后才进入自动分类。');});
     if(mergeSeparate)mergeSeparate.addEventListener('change',function(){chooseMode(false);tell('已选择“分别保留清单”，不做合并；确认后才进入自动分类。');});
     if(mergeDetail)mergeDetail.addEventListener('click',function(){
-      var section=document.getElementById('merge-section'),list=document.getElementById('merge-list');
-      if(section)section.hidden=false;
-      if(list&&typeof list.scrollIntoView==='function')list.scrollIntoView({block:'start'});
-      tell('下方为合并预览明细：只显示会按“项目名称＋项目特征描述＋单位”完全一致合并的项目。');
+      syncImportPreview(true);
+      tell('合并预览明细：请查看主工作簿中的“导入预览”和“合并明细”；原件不变，确认选择后才开始分类。');
     });
+    function syncImportPreview(force){
+      var box=document.getElementById('import-preview-status');
+      if(!collection.entries.length||!options.application||!window.RfqImportPreviewModel)return;
+      var key=mergeSelectionKey();
+      if(!force&&importPreviewKey===key)return;
+      try{
+        var model=RfqImportPreviewModel.build(collection,merge.checked,{projectName:projectDisplayName()});
+        importPreviewHandle=RfqExportHost.showPreview(options.application,model,importPreviewHandle);
+        importPreviewKey=key;
+        if(box){box.textContent='主表已显示导入预览与合并明细（'+model.inputCount+' → '+model.outputCount+' 行）。预览随选择刷新。';box.className='note';}
+      }catch(error){
+        // 只拦主表预览，不回滚已经核实的导入；用户可明确重试，不自动反复创建失败簿。
+        importPreviewKey=key;
+        if(box){box.textContent='主表预览未完成：'+error.message+' 可点“查看合并明细”重试。';box.className='error';}
+      }
+    }
     confirmMerge.addEventListener('click',function(){
       if(busy)return;
       var result=collection.entries.length?RfqCollection.preview(collection,merge.checked):null;
@@ -294,8 +314,9 @@
       var summary=RfqClassificationReviewModel.summary(reviewModel);
       banner.textContent='自动匹配完成';
       banner.className='result-banner is-done';
-      if(stats)stats.textContent=summary.text+' · '+summary.detail+' · 尚未人工确认';
       var fresh=reviewBinding&&reviewBinding.inputKey===matchingKey();
+      if(stats)stats.textContent=summary.rows+(fresh?' 行结果已写入成果表':' 行自动分类结果待写入成果表')+
+        ' · 当前自动建议：'+summary.detail+' · 尚未人工确认';
       if(status)status.textContent=fresh?'成果表已生成：'+reviewBinding.path+'（可打开审核）'
         :'尚未生成审核成果表：请先生成独立成果簿，再在表内审核。';
       if(generate)generate.textContent=fresh?'重新生成审核成果表':'生成审核成果表';
@@ -338,18 +359,27 @@
       if(reviewBusy)return;
       try{
         if(!selectionConfirmed())throw Error('请先确认合并选择，再生成成果表。');
-        if(!reviewModel)reviewModel=buildReview();
+        reviewModel=buildReview();
         if(!reviewModel)throw Error('自动分类还没有结果，请先完成分类库加载。');
+        var plannedModel=reviewModel,plannedKey=matchingKey();
+        function requireCurrent(){
+          if(!selectionConfirmed()||matchingKey()!==plannedKey)
+            throw Error('来源或合并选择已变化，请重新确认并生成审核成果表。');
+        }
         var name=reviewTargetName(),selection=await pickReviewTarget(name);
         if(!selection||!selection.target){tell('已取消选择成果表位置，当前阶段不变。');return;}
+        requireCurrent();
         reviewBusy=true;renderReview();
         reviewTell('正在写入并重新打开校验成果表…');
         var prepared=await exportRequest('prepare',{target:selection.target,adjacent:true});
+        requireCurrent();
         // 宿主写入通常同步完成；这里await一层，保证任何异步实现（含测试夹具）先落地再发布。
-        await RfqClassificationReviewHost.write(options.application,reviewModel,prepared.stagePath,{title:name});
+        await RfqClassificationReviewHost.write(options.application,plannedModel,prepared.stagePath,{title:name});
+        requireCurrent();
         var receipt=await exportRequest('commit',{ticket:prepared.ticket});
         await exportRequest('verify',{ticket:prepared.ticket,target:receipt.target,sha256:receipt.sha256});
-        reviewBinding=RfqClassificationReviewHost.bindingFor(receipt,reviewModel,{inputKey:matchingKey(),title:name});
+        requireCurrent();
+        reviewBinding=RfqClassificationReviewHost.bindingFor(receipt,plannedModel,{inputKey:plannedKey,title:name});
         if(options.setReviewBinding)options.setReviewBinding(reviewBinding);
         tell('审核成果表已生成：'+receipt.target);
         try{
@@ -1128,6 +1158,7 @@
         for(var i=0;i<prepared.files.length;i++){
           tell('正在读取工作副本 '+(i+1)+' / '+prepared.files.length+'：'+prepared.files[i].originalName);
           await new Promise(function(resolve){setTimeout(resolve,0);});
+          prepared.files[i].importedAt=new Date().toISOString();
           entries.push({metadata:prepared.files[i],snapshot:RfqImportHost.readCopy(options.application,prepared.files[i])});
         }
         var next=RfqCollection.add(collection,entries);collection=next;added=true;render();

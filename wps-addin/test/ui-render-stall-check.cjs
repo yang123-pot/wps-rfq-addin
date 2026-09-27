@@ -79,7 +79,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
   assert.equal(await page.locator('.rfq-picker').count(),0,'确认后选择器必须关闭');
   assert.match(await page.locator('#import-message').innerText(),/已导入 2 份清单/);
-  await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余'));
+  assert.match(await page.locator('#classification-review-banner').innerText(),/尚未自动分类/,'导入未确认前不进入匹配');
 
   const before=await page.evaluate(()=>window.__frameStats.count);
   await page.waitForTimeout(1500);
@@ -87,7 +87,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
    scrollHeight:document.documentElement.scrollHeight,nodes:document.querySelectorAll('*').length,
    classificationRows:document.querySelectorAll('#classification-list > li').length,
    mergeRows:document.querySelectorAll('#merge-list > li').length}));
-  assert.ok(stats.classificationRows>0,'导入后分类列表必须已经渲染');
+  assert.equal(stats.classificationRows,0,'新版审核在成果表内，侧栏不得渲染旧逐行确认列表');
   assert.ok(stats.mergeRows>0,'导入后合并预览列表必须已经渲染');
   assert.ok(stats.count-before>=10,'导入完成后侧栏必须继续出帧，实测只增加 '+(stats.count-before)+' 帧');
   assert.ok(stats.maxGap<1000,'导入与渲染过程中不得出现超过 1 秒的出帧空档，实测 '+stats.maxGap.toFixed(1)+'ms');

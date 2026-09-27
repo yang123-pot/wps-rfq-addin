@@ -65,6 +65,21 @@ async function setInput(locator,value){
     }}};
    window.Application=app;window.__files=files;
   },{files,root});
+  await page.exposeFunction('__writeReviewFixture',file=>fs.writeFile(file,Buffer.from([0x50,0x4b,3,4,1,2])));
+  let generated=0;
+  async function reviewSnapshot(){
+   const target=path.join(root,'审核-'+(++generated)+'.xlsx');
+   await page.evaluate(target=>{
+    window.RfqPathPicker.open=options=>options.onConfirm({target});
+    window.RfqClassificationReviewHost.openForEditing=()=>({path:target,opened:true});
+    window.RfqClassificationReviewHost.write=async(app,result,stagePath)=>{
+     window.__reviewWritten=result;await window.__writeReviewFixture(stagePath);
+    };
+   },target);
+   await page.locator('#classification-review-generate').click();
+   await page.waitForFunction(target=>document.querySelector('#classification-review-message').textContent.includes(target),target);
+   return page.evaluate(()=>window.__reviewWritten);
+  }
   let failNextSave=false;
   await page.route('**/api/library/save',async route=>{
    if(failNextSave){failNextSave=false;
@@ -84,11 +99,10 @@ async function setInput(locator,value){
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===1);
   await page.locator('#confirm-merge').click();
   await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次选择已确认'));
-  await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 2'));
-  const rows=page.locator('#classification-list > li');
-  assert.equal(await rows.count(),2);
-  assert.match(await rows.nth(0).innerText(),/水阀门/);
-  assert.match(await rows.nth(1).innerText(),/无可靠匹配/);
+  const initial=await reviewSnapshot();
+  assert.equal(initial.counts.rows,2);
+  assert.equal(initial.counts.none,1);
+  assert.equal(initial.rows[0].finalCategoryId,'water-valve');
 
   await store.save({expectedRevision:0,library:defaults,memory:Memory.create()});
   await page.locator('#library-add-category').click();
@@ -107,32 +121,34 @@ async function setInput(locator,value){
   await page.locator('#library-save').click();
   await page.waitForFunction(()=>document.querySelector('#library-message').textContent.includes('分类库已保存到本机'));
   assert.match(await page.locator('#library-status').innerText(),/版本 2/);
-  await page.waitForFunction(()=>document.querySelector('#classification-list').textContent.includes('测试新规则'));
-  assert.match(await page.locator('#classification-list > li').nth(1).innerText(),/水阀门/,'新规则要立刻反映到未确认行的建议');
+  assert.match(await page.locator('#classification-review-stats').textContent(),/2 行有建议 · 0 行需重点核对/,
+   '分类库更新后应立即刷新未确认建议的统计');
+  assert.equal((await reviewSnapshot()).rows[1].finalCategoryId,'water-valve','新规则进入新成果表');
 
   await page.locator('#library-rules > li').last().getByRole('button',{name:'添加排除条件'}).click();
   await setInput(page.locator('#library-rules > li').last().locator('input[aria-label="关键词"]').nth(1),'DN50');
   await page.locator('#library-save').click();
   await page.waitForFunction(()=>document.querySelector('#library-message').textContent.includes('分类库已保存到本机'));
-  await page.waitForFunction(()=>document.querySelector('#classification-list > li:nth-child(2)').textContent.includes('无可靠匹配'));
-  assert.match(await page.locator('#classification-list > li').nth(1).innerText(),/无可靠匹配/,'命中排除条件就不推荐');
+  assert.equal((await reviewSnapshot()).counts.none,1,'命中排除条件就不推荐');
 
   await page.locator('#library-categories > li[data-category-id="water-valve"]').getByRole('button',{name:'停用'}).click();
   await page.locator('#library-save').click();
   await page.waitForFunction(()=>document.querySelector('#library-message').textContent.includes('分类库已保存到本机'));
-  await page.waitForFunction(()=>document.querySelector('#classification-list > li:nth-child(1)').textContent.includes('无可靠匹配'));
-  const options=await page.locator('#classification-list > li').nth(0).locator('select option').allInnerTexts();
-  assert.equal(options.includes('无需询价'),true,'停用其它类别后仍要能人工选择无需询价');
+  const disabled=await reviewSnapshot();
+  assert.equal(disabled.counts.none,2);
+  assert.equal(disabled.categories.some(category=>category.id==='no-inquiry'),true,'停用其它类别后成果表仍可选择无需询价');
 
   await page.locator('#library-categories > li[data-category-id="water-valve"]').getByRole('button',{name:'启用'}).click();
   await page.locator('#library-save').click();
   await page.waitForFunction(()=>document.querySelector('#library-message').textContent.includes('分类库已保存到本机'));
-  await page.waitForFunction(()=>document.querySelector('#classification-list > li:nth-child(1)').textContent.includes('水阀门'));
-
-  await page.locator('#classification-list > li').nth(0).locator('button').first().click();
-  await page.waitForFunction(()=>document.querySelector('#classification-progress').textContent.includes('剩余 1'));
-  await page.waitForFunction(()=>document.querySelector('#memory-status').textContent.includes('已保存到本机分类库'));
-  assert.match(await page.locator('#library-status').innerText(),/有效记忆 1/,'习惯保存后维护面板要同步到最新记忆');
+  assert.equal((await reviewSnapshot()).rows[0].finalCategoryId,'water-valve');
+  // 整表学习与即时面板同步由ui-memory-check验证；此处从已持久化的整表来源继续维护。
+  const persisted=await store.load();
+  const learned=Memory.learn(persisted.memory,{rowId:'row-library',categoryId:'water-valve',confirmedAt:'2026-09-27T00:00:00Z'},
+   {item:{name:'水龙头',feature:'DN15',unit:'个'},projectId:'p-library',sourceProjectId:'p-library',rowId:'row-library'});
+  await store.save({expectedRevision:persisted.revision,library:persisted.library,memory:learned});
+  await page.locator('#library-reload').click();
+  await page.waitForFunction(()=>document.querySelector('#library-status').textContent.includes('有效记忆 1'));
   assert.match(await page.locator('#library-memories').innerText(),/确认来源 p-/,'记忆列表要显示确认来源');
 
   failNextSave=true;

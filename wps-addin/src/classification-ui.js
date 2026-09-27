@@ -8,7 +8,7 @@
   var memoryStatus=document.getElementById('memory-status'),retry=document.getElementById('memory-retry');
   var library=null,state=RfqClassification.create(),groups=[],busy=false,selected={};
   var memoryState=null,libraryRevision=0,unsavedMemory=false,memoryQueue=Promise.resolve();
-  function tell(text,error){message.textContent=text;message.className=error?'error':'';}
+  function tell(text,error){if(message){message.textContent=text;message.className=error?'error':'';}}
   function memoryTell(text,error){if(!memoryStatus)return;memoryStatus.textContent=text;memoryStatus.className=error?'error':'note';}
   function projectId(){try{return options.getProjectId&&options.getProjectId()||null;}catch(_){return null;}}
   function libraryReady(){return !!(library&&library.categories&&library.categories.length&&memoryState);}
@@ -137,6 +137,8 @@
    remember(row,rowId,previous,RfqClassification.decisionFor(state,rowId));
   }
   function render(){
+   // 新流程只使用分类库/建议/整表确认后的学习服务，不创建旧侧栏逐行审核控件。
+   if(!list){if(options.onChange)options.onChange();return;}
    list.textContent='';
    var rows=groups.map(function(group){return {group:group,rowId:group.id||group.scopeId,suggestion:suggestionFor(group)};});
    var summary=RfqClassification.summary(state,rows.map(function(row){
@@ -266,9 +268,9 @@
    }
    finally{busy=false;render();}
   }
-  filter.addEventListener('change',render);
-  batch.addEventListener('click',batchConfirm);
-  write.addEventListener('click',writeCopy);
+  if(filter)filter.addEventListener('change',render);
+  if(batch)batch.addEventListener('click',batchConfirm);
+  if(write)write.addEventListener('click',writeCopy);
   if(retry)retry.addEventListener('click',retryMemory);
   renderMemory();
   loadLibrary().then(function(){renderMemory();render();});

@@ -95,7 +95,7 @@ function initScript(context){
   try{window.localStorage.setItem('rfq-review-values',JSON.stringify(copied));}catch(_){}
  };
 }
-(async()=>{
+async function run(options={}){
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-ui-sheet-review-')),
   files=[path.join(root,'给排水清单.xlsx'),path.join(root,'机电清单.xlsx')],
   reviewTarget=path.join(root,'示例园区_分类审核成果.xlsx'),projectDirectory=path.join(root,'projects');
@@ -111,6 +111,12 @@ function initScript(context){
  try{
   const page=await browser.newPage({viewport:{width:420,height:900}}),errors=[];
   page.on('pageerror',error=>errors.push(error.message));
+  let memorySaveAttempts=0;
+  if(options.memoryFailure)await page.route('**/api/library/save',route=>{
+   memorySaveAttempts++;
+   return memorySaveAttempts===1?route.fulfill({status:500,contentType:'application/json',
+    body:JSON.stringify({error:'注入的习惯保存失败'})}):route.continue();
+  });
   await page.addInitScript(initScript,{files,drain:DRAIN,mep:MEP,reviewTarget,reviewValues:REVIEW_VALUES});
   await page.exposeFunction('__writeReviewFixture',async file=>{await fs.writeFile(file,Buffer.from([0x50,0x4b,3,4,1,2]));});
   const origin='http://127.0.0.1:'+server.address().port;
@@ -185,7 +191,7 @@ function initScript(context){
   // 修回正确类别后整表一次确认：先落盘快照，再学习，并进入下一步。
   await page.evaluate(({row})=>{window.__setCell(row,8,'水泵');},{row:PUMP_ROW});
   await page.locator('#sheet-review-confirm').click();
-  await page.waitForFunction(()=>document.querySelector('#sheet-review-message').textContent.includes('整表已确认（8 行）'));
+  await page.waitForFunction(()=>document.querySelector('#sheet-review-message').textContent.includes('整表已确认'));
   assert.match(await page.locator('#sheet-review-banner').innerText(),/整表已确认/);
   assert.match(await page.locator('#sheet-review-progress').innerText(),/整表已确认/);
   assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage'),'categories',
@@ -201,7 +207,16 @@ function initScript(context){
   // 项目状态在折叠的辅助功能里，用textContent读取阶段文字（不依赖可见性）。
   assert.match(await page.locator('#project-status').textContent(),/表内审核：已确认/);
   assert.match(await page.locator('#project-status').textContent(),/分类工作簿：未完成/,'分类工作簿属R6，不得误报完成');
-  assert.match(await page.locator('#sheet-review-message').innerText(),/分类习惯已保存/);
+  if(options.memoryFailure){
+   assert.match(await page.locator('#sheet-review-message').textContent(),/习惯.*未保存/);
+   assert.equal((await store.load()).memory.memories.length,0,'习惯写入失败不留下半份数据');
+   assert.equal(confirmed.review.rows.length,8,'习惯写入失败不得回滚已保存的整表确认');
+   await page.locator('#workflow-nav .workflow-step-button[data-stage="review"]').click();
+   assert.equal(await page.locator('#sheet-review-memory-retry').isVisible(),true);
+   await page.locator('#sheet-review-memory-retry').click();
+   await page.waitForFunction(()=>document.querySelector('#sheet-review-memory-retry').hidden);
+   assert.equal(memorySaveAttempts,2,'只有明确重试才再次保存习惯');
+  }else assert.match(await page.locator('#sheet-review-message').innerText(),/分类习惯已保存/);
   const learned=await store.load();
   const active=()=>learned.memory.memories.filter(record=>record.state==='active');
   assert.equal(active().length,8,'整表确认后按材料学习');
@@ -237,6 +252,15 @@ function initScript(context){
   assert.equal(reconfirmed.review.revision,2);
   assert.equal(reconfirmed.review.rows.filter(row=>row.categoryId==='valve').length,3);
   assert.equal(reconfirmed.review.rows.filter(row=>row.categoryId==='fan').length,1);
+  // 恢复已确认项目只读回分类，不重复学习、不改写记忆文件。
+  const memoryBeforeRestore=await fs.readFile(path.join(root,'library','library-state.json'),'utf8');
+  await page.reload();
+  await page.locator('#aux-section > summary').click();
+  await page.locator('#open-project').click();
+  await page.locator('#project-list > li button').first().click();
+  await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已恢复项目'));
+  assert.equal(await fs.readFile(path.join(root,'library','library-state.json'),'utf8'),memoryBeforeRestore,
+   '恢复旧项目不得触发新的学习或重写记忆');
   // 旧inputKey：绑定属于旧内容时拒绝确认，不覆盖已保存的确认快照。
   const stale=await projectRecord();
   stale.matching.inputKey='ck2-0000000000000000';
@@ -267,4 +291,6 @@ function initScript(context){
   console.log('PASS: 图03表内审核：草稿不确认不学习、整表校验定位单元格、一次确认先落盘再学习、'+
    '重复确认幂等、改确认只撤销该行来源、旧inputKey拒绝且不覆盖已保存快照。');
  }finally{await browser.close();await new Promise(resolve=>server.close(resolve));await fs.rm(root,{recursive:true,force:true});}
-})().catch(error=>{console.error(error);process.exitCode=1;});
+}
+module.exports={run,initScript,DRAIN,MEP,REVIEW_VALUES};
+if(require.main===module)run().catch(error=>{console.error(error);process.exitCode=1;});

@@ -49,6 +49,10 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   },{files,drain:DRAIN,mep:MEP});
   const origin='http://127.0.0.1:'+server.address().port;
   await page.goto(origin+'/taskpane.html');
+  await page.evaluate(()=>{
+   window.__previews=[];
+   window.RfqExportHost.showPreview=(app,model)=>{window.__previews.push(model);return {name:'插件预览'};};
+  });
 
   // 步骤骨架：七个阶段、当前为第1步；默认“分别保留清单”。
   const labels=await page.locator('#workflow-nav .workflow-step-label').allInnerTexts();
@@ -67,17 +71,22 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.match(await page.locator('#workflow-note').innerText(),/已成功导入 2 个文件，共 10 行数据/);
   assert.equal(await page.locator('#workflow-rows').innerText(),'10','导入总行数');
   assert.equal(await page.locator('#workflow-merged').innerText(),'10','未合并时预览行数保持10');
+  assert.deepEqual(await page.evaluate(()=>window.__previews[0].sheets.map(s=>s.name)),['导入预览','合并明细'],
+   '导入后必须向主工作表输出图01预览');
   assert.equal(await page.locator('#stage-panel-import').isHidden(),false);
   assert.equal(await page.locator('#stage-panel-matching').isHidden(),true);
   await page.locator('#aux-section > summary').click();
-  assert.doesNotMatch(await page.locator('#classification-list').innerText(),/水泵|阀门|送风机/,'确认选择前不得给出任何分类建议');
-  assert.match(await page.locator('#classification-progress').innerText(),/剩余 0|尚未|0/);
+  const obsoleteActions=await page.getByRole('button',{name:/批量确认选中行|写入工作副本|生成分类品牌表|读取并核对品牌表|确认写入项目/}).allTextContents();
+  const designIssues=[];
+  if(obsoleteActions.length)designIssues.push('仍可进入旧分类/品牌确认：'+obsoleteActions.join('、'));
+  assert.match(await page.locator('#classification-review-banner').innerText(),/尚未自动分类/);
 
   // 选择“合并完全相同项”才更新精确预览：10→8。
   assert.equal(await page.locator('#merge-list > li').count(),10,'分别保留时逐条预览');
   await page.locator('#merge-identical').check();
   await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='8');
   assert.equal(await page.locator('#workflow-merged').innerText(),'8','合并后行数');
+  assert.equal(await page.evaluate(()=>window.__previews.at(-1).outputCount),8,'合并选择应同步更新主工作表');
   assert.equal(await page.locator('#merge-separate').isChecked(),false,'两个选项互斥');
   assert.equal(await page.locator('#merge-list > li').count(),8,'合并预览只显示合并结果');
   await page.locator('#merge-separate').check();
@@ -88,7 +97,7 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   // 查看合并明细与“确认前不匹配”。
   await page.locator('#merge-detail').click();
   assert.match(await page.locator('#import-message').innerText(),/合并预览明细/);
-  assert.doesNotMatch(await page.locator('#classification-list').innerText(),/水泵|阀门|送风机/,'未确认前仍然没有分类建议');
+  assert.match(await page.locator('#classification-review-banner').innerText(),/尚未自动分类/,'未确认前不得匹配');
 
   // 确认选择：来源问题清零时进入自动分类；期间未实现阶段保持未完成。
   await page.locator('#confirm-merge').click();
@@ -97,14 +106,14 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.equal(await page.locator('#stage-panel-matching').isHidden(),false);
   // R4：自动分类完成后显示“自动匹配完成”，但仍写明尚未人工确认。
   await page.waitForFunction(()=>/自动匹配完成/.test(document.querySelector('#classification-review-banner').textContent));
-  assert.match(await page.locator('#classification-review-stats').innerText(),/8 行结果已写入成果表/,'图02统计');
+  if(/已写入成果表/.test(await page.locator('#classification-review-stats').innerText()))
+   designIssues.push('尚无成果文件却显示已写入成果表');
   assert.match(await page.locator('#classification-review-stats').innerText(),/7 行有建议 · 1 行需重点核对/,'7行建议＋1行重点核对');
   assert.match(await page.locator('#classification-review-stats').innerText(),/尚未人工确认/,'自动建议不得当成人工确认');
   assert.equal(await page.locator('#classification-review-open').isDisabled(),true,'尚未生成成果表时不能打开');
   assert.equal(await page.locator('#classification-review-generate').innerText(),'生成审核成果表');
-  await page.waitForFunction(()=>/水泵/.test(document.querySelector('#classification-list').textContent));
-  assert.match(await page.locator('#classification-list').innerText(),/水泵/,'确认后才开始匹配');
   assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage'),'matching');
+  assert.deepEqual(designIssues,[],'获批图02/03/05：状态必须真实，旧确认入口不得继续暴露');
 
   // 生成独立成果簿：过真实prepare/commit/verify，只把写盘换成夹具，并核对成果簿内容与绑定。
   const reviewTarget=path.join(root,'示例园区_分类审核成果.xlsx');
@@ -125,6 +134,7 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.equal(require('node:fs').existsSync(reviewTarget),true,'成果表必须真实发布到所选位置');
   assert.equal(await page.locator('#classification-review-open').isDisabled(),false,'生成后才能打开成果表审核');
   assert.equal(await page.locator('#classification-review-generate').innerText(),'重新生成审核成果表');
+  assert.match(await page.locator('#classification-review-stats').innerText(),/8 行结果已写入成果表/,'文件发布校验后才能显示已写入');
   const written=await page.evaluate(()=>window.__reviewWritten);
   assert.equal(written.title,'示例园区_分类审核成果.xlsx','文件名按“项目名_分类审核成果.xlsx”');
   assert.deepEqual(written.result.counts,{rows:8,suggested:6,skip:1,conflict:1,none:0,pending:8});

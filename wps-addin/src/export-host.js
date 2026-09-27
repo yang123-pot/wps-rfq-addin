@@ -187,5 +187,40 @@
     }
     if(error)throw error;
   }
-  return {selectTarget:selectTarget,write:write,address:address};
+  // 图01预览只占用插件自己新建且尚未另存的工作簿；绝不把当前活动簿当预览目标。
+  function showPreview(app,model,handle){
+    var book=null,previous=app.ActiveWorkbook;
+    if(handle&&handle.book){
+      try{
+        if(handle.book.FullName===handle.name&&handle.book.Worksheets.Count===model.sheets.length){
+          for(var n=1;n<=app.Workbooks.Count;n++)if(app.Workbooks.Item(n)===handle.book)book=handle.book;
+        }
+      }catch(_){book=null;}
+    }
+    var reused=!!book;
+    if(!book)book=app.Workbooks.Add(-4167);
+    try{
+      book.Activate();
+      model.sheets.forEach(function(s,i){
+        var sheet=reused?book.Worksheets.Item(i+1):(i===0?book.Worksheets.Item(1):book.Worksheets.Add(null,book.Worksheets.Item(i)));
+        if(reused){sheet.UsedRange.UnMerge();sheet.UsedRange.Clear();}
+        sheet.Name=s.name;
+        if(typeof sheet.Activate==='function')sheet.Activate();
+        chunks(sheet,s.values,true);
+        var used=sheet.Range('A1:'+columnName(s.values[0].length)+s.values.length);
+        used.Font.Size=(s.layout&&s.layout.fontSize)||layout.FONT_SIZE;used.WrapText=true;
+        if(app.ActiveWindow)app.ActiveWindow.FreezePanes=false;
+        applyLayout(app,sheet,model,s.layout);
+      });
+      verify(book,model);
+      var first=book.Worksheets.Item(1);if(typeof first.Activate==='function')first.Activate();
+      return {book:book,name:book.FullName};
+    }catch(error){
+      // 新建失败簿由插件负责清理；已有预览保持打开，避免丢失用户可能的另存操作。
+      if(!reused)try{book.Close(false);}catch(_){}
+      try{if(previous)previous.Activate();}catch(_){}
+      throw error;
+    }
+  }
+  return {selectTarget:selectTarget,write:write,showPreview:showPreview,address:address};
 }));
