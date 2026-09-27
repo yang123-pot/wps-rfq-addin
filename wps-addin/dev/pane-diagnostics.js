@@ -39,6 +39,13 @@
    // 诊断用：把侧栏上几条状态文字带回来，便于定位“红色提示到底说了什么”。
    messageText:text('message'),importMessageText:text('import-message'),mergeStatusText:text('merge-status'),
    classificationMessageText:text('classification-message'),classificationProgressText:text('classification-progress'),
+   // 七步流程各阶段的提示文字：实机停摆或生成失败时，报告里要能看到“屏幕上到底说了什么”。
+   classificationReviewMessageText:text('classification-review-message',240),
+   sheetReviewMessageText:text('sheet-review-message',240),
+   categoriesMessageText:text('categories-message',240),
+   brandsMessageText:text('brands-message',240),
+   inquiryMessageText:text('inquiry-message',240),
+   splitMessageText:text('split-message',240),
    brandStatusText:text('brand-status'),inquiryStatusText:text('inquiry-status'),splitStatusText:text('split-status'),
    projectStatusText:text('project-status'),headerStatusText:text('header-status'),
    scriptError:window.__RFQ_LAST_ERROR__||null};

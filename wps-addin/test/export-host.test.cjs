@@ -70,10 +70,14 @@ function layoutFixture(overrides){
    Merge(){if(options.mergeFails)throw Error('merge failed');this.MergeCells=true;merges[address]=true;},
    Interior:{Color:null},
    Select(){selected=address;},
-   Validation:{Formula1:null,InCellDropdown:null,IgnoreBlank:null,
+   Validation:{Formula1:null,Type:null,InCellDropdown:null,IgnoreBlank:null,
     Add(type,style,operator,formula1){if(options.validationFails)throw Error('validation failed');
-     this.Formula1=formula1;validations[anchorKey({__address:address})]=formula1;},
-    Delete(){this.Formula1=null;}},
+     if(options.validationIgnore)return;
+     this.Type=type;
+     // 实测WPS表格会把区域引用的等号去掉后再回读Formula1，模拟宿主差异。
+     this.Formula1=options.validationEchoBare?String(formula1).replace(/^=/,''):formula1;
+     validations[anchorKey({__address:address})]=this.Formula1;},
+    Delete(){this.Formula1=null;this.Type=null;}},
    get Hyperlinks(){return hyperlinkView(anchorKey({__address:address}));}};
   range.__address=address;
   ranges.set(address,range);return range;
@@ -88,7 +92,10 @@ function layoutFixture(overrides){
   const cells=new Map();
   const sheet={Name:name||'Sheet',Range:rangeFor,
    Cells:{Item(row,column){const address=colName(column)+row;if(!cells.has(address))cells.set(address,rangeFor(address));return cells.get(address);}},
-   Columns:{Item(index){const key='col'+index;if(!columnWidths.has(key))columnWidths.set(key,{ColumnWidth:null});return columnWidths.get(key);}},
+   // 实测WPS表格（同Excel）：隐藏列的ColumnWidth恒为0，读不回原宽度，必须按Hidden核隐藏。
+   Columns:{Item(index){const key='col'+index;if(!columnWidths.has(key)){columnWidths.set(key,{_w:null,_h:false,
+    get ColumnWidth(){return this._h?0:this._w;},set ColumnWidth(value){this._w=value;},
+    get Hidden(){return this._h;},set Hidden(value){this._h=value===true;}});}return columnWidths.get(key);}},
    Rows:{Item(index){const key='row'+index;if(!rowHeights.has(key))rowHeights.set(key,{RowHeight:null,Font:{Bold:false},AutoFit(){}});return rowHeights.get(key);}},
    PageSetup:{PrintArea:null,PrintTitleRows:null}};
   if(!options.noHyperlinks){
@@ -269,4 +276,54 @@ test('R9 inquiry workbook keeps the 图06 layout: title merge, header fill, free
  assert.equal(h.app.ActiveWindow.FreezePanes,true,'冻结表头以上');
  assert.deepEqual(book.sheets.slice(1).map(s=>s.name),['内部追溯','处理记录'],'内部页留在总表内，不进入公开询价页');
  assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx','用户工作簿保持活动');
+});
+
+// R12实机（2026-09-27）：WPS表格把区域引用的等号/引号去掉后回读Formula1，
+// 不能因为等价写法就把“已经落地的下拉”判成未生效，也不能因此阻断整条生成链路。
+test('宿主回读去掉等号的同一区域时按等价通过，下拉区域不变',()=>{
+ const layoutModule=require('../src/workbook-layout.js');
+ const values=layoutModule.equalize([['清单'],
+  ['序号','项目编码','项目名称','项目特征描述','单位','工程量','品牌','报价单价','金额','备注'],
+  ['1','FM-001','阀门','DN50','个','20','通达','','','']],10);
+ const spec=layoutModule.build({columns:values[1].map(function(_,i){return {index:i+1};}),headerRows:[2],
+  validations:[layoutModule.listValidation(3,7,1,1,'内部选项','$A$1:$A$5')],metadata:{profile:'category-detail'}},
+  {rowCount:values.length,columnCount:10});
+ const h=layoutFixture({validationEchoBare:true});
+ host.write(h.app,{sheets:[{name:'材料明细',values:values,layout:spec}]},'C:\\temp\\rfq-layout.xlsx');
+ assert.equal(String(h.validations['G3']).replace(/^=/,''),"'内部选项'!$A$1:$A$5",'只落到G3一个区域');
+ assert.equal(h.saved,true,'等价回读不阻断保存快照');
+});
+
+test('宿主完全没有落下拉时明确报出期望与实际，不产出文件',()=>{
+ const layoutModule=require('../src/workbook-layout.js');
+ const values=layoutModule.equalize([['清单'],
+  ['序号','项目编码','项目名称','项目特征描述','单位','工程量','品牌','报价单价','金额','备注'],
+  ['1','FM-001','阀门','DN50','个','20','通达','','','']],10);
+ const spec=layoutModule.build({columns:values[1].map(function(_,i){return {index:i+1};}),headerRows:[2],
+  validations:[layoutModule.listValidation(3,7,1,1,'内部选项','$A$1:$A$5')],metadata:{profile:'category-detail'}},
+  {rowCount:values.length,columnCount:10});
+ const h=layoutFixture({validationIgnore:true});
+ assert.throws(function(){host.write(h.app,{sheets:[{name:'材料明细',values:values,layout:spec}]},'C:\\temp\\rfq-layout.xlsx');},
+  /下拉未生效.*G3:G3.*期望.*实际空/,'必须报出具体单元格、期望公式与实际回读');
+ assert.equal(h.saved,false,'下拉未落地时不得保存文件');
+});
+
+// R12实机（2026-09-27）：WPS表格把隐藏列的ColumnWidth读回0，随行rowId隐藏列不能因此判失败。
+test('隐藏辅助列按Hidden判定，不因隐藏列宽读回0而阻断',()=>{
+ const layoutModule=require('../src/workbook-layout.js');
+ const values=layoutModule.equalize([['示例园区_分类审核成果.xlsx'],
+  ['自动匹配仅供参考'],
+  ['序号','项目名称','规格','单位','工程量','自动建议','匹配情况','最终分类','审核备注','','行标识'],
+  ['1','水泵','DN50','台','2','水泵','匹配成功','水泵','','','row-1']],11);
+ const spec=layoutModule.build({columns:[{index:1,width:6},{index:2,width:16},{index:3,width:22},{index:4,width:8},
+   {index:5,width:10},{index:6,width:14},{index:7,width:12},{index:8,width:16},{index:9,width:20},{index:10,width:3},
+   {index:11,width:26,hidden:true}],
+  headerRows:[3],validations:[layoutModule.listValidation(4,8,1,1,'内部选项','$B$2:$B$7')],metadata:{profile:'classification-review'}},
+  {rowCount:values.length,columnCount:11});
+ const h=layoutFixture({validationEchoBare:true});
+ host.write(h.app,{sheets:[{name:'分类审核成果',values:values,layout:spec}]},'C:\\temp\\rfq-layout.xlsx');
+ assert.equal(h.sheets[0].Columns.Item(11).Hidden,true,'随行rowId辅助列必须隐藏');
+ assert.equal(h.sheets[0].Columns.Item(11).ColumnWidth,0,'隐藏列的宽度在WPS里读回0');
+ assert.equal(h.saved,true,'隐藏列宽读回0不得阻断生成');
+ assert.equal(h.sheets[0].Columns.Item(8).ColumnWidth,16,'可见列宽仍按版式读回校对');
 });

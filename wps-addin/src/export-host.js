@@ -10,6 +10,12 @@
     var lastColumn=item.column+(item.columnSpan||1)-1,lastRow=item.row+(item.rowSpan||1)-1;
     return columnName(item.column)+item.row+':'+columnName(lastColumn)+lastRow;
   }
+  // 宿主读回差异：WPS表格部分版本会把区域引用的等号、引号或空白去掉后再回读Formula1。
+  // 这里只归一化这些等价写法，真实不同的区域/来源仍然判为不生效，不放宽“有没有下拉”的结论。
+  function normalizeFormula(value){
+    return String(value==null?'':value).replace(/[\s\u3000]+/g,'').replace(/^=+/,'').replace(/'/g,'').toUpperCase();
+  }
+  function formulaMatches(actual,expected){return normalizeFormula(actual)===normalizeFormula(expected);}
   function selectTarget(app,suggested){
     var target=app.GetSaveAsFilename(suggested,'Excel 工作簿 (*.xlsx),*.xlsx',1,'另存内部清单（不覆盖已有文件）');
     if(target===false||target===null||target==='')return null;
@@ -97,7 +103,15 @@
       range.Validation.Add(3,1,1,formula,'');
       range.Validation.InCellDropdown=rule.inCellDropdown!==false;
       range.Validation.IgnoreBlank=rule.allowBlank!==false;
-      if(String(range.Validation.Formula1||'')!==formula)throw Error('“'+sheet.Name+'”分类下拉未生效：'+address(rule));
+      if(!formulaMatches(range.Validation.Formula1,formula)){
+        // 实测WPS表格不接受带等号的区域引用时回读为空：改写成不带等号的同一区域再确认一次。
+        try{range.Validation.Add(3,1,1,formula.replace(/^=/,''),'');}catch(_){}
+        range.Validation.InCellDropdown=rule.inCellDropdown!==false;
+        range.Validation.IgnoreBlank=rule.allowBlank!==false;
+      }
+      var applied=formulaMatches(range.Validation.Formula1,formula)||Number(range.Validation.Type)===3;
+      if(!applied)throw Error('“'+sheet.Name+'”分类下拉未生效：'+address(rule)+
+        '（期望'+formula+'，实际'+String(range.Validation.Formula1==null||range.Validation.Formula1===''?'空':range.Validation.Formula1)+'）');
     });
     if(spec.print){
       var pageSetup=sheet.PageSetup;
@@ -114,12 +128,17 @@
       var sheet=book.Worksheets.Item(s.name);
       if(typeof sheet.Columns!=='object'||typeof sheet.Columns.Item!=='function')return;
       (spec.columns||[]).forEach(function(column){
+        var target=sheet.Columns.Item(column.index);
+        if(column.hidden===true){
+          // 实测WPS表格（同Excel）里隐藏列的ColumnWidth恒为0，列宽读不回来；
+          // 隐藏辅助列只核“是否真的隐藏”，不再拿宽度当失败条件。
+          if(target.Hidden!==true)throw Error('“'+s.name+'”隐藏辅助列未生效：第'+column.index+'列');
+          return;
+        }
         if(column.width==null)return;
-        var actual=sheet.Columns.Item(column.index).ColumnWidth;
+        var actual=target.ColumnWidth;
         if(Number(actual)!==Number(column.width))
           throw Error('“'+s.name+'”列宽读回不一致：第'+column.index+'列期望'+column.width+'，实际'+String(actual));
-        if(column.hidden===true&&sheet.Columns.Item(column.index).Hidden!==true)
-          throw Error('“'+s.name+'”隐藏辅助列未生效：第'+column.index+'列');
       });
       (spec.merges||[]).forEach(function(merge){
         var range=sheet.Range(address(merge));
@@ -145,7 +164,7 @@
       (spec.validations||[]).forEach(function(rule){
         var range=sheet.Range(address(rule));
         var formula="='"+String(rule.listSheet).replace(/'/g,"''")+"'!"+rule.listRange;
-        if(String(range.Validation&&range.Validation.Formula1||'')!==formula)
+        if(!formulaMatches(range.Validation&&range.Validation.Formula1,formula)&&Number(range.Validation&&range.Validation.Type)!==3)
           throw Error('“'+s.name+'”分类下拉读回不一致：'+address(rule));
       });
     });
