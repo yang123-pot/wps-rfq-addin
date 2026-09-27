@@ -150,7 +150,10 @@ function layoutFixture(overrides){
    Rows:{AutoFit(){this.autoFitCount=(this.autoFitCount||0)+1;}},
    get Value2(){return this.value;},
    set Value2(rows){this.value=rows.map(r=>r.slice());},
-   Merge(){if(options.mergeFails)throw Error('merge failed');this.MergeCells=true;merges[address]=true;},
+   // 真实WPS/Excel不会把单格区域(A5:A5)标成已合并；单格合并没有版式意义，写入/读回都必须跳过。
+   Merge(){if(options.mergeFails)throw Error('merge failed');
+    const parts=String(address).split(':'),multi=parts.length===2&&parts[0]!==parts[1];
+    this.MergeCells=multi;if(multi)merges[address]=true;},
    Interior:{Color:null},
    Select(){selected=address;},
    Validation:{Formula1:null,Type:null,InCellDropdown:null,IgnoreBlank:null,
@@ -464,6 +467,9 @@ function verifyFixture(options){
  h.sheets[0].Name=opts.sheetName||'水泵_青源';
  h.sheets[0].Range('A1:J'+values.length).Value2=values;
  h.sheets[0].Range('A1:J1').Merge();
+ const expectedMerges=[{row:1,column:1,columnSpan:10}];
+ // 单格“合并”（供应商区只有一组时的产物）在真实宿主不生效，核对必须跳过。
+ if(opts.singleCellMerge)expectedMerges.push({row:3,column:1});
  if(opts.extraSheet)h.book.Worksheets.Add();
  if(opts.hiddenAuxiliary)h.sheets[0].Columns.Item(11).Hidden=true;
  const opened=[];
@@ -472,7 +478,7 @@ function verifyFixture(options){
   h.app._active=h.book;return h.book;};
  return Object.assign(h,{target:target,opened:opened,expected:{name:opts.sheetName||'水泵_青源',values:values,
   layout:{columns:[1,2,3,4,5,6,7,8,9,10].map(function(index){return {index:index};}),
-   merges:[{row:1,column:1,columnSpan:10}],metadata:{profile:'inquiry-sheet'}}}});
+   merges:expectedMerges,metadata:{profile:'inquiry-sheet'}}}});
 }
 test('R12-E verifyExistingOutput只认内容逐值一致的已有文件，核对前后SHA必须稳定',async()=>{
  const h=verifyFixture(),shaBefore='1'.repeat(64);
@@ -523,6 +529,27 @@ test('R12-E verifyExistingOutput对缺失目标直接保守拒绝，不打开工
  assert.equal(result.ok,false);
  assert.equal(result.sha256,null);
  assert.equal(h.opened.length,0);
+});
+// R12真实宿主（WPS 12.1.0.29161，本机原生COM实测）：供应商区只有一组时，询价版式会带一个单格“合并”A5:A5，
+// 真实WPS不会把它标成已合并。写入/读回/内容核对都要跳过单格合并，只对有多格意义的合并判失败。
+test('R12-E单格合并在真实宿主不生效：写入与内容核对都跳过，不误判失败',async()=>{
+ const layoutModule=require('../src/workbook-layout.js');
+ const values=layoutModule.equalize([['示例园区 水泵询价表','','','','','','','','',''],
+  ['项目名称：示例园区','','','','','单位名称：示例建设公司','','','',''],
+  ['序号','项目编码','项目名称','项目特征描述','单位','工程量','品牌','报价单价','金额','备注'],
+  ['1','FM-001','水泵','DN50','台','3','青源','','','']],10);
+ const spec=layoutModule.build({columns:values[2].map(function(_,index){return {index:index+1};}),headerRows:[3],
+  merges:[{row:1,column:1,columnSpan:10},{row:3,column:1,rowSpan:1},{row:3,column:2,columnSpan:9}]},
+  {rowCount:values.length,columnCount:10});
+ const h=layoutFixture();
+ host.write(h.app,{sheets:[{name:'水泵_青源',values:values,layout:spec}]},'C:\\temp\\rfq-single-merge.xlsx');
+ assert.equal(h.saved,true,'单格合并不生效不得阻断真实写入');
+ assert.equal(h.sheets[0].Range('A1:J1').MergeCells,true,'多格合并仍必须落地');
+ const verified=verifyFixture({values:values,singleCellMerge:true});
+ const result=await host.verifyExistingOutput(verified.app,{fileId:'file-a',target:verified.target},verified.expected,
+  function(){return Promise.resolve({target:verified.target,exists:true,sha256:'6'.repeat(64),bytes:100});});
+ assert.equal(result.ok,true,'内容一致时单格合并不应判失败');
+ assert.deepEqual(result.layoutIssues,[]);
 });
 
 // R12实机（2026-09-27）：WPS表格把隐藏列的ColumnWidth读回0，随行rowId隐藏列不能因此判失败。

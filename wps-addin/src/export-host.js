@@ -10,6 +10,10 @@
     var lastColumn=item.column+(item.columnSpan||1)-1,lastRow=item.row+(item.rowSpan||1)-1;
     return columnName(item.column)+item.row+':'+columnName(lastColumn)+lastRow;
   }
+  // 单格“合并”（如A5:A5，供应商区只有一组时的产物）在真实WPS里 MergeCells 永远不是True：
+  // 它没有任何版式意义，写入和读回都必须跳过，否则真机生成/核对会被误判失败。
+  function mergeCells(merge){return (merge.rowSpan||1)*(merge.columnSpan||1)>1;}
+  function realMerges(spec){return ((spec&&spec.merges)||[]).filter(mergeCells);}
   // 宿主读回差异：WPS表格部分版本会把区域引用的等号、引号或空白去掉后再回读Formula1。
   // 这里只归一化这些等价写法，真实不同的区域/来源仍然判为不生效，不放宽“有没有下拉”的结论。
   function normalizeFormula(value){
@@ -56,7 +60,7 @@
     });
     (spec.rows||[]).forEach(function(row){sheet.Rows.Item(row.index).RowHeight=row.height;});
     (spec.headerRows||[]).forEach(function(row){sheet.Rows.Item(row).Font.Bold=true;});
-    (spec.merges||[]).forEach(function(merge){
+    realMerges(spec).forEach(function(merge){
       var range=sheet.Range(address(merge));
       if(typeof range.Merge!=='function')throw Error('当前WPS不支持合并单元格API（Range.Merge），未按获批版式输出“'+sheet.Name+'”。');
       range.Merge();
@@ -168,7 +172,7 @@
         if(Number(actual)!==Number(column.width))
           throw Error('“'+s.name+'”列宽读回不一致：第'+column.index+'列期望'+column.width+'，实际'+String(actual));
       });
-      (spec.merges||[]).forEach(function(merge){
+      realMerges(spec).forEach(function(merge){
         var range=sheet.Range(address(merge));
         if(range.MergeCells!==true)throw Error('“'+s.name+'”合并读回不一致：'+address(merge));
       });
@@ -428,7 +432,7 @@
               if(extra&&extra.Hidden===true){layoutIssues.push('公开列范围外存在隐藏辅助列：第'+index+'列。');break;}
             }
           }
-          (spec.merges||[]).forEach(function(merge){
+          realMerges(spec).forEach(function(merge){
             var range=sheet.Range(address(merge));
             if(range.MergeCells!==true)layoutIssues.push('必需合并未生效：'+address(merge)+'。');
           });

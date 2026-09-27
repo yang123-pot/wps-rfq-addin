@@ -31,7 +31,7 @@
 | 命令 | 结果 |
 | --- | --- |
 | `node --test wps-addin/test/split-plan.test.cjs wps-addin/test/split-store.test.cjs wps-addin/test/split-server.test.cjs` | **17 pass / 0 fail**（本包新增 8 项） |
-| `node --test wps-addin/test/*.test.cjs` | **355 pass / 0 fail**（R12-D 344 ＋ 本包 11） |
+| `node --test wps-addin/test/*.test.cjs` | **356 pass / 0 fail**（R12-D 344 ＋ 本包 12；含真实宿主暴露的单格合并修复用例） |
 | `node wps-addin/test/ui-split-check.cjs`（`NODE_PATH` 指向本机已有 `playwright` 模块，系统 Edge headless） | **PASS(R12-E)**：5份独立文件、失败只续作；待核对重复刷新/重开结果窗口不自动成功；同名异内容保持待核对且不覆盖；显式逐值核对通过后才按实际SHA记成功 |
 
 **本机证据（脱敏，不入 Git）：** `outputs/wps-acceptance-20260927/R12-E/`
@@ -48,7 +48,18 @@
 - 本机此前记录“无 playwright 模块”只对仓库根 `require` 成立；本轮用 `NODE_PATH=F:\学习四（AI）\AI工作台\node_modules`（本机已有模块）＋系统 Edge 跑通 UI 检查。依赖路径只作为本机运行参数，不写入产品；浏览器检查用模拟宿主，只替代 WPS 的写入/打开接口，**不能替代真实 WPS**。
 - `ui-brand`/`ui-category`/`ui-memory`/`ui-sheet-review` 四项仍为 R12-C 遗留失败（与本包无关），未在本包收口。
 
-## 6. 未完成与下一包
+## 6. 真实宿主补充验证（追加：发布后未记账入口与内容证明）
 
-- **未做真机 WPS 操作**：真实“发布后未记账/响应丢失”、外部改写后逐值核对、真机侧缓存清理，均**挂 R12-J**（文件故障与恢复）在同一入口检验；插件UI内正式点按生成与真实 xlsx 逐值读回挂 R12-G/H。不得把本包模拟宿主结果写成真机通过。
+用本机隔离 WPS（KET.Application，`workbooksAtStart=0`，不改用户会话；结束时无打开工作簿才退出）由原生 PowerShell 按 `export-host` 同一写入顺序生成真实供应商拆分文件，再由真实宿主读回比较；随即用真实文件 SHA 跑 `split-store` 的“发布后未记账”入口。
+
+- **真实文件（合成样例，图07 水泵_华川设备）**：工作表1张、8行×10列、6个多格合并；WPS COM 逐值读回 `A1:J8` 全部与冻结快照一致，合并全部成立，1–10列无隐藏、公开列范围外无隐藏辅助列，`UsedRange=10列×8行`，`ok=true`，SHA256 `7795da93…`（完整值见 `outputs/wps-acceptance-20260927/R12-E/real/inquiry-real-report.json`）。
+- **同名异内容**：另一份同名文件把工程量改成999，真实宿主读回报 `值 F8 期望[3] 实际[999]`，`ok=false`；证明“同名≠可沿用成功”。
+- **状态机（真实文件SHA）**：目标先存在、回执仍 pending 时，连续3次 `prepare` 与一次 store 重建都保持 `needs-verification`、`done=false`、`canPublish=false`、`canVerify=true`，观察SHA在 `observedSha256` 而 `sha256` 为空；显式内容核对通过后用带 `expectedRevision` 的 `save` 记 `verifiedBy=content-check` 成功；重建 store 后成功件按SHA跳过；再用真实“同名异内容”文件覆盖后重新转待核对。完整报告 `outputs/wps-acceptance-20260927/R12-E/real/store-real-report.json`。
+- **真实宿主暴露的缺陷并已修**：单组询价页的版式含单格“合并”`A5:A5`，真实 WPS 不会把它标成已合并，原 `applyLayout`/`verifyLayout`/`verifyExistingOutput` 会误判失败。现已在 `src/export-host.js` 跳过单格合并（`(rowSpan||1)*(columnSpan||1)>1` 才核对），并加用例 `R12-E单格合并在真实宿主不生效：写入与内容核对都跳过，不误判失败`。
+- **边界（不得夸大）**：真机侧由原生 PowerShell 按同一比对项读取真实 xlsx；`verifyExistingOutput` 的 JS 实现仍由 Node 用例执行（浏览器检查用模拟宿主）。插件UI内点击的完整“发布后未记账”流程仍未执行，**仍挂 R12-J**。
+- **本机副作用已清理**：探针期间的隔离 WPS 进程已终止，只保留运行前已有的 5 个用户进程；未改动用户打开的文档。
+
+## 7. 未完成与下一包
+
+- **仍未做插件UI内操作**：真实“发布后未记账/响应丢失”的界面链路、发布后目标已存在时的重试点击、真机侧缓存清理，均**挂 R12-J**（文件故障与恢复）在同一入口检验；插件UI内正式点按生成挂 R12-G/H。本包的真实宿主证据只覆盖“真实WPS写文件+读回比较+真实文件SHA下的状态机”，不得写成插件UI真机通过。
 - R12 仍未完成；下一包 **R12-F**（公开输出审计：允许指定抬头联系方式、区分内部总簿与供应商件）。

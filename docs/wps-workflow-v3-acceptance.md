@@ -190,9 +190,11 @@
 
 **修正：** 观察SHA（`observedSha256`）与经核对SHA（`sha256`）分开；`reconcile` 只标记待核对，成功只能由真实发布写回或显式内容核对（`mark(...,{proof})`）落地；旧回执无 `verifiedBy` 保守降为待核对；`prepare` 收紧 `inputKey`/总簿SHA绑定并新增 `canVerify`。新增 `export-host.verifyExistingOutput(app,file,expectedSheet,inspectTarget)`：只读打开实际文件，逐值核公开值、工作表数量、隐藏列范围、必需合并/抬头，并核核对前后SHA；UI 把待核对单列并提供“核对已有文件”，通过且来源键/SHA未变才用带 `expectedRevision` 的 `save` 记成功，409/失败保持待核对、原文件不覆盖。
 
-**验证：** split plan/store/server **17/17**；全量 Node **355/355**（R12-D 344＋本包11）；`ui-split-check` **PASS**（本机 `NODE_PATH` 指向已有 playwright 模块＋系统 Edge，模拟宿主只替代WPS写入/打开接口）。证据在本机 `outputs/wps-acceptance-20260927/R12-E/`（日志、`split-blocked/verified/result.json`、模拟界面截图）。
+**验证：** split plan/store/server **17/17**；全量 Node **356/356**（R12-D 344＋本包12）；`ui-split-check` **PASS**（本机 `NODE_PATH` 指向已有 playwright 模块＋系统 Edge，模拟宿主只替代WPS写入/打开接口）。证据在本机 `outputs/wps-acceptance-20260927/R12-E/`（日志、`split-blocked/verified/result.json`、模拟界面截图）。
 
-**未完成：** 未做真机WPS操作；真实“发布后未记账/响应丢失”、外部改写后逐值核对与真机清理**挂 R12-J**，插件UI内正式生成与真实xlsx读回挂 R12-G/H。`ui-brand`/`ui-category`/`ui-memory`/`ui-sheet-review` 四项浏览器检查仍为 R12-C 遗留失败。R12 仍未完成；下一包 R12-F。
+**真实宿主补充（追加）：** 用隔离WPS（`workbooksAtStart=0`，未改用户会话）按 `export-host` 写入顺序生成真实供应商拆分文件并读回：8行×10列、6个多格合并逐值一致、无隐藏辅助列，`ok=true`；同名异内容件读回报 `F8 期望3 实际999`、`ok=false`。用真实文件SHA跑状态机：目标存在而回执pending时连续3次prepare与一次store重建都待核对、`done=false`；显式内容核对通过后才记 `content-check` 成功；重建后跳过；真实异内容覆盖后重新待核对。该轮还暴露并修复“单格合并`A5:A5`在真实WPS不生效被误判失败”的缺陷（`export-host` 跳过无意义单格合并，新增用例）。
+
+**未完成：** 仍未做插件UI内点击的完整真机链路；真实“发布后未记账/响应丢失”的界面重试、外部改写后逐值核对的UI动作与真机清理**挂 R12-J**，插件UI内正式生成挂 R12-G/H。`ui-brand`/`ui-category`/`ui-memory`/`ui-sheet-review` 四项浏览器检查仍为 R12-C 遗留失败。R12 仍未完成；下一包 R12-F。
 
 ## 已核实的图03与图04证据
 
