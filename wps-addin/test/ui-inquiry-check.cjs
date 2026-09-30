@@ -203,10 +203,17 @@ async function run(){
   const receipt=await projectRecord();
   await page.evaluate(function(args){window.__seedSummary(args.file,args.values);},
    {file:receipt.summary.path,values:fillSummaryGrid(summary,SUMMARY_FILLS)});
+  // 用户保存已填汇总后，读回必须刷新物理SHA，不能沿用生成时的空表SHA。
+  await fs.appendFile(receipt.summary.path,'saved-brand-values');
+  const filledSummarySha=require('node:crypto').createHash('sha256')
+   .update(await fs.readFile(receipt.summary.path)).digest('hex');
   // R8主按钮：读回品牌与供应商（不填抬头也应成功），读回后进入第6步询价表。
   await page.locator('#brands-confirm').click();
   await page.waitForFunction(function(){return /已读回并校验汇总表/.test(document.querySelector('#brands-message').textContent);});
   await page.waitForFunction(function(){return document.querySelector('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage')==='inquiry';});
+  const savedBrands=await projectRecord();
+  assert.equal(savedBrands.summary.sha256,filledSummarySha,'已填汇总的实际SHA必须保存到绑定');
+  assert.equal(savedBrands.brands.sourceSha256,filledSummarySha,'读回来源SHA必须对应当前文件');
   assert.match(await page.locator('#inquiry-banner').innerText(),/询价抬头未填齐/,'抬头四项未填齐时不能生成询价表');
   assert.equal(await page.locator('#inquiry-generate').isDisabled(),true,'抬头未填齐时生成按钮禁用');
   assert.match(await page.locator('#inquiry-status').innerText(),/缺少项目名称/,'缺项要如实定位');

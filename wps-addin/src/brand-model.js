@@ -277,6 +277,8 @@
    merges.push({row:spec.titleRow,column:1,columnSpan:spec.width});
    if(spec.projectRow)merges.push({row:spec.projectRow,column:1,columnSpan:spec.width});
   }
+  // 操作说明使用整行公开区域，避免被序号列的窄宽度截断；隐藏绑定列保持独立。
+  merges.push({row:hintRow,column:1,columnSpan:spec.width});
   plan.categories.forEach(function(entry,index){
    var row=spec.firstRow+index;
    hyperlinks.push({row:row,column:2,address:entry.relative,display:entry.categoryName,relative:true,

@@ -1,5 +1,16 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const brand=require('../src/brand-table.js'),model=require('../src/brand-model.js');
+test('R12-D：分类汇总操作说明跨公开列显示，不挤入序号列或吞并内部绑定',()=>{
+ const categories=[{categoryId:'pump',categoryName:'水泵',rowCount:2,path:'C:\\out\\分类工作簿\\水泵.xlsx'}];
+ for(const [layoutName,hintRow,width] of [['separated',6,10],['combined',7,7]]){
+  const built=model.buildSummary(model.summaryPlan(categories,{directory:'C:\\out',layout:layoutName}));
+  const sheet=built.sheets[0];
+  const hintMerge=sheet.layout.merges.find(m=>m.row===hintRow&&m.column===1);
+  assert.ok(hintMerge,'操作说明必须获得整行公开显示区域');
+  assert.equal(hintMerge.columnSpan,width,'不得延伸到隐藏的类别或文件绑定列');
+  assert.match(sheet.values[hintRow-1][0],/点击名称打开对应分类工作簿/);
+ }
+});
 test('R7：分类汇总表模型与旧品牌表模型共存，双布局可用且名称链接指向独立工作簿',()=>{
  assert.equal(model.SUMMARY_SHEET,'分类汇总表');
  assert.deepEqual(model.SUMMARY_LAYOUTS,['separated','combined']);

@@ -1211,6 +1211,11 @@
           return {ok:false,result:result};
         }
         summaryIssues=[];
+        // 表内填写保存后文件SHA会改变；重新读回通过时同步当前物理文件，避免重开误用生成空表时的SHA。
+        var actualSummary=await exportRequest('inspect',{target:summaryReceipt.path});
+        if(!actualSummary.exists||actualSummary.target!==summaryReceipt.path||!/^[a-f\d]{64}$/i.test(actualSummary.sha256||''))
+          throw Error('分类汇总表文件校验未完成，请确认文件存在后重试。');
+        summaryReceipt=Object.assign({},summaryReceipt,{sha256:actualSummary.sha256,bytes:actualSummary.bytes});
         summaryRead=Object.assign(RfqBrandModel.summaryReadRecord(result,{summaryPath:summaryReceipt.path,
           readAt:new Date().toISOString()}),{sourceSha256:summaryReceipt.sha256||null});
         renderBrands();

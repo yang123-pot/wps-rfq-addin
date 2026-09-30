@@ -68,7 +68,7 @@ test('分列布局（图05A）：一类一行、两行表头、黄色填写区�
  assert.equal([1,2,3,4].every(index=>visibleRow(workbook,index+3).slice(3,9).every(value=>value==='')),true,
   '品牌与供应商初始必须空白，等人工填写');
  assert.deepEqual(sheet.values.slice(1).map(row=>row.length===13),sheet.values.slice(1).map(()=>true),'等宽矩阵供版式使用');
- assert.deepEqual(spec.merges.map(addr),['A1:J1','A2:A3','B2:B3','C2:C3','J2:J3','D2:E2','F2:G2','H2:I2'],
+ assert.deepEqual(spec.merges.map(addr),['A1:J1','A2:A3','B2:B3','C2:C3','J2:J3','D2:E2','F2:G2','H2:I2','A9:J9'],
   '图05A：标题跨公开列，序号/名称/材料条数/询价生成方式跨两行，三组品牌供应商各跨两列');
  assert.deepEqual(spec.fills.map(addr),
   ['A2:J2','A3:J3','D4:E7','F4:G7','H4:I7'],'表头浅色＋D:I黄色填写区');
@@ -103,7 +103,7 @@ test('同格布局（图05B）：单行表头、单格三组、方式下拉；�
   [['1','水泵','2'],['2','阀门','2'],['3','风机','2'],['4','汽车充电桩','1']]);
  assert.equal([1,2,3,4].every(index=>visibleRow(combined,index+4).slice(3,6).every(value=>value==='')),true,
   '同格单格初始必须空白');
- assert.deepEqual(spec.merges.map(addr),['A1:G1','A2:G2'],'图05B：标题与项目名称行跨公开列合并；三组各占一列不合并');
+ assert.deepEqual(spec.merges.map(addr),['A1:G1','A2:G2','A10:G10'],'图05B：标题、项目名称及说明跨公开列合并；三组各占一列不合并');
  assert.deepEqual(spec.fills.map(addr),['A4:G4','D5:D8','E5:E8','F5:F8'],'三组单列黄色填写区');
  assert.deepEqual(spec.validations.map(rule=>[addr(rule),rule.listRange]),[['G5:G8','$J$1:$J$2']]);
  assert.deepEqual(spec.columns.filter(column=>column.hidden).map(column=>column.index),[8,9,10]);
@@ -141,14 +141,14 @@ test('绑定：保存布局/数据区域/稳定类别ID/文件绑定/内容键�
 test('R12-D汇总layout：分列/同格标题与跨行表头按图合并，不含隐藏辅助列、不吞公开字段',()=>{
  const separated=built('separated').workbook.sheets[0],combined=built('combined').workbook.sheets[0];
  assert.deepEqual(separated.layout.merges.map(addr),
-  ['A1:J1','A2:A3','B2:B3','C2:C3','J2:J3','D2:E2','F2:G2','H2:I2'],'图05A表头合并');
- assert.deepEqual(combined.layout.merges.map(addr),['A1:G1','A2:G2'],'图05B表头合并');
+  ['A1:J1','A2:A3','B2:B3','C2:C3','J2:J3','D2:E2','F2:G2','H2:I2','A9:J9'],'图05A表头与说明合并');
+ assert.deepEqual(combined.layout.merges.map(addr),['A1:G1','A2:G2','A10:G10'],'图05B表头与说明合并');
  [separated,combined].forEach(sheet=>{
   sheet.layout.merges.forEach(merge=>{
    const lastRow=merge.row+(merge.rowSpan||1)-1,lastColumn=merge.column+(merge.columnSpan||1)-1;
    assert.ok(lastColumn<=sheet.layout.columns.length-3,'合并不得跨到隐藏的类别ID/相对链接/选项列');
    assert.equal(merge.column>=1,true);
-   assert.ok(lastRow<=sheet.layout.metadata.lastRow,'合并不得压到数据行');
+   assert.ok(lastRow<sheet.layout.metadata.firstRow||merge.row>sheet.layout.metadata.lastRow,'合并不得压到数据行');
   });
  });
  // 公开字段一个都不能被合并吞掉：分列三组各占两列，同格三组各占一列。
