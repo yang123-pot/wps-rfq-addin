@@ -259,6 +259,10 @@
   function openDirectory(){
    var app=options.application;
    if(!app)throw Error('请在WPS内打开侧栏后再打开输出文件夹。');
+   if(app.OAAssist&&typeof app.OAAssist.ShellExecute==='function'){
+    app.OAAssist.ShellExecute('explorer.exe','"'+String(directory).replace(/"/g,'')+'"');
+    return;
+   }
    if(typeof app.Shell==='function'){
     app.Shell('explorer.exe "'+String(directory).replace(/"/g,'')+'"',1,false);
     return;

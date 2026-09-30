@@ -96,6 +96,12 @@ async function run(){
    window.__splitPanel.restore(null);
   },{generation:generation,outputDirectory:outputDirectory});
   await page.locator('#workflow-nav .workflow-step-button[data-stage="split"]').click();
+  assert.equal(await page.locator('#stage-panel-split #split-directory').count(),1,
+   '图07目录选择与一键拆分必须属于第七步主面板');
+  assert.equal(await page.locator('#stage-panel-split #split-run').isVisible(),true,
+   '进入第七步直接显示拆分主操作，无需展开辅助功能');
+  assert.doesNotMatch(await page.locator('#stage-panel-split').innerText(),/将在 R10 开发包实现/,
+   '已实现拆分不可继续展示未实现占位说明');
   await page.evaluate(function(){document.getElementById('split-directory').click();});
   await page.waitForFunction(function(){return /计划 5 个文件/.test(document.getElementById('split-status').textContent)&&
    !document.getElementById('split-run').disabled;});
@@ -132,6 +138,15 @@ async function run(){
   await page.evaluate(function(){document.getElementById('split-open').click();});
   await page.waitForFunction(function(){return /explorer\.exe/.test(window.__openedFolder||'');});
   assert.match(await page.evaluate(function(){return window.__openedFolder;}),/询价输出/,'打开输出文件夹指向实际目录');
+  // 真机Application没有Shell/ShellExecute；WPS加载项壳服务在OAAssist对象上。
+  await page.evaluate(function(){
+   delete window.Application.Shell;
+   window.Application.OAAssist={ShellExecute:function(url,params){window.__openedViaOA={url:url,params:params};}};
+   document.getElementById('split-open').click();
+  });
+  assert.deepEqual(await page.evaluate(function(){return window.__openedViaOA||null;}),
+   {url:'explorer.exe',params:'"'+outputDirectory+'"'},
+   '没有Application.Shell时通过WPS OAAssist打开实际中文目录');
   const receiptCount=await page.evaluate(function(){return window.__receipts.length;});
   assert.equal(receiptCount>0,true,'每次回执变化都请求项目记录保存');
   const receiptFiles=await fs.readdir(splitDirectory);

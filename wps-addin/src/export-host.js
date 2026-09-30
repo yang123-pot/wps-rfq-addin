@@ -125,8 +125,17 @@
     if(spec.print){
       var pageSetup=sheet.PageSetup;
       if(!pageSetup)throw Error('当前WPS不支持打印设置API（PageSetup），未按获批版式输出“'+sheet.Name+'”。');
+      // WPS 12.1.0.29161 未显式设纸张时会在SaveAs省略pageSetup，重开丢失方向/页高。
+      // 纸张来自版式模型；先初始化，再设置方向与缩放，仍须保存重开逐项核实。
+      if(spec.print.paperSize!=null)pageSetup.PaperSize=spec.print.paperSize;
       if(spec.print.area)pageSetup.PrintArea=address(spec.print.area);
       if(spec.print.repeatRow)pageSetup.PrintTitleRows='$'+spec.print.repeatRow+':$'+spec.print.repeatRow;
+      if(spec.print.orientation)pageSetup.Orientation=spec.print.orientation==='landscape'?2:1;
+      if(spec.print.fitToWidth!=null){
+        pageSetup.Zoom=false;
+        pageSetup.FitToPagesWide=spec.print.fitToWidth;
+        pageSetup.FitToPagesTall=spec.print.fitToHeight==null?0:spec.print.fitToHeight;
+      }
     }
   }
   // 重开后的版式读回：只核对能证明“公开值＋必要版式”的关键项。
@@ -206,6 +215,21 @@
         if(!(typeOk&&formulaMatches(range.Validation&&range.Validation.Formula1,formula)))
           throw Error('“'+s.name+'”分类下拉读回不一致：'+address(rule));
       });
+      if(spec.print){
+        var page=sheet.PageSetup;
+        if(!page)throw Error('“'+s.name+'”打印设置无法读回。');
+        if(spec.print.paperSize!=null&&Number(page.PaperSize)!==spec.print.paperSize)
+          throw Error('“'+s.name+'”打印纸张读回不一致。');
+        if(spec.print.area&&String(page.PrintArea).replace(/\$/g,'')!==address(spec.print.area))
+          throw Error('“'+s.name+'”打印区域读回不一致。');
+        if(spec.print.repeatRow&&String(page.PrintTitleRows)!=='$'+spec.print.repeatRow+':$'+spec.print.repeatRow)
+          throw Error('“'+s.name+'”打印重复表头读回不一致。');
+        if(spec.print.orientation&&Number(page.Orientation)!==(spec.print.orientation==='landscape'?2:1))
+          throw Error('“'+s.name+'”打印方向读回不一致（期望'+(spec.print.orientation==='landscape'?2:1)+'，实际'+String(page.Orientation)+'）。');
+        if(spec.print.fitToWidth!=null&&(page.Zoom!==false||Number(page.FitToPagesWide)!==spec.print.fitToWidth||
+          Number(page.FitToPagesTall)!==(spec.print.fitToHeight==null?0:spec.print.fitToHeight)))
+          throw Error('“'+s.name+'”打印页宽设置读回不一致。');
+      }
     });
   }
   function write(app,model,stagePath){

@@ -93,6 +93,10 @@ test('图06版式：标题合并、表头填充、冻结、打印重复表头随
  assert.equal(spec.fills.some(function(fill){return fill.row===7&&fill.color===layout.COLORS.header;}),true,'表头浅色填充');
  assert.deepEqual(spec.print.repeatRow,7,'打印重复表头行');
  assert.equal(spec.print.area.rowSpan,valve.values.length,'打印区域覆盖整张询价表');
+ assert.equal(spec.print.orientation,'landscape','十列材料横向打印');
+ assert.equal(spec.print.paperSize,9,'A4纸张随询价及拆分版式传递');
+ assert.equal(spec.print.fitToWidth,1,'十列保持在同一页宽度');
+ assert.equal(spec.print.fitToHeight,0,'长清单按高度自然分页，不强缩成一页');
 });
 
 test('抬头四项必填、原公司地址可选；缺项或非文本拒绝生成',()=>{

@@ -216,6 +216,11 @@ function layoutFixture(overrides){
    Add(){app._active=book;const s=newSheet();sheets.push(s);return book;},
    Open(file){
     app._active=book;
+    // 真实WPS：未显式设置纸张时，SaveAs省略pageSetup，方向/页高重开变回默认值。
+    if(options.dropUninitializedPrint)sheets.forEach(function(sheet){
+     if(sheet.PageSetup.PaperSize==null){sheet.PageSetup.Orientation=1;sheet.PageSetup.FitToPagesTall=1;}
+    });
+    if(options.reopenPaperSize!=null)sheets.forEach(sheet=>{sheet.PageSetup.PaperSize=options.reopenPaperSize;});
     // 模拟宿主保存/重开时把原生链接字体统一成自带链接色的行为。
     if(options.reopenLinkColor!=null)Object.keys(links).forEach(function(address){
      rangeFor(address).Font.Color=options.reopenLinkColor;
@@ -409,7 +414,7 @@ test('R9 inquiry workbook keeps the 图06 layout: title merge, header fill, free
   groups:groups,classification:classification,inputKey:'ck2-inquiry-layout',
   header:{projectName:'示例园区',company:'示例建设公司',contact:'测试员',phone:'示例联系方式',address:''}});
  const book=inquiry.workbook(model,'2026-09-27T00:00:00.000Z');
- const h=layoutFixture();
+ const h=layoutFixture({dropUninitializedPrint:true});
  host.write(h.app,book,'C:\\temp\\rfq-inquiry.xlsx');
  const sheet=h.sheets[0];
  assert.deepEqual(sheet.Range('A1:J9').Value2,model.sheets[0].values,'公开值逐格写回且与模型一致');
@@ -419,9 +424,16 @@ test('R9 inquiry workbook keeps the 图06 layout: title merge, header fill, free
  assert.equal(sheet.Range('A7:J7').Interior.Color,layoutModule.toColor('#DCE6F1'),'表头浅色填充');
  assert.equal(sheet.PageSetup.PrintTitleRows,'$7:$7','打印重复表头');
  assert.equal(sheet.PageSetup.PrintArea,'A1:J9','打印区域覆盖标题到末行');
+ assert.equal(sheet.PageSetup.Orientation,2,'横向打印');
+ assert.equal(sheet.PageSetup.PaperSize,9,'显式A4使打印设置保存重开后仍保留');
+ assert.equal(sheet.PageSetup.Zoom,false,'关闭固定百分比缩放，使适合页宽生效');
+ assert.equal(sheet.PageSetup.FitToPagesWide,1,'十列不横向分割');
+ assert.equal(sheet.PageSetup.FitToPagesTall,0,'保留纵向分页');
  assert.equal(h.app.ActiveWindow.FreezePanes,true,'冻结表头以上');
  assert.deepEqual(book.sheets.slice(1).map(s=>s.name),['内部追溯','处理记录'],'内部页留在总表内，不进入公开询价页');
  assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx','用户工作簿保持活动');
+ const wrongPaper=layoutFixture({reopenPaperSize:1});
+ assert.throws(()=>host.write(wrongPaper.app,book,'C:\\temp\\rfq-inquiry.xlsx'),/打印纸张读回不一致/);
 });
 
 // R12实机（2026-09-27）：WPS表格把区域引用的等号/引号去掉后回读Formula1，
