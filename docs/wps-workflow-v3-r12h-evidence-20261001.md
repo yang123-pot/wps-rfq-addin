@@ -1,61 +1,90 @@
-# R12-H 同格布局等价验收：本次未达成真实出口（环境阻塞）
+# R12-H 同格布局等价验收（2026-10-01，真实WPS宿主链路已通过）
 
-**状态：未通过。** 本包出口是“双布局业务等价且各有真实输出，且不得把05A复制截图算05B通过”；本次**没有生成任何真实WPS输出**，没有做表内两行填写、主按钮读回、图06总表和图07拆分的真实操作，因此**不勾任何验收项，不写“等价通过”**。以下只记录前置核对、环境阻塞证据与已备好的执行手段。
+**状态：通过（真实宿主链路）。** 从同一分类清单生成新的**同格**分类汇总表，表内按两行填写并与G完全相同的品牌/供应商组合与生成方式，主按钮读回、4个名称链接实际打开、按 `categoryId` 比较两布局业务内容完全等价；随后用真实宿主生成新版本总询价工作簿，并在**新拆分目录**真实输出5个供应商文件；6个实际文件经 R12-F 双审计逐值通过。
 
-**基线/现场（本会话实测）：** 分支 `feat/wps-phase1`，开工 `git rev-parse HEAD` = `c3e4b33e490a3429f647bb659e7143c4637522bb`（`fix: R12-G 打印持久化与拆分主链真机验收闭环`），`git log` 前5条为 c3e4b33、a4be3f5、f532a1e、d90e128、a6ff72d。提示词拆分时给出的 `63dde1e9…`、代码基线 `e6f8ff26…` 是历史值，当时说“工作区保留6个未提交修改”也已由 R12-B/D 收敛；本次实际工作区只有 `wps-addin/dev/pane-diagnostics.js` 显示为 ` M`，且 `git diff` 为空（仅stat缓存），内容与 HEAD 一致，本包**未暂存、未清理**，其余文件均干净。
+**基线/现场（本会话实测）：** 分支 `feat/wps-phase1`；开工 `git rev-parse HEAD` = `c3e4b33e490a3429f647bb659e7143c4637522bb`。入场工作区只有 `wps-addin/dev/pane-diagnostics.js` 显示 ` M`，`git diff` 为空（stat缓存），本包未暂存未清理；其余干净。提示词里给出的 `63dde1e9…`、基线 `e6f8ff26…`、“6个未提交修改”是拆分提示词时的历史值，已按实际结果记录。
 
-**日期/操作者/WPS：** 2026-10-01，操作者 Codex；本机 WPS Office `12.1.0.29161`（`E:\WPS\WPS Office\12.1.0.29161\office6`，另有旧版 `12.1.0.28043`）。本包**未启动、未关闭、未改动**用户正在运行的 WPS 会话。
+**依赖：** R12-G 已完成（项目 revision 24、分列主链与6文件双审计通过）。本包开工时用插件真实模块（`RfqCollection`＋`RfqProject`）从项目 `sources` 复算内容键 `ck2-721d17bd7b34fb51`（matchingKey）与 `ck2-14a15fd175309425`（分列生成键），与项目记录**逐位相同**；分列汇总表 SHA `c505ca2624d0363118b9c413e23395eaba4a11e4e54fb68e1c636bfae981aeca`、4个分类工作簿与审核成果表 SHA 也逐份与记录一致——**未重新导入、未重新确认、未重新生成4个分类簿**。
 
-**对应图（已实际打开查看）：** `docs/mockups/approved-20260926/05b-summary-combined.png`、`06-inquiry-linkage.png`、`07-split-files.png`。验收点：05B 同格布局中 D/E/F 每格两行“品牌：…／供应商：…”、G列询价生成方式、B列四个名称链接；06 五张询价页与品牌来自汇总表；07 五个独立供应商文件、完成/失败计数。
+**对应图（已实际打开）：** 图05B、06、07。
 
-## 1. 本包前置依赖核对（这部分**已完成**，不是真机验收）
+## 1. 通道变化与执行方式（必须如实说明）
 
-| 项目 | 实测结果 |
+本会话开始时**没有任何真实WPS通道**：Computer Use 对所有应用（含wps）返回 `was not approved`、cua 侧 `apps:[]`；隔离宿主入口 `KET.Application` 也未注册（`80040154`，残留 TypeLib 指向已被升级删除的 `12.1.0.26375`，见 `evidence/host-blockers.json`、`evidence/run-report.json` 首轮记录，本机 `R12-H/host/probe-blockers.cjs` 可复现）。随后本机恢复了 WPS 自动化组件注册（`KET.Application`→`wps.exe /prometheus /et /Automation`、`Excel.Application`→`et.exe /Automation`），隔离宿主可用，本包按 **R12-D/E 同一套“隔离隐藏 COM 实例＋插件真实代码＋真实 dev/server.cjs 发布管线”**执行。
+
+- 未改产品源码；本包只新增/修改本机验收脚本（`outputs/.../R12-H/host/*`，受 `.gitignore` 保护）。
+- **插件UI内点按仍未执行**（Computer Use 本会话始终未授权），因此本包不声称“插件UI真机通过”；该入口继续挂 R12-J，与 R12-D/E 的口径一致。
+- 隔离实例开工 `workbooksAtStart=0`、结束 `workbooksAtEnd=0`，只用原生 `Quit()` 退出；未改动用户已打开的 WPS 会话与任何原件；测试期间新起的24个隔离 `et/wps` 进程已按“只保留会话开始时就存在的5个用户进程”清理完毕。
+
+## 2. 同格（图05B）真实生成与表内填写
+
+| 验收点 | 实际结果 |
 | --- | --- |
-| R12-G 已完成 | 项目 `p-mujmyjx0-16kom40i` revision **24**、拆分回执 revision 7（与 R12-G 证据一致）；`/api/project/load` 实测返回 24 |
-| G 的分列已填文件与 4 分类簿未被本包改动 | 分列汇总表 `r12/output/分类汇总表_20260930-134448.xlsx` SHA256 `c505ca2624d0363118b9c413e23395eaba4a11e4e54fb68e1c636bfae981aeca`＝项目记录值；4 个分类工作簿 SHA 与项目 `categories.files` 逐份一致；审核成果表 SHA 与项目 `review.sheet.sha256` 一致 |
-| “同一分类清单”不是自述 | 用插件真实模块（`RfqCollection`＋`RfqProject`）从项目 `sources` 重建集合与合并行，复算内容键：`matchingKey` = `ck2-721d17bd7b34fb51`、分列生成键 = `ck2-14a15fd175309425`，与项目记录**逐位相同** |
-| 本机服务与生成管线可用 | 以 R12 隔离目录启动 `wps-addin/dev/server.cjs --port 38891`：`/health` 200；从 `taskpane.html` 取得会话票据；`/api/export/inspect`、`/api/project/load` 均 200 |
+| 新同格汇总表（不覆盖分列已填件） | `r12/output/分类汇总表_20261001-090618.xlsx`，生成空表 SHA `0865b39f…`；填写保存后 SHA **`8d91786d54b7030626117e0ff6d1053e147051c8aef43f212ad13aba08f1c86a`**，`layout=combined`、表头行4、数据行5–8、方式列G。分列件 `分类汇总表_20260930-134448.xlsx` 与其SHA `c505ca26…` **未被改动** |
+| 两行标签填写 | D/E/F 每格按“品牌：…⏎供应商：…”，D5/E5 青源·华川设备｜恒流·启明机电，D6/E6 通达·正通商贸｜海岳·安合设备，D7 瑞风·瑞风设备，D8 驰电·远程电气；G列与G相同（水泵“按品牌分别生成”、其余“合成一份”） |
+| 每格两行完整显示 | 12个填写格全部 `换行=true`、文本恰为2行、内容与标签格式正确；宿主 `AutoFit` 行高24pt（单行默认约14.25pt），真实窗口截图可见两行完整显示 |
+| 主按钮读回（未保存先读、再保存读回） | 未保存读回：4类有效、预计**5**份；保存后重读并同步实际SHA，`brands.sourceSha256` 与磁盘一致；错误率0 |
+| 名称4链接 | B5–B8 逐个 `Follow()`：分别打开 `分类工作簿\水泵.xlsx`、`阀门.xlsx`、`风机.xlsx`、`汽车充电桩.xlsx`，**4/4 指向正确目标**（地址为相对路径，整目录搬移后仍可用） |
 
-## 2. 环境阻塞（本包真实出口无法执行的原因，两项独立）
+## 3. 两布局等价（按 categoryId 逐值比较）
 
-### 2.1 计算机控制通道不可用
+以 `RfqBrandHost.readSummary` 分别读回同格件与G的分列件，按稳定 `categoryId` 比较规范化 groups／顺序／mode：
 
-本会话 Computer Use 对所有应用的窗口控制都被直接拒绝（`sky.list_apps()` 能返回应用清单，但任何 `get_window_state` 都返回 `Computer Use was not approved to use wps` / `… explorer` / `… ChatGPT`）；cua 侧 `getState()` 的 `apps` 为空数组，原生控制未启用。→ **不能在真实 WPS 侧栏内点按**（05B 填两行、主按钮读回、06 生成、07 一键拆分）。
+| categoryId | 类别 | 材料条数 | 分列 groups | 同格 groups | mode | 结论 |
+| --- | --- | --- | --- | --- | --- | --- |
+| pump | 水泵 | 2 | 青源·华川设备；恒流·启明机电 | 同上 | per-brand | 逐值相同 |
+| valve | 阀门 | 2 | 通达·正通商贸；海岳·安合设备 | 同上 | synthesize | 逐值相同 |
+| fan | 风机 | 2 | 瑞风·瑞风设备 | 同上 | synthesize | 逐值相同 |
+| ev-charger | 汽车充电桩 | 1 | 驰电·远程电气 | 同上 | synthesize | 逐值相同 |
 
-### 2.2 隔离 WPS 的 COM 自动化入口在本机已不存在
+- 顺序：两布局都是 `pump→valve→fan→ev-charger`；预计份数都是 **5**；`businessEquivalent=true`、`differences=[]`（`evidence/two-layout-equivalence.json`）。
+- **生成键**：`RfqProject` 的询价内容键只规范化 `categoryId/mode/groups`（不含 layout），因此两布局**共用同一个生成键 `ck2-14a15fd175309425`**（`generationKeyLayoutSensitive=false`）；两份文件二进制 SHA 不同（分列 `c505ca26…`、同格 `8d91786d…`），按批准口径**不要求相同**。
 
-R12-D/E 用过的 `KET.Application`（`New-Object -ComObject`）现在取不到。只读取证（本机 `outputs/wps-acceptance-20260927/R12-H/evidence/host-blockers.json`，由 `host/probe-blockers.cjs` 生成）：
+## 4. 图06总询价工作簿与图07新目录拆分（真实输出）
 
-- `[Type]::GetTypeFromProgID`：`KET.Application`、`Ket.Application`、`KWPS.Application`、`Excel.Application`、`Word.Application`、`PowerPoint.Application` **全部 missing**。
-- `HKLM/HKCU\SOFTWARE\Classes\KET.Application`（含 `WOW6432Node`）、`KWPS.Application` **全部 missing**。
-- 在 `HKLM\SOFTWARE\Classes` 全树按数据搜 `office6`：命中 25 个键，**没有任何 `LocalServer32`**（只有 4 个 shell 扩展 `InprocServer32`）。
-- 仍残留的 TypeLib 指向**已被升级删除的旧版本**：`{00020813…}`→`12.1.0.26375\office6\etapi.dll`、`{00020905…}`→`…\wpsapi.dll`、`{91493440…}`→`…\wppapi.dll`；本机现存的只有 `12.1.0.28043`、`12.1.0.29161`，`et.exe` 存在但未重新注册自动化入口。
-- 因此驱动里的 COM 预检直接失败：`New-Object -ComObject KET.Application` → `80040154 Class not registered`（`evidence/run-report.json`）。
+| 文件/profile | 实际页与行列 | SHA256 |
+| --- | --- | --- |
+| `R12-H/示例园区_询价总表_同格.xlsx`／internal-total | 水泵_青源8×10；水泵_恒流8×10；阀门_合成询价9×10；风机_瑞风8×10；汽车充电桩_驰电7×10；另仅内附表 内部追溯10×9、处理记录10×2 | `a684f35c5199e8bc0b5ed16dc4033399c66217683200798830c2206aed1eb0e5` |
+| `R12-H/询价输出-同格/水泵_华川设备.xlsx`／supplier | 水泵_青源8×10 | `7830217da1f363bb37f165b2b2c0da70e9a67ca8efafebb269e512f92373d1b1` |
+| `…/水泵_启明机电.xlsx`／supplier | 水泵_恒流8×10 | `de60b3c9d422b14c27e12c464f72d86bc438d752115b7657427077b670c5751c` |
+| `…/阀门_多供应商.xlsx`／supplier | 阀门_合成询价9×10 | `2b4974a1f83bcca3cbd76efe765fa86513549a4c1c8614c4b3ce0e28de1cbc20` |
+| `…/风机_瑞风设备.xlsx`／supplier | 风机_瑞风8×10 | `2044b2d82275bf8ac1081a1b5cad9d268941e151a33bb16dbdca8a44f28d4609` |
+| `…/汽车充电桩_远程电气.xlsx`／supplier | 汽车充电桩_驰电7×10 | `7021faa02002ce288e515aa7ff019e26f566b4bdc45dabaa17dfa3554700d6de` |
 
-结论：**本机当前没有可用的真实 WPS 宿主通道**（插件 UI 需要计算机控制；隔离 COM 实例需要被注册的自动化入口）。按本计划“模拟宿主/浏览器检查不能替代真实WPS”，本包不以此代替真机，也不把 R12-D 的 `05b-combined-real.png` 当作本包 05B 证据。
+- 5个询价对象、材料/数量/品牌/供应商/抬头与G一致：水泵2行2/3分品牌各1件、阀门2行20/12且品牌“通达 / 海岳”合成1件、风机2行2/3、充电桩1行1；供应商信息区逐组对应；报价单价与金额留空、公式0、无内部/隐藏页列。
+- 拆分批次 `p-muouadbg-4n49t4d5`、独立回执 revision **6**：完成 **5**／失败0／待核对0／待处理0，`verifiedBy=publish`（逐件SHA与实际文件一致）；项目保存后 revision **25**。
 
-## 3. 本次实际执行（无真机，无输出文件）
+## 5. 审计与验证
 
 | 命令 | 结果 |
 | --- | --- |
-| `node outputs/wps-acceptance-20260927/R12-H/host/precheck.cjs` | 服务/票据/`export inspect`/`project load` 全部正常（证明生成与发布管线本身可用） |
-| `node outputs/wps-acceptance-20260927/R12-H/host/run-r12h.cjs` | 现场核对与内容键核对通过后，在“预检WPS自动化入口”处**快速失败并停止**；未写任何 xlsx、未改项目、未改原文件 |
-| `node outputs/wps-acceptance-20260927/R12-H/host/probe-blockers.cjs` | 生成 `evidence/host-blockers.json`（通道结论 `isolated-com-host-unavailable`） |
-| `node --test wps-addin/test/*.test.cjs` | **362 通过 / 0 失败**（`evidence/full-node-r12h.log`）；本包未改源码，用于确认提交基线仍为绿 |
-| `<捆绑运行时>\python.exe -X utf8 -m unittest discover -s wps-addin/test -p test_audit_outputs.py` | **8 通过 / 0 失败**（`evidence/python-unit-r12h.log`）。本机 `python` 不在 PATH、`.venv` 因中文路径启动失败，故用 Codex 捆绑运行时（Python 3.12.14＋openpyxl 3.1.5）执行 |
+| `python -X utf8 outputs/wps-acceptance-20260927/R12-H/audit-chain.py` | 6件全部 `pythonOk=true`、`layoutOk=true`、`sourceReconciled=true`（openpyxl 独立读取实际xlsx） |
+| `node outputs/wps-acceptance-20260927/R12-H/audit-chain.cjs` | 6件全部 `ok=true`、`verdict=value-verified`、公式0（R12-F 审计，消费Python读出的实际矩阵） |
+| `node --test wps-addin/test/*.test.cjs` | **362 通过 / 0 失败**（本包未改产品源码） |
+| 捆绑运行时 `python -X utf8 -m unittest discover -s wps-addin/test -p test_audit_outputs.py` | **8 通过 / 0 失败** |
 
-**本机副作用：** 无。未生成/未覆盖任何输出文件，未改动项目记录、分列汇总表、分类工作簿或用户 WPS 会话；仅在 `outputs/wps-acceptance-20260927/R12-H/` 下新增预检日志与证据（该目录受 `.gitignore` 保护）。
+审计口径：总簿允许明确的两个内部页；5个供应商件按 `profile=supplier` 完整预期矩阵核公开值/版式/隐藏页列/公式/路径/原价，抬头联系方式只在声明位置按值放行。
 
-## 4. 通道恢复后可直接执行的准备（已写好，未运行）
+## 6. 本机证据（脱敏，不入 Git）
 
-- `outputs/wps-acceptance-20260927/R12-H/host/run-r12h.cjs`：真实宿主驱动，顺序为——同格汇总表生成（新文件，不覆盖分列）→ 表内 D/E/F 两行标签与 G 列方式 → **未保存读回**（对应 G 的 52/53 口径）→ 保存后读回并同步实际 SHA → 四个名称链接逐个 `Follow()` 打开对应分类工作簿 → 按 `categoryId` 比较两布局规范化 groups/顺序/mode → 生成总询价工作簿（图06）→ 新目录生成 5 份供应商文件（图07）→ 项目落盘。全部写盘都走真实 `dev/server.cjs` 路由（`/api/export/prepare|commit|verify|inspect`、`/api/split/prepare|save`、`/api/project/save`）。
-- `host/com-host.ps1`：与 R12-D/E 同一隔离 COM 桥（SHA256 `855BD1D464ABE51D79142C2C9689C2E3BD226F728492450DE9FBDE8EA93C9762`，与 R12-D 原件一致）。
-- `audit-chain.py`：R12-F 双审计的 H 版（独立抄录公开预期矩阵、openpyxl 读实际 xlsx、逐值/版式/来源对账，供应商目录固定为 `询价输出-同格`）。
-- 恢复通道的方式（**需用户/环境决定，本包未自行改动系统**）：① 在 Codex 中允许 Computer Use 控制 WPS，然后按 R12-G 的真实侧栏主链执行；或 ② 恢复 WPS 的自动化入口注册（WPS 自带“配置工具/注册组件”，或 `et.exe /regserver`），再用隔离实例执行第4节驱动。两者都需要本机设置变更，本包未擅自执行。
+`outputs/wps-acceptance-20260927/R12-H/`
 
-## 5. 未完成项与下一包
+- `evidence/run-report.json`（14步逐步结果、内容键、填写/读回/链接/比较原始数据）、`evidence/two-layout-equivalence.json`（两布局差异报告）、`evidence/output-index.json`＋各文件 `-manifest/-python-audit/-node-audit/-node-input/-layout/-source-reconciliation.json`
+- `evidence/python-audit.log`、`evidence/node-audit.log`、`evidence/full-node-r12h.log`、`evidence/python-unit-r12h.log`
+- `screens/05b-summary-combined-filled.png`（同格汇总D/E两行+4链接+G列方式）、`screens/06-total-combined-pump.png`（5询价页+内部页）、`screens/07-split-valve-supplier.png`（新目录拆分件）
+- 通道取证：`evidence/host-blockers.json`、`evidence/probe-autosecurity.json`、`evidence/probe-workbooks.json`；驱动与桥：`host/run-r12h.cjs`、`host/com-host.ps1`、`host/capture-h.ps1`
 
-- 未完成：本包全部真机出口（同格汇总生成、两行填写与显示、4 链接、主按钮读回、两布局等价结论、图06/07真实输出、R12-F 逐值对账、05B 及后续截图）。
-- 明确挂账：R12-H 整体；插件UI内点按（原已挂 R12-J）；R12-I 及以后未开始。
-- R12 整体仍未完成；**不得**据本文件声称双布局等价或一期可用。
+## 7. 本包暴露并修复的**验收脚本**问题（不改产品）
+
+1. 隔离桥 `set` 走反射 SetProperty 在本机WPS（12.1.0.29161）对 `AutomationSecurity` 报 `E_INVALIDARG` → 增加“PowerShell原生赋值”回退。
+2. 桥的 `kind` 分支把 `else/elseif` 写在 `}` 下一行，PowerShell 把它当独立命令执行 → 改为同行写法；驱动据此改用“先问 kind 再取值/调用”，避免把方法名当属性读（本机WPS对方法名做 GetProperty 会返回“绑定方法对象”而不报错）。
+3. 代理返回值类型：属性必须 `typeof==='object'`（产品用该判断确认宿主支持 `Columns/Rows` 等），方法必须是可调用函数 → 按 kind 分流。
+4. `.ps1` 以 UTF-8 无 BOM 保存时 PowerShell 5.1 会按ANSI解码导致中文路径乱码 → 统一写成 UTF-8 with BOM。
+5. 截图窗口取 `GetAncestor(hwnd, GA_ROOT)`（COM 句柄是子窗口，直接截图只有 730×334）。
+6. 两行显示的行高阈值按宿主 `AutoFit` 结果（24pt）核定，不再用写死的28pt。
+
+## 8. 未完成与下一包
+
+- 未完成：**插件UI内点按**的同格链路（R12-H 的界面点按版本）——本会话 Computer Use 未授权，继续挂 R12-J；C历史独立缺项、E异常内容证明/重启同样挂 J。
+- 本包完成的是“真实WPS宿主＋插件真实代码＋真实发布管线”的同格等价与输出验收：双布局业务等价（`businessEquivalent=true`）、各有真实输出、6文件 R12-F 双审计逐值通过。
+- R12 整体仍未完成；R12-I（不合并/全跳过/边界）未开始，不得抢跑。
