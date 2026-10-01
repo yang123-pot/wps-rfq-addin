@@ -141,11 +141,28 @@ function expectedRows(mergeIdentical) {
   });
 }
 
+// R12-I 图01“分别保留清单”（默认不合并）：10行全部保留、不跨清单合并。
+// 水泵在两份清单里各出现DN50/DN65，来源边界不同则各成一行，数量不累加：1、1、1、2，合计仍4行。
+// 该口径只用于合成验收，不改变6.1节“合并8行”的固定样例。
+const SEPARATE_CATEGORY_ROWS = { pump: 4, valve: 2, fan: 2, 'ev-charger': 1 };
+function expectedSeparateRows() {
+  return collection.preview(buildCollection(), false).groups.map(function (group) {
+    return {
+      rowId: group.id, name: group.name, feature: group.feature, unit: group.unit,
+      quantity: group.quantity, scopeId: group.scopeId, sources: group.sources.length,
+      codes: (group.sources || []).map(function (source) { return source.code; })
+    };
+  });
+}
+
 const expectations = {
   input: { files: 2, rows: 10 },
   merged: { rows: 8 },
   inquiry: { rows: 7, sheets: 5, files: 5 },
   noInquiry: { rows: 1 },
+ // 不合并（分别保留清单）：不合并时行数、类别条数与询价材料数的固定口径。
+  separate: { rows: 10, outputRows: 10, categoryRows: SEPARATE_CATEGORY_ROWS, inquiryRows: 9, noInquiryRows: 1,
+    pumpQuantities: ['1', '1', '1', '2'], pumpSheetRows: 4, inquirySheets: 5, splitFiles: 5 },
   categoryFiles: 4,
   summaryRows: 4,
   order: ORDER.map(function (entry) { return keyOf(entry.name, entry.feature, entry.unit); }),
@@ -162,6 +179,7 @@ module.exports = {
   createMemory: function () { return categoryMemory.create(); },
   buildCollection: buildCollection,
   expectedRows: expectedRows,
+  expectedSeparateRows: expectedSeparateRows,
   rowIdOf: rowIdOf,
   keyOf: keyOf,
   validateLibrary: function () { return categoryLibrary.validate(library); },

@@ -33,6 +33,19 @@
    return next;
   });
  }
+ // R12-I：宿主单格上限（32767字符）与XML控制字符必须在模型边界明确拒绝，绝不交给宿主截断或报底层错误。
+ // 分类审核成果表、分类工作簿、品牌汇总、询价表都调用这里，保证“未截断”口径一致。
+ function guardValues(name,values){
+  var sheet=name||'工作表';
+  (values||[]).forEach(function(row,index){
+   (Array.isArray(row)?row:[]).forEach(function(value){
+    var text=value==null?'':String(value);
+    if(text.length>32767||/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(text))
+     throw Error('“'+sheet+'”第'+(index+1)+'行含超长文本或不支持字符，未截断，不能生成。');
+   });
+  });
+  return values;
+ }
  function rect(item,at,errors){
   if(!isObject(item)){errors.push(at+'区域无效。');return;}
   ['row','column'].forEach(function(field){
@@ -146,7 +159,7 @@
   return {row:row,column:column,rowSpan:rowSpan,columnSpan:columnSpan,listSheet:listSheet,listRange:listRange,
    allowBlank:true,inCellDropdown:true};
  }
- return {SCHEMA_VERSION:SCHEMA_VERSION,COLORS:COLORS,FONT_SIZE:FONT_SIZE,equalize:equalize,validate:validate,
+ return {SCHEMA_VERSION:SCHEMA_VERSION,COLORS:COLORS,FONT_SIZE:FONT_SIZE,equalize:equalize,guardValues:guardValues,validate:validate,
   assertValid:assertValid,build:build,toColor:toColor,headerFill:headerFill,inputFill:inputFill,linkFont:linkFont,
   listValidation:listValidation};
 }));

@@ -252,6 +252,7 @@
    ?'单格按两行填写：第一行“品牌：…”，第二行“供应商：…”。点击名称打开对应分类工作簿，例如：'+first.categoryName+' → '+first.file
    :'点击名称打开对应分类工作簿，例如：'+first.categoryName+' → '+first.file);
   values=layout.equalize(values,width);
+  layout.guardValues(SUMMARY_SHEET,values);          // 汇总表类别名/链接也不得超宿主单格上限
   var baseWidth=spec.name==='combined'?[6,20,10,26,26,26,22]:[6,20,10,16,18,16,18,16,18,20];
   var columns=[];
   for(rowIndex=0;rowIndex<width;rowIndex++){

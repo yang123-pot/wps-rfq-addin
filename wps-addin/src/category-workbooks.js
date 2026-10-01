@@ -150,6 +150,7 @@ function summarize(record){
    values.push(line);
   });
   values=layout.equalize(values,ROW_ID_COLUMN);
+  layout.guardValues(SHEET,values);
   var width=[6,16,20,30,8,10,14,12,12,18,26],lastRow=FIRST_ROW+entry.rows.length-1;
   var columns=width.map(function(value,index){return {index:index+1,width:value,
    hidden:index+1===ROW_ID_COLUMN,title:index<COLUMNS.length?COLUMNS[index]:'行标识'};});

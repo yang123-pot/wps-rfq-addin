@@ -249,6 +249,7 @@ function fromSnapshot(snapshot,binding,options){
    values.push(line);
   });
   values=layout.equalize(values,ROW_ID_COLUMN);   // 等宽矩阵：短标题行不再决定列宽
+  layout.guardValues(SHEET,values);               // 超宿主单格上限先在模型拒绝，不交给宿主截断
   var width=[6,16,22,8,10,14,12,16,20,3,26];
   var columns=width.map(function(value,index){return {index:index+1,width:value,
    hidden:index+1===ROW_ID_COLUMN,title:index<COLUMNS.length?COLUMNS[index]:'行标识'};});
