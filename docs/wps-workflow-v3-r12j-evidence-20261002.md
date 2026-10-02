@@ -113,3 +113,38 @@ node wps-addin/test/ui-cancel-check.cjs                        # PASS（选择�
 - ✔ 未完成项明确保留（第 4 节），未把“文件存在/SHA一致”当作内容正确，未把边界观察粉饰为缺陷已修。
 - ✔ 旧停摆存档、原输入件和已完成输出未被覆盖；原始运行数据只留本机 `outputs/`，不入 Git。
 - **下一包：R12-K**（功能区阶段快捷入口）。**本会话到此停止**，不开始 R12-K。
+
+## 7. 插件UI内点按尝试（2026-10-02，Computer Use 已授权）
+
+用户选择方案A（授权 Computer Use 后由我重试界面内点按）。本轮实际尝试与结果：
+
+| 观察 | 结果 |
+| --- | --- |
+| `sky.list_apps` / `list_windows` | 可用；WPS 起初没有窗口（只有后台进程），用 `et.exe` 路径启动后出现「工作簿1 - WPS Office」 |
+| 原生功能区 | **可注入**：点「项目询价」选项卡成功切换（先误点 WPS AI，按坐标校准后命中），点「打开询价助手」成功打开真实侧栏 |
+| 原生表格 | **可注入**：点表格区选中 C5、Y9，名称框同步变化，坐标基准正确 |
+| 侧栏（CEF 加载项面板） | **不响应注入鼠标**：连续 6 次点击（两次大按钮「浏览本机文件并导入（推荐）」、一次面板关闭×、一次步骤按钮、两次位移试探）面板内容完全无变化；滚轮注入也不滚动面板 |
+| 重建侧栏 | 点「打开询价助手」触发原生确认框「重建侧栏会清除尚未保存的页面修改…」；**注入鼠标点「确定」无效**，但**注入 Enter 生效**，侧栏被重建（说明键盘至少能到该对话框） |
+| 面板键盘焦点 | Tab 注入后面板无可见焦点变化，无法确认键盘能否在面板内导航 |
+
+**结论（如实记录，不冒充通过）：** Computer Use 现在**可以**驱动 WPS 原生界面（功能区、表格），但**加载项侧栏这一层（CEF）不接收注入的鼠标输入**，因此我无法自己完成"插件界面内点按"的整条链路；这与之前"Computer Use 未授权"是**不同的阻塞**，不再能用授权解决。
+
+**可行替代（下一步二选一）：**
+
+1. **半自动**：用户用真实鼠标按清单点侧栏，我在同一台机器上用 Computer Use 逐步观察并截图/核对文件内容，最后按"真实界面点按 + 真实输出"归档。
+2. **用户自点**：用户按清单完成 7 步，把成果目录告诉我，我用 openpyxl/项目记录独立核对输出并出证据。
+
+两种都不改变产品；只是把"谁来点"从注入输入改成人工点击。
+
+本轮现场准备（可复用，不入 Git）：隔离数据目录 `outputs/wps-acceptance-20260927/R12-J/ui-data/`（含夹具分类库，`host/seed-ui-library.cjs` 生成），开发服务命令——
+
+~~~powershell
+node wps-addin/dev/server.cjs --port 38891 `
+  --import-directory  "F:\材料软件开发\outputs\wps-acceptance-20260927\R12-J\ui-data\imports" `
+  --library-directory "F:\材料软件开发\outputs\wps-acceptance-20260927\R12-J\ui-data\library" `
+  --project-directory "F:\材料软件开发\outputs\wps-acceptance-20260927\R12-J\ui-data\projects" `
+  --header-directory  "F:\材料软件开发\outputs\wps-acceptance-20260927\R12-J\ui-data\headers" `
+  --split-directory   "F:\材料软件开发\outputs\wps-acceptance-20260927\R12-J\ui-data\splits"
+~~~
+
+清单（10 行合成样例）：`outputs/wps-acceptance-20260926/r12/inputs/给排水清单.xlsx`、`机电清单.xlsx`。
