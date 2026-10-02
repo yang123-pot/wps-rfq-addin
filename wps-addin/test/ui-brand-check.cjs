@@ -96,7 +96,15 @@ function summaryInitScript(context){
     return window.__openBooks.filter(item=>item.FullName===file)[0]||openBook(file,readOnly);
    }}};
  window.Application=app;window.__files=files;
- window.__setCell=function(row,column,value){storeFor(reviewTarget).cells[row+':'+column]=value;};
+ // R12-C 之后侧栏按业务内容比较“打开簿/磁盘内容”与已保存快照；表内修改要落值并持久化，
+ // 重载后成果表内容才与已保存确认一致（否则重开会正确判为“内容与已保存确认不一致”）。
+ window.__setCell=function(row,column,value){
+  const store=storeFor(reviewTarget);
+  store.cells[row+':'+column]=value;
+  const line=store.values[row-1]||(store.values[row-1]=[]);
+  line[column-1]=value;
+  try{window.localStorage.setItem('rfq-summary-review',JSON.stringify(store.values));}catch(_){}
+ };
  window.__seedReview=function(values){
   const copied=values.map(row=>row.slice());
   storeFor(reviewTarget).values=copied;storeFor(reviewTarget).cells={};

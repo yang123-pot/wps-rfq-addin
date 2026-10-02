@@ -1,4 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
+const {execFileSync}=require('node:child_process');
 const {createExportStore}=require('../dev/export-files.cjs');
 async function fixture(t){const root=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-export-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));return {root,store:createExportStore({directory:path.join(root,'staging')}),target:path.join(root,'清单.xlsx')};}
 const zip=Buffer.from([0x50,0x4b,0x03,0x04,1,2,3,4]);
@@ -178,4 +179,20 @@ test('inspect按记录SHA核对已发布文件，可发现缺失与外部改写'
  assert.equal((await store.inspect(target,result.sha256)).matches,false,'外部改写后不得沿用旧成功');
  await assert.rejects(store.inspect(path.join(root,'out.xls')),/绝对路径/);
  await assert.rejects(store.inspect('relative.xlsx'),/绝对路径/);
+});
+// R12-J 补强：只读目标目录必须在“写第一份”之前就明确拒绝，不产生任何目标文件，权限恢复后照常可用。
+test('R12-J：目标目录不可写时prepare先拒绝且不创建任何文件',{skip:process.platform!=='win32'},async t=>{
+ const {store,root}=await fixture(t),directory=path.join(root,'只读输出'),target=path.join(directory,'水泵.xlsx');
+ await fs.mkdir(directory,{recursive:true});
+ const lock=()=>execFileSync('icacls',[directory,'/deny','*S-1-1-0:(WD,AD,DC,DE)'],{encoding:'utf8'});
+ const unlock=()=>execFileSync('icacls',[directory,'/remove:d','*S-1-1-0'],{encoding:'utf8'});
+ lock();
+ try{
+  await assert.rejects(store.prepare(target),/不可写/,'只读目录必须在prepare阶段就拒绝，而不是等到逐份发布');
+  assert.deepEqual(await fs.readdir(directory),[],'拒绝时不得在只读目录里留下任何文件');
+ }finally{unlock();}
+ const prepared=await store.prepare(target);
+ assert.ok(prepared.ticket,'权限恢复后同一目标可以正常准备');
+ await fs.writeFile(prepared.stagePath,zip);
+ assert.deepEqual(await fs.readFile((await store.commit(prepared.ticket)).target),zip);
 });

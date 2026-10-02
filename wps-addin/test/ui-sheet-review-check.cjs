@@ -83,7 +83,15 @@ function initScript(context){
     return window.__openBooks.filter(item=>item.FullName===file)[0]||openBook(file,readOnly);
    }}};
  window.Application=app;window.__files=files;
- window.__setCell=function(row,column,value){storeFor(reviewTarget).cells[row+':'+column]=value;};
+ // R12-C 之后，侧栏会把“打开簿/磁盘内容”与已保存快照按业务内容比较；因此表内修改必须同时落到
+ // 这张表的值并持久化（相当于用户保存了 xlsx），否则重载后会被正确判为“内容与已保存确认不一致”。
+ window.__setCell=function(row,column,value){
+  const store=storeFor(reviewTarget);
+  store.cells[row+':'+column]=value;
+  const line=store.values[row-1]||(store.values[row-1]=[]);
+  line[column-1]=value;
+  try{window.localStorage.setItem('rfq-review-values',JSON.stringify(store.values));}catch(_){}
+ };
  window.__reviewSnapshot=function(){
   const store=storeFor(reviewTarget);
   return {values:store.values.map(row=>row.slice()),cells:store.cells};
@@ -254,6 +262,10 @@ async function run(options={}){
   assert.equal(await page.locator('#sheet-review-use-sheet').isVisible(),true);
   assert.equal(await page.locator('#sheet-review-restore-copy').isVisible(),true);
   await page.evaluate(({row})=>{window.__setCell(row,9,'');},{row:FAN_ROW});
+ // 清掉草稿改动后，像用户重进“表内审核”那样重新读回一次，侧栏才会按 R12-C 重新比较并回到“整表已确认”。
+ await page.locator('#workflow-nav .workflow-step-button[data-stage="matching"]').click();
+ await page.locator('#workflow-nav .workflow-step-button[data-stage="review"]').click();
+ await page.waitForFunction(()=>document.querySelector('#sheet-review-banner').textContent.includes('整表已确认'));
   // 留证：确认后的侧栏（图03）与表内实际值（含按一致/存在差异刷新过的“匹配情况”列）。
   assert.match(await page.locator('#sheet-review-banner').innerText(),/整表已确认/);
   if(SHOT)await page.screenshot({path:SHOT,fullPage:true});
@@ -274,6 +286,9 @@ async function run(options={}){
   assert.equal(reconfirmed.review.revision,2);
   assert.equal(reconfirmed.review.rows.filter(row=>row.categoryId==='valve').length,3);
   assert.equal(reconfirmed.review.rows.filter(row=>row.categoryId==='fan').length,1);
+ // 整表确认成功后侧栏会进入下一步（分类工作簿）；409 负例要回到“表内审核”再点整表确认。
+ await page.locator('#workflow-nav .workflow-step-button[data-stage="review"]').click();
+ await page.waitForFunction(()=>!document.querySelector('#stage-panel-review').hidden);
   // R12-C：项目保存冲突(409)——保留表内最新值与已存快照，不覆盖、不学习，并回滚为已存确认。
   const reviewFile=await projectFile(),conflictBase=await projectRecord();
   const memoryBefore409=JSON.stringify((await store.load()).memory);

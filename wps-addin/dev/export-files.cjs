@@ -16,6 +16,24 @@ function isStaleStageName(name,base){
  if(!/^[0-9a-f]{12}\.xlsx$/i.test(tail))return false;
  return true;
 }
+// R12-J 补强：目标目录不可写（只读目录/只读卷）时，必须在准备阶段就明确拒绝，而不是等到逐份
+// commit 才逐个失败。只创建一个隐藏探测文件并立即删除，不写任何目标文件，也不留下半成品。
+async function assertWritableDirectory(destination){
+ const parent=path.dirname(destination),base=path.basename(destination);
+ for(let attempt=0;attempt<3;attempt++){
+  const probe=path.join(parent,'.'+base+'.wchk-'+crypto.randomBytes(6).toString('hex')+'.tmp');
+  let handle=null;
+  try{handle=await fs.open(probe,'wx');}
+  catch(error){
+   if(error.code==='EEXIST')continue;
+   throw Error('保存目录不可写，未写入任何文件：'+parent+'（'+String(error.code||error.message)+'）');
+  }
+  try{await handle.close();}catch(_){/* 关闭失败不影响判定 */}
+  try{await fs.rm(probe,{force:true});}catch(_){/* 探测文件残留不影响结果 */}
+  return;
+ }
+ throw Error('保存目录不可写，未写入任何文件：'+parent+'（探测文件名连续冲突）');
+}
 function createExportStore({directory}){
  const tickets=new Map(),owned=new Map(),root=path.resolve(directory);
  // 只有在本进程prepare里登记过的相邻暂存路径才算“可证明属于本插件”的残留。
@@ -54,6 +72,7 @@ function createExportStore({directory}){
   const parent=await fs.realpath(path.dirname(target)),destination=path.join(parent,path.basename(target));
   if(!(await fs.stat(parent)).isDirectory())throw Error('保存目录不存在。');
   await absent(destination);
+  await assertWritableDirectory(destination);
   for(const [id,entry] of tickets)if(Date.now()-entry.created>3600000)tickets.delete(id);
   if(tickets.size>=100)throw Error('另存会话过多，请重启开发服务后重试。');
   // 带相对超链接的汇总表必须在最终目录里的唯一相邻暂存生成，否则地址基准会落在中心暂存目录，整目录搬移后链接失效。
