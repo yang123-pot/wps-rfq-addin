@@ -4,7 +4,10 @@
 
 **基线/包提交：** 分支 `feat/wps-phase1`，本会话开工 HEAD `7d33032f77260cc6ef29533ac28ecaece7d6c65e`
 （提示词记录的 `63dde1e9…` 是更早拆分时的快照，代码基线 `e6f8ff26…` 未变）。开工工作区只有 1 个未提交修改
-`wps-addin/dev/pane-diagnostics.js`（原样保留、未暂存）。包提交与远程 SHA 以实际 `git` 结果为准。
+`wps-addin/dev/pane-diagnostics.js`（原样保留、未暂存）。
+**包提交 `4b89954d1b2a6d670b070404ad3c0d7e43fe21fa`，已 `git push origin feat/wps-phase1`；
+`git rev-parse HEAD` 与 `git ls-remote origin refs/heads/feat/wps-phase1` 逐位相同。**本机回执
+`outputs/wps-acceptance-20260927/R12-K/backup-receipt.json`。
 
 **对应图：** 图01、图07 及现有七步导航，开工前实际打开查看。图01 功能区“项目询价”选项卡含七个阶段图标
 （导入清单/自动分类/表内审核/分类工作簿/品牌汇总/询价表/拆分文件），侧栏显示同一七步导航；图07 第7步高亮，
