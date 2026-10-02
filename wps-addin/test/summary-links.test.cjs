@@ -256,7 +256,8 @@ test('模拟宿主：汇总表单页写入，链接/下拉/字体/隐藏列落�
   assert.equal(links[0].Address,'分类工作簿\\水泵.xlsx','链接必须是相对地址，整目录搬移仍可点开');
   assert.equal(links[0].TextToDisplay,'水泵');
   const modeCell=fixture.ranges.get(addr(spec.validations[0]));
-  assert.equal(modeCell.Validation.Formula1,"='分类汇总表'!$"+columnName(workbook.auxOptions)+"$1:$"+columnName(workbook.auxOptions)+"$2");
+ // R12-J 真机纠正：简单中文表名不加引号，WPS 才会存成区域引用（加引号会被存成字面量、下拉失效）。
+ assert.equal(modeCell.Validation.Formula1,"=分类汇总表!$"+columnName(workbook.auxOptions)+"$1:$"+columnName(workbook.auxOptions)+"$2");
   spec.columns.filter(column=>column.hidden).forEach(column=>assert.equal(fixture.widths.get('c'+column.index).Hidden,true));
   assert.equal(fixture.app.ActiveWindow.FreezePanes,true,'冻结表头');
   assert.equal(workbook.sheets[0].values[0].length,expectedWidth,'单页等宽矩阵');

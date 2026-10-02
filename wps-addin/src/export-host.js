@@ -20,6 +20,15 @@
     return String(value==null?'':value).replace(/[\s\u3000]+/g,'').replace(/^=+/,'').replace(/'/g,'').toUpperCase();
   }
   function formulaMatches(actual,expected){return normalizeFormula(actual)===normalizeFormula(expected);}
+  // R12-J 真机（2026-10-02）实测：WPS JSA 路径把跨表来源写成 '内部选项'!$B$2:$B$7 时，
+  // 保存出来的是字面量 "内部选项'!$B$2:$B$7"，下拉只剩一个原始文本项（分类下拉等于失效）；
+  // 简单名称（中文/字母/数字/下划线等，不含空格与特殊字符）不加引号，宿主才会存成区域引用。
+  var SIMPLE_SHEET_NAME=/^[0-9A-Za-z_\u4e00-\u9fff.\-]+$/;
+  function sheetReference(name){
+    var raw=String(name==null?'':name);
+    return SIMPLE_SHEET_NAME.test(raw)?raw:"'"+raw.replace(/'/g,"''")+"'";
+  }
+  function validationFormula(rule){return '='+sheetReference(rule.listSheet)+'!'+rule.listRange;}
   function selectTarget(app,suggested){
     var target=app.GetSaveAsFilename(suggested,'Excel 工作簿 (*.xlsx),*.xlsx',1,'另存内部清单（不覆盖已有文件）');
     if(target===false||target===null||target==='')return null;
@@ -103,7 +112,7 @@
       var range=sheet.Range(address(rule));
       if(!range.Validation||typeof range.Validation.Add!=='function')
         throw Error('当前WPS不支持数据有效性API（Validation.Add），未按获批版式输出“'+sheet.Name+'”。');
-      var formula="='"+String(rule.listSheet).replace(/'/g,"''")+"'!"+rule.listRange;
+      var formula=validationFormula(rule);
       if(typeof range.Validation.Delete==='function')range.Validation.Delete();
       range.Validation.Add(3,1,1,formula,'');
       range.Validation.InCellDropdown=rule.inCellDropdown!==false;
@@ -210,7 +219,7 @@
       });
       (spec.validations||[]).forEach(function(rule){
         var range=sheet.Range(address(rule));
-        var formula="='"+String(rule.listSheet).replace(/'/g,"''")+"'!"+rule.listRange;
+        var formula=validationFormula(rule);
         var typeOk=!!(range.Validation&&(range.Validation.Type==null||Number(range.Validation.Type)===3));
         if(!(typeOk&&formulaMatches(range.Validation&&range.Validation.Formula1,formula)))
           throw Error('“'+s.name+'”分类下拉读回不一致：'+address(rule));

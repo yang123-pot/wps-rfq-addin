@@ -303,7 +303,9 @@ test('落地获批版式：等宽矩阵、列宽、表头填充、冻结、打�
  assert.equal(h.sheets[0].PageSetup.PrintTitleRows,'$3:$3','打印重复表头');
  assert.deepEqual(h.links['B4'].map(function(item){return item.Address+'|'+item.TextToDisplay;}),
   ['C:\\out\\分类工作簿\\阀门.xlsx|阀门'],'用原生超链接，显示类别名');
- assert.equal(h.validations['H4'],"='内部选项'!$A$1:$A$5",'分类下拉用区域引用，避免类别名被拆开');
+ // R12-J 真机（2026-10-02）纠正：中文表名再加单引号会被 WPS JSA 存成字面量（下拉失效），
+ // 简单名称必须不加引号，宿主才会存成区域引用。
+ assert.equal(h.validations['H4'],"=内部选项!$A$1:$A$5",'分类下拉用区域引用，避免类别名被拆开');
  assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx','用户工作簿保持活动');
  assert.equal(h.app.AutomationSecurity,1,'宏安全设置恢复');
 });
@@ -448,7 +450,7 @@ test('宿主回读去掉等号的同一区域时按等价通过，下拉区域�
   {rowCount:values.length,columnCount:10});
  const h=layoutFixture({validationEchoBare:true});
  host.write(h.app,{sheets:[{name:'材料明细',values:values,layout:spec}]},'C:\\temp\\rfq-layout.xlsx');
- assert.equal(String(h.validations['G3']).replace(/^=/,''),"'内部选项'!$A$1:$A$5",'只落到G3一个区域');
+ assert.equal(String(h.validations['G3']).replace(/^=/,''),"内部选项!$A$1:$A$5",'只落到G3一个区域');
  assert.equal(h.saved,true,'等价回读不阻断保存快照');
 });
 
@@ -582,4 +584,20 @@ test('隐藏辅助列按Hidden判定，不因隐藏列宽读回0而阻断',()=>{
  assert.equal(h.sheets[0].Columns.Item(11).ColumnWidth,0,'隐藏列的宽度在WPS里读回0');
  assert.equal(h.saved,true,'隐藏列宽读回0不得阻断生成');
  assert.equal(h.sheets[0].Columns.Item(8).ColumnWidth,16,'可见列宽仍按版式读回校对');
+});
+
+// R12-J 真机（2026-10-02）：简单中文表名不加引号（宿主存区域引用）；名字含空格等特殊字符时才加引号。
+test('下拉来源：简单表名不加引号，含空格/特殊字符的表名才加引号',()=>{
+ const layoutModule=require('../src/workbook-layout.js');
+ const values=layoutModule.equalize([['标题'],['序号','项目名称'],['1','水泵']],8);
+ function writeWith(sheetName){
+  const spec=layoutModule.build({columns:[{index:1,width:8},{index:2,width:20}],headerRows:[2],
+   validations:[layoutModule.listValidation(3,2,1,1,sheetName,'$A$1:$A$5')]},{rowCount:values.length,columnCount:8});
+  const h=layoutFixture();
+  host.write(h.app,{sheets:[{name:'材料明细',values:values,layout:spec}]},'C:\\temp\\rfq-layout.xlsx');
+  return h.validations['B3'];
+ }
+ assert.equal(writeWith('内部选项'),"=内部选项!$A$1:$A$5",'简单中文表名不加引号，避免被存成字面量');
+ assert.equal(writeWith("汇总 表"),"='汇总 表'!$A$1:$A$5",'含空格的表名仍需按公式语法加引号');
+ assert.equal(writeWith("It's 选项"),"='It''s 选项'!$A$1:$A$5",'名称里的单引号按公式语法双写');
 });
