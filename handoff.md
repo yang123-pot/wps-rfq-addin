@@ -643,6 +643,8 @@ R12-J明确清单：`wps-addin/dev/export-files.cjs`（只读目录`prepare`预�
 
 仓库F:\材料软件开发，分支feat/wps-phase1，远程yang123-pot/wps-rfq-addin。禁止盲目暂存整个目录，禁止强推。
 
+R12-J 真机点按收尾现场（2026-10-02，用户确认）：桌面整理为 `C:\Users\刘杨\Desktop\金\{初审(2).xls, 送审.xls, 询价输出\{总询价簿+5供应商件}}`（用户原始文件未动）；`ui-data\out\` 保留审核成果表、4分类工作簿、在用汇总表 `_203021`，两份重复汇总表移到 `evidence\ui-clickthrough\dup-summaries\`。项目一致性核对：项目 `p-muqwnrhh-529or44y` revision 18、七阶段全 ready、审核成果表与确认快照 8/8 行一致、4 分类簿 SHA 全对。**因整理移动，项目记录里总簿/拆分件的路径已是旧路径（重开项目会报缺失，非缺陷）；用户决定保持整洁布局、该项目记录作为历史存档**，全套副本与 SHA 在 `evidence/ui-clickthrough/`。详见[R12-J证据第10节](docs/wps-workflow-v3-r12j-evidence-20261002.md)。
+
 ~~~powershell
 git status --short
 # git add -- 后逐一列实际文件，禁止 git add . / git add -A
