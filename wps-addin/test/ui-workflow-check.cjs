@@ -45,6 +45,13 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
      const book={Name:name,FullName:file,Worksheets:{Count:1,Item(){return sheet;}},Activate(){app.ActiveWorkbook=this;},Close(){}};
      app.ActiveWorkbook=book;return book;
     }}};
+   // R12-K：功能区页与侧栏页共用 Application.PluginStorage；用 sessionStorage 承载，模拟侧栏重建后请求仍在。
+   const backing=window.sessionStorage;
+   app.PluginStorage={
+    getItem(key){return backing.getItem('plugin:'+key);},
+    setItem(key,value){backing.setItem('plugin:'+key,String(value));},
+    removeItem(key){backing.removeItem('plugin:'+key);}
+   };
    window.Application=app;window.__files=files;
   },{files,drain:DRAIN,mep:MEP});
   const origin='http://127.0.0.1:'+server.address().port;
@@ -171,6 +178,65 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.equal(cancelled.gone,true,'取消后选择器关闭');
   assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage'),'matching',
    '取消不得改变当前阶段');
+
+  // R12-K：功能区阶段快捷入口只导航，不触发确认/学习/写表/拆分。
+  await page.evaluate(()=>{
+   window.__rfqSideEffects={writes:0,confirms:0,fetch:0};
+   ['RfqClassificationReviewHost','RfqCategoryWorkbooks','RfqBrandHost','RfqExportHost'].forEach(name=>{
+    const host=window[name];if(!host||typeof host!=='object')return;
+    Object.keys(host).forEach(key=>{
+     const fn=host[key];
+     if(typeof fn!=='function'||!/(write|generate|commit)/i.test(key))return;
+     host[key]=function(){window.__rfqSideEffects.writes++;return fn.apply(this,arguments);};
+    });
+   });
+   const nativeConfirm=window.confirm;
+   window.confirm=function(){window.__rfqSideEffects.confirms++;return nativeConfirm.apply(window,arguments);};
+   const nativeFetch=window.fetch;
+   window.fetch=function(){window.__rfqSideEffects.fetch++;return nativeFetch.apply(window,arguments);};
+  });
+  const navStages=['import','matching','review','categories','brands','inquiry','split'];
+  const navLabels=['导入与合并','自动分类','表内审核','分类工作簿','品牌汇总','询价表','拆分文件'];
+  for(let index=0;index<navStages.length;index++){
+   await page.evaluate(stage=>{
+    window.Application.PluginStorage.setItem('rfq.nav.request',JSON.stringify({id:'nav-ui-'+Date.now()+'-'+stage,stage:stage}));
+    window.dispatchEvent(new Event('focus'));
+   },navStages[index]);
+   await page.waitForFunction(stage=>{
+    const current=document.querySelector('#workflow-nav .workflow-step-button.is-current');
+    return !!current&&current.getAttribute('data-stage')===stage;
+   },navStages[index]);
+   assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current .workflow-step-label').innerText(),
+    navLabels[index],'阶段入口应定位到对应步骤');
+   assert.equal(await page.evaluate(()=>window.Application.PluginStorage.getItem('rfq.nav.request')),null,
+    '导航请求只消费一次，消费后立即移除');
+  }
+  // 非法阶段：不改变当前阶段，请求被丢弃。
+  await page.evaluate(()=>{
+   window.Application.PluginStorage.setItem('rfq.nav.request',JSON.stringify({id:'nav-ui-bad',stage:'not-a-stage'}));
+   window.dispatchEvent(new Event('focus'));
+  });
+  await page.waitForTimeout(900);
+  assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage'),'split',
+   '非法阶段不得改变当前阶段');
+  assert.equal(await page.evaluate(()=>window.Application.PluginStorage.getItem('rfq.nav.request')),null,'非法请求应被丢弃');
+  const sideEffects=await page.evaluate(()=>window.__rfqSideEffects);
+  assert.deepEqual(sideEffects,{writes:0,confirms:0,fetch:0},'快捷导航不得触发业务动作：'+JSON.stringify(sideEffects));
+  // 侧栏重建：未消费的请求在打开时应用；已消费的请求不重播。
+  await page.evaluate(()=>{
+   window.Application.PluginStorage.setItem('rfq.nav.request',JSON.stringify({id:'nav-ui-rebuild',stage:'categories'}));
+  });
+  await page.reload();
+  await page.waitForFunction(()=>{
+   const current=document.querySelector('#workflow-nav .workflow-step-button.is-current');
+   return !!current&&current.getAttribute('data-stage')==='categories';
+  });
+  assert.equal(await page.evaluate(()=>window.Application.PluginStorage.getItem('rfq.nav.request')),null,
+   '重建后请求只消费一次');
+  await page.reload();
+  await page.waitForFunction(()=>document.querySelectorAll('#workflow-nav .workflow-step').length===7);
+  assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage'),'import',
+   '侧栏重建不得重播已消费的导航请求');
 
   // 窄侧栏可用：无横向滚动，七个步骤都在。
   await page.setViewportSize({width:340,height:900});

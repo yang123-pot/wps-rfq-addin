@@ -113,7 +113,7 @@
   });
   if(config.stageState)stageState=config.stageState;
   show();
-  return {goTo:goTo,current:function(){return current;},
+  var handle={goTo:goTo,current:function(){return current;},
    panel:function(stage){
     var found=STEPS.filter(function(item){return item.id===stage;})[0];
     return found?stepPanel(found):null;
@@ -130,6 +130,12 @@
     show();
    },
    refresh:show};
+  // R12-K：功能区阶段快捷入口只导航。导航请求写在共享的 Application.PluginStorage 上，这里每个请求只消费一次；
+  // 未打开时留待本次启动消费，已打开时靠低频“导航请求检查”接力（不重载页面，也不触发确认/学习/写表/拆分）。
+  if(window.RfqRibbonNavigation&&window.Application&&window.Application.PluginStorage){
+   window.RfqRibbonNavigation.watch(window.Application.PluginStorage,handle);
+  }
+  return handle;
  }
  window.RfqWorkflowUI={create:create,STEPS:STEPS};
 }());

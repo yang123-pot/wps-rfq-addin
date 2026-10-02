@@ -1,4 +1,5 @@
 document.write('<script src="src/host.js"><\/script>');
+document.write('<script src="src/ribbon-navigation.js"><\/script>');
 
 function OnAddinLoad(ribbonUI) {
   window.Application.PluginStorage.setItem('rfq.ribbon.loaded', true);
@@ -22,6 +23,21 @@ function OnOpenRfqPane() {
     pane.Visible = true;
     try { pane.Width = 380; } catch (_) { /* The host may manage pane width. */ }
     return true;
+  } catch (error) {
+    alert('无法打开项目询价侧栏：' + error.message);
+    return false;
+  }
+}
+
+// R12-K：功能区“阶段快捷入口”。只打开/聚焦侧栏并把一个 {id,stage} 导航请求交给侧栏，
+// 不执行确认、学习、写表或拆分，也不传递材料内容；阶段自身的前置条件仍由各阶段原按钮判定。
+function OnGotoStage(control) {
+  try {
+    // 旧开发服务可能还没提供新增导航脚本；此时不打开侧栏、也不误报，避免影响原有打开/重建入口。
+    if (!window.RfqRibbonNavigation) return false;
+    var stage = window.RfqRibbonNavigation.stageFromControl(control);
+    if (!stage) return false;
+    return window.RfqRibbonNavigation.openStage(window.Application, stage);
   } catch (error) {
     alert('无法打开项目询价侧栏：' + error.message);
     return false;

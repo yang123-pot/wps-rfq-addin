@@ -3,7 +3,16 @@
   <ribbon startFromScratch="false">
     <tabs>
       <tab id="rfqProjectTab" label="项目询价">
-        <group id="rfqWorkspace" label="招标清单整理">
+        <group id="rfqStages" label="阶段导航">
+          <button id="rfqStageImport" label="导入清单" size="large" tag="import" onAction="OnGotoStage" getImage="GetRfqImage"/>
+          <button id="rfqStageMatching" label="自动分类" size="large" tag="matching" onAction="OnGotoStage" getImage="GetRfqImage"/>
+          <button id="rfqStageReview" label="表内审核" size="large" tag="review" onAction="OnGotoStage" getImage="GetRfqImage"/>
+          <button id="rfqStageCategories" label="分类工作簿" size="large" tag="categories" onAction="OnGotoStage" getImage="GetRfqImage"/>
+          <button id="rfqStageBrands" label="品牌汇总" size="large" tag="brands" onAction="OnGotoStage" getImage="GetRfqImage"/>
+          <button id="rfqStageInquiry" label="询价表" size="large" tag="inquiry" onAction="OnGotoStage" getImage="GetRfqImage"/>
+          <button id="rfqStageSplit" label="拆分文件" size="large" tag="split" onAction="OnGotoStage" getImage="GetRfqImage"/>
+        </group>
+        <group id="rfqWorkspace" label="侧栏">
           <button id="rfqOpenPane" label="打开询价助手" size="large" onAction="OnOpenRfqPane" getImage="GetRfqImage"/>
           <button id="rfqReloadPane" label="侧栏停住时重建" onAction="OnReloadRfqPane"/>
         </group>
