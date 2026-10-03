@@ -409,3 +409,5 @@ G/H复审总簿采用internal-total、10个供应商件采用supplier，完整�
 11:48（北京时间）核实38891无监听、原隔离服务进程已不存在；此前报告最后心跳为09:53:27，早于此次用户反馈，不能用于证明这次点击是否进入回调。11:50恢复同一隔离数据目录的服务，`/health`返回probe；新报告另存 `evidence/pane-report-recovery-20261003-115047.json`，保留旧报告。现有probe输出文件保留，自动探针的“目标已存在”检查会阻止重写，不把它计为导航无写入证据。服务停止原因仍未知。
 
 只读磁盘审计 `c-preparation/evidence/disk-recovery-entry-20261003-115x.json` 对照 `disk-k-entry.json`：仍0项目、库revision0、0学习来源；这是磁盘状态，不能证明打开簿的未保存单元格或实际点击者。恢复回执及用户反馈分别为 `evidence/service-recovery-current.json`、`evidence/recovery-user-results.json`，截图 `evidence/wps-recovery-before-reopen.jpg`。下一步由用户重开已保存入口簿，取得新paneSession/当前receivedAt后，再核回调、两导航键、侧栏当前阶段和出帧；C/K与R12仍未通过，产品导航代码未改。
+
+本机 `evidence/nav-probe/` 已准备独立只读诊断入口，**未启动、未用于WPS实机**。它复用真实 `createServer`，仅向三个HTML入口注入诊断：功能区记录原回调的进入/返回/异常、已知控件标量与导航模块就绪，两页只读 `rfq.nav.request/consumed`，侧栏读取当前DOM阶段；移除启动页的自动工作簿探针。产品源码及受保护pane文件未改。根独立运行 `verification.cjs` 退出0、16项检查通过，真实临时HTTP服务核57静态资源与磁盘逐字节相同，并验证原回调this/参数/结果/异常保持、观察器存储写入和宿主动作0、临时五目录内容不变；日志 `evidence/nav-probe/_verification-2026-10-03T04-05-25-075Z-1f2b9f/verification.log`。这些诊断验证仍为临时HTTP/模拟接口，不能证明实际WPS回调已执行。当前先等待原恢复服务下的用户重开结果，再决定是否启用该诊断入口。
