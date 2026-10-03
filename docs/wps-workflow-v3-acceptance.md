@@ -384,6 +384,8 @@ G/H复审总簿采用internal-total、10个供应商件采用supplier，完整�
 
 **R12仍未完成。** 本轮入口为 `feat/wps-phase1`@`80392a12b8c05b2a98a9d79b85d8d0d8e817335f`，证据另存本机 `outputs/wps-acceptance-20261003/R12-L-supplement/`，保留前轮L及G–J有效证据。用户已同意真实鼠标配合，并保存空白入口簿保护副本后重开WPS。当前可读取和点击实际 `wps.exe` 表格窗口；前轮et授权拒绝属于历史，不能继续当作当前错误。
 
+当前补验进度：C07真人降序/筛水泵后，root实际点保存草稿，独立磁盘25/25及新pane8/8通过；revision4草稿完整8行按8→1保留，未确认/学习/生成分类簿。root取消筛选、真人升序恢复及root上下部复核已留证，C07该协议已补；草稿未再次保存，持久顺序仍降序。下一项C08重开确切版本4项目核差异、恢复新副本并保存新绑定，C08–C13未执行，C/K及四项目全链仍未完成。详细范围与证据见本节末尾。
+
 ### 功能区图标最小修复及回归
 
 七阶段原共用询价图标，本轮仅调整 `main.js:GetRfqImage`，按控件ID返回六个新增本地静态SVG及既有询价SVG；服务增加六条明确资源白名单，补资源映射、路由和发布包含测试。`OnGotoStage`、导航桥、ribbon.xml及业务流程保持原内容。相关四文件测试先红34通过/4预期失败，再绿38/38；全量Node **394/394**，失败/取消/跳过/todo均0。指定workflow、sheet-review、brand、inquiry、split、project及追加restore共 **7/7** 浏览器脚本退出0，宿主接口仍为模拟，不能代替真机。
@@ -490,4 +492,18 @@ C05及两项C06临时改动均已恢复，保留C01未保存的H10分类/I10草�
 
 **新会话接入及C07准备**：root工具点原“侧栏停住时重建”并确认，实际新侧栏显示，截图`c07-service-rebuild-confirm-20261003.jpg`、`c07-new-pane-visible-20261003.jpg`。随后在辅助区打开唯一项目`p-murytt8g-b1dgbi43`版本3，实际恢复8/8草稿，回第3步及仍有未保存编辑的审核簿；截图`c07-reopened-project-native-unsaved-20261003.jpg`。封存报告`c07-new-session-reopen-pane-report-20261003.json`记录新paneSession `6f5b822ca7198922`、真实心跳至20:18:27（12:18:27Z），PID13640仍监听；**本次新会话接入已核，不代表长期稳定性通过**。
 
-C07仍进行中：root拖选A3:L11，包含隐藏K行标识和额外空L列；自定义排序子窗口工具激活失败，已请求真人选择“序号”降序、含标题并确定，结果尚待反馈。未计排序/筛选全表读回通过。下一步直接继续C07，C08–C13待补。
+C07排序前的准备时点：root拖选A3:L11，包含隐藏K行标识和额外空L列；自定义排序子窗口工具激活失败，当时请求真人选择“序号”降序、含标题并确定。该时点尚未计排序/筛选全表读回通过，后续结果如下。
+
+### C07排序筛选全表草稿读回（2026-10-03追加）
+
+**排序/筛选由真人完成，保存草稿由root执行。** 用户实际按序号降序8→1，再只筛项目名称水泵2条，反馈`c07-human-{sort,filter}-feedback-20261003.json`分别留存；root实际截图复核，`c07-human-descending-visible-20261003.jpg`显示降序，`c07-human-filter-two-pumps-visible-20261003.jpg`显示两条水泵。随后root实际点侧栏“保存审核成果”，截图`c07-filtered-root-draft-eight-20261003.jpg`显示8/8草稿提示。未点WPS保存，也未成功整表确认。
+
+独立只读`audit-c07-sorted-filtered-draft.py`对比C01基线及`disk-c07-filtered-draft-root-save-20261003.json`，`c07-sorted-filtered-draft-audit-20261003.json` **25/25通过**：draft全部8行、rowId集合及唯一性保持，按rowId的序号/名称/特征/单位/工程量、最终分类和备注均不变，保存后的列表顺序8→1；不是只保存筛选可见的2行。唯一项目`p-murytt8g-b1dgbi43` revision3→4，savedAt为20:34:24.954（12:34:24.954Z），draft8/filled8，binding/inputKey保持；review=null、无分类输出，库revision0/学习来源0，原件/导入副本/当前审核簿SHA及下游记录不变。审计前后输入证据字节不变。
+
+同次新封存报告`c07-filtered-root-save-pane-report-20261003.json`由独立只读审计核得 **8/8通过**，结果`c07-independent-pane-save-audit-20261003.json`：新paneSession `6f5b822ca7198922`于20:34:24.927（12:34:24.927Z）记录`sheet-review-save` click，20:34:27.055记录“审核草稿已保存（8 / 8 行已填），尚未确认、未学习、未生成分类工作簿。”，项目由版本3到4，未见scriptError。没有借用旧C04 click。**磁盘只证明草稿保存及其内容/顺序；真人排序筛选和root点击由各自反馈、实际画面及新报告分别证明。** 磁盘审核xlsx未另存，不能把草稿顺序视为该xlsx的持久排序。
+
+**取消筛选/升序恢复已完成**：root CtrlShiftL取消筛选，实际图`c07-filter-cancelled-visible-20261003.jpg`留存。随后A3选区CtrlShiftEnd两次无响应、没有变值；转请真人通过名称框选择A3:K11、按序号升序并含标题恢复原顺序。用户已反馈“已恢复升序，第一行水泵 DN50”，独立封存`c07-human-ascending-feedback-20261003.json`；root实际核顶部序号1–6升序、首行水泵DN50/工程量2，PageDown核物理10/11行为序号7充电桩配电箱/汽车充电桩、8钢索/无需询价，图为`c07-human-ascending-restored-{top,bottom}-20261003.jpg`。C07该协议已补，升序是当前未保存画面；草稿未再次保存，revision4持久快照仍8→1，不称已保存升序。root另封存`disk-c07-after-ascending-restored-20261003.json`，比较项目仍版本4、库/输入/确认不变；五个trackedFiles现取SHA与上述审计一致，该复核不扩大25/25的范围。
+
+**下一项C08，尚未执行**：三文档审查备份后，仅关闭本C审核簿且不保存，重开确切项目`p-murytt8g-b1dgbi43`版本4；在第3步核草稿与磁盘差异，恢复项目草稿到新副本，保存项目的新绑定并留证。C08–C13恢复/确认幂等与学习边界未执行；C/K、四项目及R12整体仍未完成，R13不开始。
+
+最近状态备份`7b74b478f2a9691a35f86486cc99a627f7f9dfcc`已普通推送且远程SHA一致；本次C07记录仍由root审查后按三文档清单备份。产品源码及受保护pane未改，未重跑已通过的404项回归；详细私有证据仅留本机忽略目录。
