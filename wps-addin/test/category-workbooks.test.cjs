@@ -166,7 +166,7 @@ test('绑定必须带项目编码与来源边界：R6从成果表内部绑定取
 // 模拟宿主：只实现export-host真正用到的API，用来验证逐份写入、版式落地与重开读回。
 function fakeApp(){
   const state={created:0,opened:0,closed:0,saved:[],written:{}};
-  let active=null,lastSaved=null;
+  let active=null,lastSaved=null,activeSheet=null,frozen=false;
   const previous={FullName:'C:\\user.xlsx',Activate(){active=this;},Close(){assert.fail('user book closed');}};
   active=previous;
   function newSheet(name){
@@ -175,7 +175,8 @@ function fakeApp(){
     function range(address){
       if(ranges.has(address))return ranges.get(address);
       const target={NumberFormat:'',value:null,WrapText:null,HasFormula:false,MergeCells:false,
-        Font:{Size:null,Bold:false},Rows:{AutoFit(){}},Interior:{Color:null},Select(){this.selected=true;},
+        Font:{Size:null,Bold:false},Rows:{AutoFit(){}},Interior:{Color:null},
+        Select(){assert.equal(activeSheet,sheet,'只能在当前工作表选择冻结锚点');this.selected=true;},
         Merge(){this.MergeCells=true;},
         get Value2(){return this.value;},
         set Value2(values){
@@ -184,7 +185,7 @@ function fakeApp(){
         }};
       ranges.set(address,target);return target;
     }
-    return {Name:name||'Sheet',Range:range,
+    const sheet={Name:name||'Sheet',Activate(){activeSheet=sheet;},Range:range,
       Cells:{Item(row,column){return range(columnName(column)+row);}},
       Columns:{Item(index){
         if(!columns.has(index))columns.set(index,{ColumnWidth:null,Hidden:false});
@@ -194,13 +195,15 @@ function fakeApp(){
         return rows.get(index);}},
       PageSetup:{PrintArea:null,PrintTitleRows:null},
       __ranges:ranges,__columns:columns,__rows:rows,__state:sheetState};
+    return sheet;
   }
   function makeBook(){
     const sheets=[newSheet('Sheet1')];
+    activeSheet=sheets[0];
     return {FullName:'Book'+state.created,
       Worksheets:{get Count(){return sheets.length;},
         Item(requested){return typeof requested==='number'?sheets[requested-1]:sheets.filter(s=>s.Name===requested)[0];},
-        Add(){const sheet=newSheet('Sheet');sheets.push(sheet);return sheet;}},
+        Add(){const sheet=newSheet('Sheet');sheets.push(sheet);activeSheet=sheet;return sheet;}},
       SaveAs(file,format){
         assert.equal(format,51,'必须以xlsx格式独占保存');
         this.FullName=file;lastSaved=this;state.saved.push(file);
@@ -213,7 +216,10 @@ function fakeApp(){
       __sheets:sheets};
   }
   const app={AutomationSecurity:1,FileSystem:{Exists:()=>false},
-    get ActiveWorkbook(){return active;},ActiveWindow:{FreezePanes:false},
+    get ActiveWorkbook(){return active;},ActiveWindow:{
+      get FreezePanes(){return frozen;},set FreezePanes(value){
+        assert.ok(activeSheet,'冻结前必须有活动工作表');frozen=value===true;state.frozenSheet=activeSheet.Name;
+      }},
     Workbooks:{Count:1,Item(){return previous;},
       Add(){const book=makeBook();state.created++;active=book;return book;},
       Open(file,links,readonly){
@@ -239,6 +245,7 @@ test('逐份写入模拟宿主：4个文件各建一个新工作簿，值与版�
     const stored=fixture.state.written[stage];
     assert.equal(stored.length,1,'每个分类工作簿只有一张工作表');
     assert.equal(stored[0].name,'材料明细');
+    assert.equal(fixture.state.frozenSheet,'材料明细','冻结落在分类材料页');
     assert.deepEqual(stored[0].values.slice(0,1+file.rowCount).map(row=>row.slice(0,10)),
       books.mainSheet(file).values.map(row=>row.slice(0,10)));
     assert.equal(stored[0].columns.get(books.ROW_ID_COLUMN).Hidden,true,'随行rowId列必须隐藏');

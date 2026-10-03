@@ -112,22 +112,54 @@ test('读表复用已打开簿，只关闭自开簿，并恢复宏安全值与�
   assert.throws(()=>host.readSheet(()=>'',Object.assign({},binding,{fields:[]})),/固定字段快照/);
 });
 
-test('打开成果表供用户编辑：临时禁宏、置前且不关闭，安全值恢复',()=>{
+// 删除公开页激活、误选最后的内部页，或吞掉缺页错误，都必须让这些打开行为测试失败。
+// WPS是外部宿主；仅用工作簿/页状态替身，实际执行openForEditing，不替换被测方法。
+function editingFixture(alreadyOpen,missingMode){
   const {binding}=bound();
   const calls={opened:0,activated:0};
-  const book={FullName:binding.path,Activate(){calls.activated++;app._active=this;}};
+  const internal={Name:'内部绑定'};
+  const review={Name:'分类审核成果',Activate(){
+   assert.equal(app.ActiveWorkbook,book,'先置前目标工作簿，再选择审核页');
+   book.ActiveSheet=this;
+  }};
+  const book={FullName:binding.path,ActiveSheet:internal,
+   Worksheets:{Item(name){
+    if(name==='内部绑定')return internal;
+    if(name!=='分类审核成果')return undefined;
+    if(missingMode==='throws')throw Error('宿主找不到指定工作表');
+    return missingMode==='undefined'?undefined:review;
+   }},
+   Save(){assert.fail('打开审核页不能保存文件');},
+   Close(){assert.fail('打开审核页不能关闭工作簿');},
+   Activate(){calls.activated++;app._active=this;}};
   const app={AutomationSecurity:1,_active:{FullName:'C:\\用户.xlsx',Activate(){}},get ActiveWorkbook(){return app._active;},
-   Workbooks:{Count:1,Item(){return {FullName:'C:\\其他.xlsx'};},
+   Workbooks:{Count:1,Item(){return alreadyOpen?book:{FullName:'C:\\其他.xlsx'};},
     Open(path,links,readonly){calls.opened++;assert.equal(path,binding.path);
      assert.equal(readonly,false,'编辑用必须可写打开');assert.equal(app.AutomationSecurity,3,'打开前临时禁宏');
      app._active=book;return book;}}};
+  return {binding,app,book,calls};
+}
+for(const alreadyOpen of [false,true]){
+ test((alreadyOpen?'复用已打开':'首次打开')+'成果表时切到公开审核页，保持打开且恢复宏安全值',()=>{
+  const {binding,app,book,calls}=editingFixture(alreadyOpen);
   assert.deepEqual(host.openForEditing(app,binding.path),{path:binding.path,opened:true});
-  assert.equal(calls.opened,1);assert.equal(calls.activated,1,'必须置前供用户直接编辑');
-  assert.equal(app._active,book,'成果表保持打开并置前');
+  assert.equal(book.ActiveSheet.Name,'分类审核成果','编辑入口必须离开内部绑定页');
+  assert.equal(calls.opened,alreadyOpen?0:1,'同路径已打开簿应复用，不重复打开');
+  assert.equal(calls.activated,1,'必须置前供用户直接编辑');
+  assert.equal(app.ActiveWorkbook,book,'成果表保持打开并置前');
   assert.equal(app.AutomationSecurity,1,'宏安全值必须恢复');
   assert.throws(()=>host.openForEditing(app,'relative.xlsx'),/路径无效/);
   assert.throws(()=>host.openForEditing({AutomationSecurity:null,Workbooks:{Count:0}},binding.path),/宏安全设置/);
-});
+ });
+ for(const missingMode of ['undefined','throws']){
+  test((alreadyOpen?'已打开':'首次Open')+'簿缺少公开审核页（'+missingMode+'）时明确失败并恢复宏安全值',()=>{
+   const {binding,app,book}=editingFixture(alreadyOpen,missingMode);
+   assert.throws(()=>host.openForEditing(app,binding.path),/找不到.*分类审核成果/);
+   assert.equal(book.ActiveSheet.Name,'内部绑定','找不到公开页不能假称切换成功');
+   assert.equal(app.AutomationSecurity,1,'缺页失败也必须恢复宏安全值');
+  });
+ }
+}
 
 // R5：整表读回要能按自动建议重算“匹配情况”，因此绑定必须记下生成时的自动建议并把它当固定字段核对。
 test('绑定保存自动建议：冲突行记“待核对”，用户改动“自动建议”列会定位到第6列',()=>{

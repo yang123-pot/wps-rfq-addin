@@ -267,7 +267,12 @@
     book=app.Workbooks.Open(path,0,false);
     if(!book||key(book.FullName)!==key(path))throw Error('WPS未返回指定成果表。');
    }
+   // 生成时最后写入的是内部绑定页；首次打开和复用已开簿都要切到公开审核页。
+   var sheet=null;
+   try{sheet=book.Worksheets.Item(model.SHEET);}catch(_){}
+   if(!sheet)throw Error('找不到审核工作表：'+model.SHEET+'，未进入表内审核。');
    book.Activate();
+   sheet.Activate();
   }catch(problem){error=problem;}
   finally{
    try{app.AutomationSecurity=security;}catch(problem){error=Error('宏安全设置恢复失败：'+problem.message);}

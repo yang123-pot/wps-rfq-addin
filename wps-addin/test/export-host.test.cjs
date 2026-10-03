@@ -144,8 +144,9 @@ test('预览归属证明：同名同结构但不是插件草稿的工作簿一�
 function layoutFixture(overrides){
  const options=overrides||{},stage='C:\\temp\\rfq-layout.xlsx';
  const merges={},fills={},validations={},links={};
- function rangeFor(address){
-  if(ranges.has(address))return ranges.get(address);
+ function rangeFor(address,sheet){
+  const sheetIndex=sheet?sheets.indexOf(sheet):0,prefix=sheetIndex>0?'sheet'+sheetIndex+'!':'',cacheKey=prefix+address;
+  if(ranges.has(cacheKey))return ranges.get(cacheKey);
   const range={Font:{Size:null,Bold:false},NumberFormat:null,value:null,WrapText:null,HasFormula:false,MergeCells:false,
    Rows:{AutoFit(){this.autoFitCount=(this.autoFitCount||0)+1;}},
    get Value2(){return this.value;},
@@ -155,10 +156,18 @@ function layoutFixture(overrides){
     const parts=String(address).split(':'),multi=parts.length===2&&parts[0]!==parts[1];
     this.MergeCells=multi;if(multi)merges[address]=true;},
    Interior:{Color:null},
-   Select(){selected=address;},
+   Select(){
+    if(options.requireActiveSheet&&activeSheet!==sheet)throw Error('cannot select cells on inactive sheet: '+sheet.Name);
+    selected=address;
+   },
    Validation:{Formula1:null,Type:null,InCellDropdown:null,IgnoreBlank:null,
     Add(type,style,operator,formula1){if(options.validationFails)throw Error('validation failed');
      if(options.validationIgnore)return;
+     if(options.validationRequiresExistingSheet){
+      const reference=/^=?('(?:[^']|'')+'|[^!]+)!/.exec(String(formula1));
+      const sourceName=reference&&reference[1].replace(/^'|'$/g,'').replace(/''/g,"'");
+      if(!sourceName||!book.Worksheets.Item(sourceName))throw Error('validation source sheet missing: '+sourceName);
+     }
      this.Type=type;
      // 实测WPS 12.1.0.29161 会把区域引用的引号/等号归一化后再回读：写 ='表'!$A$1 回读 =表!$A$1。
      if(options.validationWrongRegion)this.Formula1="='别的选项'!$Z$1:$Z$9";// 类型仍是3，来源却是别的区域
@@ -168,24 +177,25 @@ function layoutFixture(overrides){
      validations[anchorKey({__address:address})]=this.Formula1;},
     Delete(){this.Formula1=null;this.Type=null;}},
    get Hyperlinks(){return hyperlinkView(anchorKey({__address:address}));}};
-  range.__address=address;
-  ranges.set(address,range);return range;
+  range.__address=prefix+address;
+  ranges.set(cacheKey,range);return range;
  }
  function hyperlinkView(address){
   const list=links[address]||(links[address]=[]);
   return {get Count(){return list.length;},Item(index){return list[index-1]||{};}};
  }
- const ranges=new Map();let selected='';
+ const ranges=new Map(),frozenSheets=new Map();let selected='',activeSheet=null,frozen=false;
  const sheets=[];
  function newSheet(name){
   const cells=new Map();
-  const sheet={Name:name||'Sheet',Range:rangeFor,
-   Cells:{Item(row,column){const address=colName(column)+row;if(!cells.has(address))cells.set(address,rangeFor(address));return cells.get(address);}},
+  const prefix='sheet'+sheets.length+'!';
+  const sheet={Name:name||'Sheet',Activate(){activeSheet=sheet;},Range(address){return rangeFor(address,sheet);},
+   Cells:{Item(row,column){const address=colName(column)+row;if(!cells.has(address))cells.set(address,rangeFor(address,sheet));return cells.get(address);}},
    // 实测WPS表格（同Excel）：隐藏列的ColumnWidth恒为0，读不回原宽度，必须按Hidden核隐藏。
-   Columns:{Item(index){const key='col'+index;if(!columnWidths.has(key)){columnWidths.set(key,{_w:null,_h:false,
+   Columns:{Item(index){const key=prefix+'col'+index;if(!columnWidths.has(key)){columnWidths.set(key,{_w:null,_h:false,
     get ColumnWidth(){return this._h?0:this._w;},set ColumnWidth(value){this._w=value;},
     get Hidden(){return this._h;},set Hidden(value){this._h=value===true;}});}return columnWidths.get(key);}},
-   Rows:{Item(index){const key='row'+index;if(!rowHeights.has(key))rowHeights.set(key,{RowHeight:null,Font:{Bold:false},AutoFit(){}});return rowHeights.get(key);}},
+   Rows:{Item(index){const key=prefix+'row'+index;if(!rowHeights.has(key))rowHeights.set(key,{RowHeight:null,Font:{Bold:false},AutoFit(){}});return rowHeights.get(key);}},
    PageSetup:{PrintArea:null,PrintTitleRows:null}};
   if(!options.noHyperlinks){
    sheet.Hyperlinks={Add(anchor,address,subAddress,screenTip,display){
@@ -198,6 +208,7 @@ function layoutFixture(overrides){
     list.push({Address:stored,SubAddress:subAddress,ScreenTip:screenTip,TextToDisplay:display});
    }};
   }
+  if(options.noSheetActivation)delete sheet.Activate;
   return sheet;
  }
  function anchorKey(anchor){return String(anchor.__address||'').split(':')[0];}
@@ -206,16 +217,22 @@ function layoutFixture(overrides){
  const previous={FullName:'C:\\user.xlsx',Activate(){app._active=this;},Close(){assert.fail('user book closed');}};
  const book={FullName:'Book1',Worksheets:{get Count(){return sheets.length;},
    Item(i){return typeof i==='number'?sheets[i-1]:sheets.filter(s=>s.Name===i)[0];},
-   Add(){const s=newSheet();sheets.push(s);return s;}},
+   Add(){const s=newSheet();sheets.push(s);activeSheet=s;return s;}},
   SaveAs(file,format){assert.equal(format,51);this.FullName=file;saved=true;},
   Close(save){assert.equal(save,false);closed++;},
   Activate(){app._active=this;}};
  let closed=0,saved=false;
- const app={AutomationSecurity:1,FileSystem:{Exists:()=>false},ActiveWindow:{FreezePanes:false,get Frozen(){return this.FreezePanes;}},
+ const app={AutomationSecurity:1,FileSystem:{Exists:()=>false},ActiveWindow:{
+   get FreezePanes(){return options.requireActiveSheet?frozenSheets.get(activeSheet)===true:frozen;},
+   set FreezePanes(value){if(options.requireActiveSheet)frozenSheets.set(activeSheet,value===true);else frozen=value===true;},
+   get Frozen(){return this.FreezePanes;}},
   get ActiveWorkbook(){return app._active;},Workbooks:{Count:1,Item(){return previous;},
-   Add(){app._active=book;const s=newSheet();sheets.push(s);return book;},
+   Add(){app._active=book;const s=newSheet();sheets.push(s);activeSheet=s;return book;},
    Open(file){
     app._active=book;
+    if(options.validationLiteralOnReopen)ranges.forEach(function(range){
+     if(range.Validation.Type===3)range.Validation.Formula1='"'+String(range.Validation.Formula1).replace(/^=/,'')+'"';
+    });
     // 真实WPS：未显式设置纸张时，SaveAs省略pageSetup，方向/页高重开变回默认值。
     if(options.dropUninitializedPrint)sheets.forEach(function(sheet){
      if(sheet.PageSetup.PaperSize==null){sheet.PageSetup.Orientation=1;sheet.PageSetup.FitToPagesTall=1;}
@@ -229,6 +246,7 @@ function layoutFixture(overrides){
  app._active=previous;
  // Range()缓存必须按地址记忆住合并/填充/下拉状态，才能被读回校验。
  return {app,book,ranges,get sheets(){return sheets;},get saved(){return saved;},merges,fills,validations,links,columnWidths,rowHeights,
+  isFrozen(name){return frozenSheets.get(sheets.find(sheet=>sheet.Name===name))===true;},
   get selected(){return selected;},get closed(){return closed;}};
 }
 
@@ -600,4 +618,64 @@ test('下拉来源：简单表名不加引号，含空格/特殊字符的表名�
  assert.equal(writeWith('内部选项'),"=内部选项!$A$1:$A$5",'简单中文表名不加引号，避免被存成字面量');
  assert.equal(writeWith("汇总 表"),"='汇总 表'!$A$1:$A$5",'含空格的表名仍需按公式语法加引号');
  assert.equal(writeWith("It's 选项"),"='It''s 选项'!$A$1:$A$5",'名称里的单引号按公式语法双写');
+});
+
+// R12-L：跨表下拉依赖真实选项页；不能让不存在的“未来工作表”在夹具里自动成功。
+function reviewWorkbookWithOptions(){
+ const sample=require('./fixtures/workflow-v3-sample.cjs'),collection=require('../src/collection.js');
+ const review=require('../src/classification-review-model.js');
+ const groups=collection.preview(sample.buildCollection(),true).groups;
+ return review.workbook(review.build(groups,{library:sample.library,memory:sample.createMemory(),projectId:'p-options-order'}));
+}
+
+test('审核成果的跨表分类下拉在选项页实际存在后写入，并保存重开核对',()=>{
+ const workbook=reviewWorkbookWithOptions(),h=layoutFixture({validationRequiresExistingSheet:true,validationEchoBare:true});
+ host.write(h.app,workbook,'C:\\temp\\rfq-layout.xlsx');
+ const main=h.book.Worksheets.Item('分类审核成果'),options=h.book.Worksheets.Item('内部选项');
+ assert.equal(h.saved,true);
+ assert.equal(main.Range('H4:H11').Validation.Formula1,'内部选项!$B$2:$B$7');
+ assert.equal(main.Range('H4:H11').Validation.InCellDropdown,true);
+ assert.deepEqual(options.Range('A1:B7').Value2,[['类别编号','类别名称'],
+  ['no-inquiry','无需询价'],['pump','水泵'],['valve','阀门'],['fan','风机'],['ev-charger','汽车充电桩'],['strong-electric','强电']]);
+ assert.deepEqual(main.Range('A1:K11').Value2[3].slice(0,9),['1','水泵','DN50','台','2','水泵','匹配成功','水泵','']);
+ assert.equal(h.app.AutomationSecurity,1);
+ assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx');
+});
+
+test('分类下拉缺少实际选项页时拒绝保存，清理自建簿并恢复用户簿',()=>{
+ const workbook=reviewWorkbookWithOptions(),h=layoutFixture({validationRequiresExistingSheet:true});
+ workbook.sheets=workbook.sheets.filter(sheet=>sheet.name!=='内部选项');
+ assert.throws(()=>host.write(h.app,workbook,'C:\\temp\\rfq-layout.xlsx'),/validation source sheet missing: 内部选项/);
+ assert.equal(h.saved,false);
+ assert.equal(h.closed,1);
+ assert.equal(h.app.AutomationSecurity,1);
+ assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx');
+});
+
+test('保存重开后分类来源变成带双引号字面量时拒绝假成功',()=>{
+ const workbook=reviewWorkbookWithOptions(),h=layoutFixture({validationEchoBare:true,validationLiteralOnReopen:true});
+ assert.throws(()=>host.write(h.app,workbook,'C:\\temp\\rfq-layout.xlsx'),/分类下拉读回不一致/);
+ assert.equal(h.book.Worksheets.Item('分类审核成果').Range('H4:H11').Validation.Type,3,'下拉类型仍存在也不能放行');
+ assert.equal(h.saved,true,'保存前回读看似相同，必须在保存重开后继续核验');
+ assert.equal(h.closed,2);
+ assert.equal(h.app.AutomationSecurity,1);
+ assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx');
+});
+
+test('审核簿全部页建齐后激活公开页，再选择冻结锚点，内部页不被错误冻结',()=>{
+ const workbook=reviewWorkbookWithOptions(),h=layoutFixture({validationRequiresExistingSheet:true,requireActiveSheet:true});
+ host.write(h.app,workbook,'C:\\temp\\rfq-layout.xlsx');
+ assert.equal(h.isFrozen('分类审核成果'),true);
+ assert.equal(h.isFrozen('内部选项'),false);
+ assert.equal(h.isFrozen('内部绑定'),false);
+ assert.equal(h.saved,true);
+});
+
+test('需要冻结的审核页缺少工作表激活API时拒绝保存',()=>{
+ const workbook=reviewWorkbookWithOptions(),h=layoutFixture({noSheetActivation:true});
+ assert.throws(()=>host.write(h.app,workbook,'C:\\temp\\rfq-layout.xlsx'),/工作表激活|Worksheet.Activate/);
+ assert.equal(h.saved,false);
+ assert.equal(h.closed,1);
+ assert.equal(h.app.AutomationSecurity,1);
+ assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx');
 });

@@ -189,14 +189,15 @@ test('R12-D链接目标：另一目录同名文件与搬走的暂存目录都拒
 function summaryApp(options){
  const settings=options||{},ranges=new Map(),widths=new Map(),heights=new Map(),links=new Map(),merges=new Map();
  const state={created:0,opened:0,closed:0,saved:[]};
- let active=null,lastSaved=null;
+ let active=null,lastSaved=null,activeSheet=null,frozen=false;
  const previous={FullName:'C:\\user.xlsx',Activate(){active=this;},Close(){assert.fail('user book closed');}};
  active=previous;
  function key(address){return String(address).split(':')[0];}
- function range(address){
+ function range(address,sheet){
   if(ranges.has(address))return ranges.get(address);
   const target={__address:address,Font:{Size:null,Bold:false,Color:null,Underline:null},NumberFormat:null,value:null,
-   WrapText:null,HasFormula:false,MergeCells:false,Interior:{Color:null},Rows:{AutoFit(){}},Select(){},
+   WrapText:null,HasFormula:false,MergeCells:false,Interior:{Color:null},Rows:{AutoFit(){}},
+   Select(){assert.equal(activeSheet,sheet,'只能在当前工作表选择冻结锚点');},
    Merge(){this.MergeCells=true;merges.set(address,true);},
    get Value2(){return this.value;},set Value2(values){this.value=values.map(row=>row.slice());},
    Validation:{Formula1:null,InCellDropdown:null,IgnoreBlank:null,Delete(){this.Formula1=null;},
@@ -205,8 +206,8 @@ function summaryApp(options){
   ranges.set(address,target);return target;
  }
  function newSheet(name){
-  const sheet={Name:name||'Sheet',Range:range,
-   Cells:{Item(row,column){return range(columnName(column)+row);}},
+  const sheet={Name:name||'Sheet',Activate(){activeSheet=sheet;},Range(address){return range(address,sheet);},
+   Cells:{Item(row,column){return range(columnName(column)+row,sheet);}},
    Columns:{Item(index){const id='c'+index;if(!widths.has(id))widths.set(id,{ColumnWidth:null,Hidden:false});return widths.get(id);}},
    Rows:{Item(index){const id='r'+index;if(!heights.has(id))heights.set(id,{RowHeight:null,Font:{Bold:false}});return heights.get(id);}},
    PageSetup:{PrintArea:null,PrintTitleRows:null},
@@ -221,15 +222,19 @@ function summaryApp(options){
  }
  function makeBook(){
   const sheets=[newSheet('Sheet1')];
+  activeSheet=sheets[0];
   return {FullName:'Book'+state.created,
    Worksheets:{get Count(){return sheets.length;},
     Item(requested){return typeof requested==='number'?sheets[requested-1]:sheets.filter(s=>s.Name===requested)[0];},
-    Add(){const sheet=newSheet('Sheet');sheets.push(sheet);return sheet;}},
+    Add(){const sheet=newSheet('Sheet');sheets.push(sheet);activeSheet=sheet;return sheet;}},
    SaveAs(file,format){assert.equal(format,51,'必须以xlsx格式独占保存');this.FullName=file;lastSaved=this;state.saved.push(file);},
    Close(save){assert.equal(save,false);state.closed++;},
    Activate(){active=this;},__sheets:sheets};
  }
- const app={AutomationSecurity:1,FileSystem:{Exists:()=>false},ActiveWindow:{FreezePanes:false},
+ const app={AutomationSecurity:1,FileSystem:{Exists:()=>false},ActiveWindow:{
+   get FreezePanes(){return frozen;},set FreezePanes(value){
+    assert.ok(activeSheet,'冻结前必须有活动工作表');frozen=value===true;state.frozenSheet=activeSheet.Name;
+   }},
   get ActiveWorkbook(){return active;},
   Workbooks:{Count:1,Item(){return previous;},
    Add(){const book=makeBook();state.created++;active=book;return book;},
@@ -260,6 +265,7 @@ test('模拟宿主：汇总表单页写入，链接/下拉/字体/隐藏列落�
  assert.equal(modeCell.Validation.Formula1,"=分类汇总表!$"+columnName(workbook.auxOptions)+"$1:$"+columnName(workbook.auxOptions)+"$2");
   spec.columns.filter(column=>column.hidden).forEach(column=>assert.equal(fixture.widths.get('c'+column.index).Hidden,true));
   assert.equal(fixture.app.ActiveWindow.FreezePanes,true,'冻结表头');
+  assert.equal(fixture.state.frozenSheet,'分类汇总表','冻结落在汇总公开页');
   assert.equal(workbook.sheets[0].values[0].length,expectedWidth,'单页等宽矩阵');
  }
 });

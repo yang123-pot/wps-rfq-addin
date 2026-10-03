@@ -262,6 +262,13 @@
           });
           used.Rows.AutoFit();
         }
+      });
+      // 审核主表的下拉引用后面的“内部选项”页；先创建并写齐所有页，避免向尚不存在的页建区域引用。
+      model.sheets.forEach(function(s){
+        var sheet=created.Worksheets.Item(s.name);
+        if(typeof sheet.Activate==='function')sheet.Activate();
+        else if(s.layout&&s.layout.freeze)
+          throw Error('当前WPS不支持工作表激活API（Worksheet.Activate），未冻结“'+s.name+'”。');
         applyLayout(app,sheet,model,s.layout);
       });
       verify(created,model);

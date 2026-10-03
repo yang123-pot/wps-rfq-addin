@@ -439,3 +439,15 @@ G/H复审总簿采用internal-total、10个供应商件采用supplier，完整�
 用户反馈停留后的第1步切换正常，关闭侧栏后重新打开到第5步；反馈 `user-idle-hidden-reopen-success-result.json`，当前原生侧栏显示05品牌汇总，报告两页consumed一致、DOM=brands。固定报告 `user-idle-hidden-reopen-success-report.json` 留存的是后续100条（13:05:41～09:46），该次入口及关闭回调已滚动淘汰，故不能称全链trace；不以当前DOM替代关闭动作证据。已请求真人调窄侧栏、回第1步并保留画面，用原生截图检验步骤换行及主按钮。原先绘制不同步仍留档，单次恢复/数分钟后导航成功不等于长期稳定性已修；C与四项目尚未新执行。
 
 窄栏补验用户反馈步骤及主按钮完整，但原生 `user-narrow-wps-observed.jpg` 仍第7步，顶部七步导航未进入该画面；当次复制的旧报告仍brands、末receivedAt13:09:46，不是当前现场。因此窄栏所需第1步图及精确CSS宽度均不计通过。13:19独立核实PID38976不存在、38891无监听、health连接拒绝、stderr为空，最后报告写入13:09:47；退出原因未知，回执 `nav-probe/second-service-exit.json`。确认端口空后13:19:58同一测试入口及五隔离目录启动PID37452，health成功，日志由更新的 `nav-probe/service-current.json` 指向。未改产品源码，新诊断令牌不同于旧页，需重新加载当前观察器再继续；旧静态报告不证明此次回调。七入口既有真人成功证据保留，K/C与R12仍未收口。
+
+### 当前窄栏与C入口缺陷（2026-10-03追加）
+
+root通过Computer Use打开已保存入口簿并重建侧栏，13:35:38新paneSession为`eadac314d28bf8a8`、navSession为`nav-pane-murykom2-nwigckzm11`。本次实际滚动至第1步顶部及导入按钮区，七步骤5+2换行，两个导入主按钮完整可见，工具点击浏览按钮实际打开选择器。证据为`nav-probe/root-current-import-narrow-{navigation,buttons}.jpg`及配对报告。固定报告只有pane角色，不据此补推Ribbon回调；实际CSS320未测，也不证明长期绘制稳定。与此前真人七入口/窄栏反馈分别记点击者。
+
+root只导入本次独立8行源，默认分别保留、自动分类、通过插件生成`out/A/C审核A.xlsx`；生成与打开审核仍显示“内部绑定”，手动切到公开审核页后，H10下拉实看仅一条`内部选项!$B$2:$B$7`文本。旧簿SHA为`2b4a5d28993984b0d7f35d4ff382dba1a0591d5a9dced4331e776a513a73a3c9`，磁盘验证来源为双引号字面量，保留故障簿及两处真实截图。项目通过实际“保存项目”写成`p-murytt8g-b1dgbi43` revision1。独立只读审计28/28：原件/导入复制件指纹一致，9个公开表头、8行固定字段/文本工程量、K隐藏唯一ID及来源绑定正确；H10空、H11无需询价，review/reviewDraft/分类输出均null，库revision0/0学习来源。审计在`evidence/c00-current-native-baseline-audit.{json,md}`，各时点截图/磁盘报告在`c-preparation/evidence/`。生成后未手动保存审核簿、未改分类或执行整表确认/学习。
+
+最小修复两个产品文件：`classification-review-host.js`在首次打开/复用时激活公开审核页、缺页明确失败；`export-host.js`先创建并写齐所有页，再逐页激活并应用版式，确保设置审核下拉时选项页已存在、冻结锚点落在正确活动页。历史J的去单引号修复只实证汇总同页区域下拉，不能作为当前审核跨表下拉已恢复的证明。两内部页仍可见；巨大行高与隐藏K长ID换行的关系仅为待隔离核实风险，本次未扩大源码修复。
+
+TDD保留选页9通过/6预期失败、跨表依赖29通过/1预期失败及活动页负例；绿色后根独立全量**404/404**，失败/取消/跳过/todo均0；相关sheet-review/restore/category/brand/inquiry/split浏览器**6/6**。全量一度403/404，唯一失败为过期category宿主夹具缺Worksheet.Activate，补齐状态和冻结页断言后通过；同样补齐summary夹具，未放宽业务断言。六源码/测试文件独立代码审查通过（相关65/65）。日志、RED/GREEN回执及根验证记录均留本机`c-preparation/evidence/`，浏览器为真实页面/服务＋模拟宿主，不能替代修复后WPS核验。
+
+服务当前提供两个修复脚本HTTP200、no-store且与磁盘SHA一致；工具重载未观察到提示或新pane ready，原生侧栏为空白、报告仍旧session，因此**修复后真机未计通过**，已请求真人重建。下一步重载后打开上述项目并生成新审核副本，核公开页/实际六项下拉/冻结，再继续C草稿与错误定位。当前只读对比确认输入、故障审核簿、库及保护pane SHA不变；未做真人确认/学习。公开暂存仅六源码/测试文件及三状态文档，私有证据不上传；C/K、四项目及R12继续未完成。
