@@ -472,4 +472,22 @@ root通过实际侧栏打开版本1项目`p-murytt8g-b1dgbi43`，生成**新件*
 
 **C04由真人确认**：root只将K4标识复制到K5，用户反馈“提示第5行 K 列行标识重复”，并提供实际WPS截图。报告记录11:20:45.756Z确认click及“2处待修改”：K5与K4同一标识、原水泵DN65材料行缺失。root点“定位到K单元格”选中公开页K5，随后Ctrl+Z恢复原标识尾号5，公式栏截图核对。证据`c04-human-{duplicate-id-pane-report,feedback}-20261003.json`、用户原图`c04-human-attached-duplicate-id-20261003.png`、`c04-human-duplicate-id-k5-located-20261003.jpg`、`c04-k5-original-id-restored-20261003.jpg`；磁盘`disk-c04-human-duplicate-rejected-20261003.json`及拒绝审计13/13。项目/草稿/库/输入/审核磁盘保持C01基线，无成功确认、学习或分类输出。准备时一次名称框复制误粘字面量K5已撤销，重新复制正确K4后才进行本次确认，不冒充第一次粘贴成功。
 
-当前C05仅已临时清空K4并留准备截图，待真人点击；K5及H4已恢复。未保存测试值，C05–C13、K余项、四项目和R12继续未完成。
+上述段落截至C04完成时：当时C05仅准备清空K4、待真人点击，K5及H4已恢复；后续进度见下段。C00–C04状态文档提交`bf725fc0502a83261206afdbb5cfed25dfd04449`已普通推送并核远程SHA。
+
+### C05缺失标识、C06固定字段负例与报告缺口（2026-10-03追加）
+
+**C05由真人确认**：root临时清空K4后，用户反馈第4行K列缺少行标识，并提供实际WPS原图`c05-human-attached-missing-id-20261003.png`；画面还显示水泵/DN50材料行缺失。root点问题定位到公开页K4，再Ctrl+Z恢复原标识尾号4。拒绝、定位及恢复截图为`c05-human-missing-id-{rejected,k4-located}-20261003.jpg`、`c05-k4-original-id-restored-20261003.jpg`，真人反馈单独封存。`disk-c05-human-missing-rejected-20261003.json`及`c05-native-rejection-disk-audit-20261003.json` **10/10仅磁盘通过**：项目字节/revision3/原draft、库revision0/来源0、输入及审核磁盘SHA不变，review=null、无分类输出。
+
+**C06工程量由真人确认**：E4临时从2改为999，用户反馈第4行E列工程量原2、现999；root点击问题定位E4，再Ctrl+Z恢复2。三张实际截图`c06-quantity-{human-rejected,e4-located,e4-restored}-20261003.jpg`记录拒绝、选格及恢复值；`disk-c06-quantity-human-rejected-20261003.json`和`c06-quantity-native-rejection-disk-audit-20261003.json` **10/10仅磁盘通过**，上述项目/草稿/确认/库/输入/审核磁盘边界均保持C01基线。未保存测试值，也未执行成功确认或学习。
+
+**C06名称由真人确认**：B4临时从水泵改为`水泵_C错误`，用户反馈第4行B列固定字段改动及原/现名称；root点击问题定位B4，再恢复水泵，真实名称框/公式栏核对。三张截图`c06-name-{human-rejected,b4-located,b4-restored}-20261003.jpg`与`c06-name-human-feedback-20261003.json`分别记录真人确认和root准备/定位/恢复；`disk-c06-name-human-rejected-20261003.json`及`c06-name-native-rejection-disk-audit-20261003.json` **10/10仅磁盘通过**，保持C01基线，未WPS保存、成功确认或学习。工程量反馈也独立封存为`c06-quantity-human-feedback-20261003.json`，两个反馈的clickTimestamp均为null。
+
+**报告范围限制**：C05封存的`c05-human-missing-id-pane-report-20261003.json`仍只有旧C04信息，不证明C05的新click或结果；C06工程量/名称也没有封存到相应新业务click。不猜点击时间，不把三份10项磁盘审计写成此前13项“磁盘＋当前pane事件”审计。真人点击者由用户反馈证明，拒绝/定位/恢复由真实画面证明；磁盘审计只证明其保存时点的文件状态。
+
+19:56–19:58（11:56–11:58Z）只读检查发现服务PID38992不存在、127.0.0.1:38891无监听。退出时间/原因未知，不能据此倒推C05点击时服务已退出。报告保留100条且心跳可被丢弃/重写的规则可以解释心跳缺席，**不能解释新业务click缺失**。root于20:05:02.92（12:05:02.92Z）受控启动原`nav-probe/launcher-plain-ribbon.cjs` PID13640，沿用同五隔离目录；监听进程归属13640及HTTP200已核，新报告`plain-ribbon-report-2026-10-03T12-05-02-896Z.json`。首次ownership回执误查不存在的`/ribbon.js`得到false，实际入口为`/main.js`；原回执保留，另存`nav-probe/plain-restart-script-correction-20261003-2002.json`修正检查，不计为产品脚本缺失。该检查时旧侧栏尚未重建，后续接入见下段；长期稳定性未结案。
+
+C05及两项C06临时改动均已恢复，保留C01未保存的H10分类/I10草稿备注。C/K、四项目及R12继续未完成，R13不开始。
+
+**新会话接入及C07准备**：root工具点原“侧栏停住时重建”并确认，实际新侧栏显示，截图`c07-service-rebuild-confirm-20261003.jpg`、`c07-new-pane-visible-20261003.jpg`。随后在辅助区打开唯一项目`p-murytt8g-b1dgbi43`版本3，实际恢复8/8草稿，回第3步及仍有未保存编辑的审核簿；截图`c07-reopened-project-native-unsaved-20261003.jpg`。封存报告`c07-new-session-reopen-pane-report-20261003.json`记录新paneSession `6f5b822ca7198922`、真实心跳至20:18:27（12:18:27Z），PID13640仍监听；**本次新会话接入已核，不代表长期稳定性通过**。
+
+C07仍进行中：root拖选A3:L11，包含隐藏K行标识和额外空L列；自定义排序子窗口工具激活失败，已请求真人选择“序号”降序、含标题并确定，结果尚待反馈。未计排序/筛选全表读回通过。下一步直接继续C07，C08–C13待补。
