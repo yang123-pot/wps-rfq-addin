@@ -411,3 +411,31 @@ G/H复审总簿采用internal-total、10个供应商件采用supplier，完整�
 只读磁盘审计 `c-preparation/evidence/disk-recovery-entry-20261003-115x.json` 对照 `disk-k-entry.json`：仍0项目、库revision0、0学习来源；这是磁盘状态，不能证明打开簿的未保存单元格或实际点击者。恢复回执及用户反馈分别为 `evidence/service-recovery-current.json`、`evidence/recovery-user-results.json`，截图 `evidence/wps-recovery-before-reopen.jpg`。下一步由用户重开已保存入口簿，取得新paneSession/当前receivedAt后，再核回调、两导航键、侧栏当前阶段和出帧；C/K与R12仍未通过，产品导航代码未改。
 
 本机 `evidence/nav-probe/` 已准备独立只读诊断入口，**未启动、未用于WPS实机**。它复用真实 `createServer`，仅向三个HTML入口注入诊断：功能区记录原回调的进入/返回/异常、已知控件标量与导航模块就绪，两页只读 `rfq.nav.request/consumed`，侧栏读取当前DOM阶段；移除启动页的自动工作簿探针。产品源码及受保护pane文件未改。根独立运行 `verification.cjs` 退出0、16项检查通过，真实临时HTTP服务核57静态资源与磁盘逐字节相同，并验证原回调this/参数/结果/异常保持、观察器存储写入和宿主动作0、临时五目录内容不变；日志 `evidence/nav-probe/_verification-2026-10-03T04-05-25-075Z-1f2b9f/verification.log`。这些诊断验证仍为临时HTTP/模拟接口，不能证明实际WPS回调已执行。当前先等待原恢复服务下的用户重开结果，再决定是否启用该诊断入口。
+
+### 恢复侧栏后再次核验（2026-10-03追加）
+
+用户提供的真实WPS截图显示“入口保护.xlsx”侧栏恢复第1步、已连接WPS、0导入行。新报告12:30:52～53（北京时间）记录javascript/ribbon/taskpane启动成功，paneSession `68a943de2c22ef69`；现有工作簿探针因目标已存在拒绝写入。工具12:34点顶部“自动分类”后真实截图仍第1步；用户随后明确反馈真实鼠标再点仍第1步，并补充侧栏目前卡死。两种点击者分别记录，不混用。
+
+固定100项快照 `evidence/stall-20261003-2/pane-report-before-next-user-click.json` 保留：网页12:30:59失焦后，rAF探针仍从frame3推进到12:31:56的frame21；12:31:59首次pending3005ms，12:32:05报告stalled，之后JS心跳持续，快照末12:35:20仍frame21/pending204000ms。无重新focus、visibilitychange或resume，scriptError为空。**hasFocus是网页焦点，frameCount是探针回调计数；不能据此认定原生窗口失焦、正常节流、全部绘制停止或整个JS冻结。** 挂起早于工具点击，不能写成点击触发。现有探针尚无导航入口/存储/DOM阶段字段，断点未确定。
+
+用户原截图、工具点击后截图和检查点分别保存在同目录 `user-restored-pane.png`、`wps-tool-matching-no-change.jpg`、`checkpoint.json`。只读审计 `c-preparation/evidence/disk-k-restored-native-click-20261003.json` 退出0：仍0项目/库revision0/0学习来源，输入及库SHA不变；无旧分类件或确认可比较，不把空映射当幂等证据。只读诊断准备最终由根再验18项/57资产通过，回执 `evidence/backup-receipt-nav-preparation.json`。
+
+真实点击失败后再次固定报告 `pane-report-user-real-click-stalled.json`、用户反馈 `user-real-click-result.json` 及无遮挡原生截图 `wps-user-real-click-stage1-foreground.jpg`。该报告网页12:45:50、12:46:38重新focus，随后wheel/click/keydown可进入并上报，但frameCount仍21、未resumed、无scriptError；末条12:46:56 JS heartbeat，rAF pending900006ms。这不能支持“重新focus即可恢复”，也仍不能定位顶部回调。
+
+12:47:37核PID34676命令行、端口38891及同一隔离五目录归属后，仅停止该自有服务，启动 `nav-probe/launcher.cjs`（PID38976）。健康响应成功，启动页/侧栏HTML均有观察器，启动页无自动工作簿探针；受保护pane SHA仍为入场值，未改产品源码。回执 `nav-probe/service-current.json`、`current-stdout.log`，新报告目标 `navigation-report-2026-10-03T04-47-38-062Z.json`。已请求用户保留其它未保存内容，关闭已保存空白入口簿、重开WPS加载新观察器并点“自动分类”。
+
+用户随后答“已重开，切到第2步”。固定 `nav-probe/user-matching-success-report.json`：12:50:41 ribbon ready，navReady=true、getItem/setItem均function；12:50:44.482 OnGotoStage进入，1个object参数，Id=`rfqStageMatching`、Tag=`matching`（其余大小写字段undefined）；.502返回true，请求ID `nav-murwyxli-r1a48bg9`；.840 pane ready已消费同ID、请求为空、currentStage=matching，后续两页状态一致。原生截图 `user-matching-success-wps.jpg` 显示第2步，真人反馈单列 `user-matching-success-result.json`。这证明本次重开后导航桥实际接力成功，不证明旧卡死根因已修复或其余六入口稳定。
+
+12:52:40工具点顶部“表内审核”未记录到新回调，随后状态截图混入其它窗口；暂停注入输入，不能据此认定产品按钮失败。独立只读审计 `c-preparation/evidence/disk-nav-diagnostic-start-20261003.json` 仍0项目/库revision0/0学习来源，输入及库SHA相同，保护pane SHA相同；该审计不覆盖未保存簿或页面状态。
+
+用户真实点“表内审核”后明确答“仍显示第二步且侧栏已卡死”。固定 `user-review-consumed-screen-stalled-report.json` 中review的object控件Id/Tag正确，OnGotoStage返回true，两页consumed相同请求ID、pane currentStage=review，而原生画面及用户反馈仍matching；反馈单列 `user-review-consumed-screen-stalled-result.json`。本次断点为DOM状态与可见画面不同步；rAF挂起而JS仍运行，不能据此进一步断定GPU、宿主节流或具体机制。
+
+用户真实点“侧栏停住时重建”、确认后答恢复可操作。固定 `user-reload-restored-report.json`：12:56:54.390 OnReloadRfqPane进入，55.770返回true，56.112新pane navSession ready、currentStage=import、request为空、consumed保留旧ID，56.127新paneSession `ed48acbd33751820`；未重放旧review请求。真人反馈单列 `user-reload-restored-result.json`。这是当前已实现恢复路径的真实成功，不是新增源码修复，也不证明后续不再停帧；已请求真人依次点七顶部入口，对照逐项DOM/画面。K/C、四项目及R12仍未通过。
+
+用户随后反馈七个顶部入口均对应切换。固定 `user-seven-visible-success-report.json` 中12:59:44.778～58.195七次OnGotoStage分别为import/matching/review/categories/brands/inquiry/split，控件Id/Tag逐项正确、均返回true；七个不同请求ID随后被消费，pane DOM阶段逐项对应，未触发业务主按钮。真人可见反馈单列 `user-seven-visible-success-result.json`，完整滚动报告采样在 `seven-entry-snapshots-2026-10-03T04-59-03-619Z.jsonl`（两分钟59次，只读源报告、仅写新本机证据文件）。这补足该重建会话七按钮的真人导航，不能代替三态、窄宽及未保存业务内容保护验收。新页后续rAF心跳未在当前固定报告保留，不能由导航心跳推断绘制稳定性；已请求真人距最后导航超过两分钟后import→关闭侧栏→brands复开，结果待答。
+
+独立复核七请求消费状态各顺序出现一次、未见旧ID回跳（没有直接计数consume调用）。新pane保留事件已frame57→61，12:59:58.421 scroll事件为frame61/pending0/sinceLast2281ms，证明重建后当时rAF已越过旧21计数；不是所有新页都按此前模式挂起。服务报告优先淘汰心跳，缺pane-heartbeat不能推断未运行。导航后只读审计 `disk-k-seven-hidden-reopen-20261003.json` 仍0项目、库revision0、0学习来源，输入及库SHA不变，不能证明未保存内容或长期绘制。
+
+用户反馈停留后的第1步切换正常，关闭侧栏后重新打开到第5步；反馈 `user-idle-hidden-reopen-success-result.json`，当前原生侧栏显示05品牌汇总，报告两页consumed一致、DOM=brands。固定报告 `user-idle-hidden-reopen-success-report.json` 留存的是后续100条（13:05:41～09:46），该次入口及关闭回调已滚动淘汰，故不能称全链trace；不以当前DOM替代关闭动作证据。已请求真人调窄侧栏、回第1步并保留画面，用原生截图检验步骤换行及主按钮。原先绘制不同步仍留档，单次恢复/数分钟后导航成功不等于长期稳定性已修；C与四项目尚未新执行。
+
+窄栏补验用户反馈步骤及主按钮完整，但原生 `user-narrow-wps-observed.jpg` 仍第7步，顶部七步导航未进入该画面；当次复制的旧报告仍brands、末receivedAt13:09:46，不是当前现场。因此窄栏所需第1步图及精确CSS宽度均不计通过。13:19独立核实PID38976不存在、38891无监听、health连接拒绝、stderr为空，最后报告写入13:09:47；退出原因未知，回执 `nav-probe/second-service-exit.json`。确认端口空后13:19:58同一测试入口及五隔离目录启动PID37452，health成功，日志由更新的 `nav-probe/service-current.json` 指向。未改产品源码，新诊断令牌不同于旧页，需重新加载当前观察器再继续；旧静态报告不证明此次回调。七入口既有真人成功证据保留，K/C与R12仍未收口。
