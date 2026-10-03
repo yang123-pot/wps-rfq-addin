@@ -451,3 +451,25 @@ root只导入本次独立8行源，默认分别保留、自动分类、通过插
 TDD保留选页9通过/6预期失败、跨表依赖29通过/1预期失败及活动页负例；绿色后根独立全量**404/404**，失败/取消/跳过/todo均0；相关sheet-review/restore/category/brand/inquiry/split浏览器**6/6**。全量一度403/404，唯一失败为过期category宿主夹具缺Worksheet.Activate，补齐状态和冻结页断言后通过；同样补齐summary夹具，未放宽业务断言。六源码/测试文件独立代码审查通过（相关65/65）。日志、RED/GREEN回执及根验证记录均留本机`c-preparation/evidence/`，浏览器为真实页面/服务＋模拟宿主，不能替代修复后WPS核验。
 
 服务当前提供两个修复脚本HTTP200、no-store且与磁盘SHA一致；工具重载未观察到提示或新pane ready，原生侧栏为空白、报告仍旧session，因此**修复后真机未计通过**，已请求真人重建。下一步重载后打开上述项目并生成新审核副本，核公开页/实际六项下拉/冻结，再继续C草稿与错误定位。当前只读对比确认输入、故障审核簿、库及保护pane SHA不变；未做真人确认/学习。公开暂存仅六源码/测试文件及三状态文档，私有证据不上传；C/K、四项目及R12继续未完成。
+
+### 原始Ribbon回调恢复与C00–C04真机补验（2026-10-03追加）
+
+两个入口修复已提交`d90613d76aada210880f95119e1d09adcf38f64b`并普通推送，远程SHA一致，回执`nav-probe/backup-receipt-c-entry-fix-20261003.json`。本段没有再次修改产品源码或重跑已过404项回归，主要操作与证据如下。
+
+root先用WPS原生“另存为”保护两个未保存簿，保存成独立会话保护副本；原审核故障件及项目版本1保留。原生关闭/重开后只读核对三簿可读且SHA、输入、项目及库均未改变，`c-preparation/evidence/session-protection-audit-20261003.json` **10/10**。重开后的Ribbon诊断心跳正常，但root点击打开及真人反馈“仍无侧栏”没有取得可操作侧栏；滚动报告无入口记录不能证明回调没有执行。
+
+18:42核自有服务身份后受控停止PID37452，启动本机`nav-probe/launcher-plain-ribbon.cjs` PID38992，继续同五隔离目录。它服务原始Ribbon回调，不加导航回调包装，仍保留既有侧栏观察器并过滤自动工作簿探针；HTTP200且原始主脚本存在、包装/自动探针缺席。第二次原生重开后root“打开询价助手”已能显示侧栏，“侧栏停住时重建”实际弹出确认并取得新页面，证据`c00-plain-ribbon-{open-restored,rebuild-confirm}-20261003.jpg`。该对照支持诊断包装可能影响WPS回调，**不确定停摆根因**；首个新页仍出现一段rAF暂停，root重建后继续操作。当前paneSession `ec59d58e375281cb`；旧`pane-report-live.json`不用于本段现场。
+
+root通过实际侧栏打开版本1项目`p-murytt8g-b1dgbi43`，生成**新件**`out/A/C审核A_修复.xlsx`，旧`C审核A.xlsx`不覆盖。首次生成自动打开到公开“分类审核成果”，root刻意切内部页后点“打开成果表审核”也回公开页；H10实际下拉显示无需询价/水泵/阀门/风机/汽车充电桩/强电六项，前三行冻结。真实截图为`c00-fixed-review-{public-active,reopen-public-active,six-dropdown-options}-20261003.jpg`。新件SHA `33c7755b2ceed0b8280ccc42d89704b279c2cd3507cefca4443cb43e8d8e57bf`，磁盘validations为真实区域`内部选项!$B$2:$B$7`、H4:H11；root另点“保存项目”才保存新绑定为revision2。
+
+**C01由root工具执行**：H10录入合法分类汽车充电桩、I10为`C-草稿未保存`，不点WPS保存，点侧栏“保存审核成果”。下拉popup的工具鼠标点击被窗口归属检查拒绝后取消，合法分类改用原生键盘录入；不把它记为成功点下拉选项。当前服务报告记录`sheet-review-save` click及“8 / 8 行已填，尚未确认、未学习、未生成分类工作簿”，项目revision3、draft8行/filled8，按rowId固定字段/分类/备注正确；磁盘H10/I10仍空、审核SHA不变，review=null、分类输出0，库revision0/0学习来源。配对截图`c01-{unsaved-classification-note,save-draft-click-result,all-eight-rows-draft-status}-20261003.jpg`及当前报告，磁盘`disk-c01-unsaved-draft-root-click-20261003.json`。
+
+只读范围审计`fixed-review-c01-scope-audit-20261003.json` **24/24**。边界：新件磁盘activeSheet仍“内部绑定”，插件打开激活公开页且不保存；首次审计误把持久活动页变化作为要求，23/24报告原样保留并说明，不能声称直接从资源管理器打开也默认公开页。磁盘行高仍84/240pt，与隐藏长ID换行的关系未隔离，本段未修。Native截图与磁盘审计分别证明其范围，不混称完整版式验收。
+
+**C02由真人确认**：root临时清空H4后，用户明确反馈整表主按钮提示第4行H列分类为空；报告记录实际失败文字，root点问题“定位到H单元格”并取得公开页H4选中及“已定位”提示，再恢复水泵。截图`c02-human-empty-category-h4-located-20261003.jpg`，当前报告`c02-human-empty-category-pane-report-20261003.json`，磁盘`disk-c02-human-empty-rejected-20261003.json`：仍revision3、旧draft8/8不改、review=null、学习0/无分类簿、输入与库SHA不变；拒绝审计13/13。首张C02截图有Codex遮挡，只用后续无遮挡定位图作为格位置证据。
+
+**C03由真人确认**：WPS接受H4临时值`C未知类别`，用户反馈“提示最终分类无效”；当前报告记录11:09:56.811Z确认click及“不在当前分类库里，请用下拉重新选择”。root点击问题定位，公开页H4选中及定位提示与真实未知值同框；随后恢复水泵。证据`c03-human-unknown-category-{rejected,h4-located}-20261003.jpg`、`c03-human-unknown-category-pane-report-20261003.json`、`disk-c03-human-unknown-rejected-20261003.json`。项目字节/版本3/原草稿、审核磁盘、库及输入均不变，review仍null/分类输出0。只读范围审计13/13；首次审计误把提示中的“库里”预期为“库中”，11/13旧报告保留，修正文本范围后通过，不计为产品错误。仅原生单元格编辑与真人失败确认，未执行成功确认或学习。
+
+**C04由真人确认**：root只将K4标识复制到K5，用户反馈“提示第5行 K 列行标识重复”，并提供实际WPS截图。报告记录11:20:45.756Z确认click及“2处待修改”：K5与K4同一标识、原水泵DN65材料行缺失。root点“定位到K单元格”选中公开页K5，随后Ctrl+Z恢复原标识尾号5，公式栏截图核对。证据`c04-human-{duplicate-id-pane-report,feedback}-20261003.json`、用户原图`c04-human-attached-duplicate-id-20261003.png`、`c04-human-duplicate-id-k5-located-20261003.jpg`、`c04-k5-original-id-restored-20261003.jpg`；磁盘`disk-c04-human-duplicate-rejected-20261003.json`及拒绝审计13/13。项目/草稿/库/输入/审核磁盘保持C01基线，无成功确认、学习或分类输出。准备时一次名称框复制误粘字面量K5已撤销，重新复制正确K4后才进行本次确认，不冒充第一次粘贴成功。
+
+当前C05仅已临时清空K4并留准备截图，待真人点击；K5及H4已恢复。未保存测试值，C05–C13、K余项、四项目和R12继续未完成。
