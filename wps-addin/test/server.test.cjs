@@ -39,6 +39,20 @@ test('serves plugin assets but not arbitrary workspace files', async t => {
   assert.doesNotMatch(index.body, /host-probe/);
   assert.deepEqual(JSON.parse((await request('/health')).body), {service:'wps-rfq-addin',version:'0.1.0',mode:'development'});
 });
+test('serves all seven local Ribbon SVG icons through the strict asset whitelist', async t => {
+  const root=path.resolve(__dirname,'..');
+  const server=createServer({root});
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  t.after(()=>new Promise(resolve=>server.close(resolve)));
+  const request=client(server);
+  for(const asset of ['import','matching','review','categories','brands','inquiry','split']){
+    const response=await request('/assets/'+asset+'.svg');
+    assert.equal(response.status,200,asset+'图标必须可由真实静态路由获取');
+    assert.equal(response.headers['content-type'],'image/svg+xml');
+    assert.equal(response.body,await fs.readFile(path.join(root,'assets',asset+'.svg'),'utf8'));
+  }
+  assert.equal((await request('/assets/not-a-release-icon.svg')).status,404,'不得扩大为任意assets路径');
+});
 test('WPS probes receive disposable copies, so host metadata writes cannot touch originals', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(),'rfq-probe-inputs-'));
   t.after(()=>fs.rm(root,{recursive:true,force:true}));

@@ -70,4 +70,16 @@ function OnReloadRfqPane() {
   }
 }
 
-function GetRfqImage() { return 'assets/inquiry.svg'; }
+// 本地静态图标按控件ID区分七阶段；取图不依赖导航脚本，也不访问宿主或项目数据。
+function GetRfqImage(control) {
+  var id = control && (control.Id || control.id || control.ID);
+  switch (id) {
+    case 'rfqStageImport': return 'assets/import.svg';
+    case 'rfqStageMatching': return 'assets/matching.svg';
+    case 'rfqStageReview': return 'assets/review.svg';
+    case 'rfqStageCategories': return 'assets/categories.svg';
+    case 'rfqStageBrands': return 'assets/brands.svg';
+    case 'rfqStageSplit': return 'assets/split.svg';
+    default: return 'assets/inquiry.svg';
+  }
+}

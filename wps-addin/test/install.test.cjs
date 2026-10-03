@@ -40,6 +40,11 @@ test('install only adds this plugin and never touches other plugin nodes',async 
  assert.equal(await fs.readFile(path.join(root,backups[0]),'utf8'),
   '<?xml version="1.0" encoding="UTF-8"?><jsplugins>'+otherPlugin+samePortPlugin+'</jsplugins>','备份必须与原文件一致');
  assert.equal(await fs.readFile(path.join(appDir,'main.js'),'utf8'),await fs.readFile(path.join(addin,'main.js'),'utf8'));
+ for(const asset of ['import','matching','review','categories','brands','inquiry','split']){
+  const relative=path.join('assets',asset+'.svg');
+  assert.equal(require('node:fs').existsSync(path.join(appDir,relative)),true,asset+'功能区图标必须随发布包复制');
+  assert.equal(await fs.readFile(path.join(appDir,relative),'utf8'),await fs.readFile(path.join(addin,relative),'utf8'));
+ }
  const files=(await fs.readdir(path.join(appDir,'dev'))).join(',');
  assert.equal(/host-probe|pane-diagnostics|acceptance-probe/.test(files),false,'发布文件不得带探针或诊断脚本');
  assert.equal(require('node:fs').existsSync(path.join(appDir,'dev','server.cjs')),true,'本机服务必须随发布文件一起复制');

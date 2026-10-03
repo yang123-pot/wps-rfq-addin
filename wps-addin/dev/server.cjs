@@ -22,7 +22,8 @@ const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.cs
   '/src/brand-reference.js', '/src/inquiry-header.js', '/src/inquiry-model.js', '/src/split-plan.js',
   '/src/split-state.js', '/src/header-ui.js', '/src/inquiry-ui.js', '/src/split-ui.js',
   '/src/ribbon-navigation.js',
-  '/src/path-picker.js', '/assets/inquiry.svg']);
+  '/src/path-picker.js', '/assets/inquiry.svg', '/assets/import.svg', '/assets/matching.svg',
+  '/assets/review.svg', '/assets/categories.svg', '/assets/brands.svg', '/assets/split.svg']);
 const TYPES = {'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
   '.html':'text/html; charset=utf-8','.xml':'application/xml; charset=utf-8','.svg':'image/svg+xml',
   '.json':'application/json; charset=utf-8'};

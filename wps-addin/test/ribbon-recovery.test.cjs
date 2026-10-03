@@ -178,3 +178,53 @@ test('未加载导航脚本时打开与重建仍可用，阶段入口静默不�
  assert.equal(staged.context.OnGotoStage({tag:'split'}),false,'无导航脚本时阶段入口不得误报成功');
  assert.deepEqual(staged.events,[],'无导航脚本时阶段入口不得产生任何宿主操作');
 });
+
+// R12-L补验：七阶段各有可发布的本地图标，getImage只取资源，不执行导航或业务动作。
+const STAGE_IMAGES=[
+ ['rfqStageImport','assets/import.svg'],
+ ['rfqStageMatching','assets/matching.svg'],
+ ['rfqStageReview','assets/review.svg'],
+ ['rfqStageCategories','assets/categories.svg'],
+ ['rfqStageBrands','assets/brands.svg'],
+ ['rfqStageInquiry','assets/inquiry.svg'],
+ ['rfqStageSplit','assets/split.svg']
+];
+test('七阶段图标回调返回各自资源，不能再共用同一询价图标',()=>{
+ const {context,events}=load({skipNav:true});
+ const images=STAGE_IMAGES.map(([id,want])=>{
+  const callback=/\bgetImage="([^"]+)"/.exec(buttonTag(id));
+  assert.ok(callback,id+'必须有图标回调');
+  const image=context[callback[1]]({Id:id});
+  assert.equal(image,want,id+'必须显示对应阶段图标');
+  assert.equal(context[callback[1]]({id:id}),want,'兼容既有小写控件id');
+  return image;
+ });
+ assert.equal(new Set(images).size,7,'七个阶段必须有七个独立资源');
+ assert.deepEqual(events,[],'取图标不能访问宿主、写存储、导航或弹确认');
+});
+test('七阶段图标资源实际存在且内容互异，无外部资源或脚本依赖',()=>{
+ const contents=STAGE_IMAGES.map(([id,asset])=>{
+  const filename=path.join(root,asset);
+  assert.equal(fs.existsSync(filename),true,id+'的SVG资源必须存在');
+  const svg=fs.readFileSync(filename,'utf8');
+  assert.match(svg,/<svg\b[^>]*xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+  assert.match(svg,/viewBox="0 0 32 32"/,'沿用现有32px图标体系');
+  assert.doesNotMatch(svg,/<script\b|\bon\w+=|\b(?:href|src)\s*=|<foreignObject\b/i,'图标须是独立静态SVG');
+  return svg;
+ });
+ assert.equal(new Set(contents).size,7,'换资源名不能掩盖图标内容仍相同');
+});
+test('图标回调保留打开入口及未知控件兜底，取图后七阶段仍只发送导航请求',()=>{
+ const {context,events}=load();
+ [undefined,null,{Id:'rfqOpenPane'},{Id:'unknown'}].forEach(control=>{
+  assert.equal(context.GetRfqImage(control),'assets/inquiry.svg');
+ });
+ assert.deepEqual(events,[],'打开入口图标和未知控件兜底不得产生宿主动作');
+ STAGE_BUTTONS.forEach(([id,,stage])=>{
+  context.GetRfqImage({Id:id});
+  assert.equal(context[buttonAction(id)]({Id:id}),true);
+  assert.equal(JSON.parse(context.window.Application.PluginStorage.getItem('rfq.nav.request')).stage,stage);
+ });
+ assert.equal(events.filter(event=>event[0]==='store').length,7,'每阶段仍只写一次导航请求');
+ assert.equal(events.some(event=>['confirm','navigate','create','alert'].includes(event[0])),false);
+});
