@@ -400,4 +400,12 @@ G/H复审总簿采用internal-total、10个供应商件采用supplier，完整�
 
 本轮公开改动清单为图标相关11文件及验收/发布清单/交接3文件；入场 `pane-diagnostics.js` SHA仍为 `e9a76e21546142907d65f1c158f6cc4138a69bcf44f950e84edaa6ac914d8e91`，原样保留、不暂存。先审查并备份已完成图标修复，继续补C/K真机及四项目人工缺口；R13不开始、不合并main、不发布。提交推送及远程SHA以本机补验备份回执为准。
 
-图标修复与准备记录14文件已普通推送，提交 `6a8e159bcbd052263303c953243b9cb4d63e1924` 与远程逐位相同；cached check退出0、完整diff已审查，工作区仅保留入场pane修改。回执 `evidence/backup-receipt-icons.json`，固定证据SHA索引 `evidence/artifact-index-icons-and-preparation.json`。本段补充备份状态及待接续点，仍等待用户真实鼠标点“自动分类”的结果；未收到结果不计为真实用户点击，也不完成C/K。
+图标修复与准备记录14文件已普通推送，提交 `6a8e159bcbd052263303c953243b9cb4d63e1924` 与远程逐位相同；cached check退出0、完整diff已审查，工作区仅保留入场pane修改。回执 `evidence/backup-receipt-icons.json`，固定证据SHA索引 `evidence/artifact-index-icons-and-preparation.json`。
+
+### 用户真实点击无响应与服务恢复（2026-10-03追加）
+
+用户已明确反馈真实鼠标点顶部“自动分类”未切换第2步，随后点“侧栏停住时重建”也无反应。Codex新观察实际WPS窗口右侧为空白，点内置JS调试入口后也未观察到调试窗口。仅据这些现象不判定导航控件解析或跨页存储缺陷。
+
+11:48（北京时间）核实38891无监听、原隔离服务进程已不存在；此前报告最后心跳为09:53:27，早于此次用户反馈，不能用于证明这次点击是否进入回调。11:50恢复同一隔离数据目录的服务，`/health`返回probe；新报告另存 `evidence/pane-report-recovery-20261003-115047.json`，保留旧报告。现有probe输出文件保留，自动探针的“目标已存在”检查会阻止重写，不把它计为导航无写入证据。服务停止原因仍未知。
+
+只读磁盘审计 `c-preparation/evidence/disk-recovery-entry-20261003-115x.json` 对照 `disk-k-entry.json`：仍0项目、库revision0、0学习来源；这是磁盘状态，不能证明打开簿的未保存单元格或实际点击者。恢复回执及用户反馈分别为 `evidence/service-recovery-current.json`、`evidence/recovery-user-results.json`，截图 `evidence/wps-recovery-before-reopen.jpg`。下一步由用户重开已保存入口簿，取得新paneSession/当前receivedAt后，再核回调、两导航键、侧栏当前阶段和出帧；C/K与R12仍未通过，产品导航代码未改。
