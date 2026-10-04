@@ -1,6 +1,6 @@
 # R12 真实 WPS 验收记录（未完成）
 
-最新接续：**2026-10-04 R12-L补验，C09/C10/C12及C11正常保存重开已有实机证据，R12仍未结案。** C08最小修复/436项回归已备份；C09真人失败后重试87/87、C10真人重复确认50/50、C11正常保存关闭重开180/180、C12 root确认后草稿变更/恢复61/61独立审计通过。当前A项目版本16、确认revision1/8行、库revision1/8活动来源、4分类簿2/2/2/1；汇总以下尚未生成。C11未保存新确认的差异重开分支、C13独立B确认/A改确认、K余项和四项目未完，R13不开始。用户要求另开会话继续；详见文末C09–C12节。
+最新接续：**2026-10-05 R12-L补验，C13 A/B真人确认与跨项目来源保护、C11未保存新确认分支已有实机证据，R12仍未结案。** B首次确认58/58＋46/46，A改确认110/110＋98/98；A确认时项目22/review2，新4分类簿1/2/2/2、库revision3/16活动来源，只替换A充电行来源，B及旧件保留。C11关闭前41/41、关闭不保存后重开40/40、恢复41/41＋边界12/12；真实识别类别/备注2差异，另名恢复并保存项目23，确认/草稿/库不变。C09/C10/C11正常分支/C12的87/50/180/61项历史证据沿用，汇总以下尚未生成。C05/C06事件缺口、K余项、四项目未完；SIDEBAR-STABILITY-01未解决，正式交付阻断，R13不开始。详见文末。
 
 最新接续：2026-09-30，**R12-G图05A→06→07真实出口通过**，项目revision24/拆分回执revision7。沿用确认8行和4分类簿2/2/2/1，固定组合未保存读回及四项抬头阻断真实有效；新总簿5询价页＋明确2内部页、全新目录5供应商件，完成5/失败0/待核对0。打印保存边界定位为WPS未初始化纸张；显式A4后横向/宽1页/高不限保存重开，5页实际预览各1页；隔离40行长特征件真实2页且重复表头。第七步主面板和打开目录两缺陷也已先红后绿并真实复验。6实际文件全部公开值/抬头/layout/来源对账及F双审计通过，公式0，供应商无内部/隐藏页列或意外内容；Node362/362、Python8/8及inquiry/workflow/split浏览器检查通过。截图67～75、77/78、80～82与最终文件/项目对应，23张旧误存截图仍撤销。原始证据留本机 `outputs/wps-acceptance-20260927/R12-G/`，详见[R12-G最终证据与6文件SHA清单](wps-workflow-v3-r12g-evidence-20260930.md)。本次到G停止，H及以后未开始，**R12整体仍未完成**；最终提交/远程核对以本机 `evidence/backup-receipt-r12g-final.json` 为准。以下9月27日状态为历史记录。
 
@@ -384,7 +384,7 @@ G/H复审总簿采用internal-total、10个供应商件采用supplier，完整�
 
 **R12仍未完成。** 本轮入口为 `feat/wps-phase1`@`80392a12b8c05b2a98a9d79b85d8d0d8e817335f`，证据另存本机 `outputs/wps-acceptance-20261003/R12-L-supplement/`，保留前轮L及G–J有效证据。用户已同意真实鼠标配合，并保存空白入口簿保护副本后重开WPS。当前可读取和点击实际 `wps.exe` 表格窗口；前轮et授权拒绝属于历史，不能继续当作当前错误。
 
-当前补验进度（10-04）：C01–C08历史证据保留，C05/C06新业务click缺口仍挂账。C09真人确认下真实库保存失败/释放后重试、C10真人幂等、C11 root正常保存重开、C12 root确认后草稿变更/恢复分别有独立87/50/180/61项通过证据。当前A版本16、确认8行、库8活动来源、4分类簿；C11未保存新确认分支和C13未执行，下一项在新会话建立独立B并由真人确认，再改A确认；C/K及四项目全链仍未完成。详细范围和既存边界见本节末尾。
+补验进度（10-04历史时点；最新以文首/文末为准）：C01–C08历史证据保留，C05/C06新业务click缺口仍挂账。C09真人确认下真实库保存失败/释放后重试、C10真人幂等、C11 root正常保存重开、C12 root确认后草稿变更/恢复分别有独立87/50/180/61项通过证据。当时A版本16、确认8行、库8活动来源、4分类簿；C11未保存新确认分支和C13待执行，后续在下方另记；C/K及四项目全链仍未完成。
 
 ### 功能区图标最小修复及回归
 
@@ -565,3 +565,43 @@ C08明确公开清单为4源码/测试文件＋本验收/发布清单/交接3文
 **下一项。** 在B新副本表内填写充电桩最终分类和备注后，由真人整表一次确认，再改A确认，独立核B来源保留/A对应旧来源撤销/A新decisionRevision和新分类批次、旧文件不覆盖；结合A新确认未保存WPS时关闭不保存/重开补C11剩余分支。A现版本16/review revision1、库revision1/8活动来源、4旧分类簿及来源保护沿用；B预填不代表已确认或学习。汇总/品牌/询价/拆分仍missing，不冒称既有完整下游失效验证。C13、C11剩余分支、K余项、四项目与R12未完成，R13不开始。
 
 本次公开清单仅2源码/测试＋本验收/发布清单/交接3文档，共5文件；保护pane保持入场SHA且不暂存，全部截图、xlsx、原始资料、库/项目运行文件和审计只留本机忽略目录。提交推送及远程SHA以`backup-receipt-c13-suggestions-20261004.json`为准。
+
+### C13 B首次真人确认与再次停摆（2026-10-04）
+
+**正式交付阻断补充（2026-10-04，用户明确要求）：** 本节再次停摆归入[SIDEBAR-STABILITY-01](wps-sidebar-stability-blocker.md)，当前未解决。**此问题不解决，不能正式交付。** 重建或重启后的临时恢复不算修复通过；须定位失效环节、完成针对性修复，并按问题记录完成真实WPS稳定性复验及未保存内容保护核对，才可关闭。本节B确认通过不解除此阻断。
+
+本节接续图03/04，文件名仍相对上述本机`c-preparation/evidence/`。前节“B尚未确认”为修复备份时点；修复5文件已普通推送`404c7ee9bcaed34648c06e55f6d1e75f9b1755cb`并核远程一致。本节未改产品代码，不重跑已通过的软件回归，**只补B首次确认，不称C13整体完成**。
+
+**实际编辑与真人确认。** root在新成果`ui-data/out/B/C审核B_修复后.xlsx`中填写H10=汽车充电桩、I10=C13-B确认，未点WPS保存；其余7行来自可靠建议，包括钢索无需询价。实际第3步8行/已填8/无需询价1/可整表确认，图为`c13-b-charge-filled-unsaved-native-20261004.png`、`c13-b-ready-for-human-confirmation-native-20261004.png`及对应pane报告。用户明确反馈“已点击，进入第4步并生成分类簿”，另存`c13-b-human-confirm-feedback-20261004.json`；同一paneSession `7d53a7917f536fb7`记录11:50:17.363Z的`sheet-review-confirm` click，确认快照11:50:17.393Z、草稿11:50:17.395Z。点击者依据真人反馈，事件只证明时间/目标；未用脚本或业务JSON代替确认。
+
+**确认结果与保护。** B项目`p-mutqdxvu-xtddhvfj`版本8/review revision1，全部8行合法，批次`p-mutrebx6-gmfqijjo`完成，目录`ui-data/out/B/分类工作簿`有4独立xlsx、水泵/阀门/风机/汽车充电桩2/2/2/1行，7询价＋1无需询价。库revision2/16活动来源，A8＋B8均decisionRevision1。真实第4步与配对报告为`c13-b-human-confirmed-category-files-native-20261004.png`、`c13-b-human-confirmed-pane-report-20261004.json`。B修复成果磁盘SHA仍`2f75c51eb68a803087d74679bc2c0d0d7916e034d5e3326e53d0bdc81e31c0f2`，磁盘H10/I10仍空，而确认快照来自打开簿的未保存修改；不能把磁盘xlsx当真人确认内容证明。
+
+独立只读`c13-b-confirmed-stage-independent-20261004T1153.json` **58/58**，SHA `650ceffa0ea63821f642ba36900716e00bc3d1e28ebab1fb8dce26247972948f`；补充`c13-b-confirmed-extra-independent-20261004T115613479079Z.json` **46/46**，SHA `40470a00c0ba1c9cb1a2a9efaea797a3ec23720af98a1eed46413ab4b7bd07ce`。逐值核4分类簿10公开列/隐藏rowId/公式0/空品牌单价金额/回执SHA，确认B独立身份且与A同来源和8个rowId。A完整项目字节、版本16/review1、实际`out/A/C草稿恢复.xlsx` SHA `b421fc3bdbcda366d7308d87eee92f97540b8b7407cef51c5965591ac87fb749`及4旧分类簿全部不变；源输入和保护pane同样不变。根目录原始资料与所有实际文件仅本机。
+
+**审计时点纠正。** `c13-independent-b-fixed-unconfirmed-audit-20261004T115109247987Z.json`为49/57，8失败因采集时B已真人确认，却仍套用未确认预期；原失败报告保留，不能写57/57。其硬编码BUnconfirmed/BLearningSources结论已撤回，修正说明为`c13-independent-checkpoint-timing-clarification-20261004T115358210561Z.json`。较早子代理47项口头检查没有带UTC的持久报告/磁盘SHA，不能补造为已封存基线；本节采用确认后的58＋46项独立证据。
+
+**再次停摆边界。** root曾实际通过项目列表打开A版本16，图`c13-a-project-v16-reopened-native-20261004.png`；第2步绑定路径为A，但旧B生成消息仍残留，属于现有显示状态边界，未据消息改绑或选错文件。A未编辑、未改确认。接续时WPS已最大化2048×1104、活动簿为B汽车充电桩分类簿，侧栏灰白；服务PID33672/HTTP200，报告最后12:11:45.754Z、同session/frame786。先封存`c13-resume-maximized-gray-pane-native-20261004.png`和同名报告；root点顶部重建未出现提示，保存`c13-rebuild-no-dialog-maximized-native-20261004.png`及报告。随后仅关闭灰白侧栏可见生效，“打开询价助手”未重新打开；用户真实鼠标重建也反馈“仍无反应”。没有新事件不足以判断原因，不宣称停摆已修或长期稳定。已请用户自行处理其他未保存内容再完整重开WPS，root未全局关闭/保存其他工作簿。
+
+**接续。** 真实侧栏恢复后打开确切A版本16，在自有恢复簿H5改强电/I5改C13-A改确认，未WPS保存时由真人改确认；核只撤销A该行旧来源、B同rowId来源仍活动、A新decisionRevision2及另目录新分类批次、旧A/B件不覆盖。封存后仅关闭自有A簿选不保存，再开最新A项目，要求类别/备注两处业务差异，不误报ready；保留双方并恢复确认快照到全新副本，恢复不再次确认/学习。汇总、品牌、询价、拆分仍missing，不冒称已形成下游的完整失效验证。C13整体、C11该分支、K余项、四项目和R12未完成；R13不开始。
+
+本节B状态原拟3文档备份，尚未单独提交即接续A/C11；现合并下节及正式交付阻断记录共4文档，以`backup-receipt-c13-c11-native-20261005.json`及普通推送/远程SHA核对为准。保护pane原样保留，私有截图、反馈、报告与运行数据不入Git。
+
+**跨日接续（10-05，A待真人改确认）。** 再次停摆的保护独立审计`c13-post-stall-protection-independent-20261004T155453523509Z.json` **55/55**，SHA `36f3f4e052af1f3241091ca70dbfdb1c3b6eff7d015be2af45ad0b5e60c174ca`，对照B确认后的58＋46项证据，A/B项目字节、两份实际成果/8分类件、16来源、输入及保护pane均不变。用户已自行处理未保存内容并重开WPS，root打开确切A恢复簿，初始新session `d6d3a270677f8d2d`可滚动，随后frame21时反向滚动画面不变；封存`c13-second-human-restart-scroll-stalled-native-20261004.png`及报告。此次原生重建真实弹出提示（`c13-second-restart-rebuild-prompt-native-20261004.png`），root确认仅重建页面；新session `215398fa5acc1b27`实际打开A版本16，后frame64→65并显示第3步。文件名沿用封存时标签，实际事件UTC在10-04、当地已跨10-05，不改历史证据名。
+
+root只在自有A成果表H5填强电、I5填C13-A改确认，未WPS保存；第3步实际比较报类别/备注2处差异。图`c13-a-changed-unsaved-h5-i5-native-20261005.png`、`c13-a-ready-human-changed-confirm-native-20261005.png`及对应report，操作/真人反馈另封存`c13-second-human-restart-and-root-actions-ledger-20261005.json`。此时等待真人主按钮一次改确认，不把表内编辑或预先出现的差异提示计为C13改确认/C11关闭重开通过；不继续索要全局重启，不保存其他工作簿。
+
+### C13 A真人改确认及C11未保存新确认分支（2026-10-05）
+
+本节接续图03/04，文件名相对上述本机`c-preparation/evidence/`；未改产品源码。点击者、机器事件、真实画面和只读文件审计分列，不用业务JSON写入代替实机操作。
+
+**A真人改确认。** 用户反馈“已点击并生成新分类簿”，对应`c13-a-human-changed-confirm-feedback-20261005.json`；session `215398fa5acc1b27`记录UTC10-04 16:04:47.149Z的整表主按钮click，确认快照16:04:47.193Z。A项目`p-murytt8g-b1dgbi43`版本22/review revision2，强电/C13-A改确认来自打开成果簿未保存修改；新批次`p-muu0hm62-2uuzq9kx`实际目录`out/A/示例园区_20261005-000447_bf54ea/分类工作簿`，强电/风机/阀门/水泵4件1/2/2/2、7询价＋1无需询价。配对真实第4步图和报告为`c13-a-human-changed-confirm-category-native-20261005.png`、`c13-a-human-changed-confirm-report-20261005.json`。
+
+独立`c13-a-changed-stage-independent-20261005-utc20261004T1611192163486Z.json` **110/110**，SHA `b499cfd0d8addba89e5499af2be2fc96ef33747436b3b915a82fc690768fe205`；补核`c13-a-changed-extra-independent-20261005-utc20261004T161431168142Z.json` **98/98**，SHA `787c4f5294ad83c104b852155eee8118d5ae5e99e16eb8443e838b044e9687e8`。只撤销A该rowId的汽车充电桩/decisionRevision1来源，新增强电/decisionRevision2；其余15来源原样，B同rowId的汽车充电桩仍在原memoryId活动。库revision3/16唯一活动键（A8/B8）；新4件公开10列表头/逐值、隐藏K rowId、空品牌报价金额、公式0及回执均相符；旧A4＋B4件、原始来源及保护pane未变。A旧磁盘成果仍SHA `b421fc3bdbcda366d7308d87eee92f97540b8b7407cef51c5965591ac87fb749`，H5=汽车充电桩/I5=C-草稿未保存，不能将其写成已WPS保存的新确认。
+
+**C11关闭不保存与差异重开。** 独立关闭前基线`c11-independent-new-confirmation-preclose-baseline-20261004T161454116035Z.json` **41/41**，SHA `073038ba8a1f6ecf2a7955a20f6f0f37308823af480591421b0b58d910a6c10c`。root只点击自有A页签×，真实提示明确指向`C草稿恢复.xlsx`，选择“不保存”，实际A页签消失，其他分类簿/预览仍在；从项目列表打开确切A22，实际报磁盘内容与新确认的类别/备注2处业务差异。图为`c11-new-confirmation-{preclose-unsaved,close-save-prompt,closed-without-saving,a22-list,reopened-a22-status,reopened-two-differences}-native-20261005.png`，配对`c11-new-confirmation-reopened-two-differences-report-20261005.json`、root操作归属JSON。独立`c11-independent-reopened-audit-20261004T162049596421Z.json` **40/40**，SHA `70dc806c12d85fbebd836773d66020441c68a465b7e38339a3a867f83d825c1f`；完整A22/review2/草稿、库、B和全部保护文件保持，没有自动覆盖、撤销或确认。差异页旁仍残留“已确认/可以生成”消息，边界另封存`c11-independent-reopened-native-boundary-note-20261004T162204512307Z.json`，未据措辞推断误生成已发生。
+
+**恢复新副本并保存绑定。** root只点“恢复项目草稿到新副本”，在可见选择器选已核不存在的`out/A/C确认恢复_未保存分支.xlsx`，生成并打开新副本；随后只点“保存项目”，实际A23可见。未点“选用现表内容”、整表确认或“保存审核成果”，未WPS保存旧成果。新件实际SHA `af58affe26c95e126c3a2f11c1a95b73ccc27b88ba48676ac1ae809957bcd270`，8行固定字段/最终分类/备注逐值等于review2，H5强电/I5 C13-A改确认，顺序8→1保持。图`c11-new-confirmation-{recovery-unique-target,recovery-copy-opened,recovery-binding-saved-a23,recovery-copy-a23-review}-native-20261005.png`及`c11-new-confirmation-recovery-copy-a23-report-20261005.json`、root操作归属JSON配对。PowerShell文件哈希被当前打开簿占用阻止，独立Python成功只读核SHA/8行，没有为审计关闭工作簿。
+
+独立`c11-independent-recovered-audit-20261004T162733716917Z.json` **41/41**，SHA `802ccce7456aad4aa1053514382bc4a087d1e70e2924ad5e5fc696bda359cb07`；补充`c11-independent-recovered-downstream-boundary-20261004T162930835305Z.json` **12/12**，SHA `07a2d3280eab94e2632c915d22aa9a4f8f1546f20dbba1a349823a249dd6a408`。仅项目版本22→23及新matching绑定/历史/状态更新，完整review2、reviewDraft、confirmedAt、新分类batch和库完整SHA均不变；旧A/B审核与全部旧新分类件保持。summary/brands/inquiry/generation/split均null，下游未形成，记missing。确认的历史provenance路径仍指向当时旧成果，新matching绑定正确；恢复提示仍泛化要求“整表确认”，本次未执行，该措辞边界保留。
+
+本节完成上述跨项目来源保护及C11功能分支；C05/C06新事件缺口、行高84/内部页及既存恢复边界、已形成完整下游的失效、K余项与四项目全链继续挂账。SIDEBAR-STABILITY-01未解决，不能正式交付；不开始R13。本次公开明确清单为本验收、发布清单、交接及`docs/wps-sidebar-stability-blocker.md`共4文档；证据、源文件、运行数据和保护pane不暂存，备份以本机`backup-receipt-c13-c11-native-20261005.json`及实际普通推送/远程SHA为准。
