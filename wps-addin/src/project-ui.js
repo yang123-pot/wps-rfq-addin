@@ -288,7 +288,7 @@
       tell('已恢复项目'+loaded.projectId+'（版本 '+loaded.revision+'）。'+(upgradedFrom?'旧版项目'+upgradedFrom+'已保留，本次继续写入v2副本，需重新确认合并与整表审核。':'')+
         (rebuilt?'已按原件SHA校验重建'+rebuilt+'份工作副本。':'工作副本完整。')+
         (audit.ok?'各阶段持久文件已核对。':'有'+audit.issues.length+'项持久文件未核对通过，未恢复为已完成；缺失文件可尝试“重新定位项目文件”。')+
-        (physicalRefreshed?'审核成果表仅另存/格式变化，业务内容与确认快照一致，物理校验已更新。':'')+
+        (physicalRefreshed?'审核成果表仅另存/格式变化，业务内容与已保存审核内容一致，物理校验已更新。':'')+
         '原件不变，快照可用于继续核对。'+(recomputed?'阶段状态已按当前来源与确认内容重算，保存后写回项目记录。':''),
         !audit.ok);
       return true;

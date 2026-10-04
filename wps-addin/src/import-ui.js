@@ -24,9 +24,43 @@
       setReviewBinding:function(value){reviewBinding=value||null;},
       // R12-C：项目重开时在SHA之外按业务内容核对审核成果表，优先读同路径已打开簿的未保存修改。
       compareReviewContent:function(project){
-        if(!options.application||!project||!project.matching||!project.review)return null;
-        return RfqClassificationReviewHost.compareSnapshot(
-          RfqClassificationReviewHost.readBack(options.application,project.matching),project.review);
+        if(!options.application||!project||!project.matching)return null;
+        var snapshot=project.review||project.reviewDraft;
+        if(!snapshot)return null;
+        function refused(code,message){return {matches:false,source:null,differences:[{code:code,message:message}]};}
+        // 草稿只属于保存时的本次清单；旧内容键不能授权刷新当前成果表的物理校验。
+        if(!project.review&&(!snapshot.inputKey||snapshot.inputKey!==project.matching.inputKey||snapshot.inputKey!==matchingKey()))
+          return refused('input-key-stale','已保存审核草稿不属于当前清单内容，无法沿用其物理校验。');
+        // 损坏的保存快照不能以重复/空标识或抛错退回SHA核验的方式授权刷新。
+        var snapshotRows=snapshot.rows,bindingIds=project.matching.rowIds;
+        if(!Array.isArray(snapshotRows)||!snapshotRows.length||!Array.isArray(bindingIds)||snapshotRows.length!==bindingIds.length)
+          return refused('snapshot-invalid','已保存审核内容的材料行结构不完整，请核对项目记录。');
+        var expectedIds=Object.create(null),snapshotIds=Object.create(null);
+        bindingIds.forEach(function(id){expectedIds[id]=true;});
+        if(snapshotRows.some(function(row){
+          var id=String(row&&row.rowId||'');
+          if(!id||snapshotIds[id]||!expectedIds[id])return true;
+          snapshotIds[id]=true;return false;
+        }))return refused('snapshot-invalid','已保存审核内容的行标识缺失、重复或不属于当前成果表，请核对项目记录。');
+        var read;
+        try{read=RfqClassificationReviewHost.readBack(options.application,project.matching);}
+        catch(error){return refused('read-failed','无法核对已保存审核内容：'+error.message);}
+        var compared=RfqClassificationReviewHost.compareSnapshot(read,snapshot);
+        // 固定字段/行标识损坏由真实读表报告；SHA相同也不能跳过这些问题。
+        compared.differences=compared.differences.concat(read.issues||[]);
+        // 未完成草稿允许空分类；未知非空文本同样没有类别ID，仍必须核对原始文字。
+        var savedRows={};(snapshot.rows||[]).forEach(function(row){savedRows[row.rowId]=row;});
+        (read.rows||[]).forEach(function(row){
+          var saved=savedRows[row.rowId];
+          if(!saved||saved.categoryId||row.finalCategoryId)return;
+          var expected=String(saved.categoryName||''),actual=String(row.finalCategoryName||'');
+          if(expected===actual)return;
+          compared.differences.push({rowId:row.rowId,code:'category-changed',field:'categoryName',label:'最终分类',
+            expected:expected,actual:actual,message:'“'+row.name+'”的“最终分类”与已保存审核内容不一致：原“'+
+              (expected||'（空）')+'”，现“'+(actual||'（空）')+'”。'});
+        });
+        compared.matches=compared.differences.length===0;
+        return compared;
       },
       getCategories:function(){return categoryReceipt;},
       restoreCategories:function(value){categoryReceipt=value||null;return categoryReceipt;},

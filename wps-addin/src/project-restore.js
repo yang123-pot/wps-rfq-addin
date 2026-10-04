@@ -70,7 +70,7 @@
      differences:((content.differences||[]).slice()),
      source:content.source||null,
      message:item.label+'（'+(content.source==='open'?'打开簿内容':'磁盘内容')+
-      '）的业务内容与项目确认快照不一致（SHA'+(shaMatches?'相同':'不同')+
+      '）的业务内容与项目已保存审核内容不一致（SHA'+(shaMatches?'相同':'不同')+
       '也不能当作已一致）：'+describeDifferences(content.differences)});
    if(!shaMatches){
     if(content&&content.matches===true)
