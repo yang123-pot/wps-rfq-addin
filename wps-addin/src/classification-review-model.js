@@ -44,7 +44,8 @@
    var suggestion=classify.suggest(item,source,{memory:input.memory||null,projectId:input.projectId||null});
    var conflicts=(suggestion.conflicts||[]).length>1;
    var candidates=suggestion.candidates||[];
-   var auto=candidates.length===1?candidates[0]:null;
+   // 同一类别可以同时有规则和记忆依据；只有不同类别才是冲突。
+   var auto=candidates.length&&!conflicts?candidates[0]:null;
    var state=conflicts?STATE.conflict:(candidates.length?(auto&&auto.categoryId===library.DECISION?STATE.skip:STATE.suggested):STATE.none);
    var origin=firstSource(group);
    return {rowId:rowIdOf(group),index:index+1,name:item.name,feature:item.feature,unit:item.unit,

@@ -64,6 +64,58 @@ test('成果表按图03列序输出9列，规格保存完整特征，编码与�
   assert.equal(binding.values.length,result.rows.length+1);
 });
 
+test('其他项目已确认的记忆与规则同类时仍预填成果表，真实类别冲突继续留空',()=>{
+  const preview=collection.preview(sample.buildCollection(),true);
+  const decisions=[
+    ['水泵','DN50','台','pump','水泵'],['水泵','DN65','台','pump','水泵'],
+    ['阀门','DN50','个','valve','阀门'],['阀门','DN65','个','valve','阀门'],
+    ['送风机','规格A','台','fan','风机'],['排风机','规格B','台','fan','风机'],
+    ['充电桩配电箱','充电桩配套','台','ev-charger','汽车充电桩'],['钢索','规格C','m','no-inquiry','无需询价']
+  ];
+  let state=sample.createMemory();
+  decisions.forEach(([name,feature,unit,categoryId,categoryName])=>{
+    const group=preview.groups.find(row=>row.name===name&&row.feature===feature&&row.unit===unit);
+    state=memory.learn(state,{categoryId,categoryName,rowId:group.id,revision:1,
+      confirmedAt:'2026-10-04T05:32:42.737Z'},
+      {item:{name,feature,unit},sourceProjectId:'p-review-owner',scope:'global'});
+  });
+  const before=JSON.stringify(state);
+  const result=model.build(preview.groups,{library:sample.library,memory:state,projectId:'p-review-other'});
+  decisions.forEach(([name,feature,,categoryId,categoryName])=>{
+    const row=result.rows.find(item=>item.name===name&&item.feature===feature);
+    if(name==='充电桩配电箱'){
+      assert.equal(row.finalCategoryId,'','不同类别仍是冲突，不能采用历史确认覆盖另一规则');
+      assert.equal(row.autoCategoryId,null);
+      assert.equal(row.abnormal,true);
+      assert.equal(row.matchState,'分类冲突');
+    }else{
+      assert.equal(row.autoCategoryId,categoryId,'同类别的两种依据应产生可靠建议');
+      assert.equal(row.finalCategoryName,categoryName,'最终分类预填唯一类别');
+      assert.equal(model.publicRow(row)[5],categoryName,'公开自动建议不能丢为待核对');
+      assert.equal(model.publicRow(row)[7],categoryName,'公开最终分类必须与建议相符');
+    }
+  });
+  assert.equal(result.counts.suggested,6);
+  assert.equal(result.counts.skip,1,'无需询价不能误记为普通匹配成功');
+  assert.equal(result.counts.conflict,1);
+  assert.equal(result.counts.pending,8,'预填不代表人工确认');
+  assert.equal(JSON.stringify(state),before,'生成不能改变任何记忆来源或学习状态');
+});
+
+test('多条规则只命中同一类别时预填最终分类，保留真实规则依据',()=>{
+  const preview=collection.preview(sample.buildCollection(),true);
+  const library=JSON.parse(JSON.stringify(sample.library));
+  library.rules.push({id:'fixture-pump-feature',categoryId:'pump',state:'active',basis:'水泵规格核对',
+    match:[{field:'name',any:['水泵']},{field:'feature',any:['DN50']}]});
+  const result=model.build(preview.groups,{library,memory:sample.createMemory(),projectId:'p-multi-rules'});
+  const row=result.rows.find(item=>item.name==='水泵'&&item.feature==='DN50');
+  assert.equal(row.autoCategoryId,'pump');
+  assert.equal(row.finalCategoryName,'水泵');
+  assert.equal(row.matchState,'匹配成功');
+  assert.equal(row.abnormal,false);
+  assert.equal(result.counts.pending,8);
+});
+
 test('版式落地：表头浅色、最终分类浅黄带区域下拉、异常行橙色、隐藏辅助列、冻结与打印',()=>{
   const {result}=built();
   const sheet=model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'});

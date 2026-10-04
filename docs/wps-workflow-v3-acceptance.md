@@ -549,3 +549,19 @@ C08明确公开清单为4源码/测试文件＋本验收/发布清单/交接3文
 **新会话从C13开始，不重做C09–C12。** 用户已要求“重新开一个窗口会话，接下往下做”。先核A版本16/当前服务与真实窗口，再按图01–04建立独立B，保存项目和审核绑定，由真人确认同一来源/同rowId；不能在A身份内直接导入冒充B。再由真人改A确认，核只撤销A对应旧学习来源、B来源保留、A新decisionRevision及新分类批次/旧件不覆盖；可结合A新确认未保存WPS时关闭不保存/重开补C11剩余分支。C13、已形成下游的完整过期实机、K余项与四项目未执行，R12不结案/R13不开始。自有C簿与其他用户未保存簿分别保护，禁止全局关闭WPS或保存其他簿。
 
 本轮公开备份仅本验收/发布清单/交接3文档，产品代码沿用C08已验证提交，不重复跑无新改动的软件测试。私有截图/行级报告/锁日志/独立审计及实际xlsx均留本机忽略目录，保护pane原样不暂存；本次提交推送与远程SHA以`evidence/nav-probe/backup-receipt-c09-c12-native-20261004.json`为准。
+
+### C13准备：停摆恢复观察与同类多依据预填修复（2026-10-04）
+
+本次继续图01–04，完整读交接并实际看对应图后操作。下列文件名相对本机`R12-L-supplement/c-preparation/evidence/`；原始Ribbon服务仍PID33672，没有写业务JSON或自动确认。**本节只证明B独立建立、预填修复及保护，不记C13整体通过。**
+
+**停摆现场与恢复。** 开始侧栏灰白；root工具重建、仅关侧栏再开、本插件禁用/重新启用均无可见恢复，用户真实鼠标重建反馈同样无反应。用户自行处理其他未保存内容并完整重开WPS后，窗口3410068出现导入页，paneSession `532d8da39c39e02c`仍停在frame21。root浏览点击11:12:56.600Z确有DOM click及focusin INPUT，随后真人点击11:14:29.138Z仍反馈无可见面板；不能写成“没有点击事件”，也不能凭DOM状态声称界面可用。原生新截图/反馈/报告及独立首帧审计27/27仅证时序与保护。root随后重新点原生“侧栏停住时重建”，真实出现重建提示并确认；新画面实际滚动、浏览、导入、生成及项目保存可用。修复代码加载时再次只重建侧栏，paneSession `7d53a7917f536fb7`在B新生成/保存期间frame106→137。未关闭或保存其他用户簿，未更改停摆逻辑，根因及长期稳定性仍未确定。
+
+**独立B及真实缺陷。** root通过WPS可见页面导入同一`C补验_独立8行.xlsx`，默认分别保留8→8/0问题，生成原故障成果并实际保存新项目`p-mutqdxvu-xtddhvfj`版本1；与A不同projectId、相同来源SHA及8个rowId，review/reviewDraft/分类和其余下游为空。原成果的G列为7成功/1冲突，但F列全“待核对”、H列全空。独立B未确认基线39/39核身份/保护，不作为功能通过；独立复现v2 14/14同时重建HEAD旧模型、无记忆模型与修正模型，并逐值核原故障xlsx，证明根因在审核模型：分类器保留同一类别的规则/精确记忆/相似记忆多条依据，旧`candidates.length===1`误当多类冲突，丢掉7行可靠建议。充电行实际有两个不同categoryId，确属冲突。
+
+**两文件最小修复与回归。** `classification-review-model.js`仅改为候选非空且无分类冲突时预填首个同类候选；分类器的`conflicts`按不同categoryId去重，真实多类仍留空，钢索无需询价仍为skip。增加跨项目规则＋记忆同类及同类多规则2个模型用例，生成不改变记忆，8行仍pending/未确认。先运行`node --test wps-addin/test/classification-review-model.test.cjs`得11/13、两预期`null !== pump`；最小实现后与`classify-memory.test.cjs`合跑20/20，全量`node --test wps-addin/test/*.test.cjs` **438/438**，失败/取消/跳过/todo0。相关workflow/sheet-review/memory/category/project/project-restore浏览器 **6/6**，真实页面/服务、模拟WPS，不能替代真机。独立代码审查再跑相关20/20、二次只读审查均无实质P1/P2；日志`c13-suggestion-{red,green,full-node}-20261004.log`、`c13-suggestion-browser-results-20261004.json`及`c13-independent-minimal-fix-code-review-20261004T113451866953Z.json`。
+
+**修复后WPS出口。** root重建加载最终代码，从项目列表实际打开B版本1，经“重新生成审核成果表”另存全新`ui-data/out/B/C审核B_修复后.xlsx`，保留原故障文件不覆盖。实际公开页水泵/阀门等F/H预填可见；root11:39:19.083Z实际点`save-project`，落盘B版本2、新matching路径/实际SHA绑定、review仍为空。`c13-b-fixed-suggestions-native-20261004.png`、`c13-b-fixed-unconfirmed-saved-native-20261004.png`及`c13-b-fixed-unconfirmed-pane-report-20261004.json`配对；点击报告截止于保存开始，版本2完成由实际画面和落盘核实，不凭文件名或心跳证明完成。
+
+**下一项。** 在B新副本表内填写充电桩最终分类和备注后，由真人整表一次确认，再改A确认，独立核B来源保留/A对应旧来源撤销/A新decisionRevision和新分类批次、旧文件不覆盖；结合A新确认未保存WPS时关闭不保存/重开补C11剩余分支。A现版本16/review revision1、库revision1/8活动来源、4旧分类簿及来源保护沿用；B预填不代表已确认或学习。汇总/品牌/询价/拆分仍missing，不冒称既有完整下游失效验证。C13、C11剩余分支、K余项、四项目与R12未完成，R13不开始。
+
+本次公开清单仅2源码/测试＋本验收/发布清单/交接3文档，共5文件；保护pane保持入场SHA且不暂存，全部截图、xlsx、原始资料、库/项目运行文件和审计只留本机忽略目录。提交推送及远程SHA以`backup-receipt-c13-suggestions-20261004.json`为准。
