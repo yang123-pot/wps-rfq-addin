@@ -1,6 +1,6 @@
 # R12 真实 WPS 验收记录（未完成）
 
-最新接续：**2026-10-04 R12-L补验，C08已补齐，R12仍未结案。** root实际恢复草稿到新副本、显式保存绑定到版本5；WPS保存后仅物理SHA变化的误报经4文件最小修复，Node436/436、相关浏览器6/6＋最终两项复验通过。真实重开自动刷新版本6，第3步8/8且尚未人工确认、无差异横幅；独立51/51＋修复后33/33。C09–C13、K余项与四项目新流程未完；review=null、库revision0/来源0、无分类输出，R13不开始。前轮L和G–J证据按原日期保留，详见文末C08节。
+最新接续：**2026-10-04 R12-L补验，C09/C10/C12及C11正常保存重开已有实机证据，R12仍未结案。** C08最小修复/436项回归已备份；C09真人失败后重试87/87、C10真人重复确认50/50、C11正常保存关闭重开180/180、C12 root确认后草稿变更/恢复61/61独立审计通过。当前A项目版本16、确认revision1/8行、库revision1/8活动来源、4分类簿2/2/2/1；汇总以下尚未生成。C11未保存新确认的差异重开分支、C13独立B确认/A改确认、K余项和四项目未完，R13不开始。用户要求另开会话继续；详见文末C09–C12节。
 
 最新接续：2026-09-30，**R12-G图05A→06→07真实出口通过**，项目revision24/拆分回执revision7。沿用确认8行和4分类簿2/2/2/1，固定组合未保存读回及四项抬头阻断真实有效；新总簿5询价页＋明确2内部页、全新目录5供应商件，完成5/失败0/待核对0。打印保存边界定位为WPS未初始化纸张；显式A4后横向/宽1页/高不限保存重开，5页实际预览各1页；隔离40行长特征件真实2页且重复表头。第七步主面板和打开目录两缺陷也已先红后绿并真实复验。6实际文件全部公开值/抬头/layout/来源对账及F双审计通过，公式0，供应商无内部/隐藏页列或意外内容；Node362/362、Python8/8及inquiry/workflow/split浏览器检查通过。截图67～75、77/78、80～82与最终文件/项目对应，23张旧误存截图仍撤销。原始证据留本机 `outputs/wps-acceptance-20260927/R12-G/`，详见[R12-G最终证据与6文件SHA清单](wps-workflow-v3-r12g-evidence-20260930.md)。本次到G停止，H及以后未开始，**R12整体仍未完成**；最终提交/远程核对以本机 `evidence/backup-receipt-r12g-final.json` 为准。以下9月27日状态为历史记录。
 
@@ -384,7 +384,7 @@ G/H复审总簿采用internal-total、10个供应商件采用supplier，完整�
 
 **R12仍未完成。** 本轮入口为 `feat/wps-phase1`@`80392a12b8c05b2a98a9d79b85d8d0d8e817335f`，证据另存本机 `outputs/wps-acceptance-20261003/R12-L-supplement/`，保留前轮L及G–J有效证据。用户已同意真实鼠标配合，并保存空白入口簿保护副本后重开WPS。当前可读取和点击实际 `wps.exe` 表格窗口；前轮et授权拒绝属于历史，不能继续当作当前错误。
 
-当前补验进度（10-04）：C01–C07已有分项实机证据，C05/C06新业务click缺口仍挂账；C08恢复新副本、显式项目保存及WPS保存后关闭重开已补。仅草稿SHA误报最小修复后真实自动刷新版本6，第3步8/8、尚未人工确认、无差异横幅；独立51/51＋33/33，review=null/学习0/无分类输出。C09–C13未执行，下一项真人整表确认与习惯保存失败重试；C/K及四项目全链仍未完成。详细范围和既存边界见本节末尾。
+当前补验进度（10-04）：C01–C08历史证据保留，C05/C06新业务click缺口仍挂账。C09真人确认下真实库保存失败/释放后重试、C10真人幂等、C11 root正常保存重开、C12 root确认后草稿变更/恢复分别有独立87/50/180/61项通过证据。当前A版本16、确认8行、库8活动来源、4分类簿；C11未保存新确认分支和C13未执行，下一项在新会话建立独立B并由真人确认，再改A确认；C/K及四项目全链仍未完成。详细范围和既存边界见本节末尾。
 
 ### 功能区图标最小修复及回归
 
@@ -520,8 +520,32 @@ root随后WPS保存新簿，SHA从`dddaec11f1d74845641693e59cc5582f386ddd7cdfab4
 
 **修复后真实出口通过。** root重建加载最终代码，新paneSession `3ead0c32523e6e86`实际打开列表版本5；插件按8行草稿业务一致自动保存物理刷新到**版本6**，真实提示“审核成果表仅另存/格式变化，业务内容与已保存审核内容一致，物理校验已更新”。随后root从第2步点“打开成果表审核”，第3步真实显示8行/已填8/与建议不同1/无需询价1/可以整表确认，尚未人工确认且无差异横幅；公开恢复簿仍8→1，充电桩物理第5行H5=汽车充电桩、I5为草稿备注。真实图及配对报告为`c08-fixed-project-reopen-v6-native-20261004.png`、`c08-fixed-project-reopen-v6-pane-report-20261004.json`、`c08-fixed-review-stage3-native-20261004.png`、`c08-fixed-review-stage3-pane-report-20261004.json`。
 
-独立只读`c08-independent-fixed-reopen-audit-20261004T051606381927Z.json` **33/33**对比`disk-c08-resume-before-reopen-20261004.json`与`disk-c08-fixed-reopen-v6-20261004.json`：仅项目revision/SHA和matching.sha256变化，matching其余字段、draft全对象、review=null、阶段和下游记录均不变；版本6项目与实际磁盘一致，新绑定SHA为`2c96581e…`。库仍revision0/来源0、分类输出0，旧审核/原件/导入副本及入场pane SHA不变。C08只完成上述恢复/物理变化重开，**C09–C13未执行**，下一项45秒只读库锁下的真人整表确认与锁释放后的真人习惯保存重试；R12整体仍未完成，R13不开始。
+独立只读`c08-independent-fixed-reopen-audit-20261004T051606381927Z.json` **33/33**对比`disk-c08-resume-before-reopen-20261004.json`与`disk-c08-fixed-reopen-v6-20261004.json`：仅项目revision/SHA和matching.sha256变化，matching其余字段、draft全对象、review=null、阶段和下游记录均不变；版本6项目与实际磁盘一致，新绑定SHA为`2c96581e…`。**这是C08收尾历史状态**：当时库revision0/来源0、分类输出0，旧审核/原件/导入副本及入场pane SHA不变，C09–C13未执行。后续实际进度以下节为准；R12整体仍未完成，R13不开始。
 
 **既存边界另挂账。** 行高84及可见内部页未在本次修复；host只读binding范围，lastRow后额外材料尚未覆盖；ProjectUI物理刷新保存失败时内存SHA未回滚且异常被吞，本次成功写版本6未触发该分支；独立第3步`detectReviewDivergence`仍可能优先较新draft，本次确认优先测试只覆盖恢复callback。不能据C08宣称全部恢复矩阵或全部结构校验通过。
 
-本次明确公开清单为4源码/测试文件＋本验收/发布清单/交接3文档，共7文件；Git结果以本机`evidence/nav-probe/backup-receipt-c08-fixed-native-20261004.json`及远程SHA核对为准。全部C08私有文件和新独占审计JSON留本机忽略目录，保护pane不暂存。
+C08明确公开清单为4源码/测试文件＋本验收/发布清单/交接3文档，共7文件；已提交推送`9a5d7e46a853df24fc9a28308e2b30d3ea1cd91a`且远程SHA一致，回执`evidence/nav-probe/backup-receipt-c08-fixed-native-20261004.json`。全部C08私有文件和新独占审计JSON留本机忽略目录，保护pane不暂存。
+
+### C09–C12实机续验及另会话入口（2026-10-04）
+
+本节对应图03/04；同包实际看图后操作。私有证据基准目录为本机`outputs/wps-acceptance-20261003/R12-L-supplement/c-preparation/evidence/`，以下文件名均相对该目录。**成功整表确认、习惯重试及重复确认由真人点击；草稿编辑/保存、导航、WPS保存与关闭重开由root工具执行。** 独立审计只读，未代替实机动作，也未写业务JSON。
+
+**C09：确认先落盘、习惯保存失败后独立重试，通过87/87。** 初始项目版本6/草稿8/8/review=null、库revision0/来源0。root仅锁本C隔离库：首个`powershell.exe`启动被执行策略拒绝，尚未取锁/未请真人点击，失败日志保留；随后现有`pwsh`隐藏进程取45秒只读句柄，未改变系统策略。`read-lock-ready`为05:32:21.160Z、释放05:33:06.195Z，释放前后库SHA不变。真人`sheet-review-confirm` click于05:32:42.704Z，确认快照05:32:42.737Z，8行/revision1；05:32:45.992Z真实报告库rename `EPERM`，确认仍保留。自动进入第4步并生成4实际分类簿2/2/2/1，项目版本12，7询价＋1无需询价。失败状态由实际侧栏“习惯保存重试”和同次报告证明，不把心跳记作点击。
+
+锁释放后真人于05:35:30.404Z只点`sheet-review-memory-retry`，05:35:30.636Z状态提示成功，库revision1/8活动来源，包含无需询价；每个来源按projectId/rowId/decisionRevision1登记。重试前后项目原始字节SHA、完整确认/草稿、分类清单和4实际文件SHA全部不变，未重复确认/生成新批次。关键配对：`c09-human-confirm-result-native-20261004.png`、`c09-learning-failed-retry-visible-native-20261004.png`、`c09-human-memory-retry-success-native-20261004.png`及同名pane报告；磁盘为`disk-c09-after-confirm-learning-failed-20261004.json`、`disk-c09-after-human-memory-retry-20261004.json`，真人反馈另存`c09-human-confirm-feedback-20261004.json`、`c09-human-memory-retry-feedback-20261004.json`。
+
+独立审计`c09-independent-human-failure-retry-scope-audit-20261004T054438201407Z.json` **87/87**，SHA `c2d1975c79a7b4d8b8b305a527dc07a0fa23417f5dc38a157ce538e677952b26`。首次`c09-independent-human-failure-retry-audit-20261004T054303407187Z.json` **86/87**保留：其唯一失败是过宽要求“首次确认保持整个草稿元数据不变”；确认会合理刷新savedAt/新恢复簿绑定。修正范围后重核首次确认8行业务不变、重试完整草稿不变并实际重开4分类簿；不是产品失败被删去。
+
+**C10：相同整表内容重复确认，通过50/50。** 真人新click为05:37:53.254Z，05:38:03.210Z报告“整表内容与上次确认一致，未重复确认（8 行）”，真实第3步保持首次确认时间与revision1。项目版本12/完整JSON及SHA、库revision1/8来源、4分类文件/回执/批次全部不变。配对`c10-human-repeat-confirm-native-20261004.png`、`c10-human-repeat-confirm-pane-report-20261004.json`、`disk-c10-after-human-repeat-confirm-20261004.json`及真人反馈；独立`c10-independent-human-idempotence-audit-20261004T054808887643Z.json` **50/50**，SHA `0642eb0c0684dc3c3c349414c196aacc8f3cbfbfadb8fa3ca80949d93b5d6b54`。
+
+**C11：正常保存关闭重开分支，通过180/180；整包未完成。** root只在自有`C草稿恢复.xlsx`执行WPS保存，8行业务不变而物理SHA变化，再实际点“保存项目”到版本13。首次Ctrl+W未生效，`c11-owned-review-closed-saved-native-20261004.png`画面仍有C簿，明确撤销其关闭证明；有效关闭为点击自有C标签×，证据`c11-owned-review-actually-closed-via-tab-native-20261004.png`，其他用户簿保留。root从项目列表重开确切版本13，业务一致自动刷新matching.sha256到`b421fc3bdbcda366d7308d87eee92f97540b8b7407cef51c5965591ac87fb749`并保存**版本14**；随后打开成果表审核，第3步8行/原确认时间/revision1，无业务差异横幅。确认全对象、库及4分类簿不变。
+
+有效配对`c11-confirmed-project-reopened-v14-native-20261004.png`、`c11-confirmed-review-reopened-stage3-native-20261004.png`及stage3报告、`disk-c11-confirmed-project-review-reopened-v14-20261004.json`。文件名含v14的项目重开pane报告实际截止时仍v13，不单凭文件名证明v14；随后真实v14画面、stage3报告和落盘快照证明结果。独立`c11-independent-normal-reopen-audit-20261004T055421040639Z.json` **180/180**，SHA `02c0fc4eab9581bc8fa9f45f21889b95cfd1932b206a5dd684ff45066ba4ab2b`；完整扫描8个pane数组/800条记录，快照内10-03旧数组不作C11当前点击证据。**“新确认未保存WPS，关闭不保存后重开”的业务差异分支未执行**，不以正常分支替代。
+
+**C12：确认后只存草稿并恢复，通过61/61，点击者root。** 自有恢复簿当前顺序8→1，充电桩位于H5/I5。root未保存WPS，临时改为H5“强电”/I5“C-确认后草稿”，实际只点右侧“保存审核成果”，05:46:10.713Z click/05:46:10.745Z草稿保存，项目版本15；画面提示成果表与已保存确认不一致、2业务差异，草稿仍8/8。随后root恢复H5“汽车充电桩”/I5“C-草稿未保存”，再次只存草稿，05:48:08.788Z click/05:48:08.818Z保存到**版本16**；画面重新显示“整表已确认”及原时间。两次完整旧确认、库revision1/8活动来源、4分类簿/回执、来源/导入/旧审核保护SHA不变，无新学习或分类批次。
+
+配对`c12-confirmed-project-draft-saved-divergence-native-20261004.png`、`c12-confirmed-project-draft-saved-pane-report-20261004.json`、`disk-c12-after-unconfirmed-draft-save-20261004.json`和`c12-draft-restored-to-confirmation-native-20261004.png`、`c12-draft-restored-to-confirmation-pane-report-20261004.json`、`disk-c12-draft-restored-to-confirmation-20261004.json`。独立`c12-independent-root-draft-restoration-audit-20261004T055252727394Z.json` **61/61**，SHA `b2585cca61cbe7b34d525e7a41c0a695f4bc4ff26f09e8cf12cf6f187cdc3546`。报告止于实际SaveDraft click，完成状态由同次原生画面及落盘savedAt/8行读回证明；磁盘文件本身不能证明未保存单元格，不能冒称真人确认。恢复后WPS仍黑点未保存，业务值已恢复；汇总/品牌/询价/总簿/拆分均尚未生成，记missing。
+
+**新会话从C13开始，不重做C09–C12。** 用户已要求“重新开一个窗口会话，接下往下做”。先核A版本16/当前服务与真实窗口，再按图01–04建立独立B，保存项目和审核绑定，由真人确认同一来源/同rowId；不能在A身份内直接导入冒充B。再由真人改A确认，核只撤销A对应旧学习来源、B来源保留、A新decisionRevision及新分类批次/旧件不覆盖；可结合A新确认未保存WPS时关闭不保存/重开补C11剩余分支。C13、已形成下游的完整过期实机、K余项与四项目未执行，R12不结案/R13不开始。自有C簿与其他用户未保存簿分别保护，禁止全局关闭WPS或保存其他簿。
+
+本轮公开备份仅本验收/发布清单/交接3文档，产品代码沿用C08已验证提交，不重复跑无新改动的软件测试。私有截图/行级报告/锁日志/独立审计及实际xlsx均留本机忽略目录，保护pane原样不暂存；本次提交推送与远程SHA以`evidence/nav-probe/backup-receipt-c09-c12-native-20261004.json`为准。
