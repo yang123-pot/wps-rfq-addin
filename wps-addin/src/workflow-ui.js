@@ -29,7 +29,7 @@
   var nav=document.getElementById('workflow-nav'),note=document.getElementById('workflow-note'),
     rowsCell=document.getElementById('workflow-rows'),mergedCell=document.getElementById('workflow-merged'),
     host=document.getElementById('workflow-stage-extra'),importPanel=document.getElementById('stage-panel-import');
-  var current='import',stats={files:0,rows:0,mergedRows:0},stageState={},panels={},buttons={};
+  var current='import',stats={files:0,rows:0,mergedRows:0},stageState={},panels={},buttons={},navigationWatch=null;
   if(!nav||!host||!importPanel)return null;
   function statsText(){
    if(rowsCell)rowsCell.textContent=String(stats.rows||0);
@@ -129,12 +129,14 @@
     Object.keys(values).forEach(function(key){stageState[key]=values[key];});
     show();
    },
-   refresh:show};
-  // R12-K：功能区阶段快捷入口只导航。导航请求写在共享的 Application.PluginStorage 上，这里每个请求只消费一次；
-  // 未打开时留待本次启动消费，已打开时靠低频“导航请求检查”接力（不重载页面，也不触发确认/学习/写表/拆分）。
-  if(window.RfqRibbonNavigation&&window.Application&&window.Application.PluginStorage){
-   window.RfqRibbonNavigation.watch(window.Application.PluginStorage,handle);
-  }
+   refresh:show,
+   // watch 会立即消费遗留请求；业务协调器准备好后才启动，避免 review 回调访问尚未赋值的项目句柄。
+   startRibbonNavigation:function(){
+    if(!navigationWatch&&window.RfqRibbonNavigation&&window.Application&&window.Application.PluginStorage){
+     navigationWatch=window.RfqRibbonNavigation.watch(window.Application.PluginStorage,handle);
+    }
+    return navigationWatch;
+   }};
   return handle;
  }
  window.RfqWorkflowUI={create:create,STEPS:STEPS};

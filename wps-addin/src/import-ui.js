@@ -1329,6 +1329,8 @@
       });
     }
     render();
+    // 所有项目/审核/分类/询价依赖与初始状态就绪后，才允许消费功能区遗留导航请求。
+    if(workflow)workflow.startRibbonNavigation();
     return {
       update:function(id,record,dirty){collection=RfqCollection.update(collection,id,record,dirty);render();},
       hasUnsaved:function(){return collection.entries.some(function(e){return e.dirty;});},
