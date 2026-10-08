@@ -662,3 +662,11 @@ root临时清K4、未保存。用户真实鼠标主按钮一次并反馈“显�
 **10-08加载后早期显隐脉冲J未改善。** 原新建立即Visible=true/Width380保留。中性complete于07:44:22.424Z，Get同ID1后属性读回true→false→true，再于07:44:27.454Z单次Navigate；complete至Navigate实际5030毫秒，无干预Create、Width或Dock。独立final GET后纯页`pane-muz8dldu-pgx0lt1q`于07:44:27.523Z ready；固定截止07:47:24.128Z内176次心跳、ready至末次176.001秒，frames停54。超过120秒截图07:46:50.290Z与root原生计数点击后07:47:10.364Z均为54/54/0，后台click记1。推算末rAF为final ready+54.010秒、中性complete+59.109秒、Create-before+59.264秒，仍只支持时序假设；Visible属性读回不证明DOM隐藏→可见生命周期。独立`bootstrap-visible-pulse-audit-20261008.json`22/22，SHA `41da3c5284d2f4c910a026d2b8c06597fcec0288e75a40b808c867845988d659`，预检GET、旧隐藏会话及截止后的清理排除。
 
 I/J详见[调查第12节](wps-sidebar-stability-investigation-20261005.md)。下一步继续查实际渲染身份及配置加载链；本轮未改产品/配置，不增加周期重载、不重跑无代码变化的软件回归。SIDEBAR-STABILITY-01仍未解决、正式交付阻断不关闭，业务余项及R13不开始。
+
+**10-08晚续早期原生输入未改善。** 有效计数点击发生于ready+16.487秒，实际像素计数更新为1；末次rAF仍约ready+60.004–60.005秒，没有顺延至点击后60秒。超过120秒第二次原生点击后台记2，前后像素仍60/60/1。170次心跳经独立25/25及封存读回11/11核对。先前漏过早期窗口与guard拒绝的准备分别保留，均无实际早期干预，不作WPS候选结果。
+
+**运行时共享缓存只读快照。** root对7个进程共912字节/64次读取的定界采集，经独立48/48核证；仅一个WPS浏览器父进程有已初始化共享缓存，dynamic=true、renderTime=60、renderBlacklist两项计数0/0、discardMode=2、discardWhitelist两项计数4/3，discard时间缓存未初始化。该快照不证明当前pane身份、资格、状态变化或故障因果；名单计数不等于当前pane成员核验。其余guard=0不能解读为false、零值或从未调用，初始化中止后复位仍可能。
+
+**DBWIN捕获前提未建立，清理已核验。** 捕获启动在CreateProcess前被自动审批拒绝，原文`Rejected blocked by policy`，未给具体理由；没有执行shell或生成捕获输出，不能作原生事件阴性，不重试或绕过。自有唯一空白簿已正常关闭，传播后WPS窗口为空；标准隔离服务恢复原五目录，health/ribbon/main/taskpane均HTTP200，原Create URL与workflow-ui.js恢复、主页面及3段内联脚本编译通过、minimalflag缺席，清理9/9通过。
+
+详见[调查第13节](wps-sidebar-stability-investigation-20261005.md)及`early-native-input-audit-20261008.json`、`early-native-input-audit-readback-20261008.json`、`render-flags-live-independent-audit-20261008.json`、`dbwin-input30-runtime-20261008-policy-rejected-prerequisite.json`、`early-input-cleanup-20261008.json`。本轮未改产品/配置，侧栏未修复、真实稳定性矩阵仍欠证据；SIDEBAR-STABILITY-01保持未解决，不勾验收项、不关闭正式交付阻断，不启动业务余项、四项目、R12结案或R13。

@@ -26,6 +26,14 @@ H同模板55秒阴性：实际55008毫秒、ID1保持，最终168次心跳/168.0
 
 I延后首次Visible=true实际未加载：Create本机ID1/Width380后约600秒仍无中性GET/load、Visible实值或Navigate，不算最终停帧阴性。J原立即显示后load+5秒显隐脉冲，属性实值true→false→true、ID1与单次Navigate已核；最终176次心跳/176.001秒停54，超过120秒及原生点击后像素均54/54/0、后台1。独立`bootstrap-deferred-visible-audit-20261008.json`15/15、`bootstrap-visible-pulse-audit-20261008.json`22/22及调查第12节分别记前提缺失和候选阴性。下一步查实际渲染身份/配置加载链；未改产品或配置、未通过长期稳定性验收，交付阻断不勾选，不重复无代码变化的软件回归。
 
+10-08晚续：有效早期原生计数点击在ready+16.487秒使实际像素计数更新为1，末次rAF仍约ready+60.004–60.005秒，没有顺延至点击后60秒。超过120秒的第二次点击后台记2，像素仍60/60/1，候选未改善。170次心跳独立25/25、封存读回11/11；漏过早期窗口与guard拒绝的准备分别保留，均未实际早期干预，不作WPS候选结果。
+
+7个进程的定界只读缓存采集共912字节/64次读取，独立48/48：仅一个WPS浏览器父进程共享缓存已初始化，dynamic=true、renderTime=60、renderBlacklist计数0/0、discardMode=2、discardWhitelist计数4/3，discard时间未初始化。未证明当前pane身份、资格或因果；其余guard=0不能记false、零值或从未调用，初始化中止复位仍可能。
+
+DBWIN启动在CreateProcess前被自动审批拒绝`Rejected blocked by policy`，无具体理由、shell执行或捕获输出；前提未建立，不作原生事件阴性，不绕过。自有唯一空白簿正常关闭后WPS窗口为空；标准隔离服务及原五目录恢复，health/ribbon/main/taskpane均HTTP200，原Create URL/workflow-ui.js恢复、主页面及3段内联脚本编译通过、minimalflag缺席，清理9/9通过。
+
+详见[调查第13节](wps-sidebar-stability-investigation-20261005.md)及`early-native-input-audit-20261008.json`、`early-native-input-audit-readback-20261008.json`、`render-flags-live-independent-audit-20261008.json`、`dbwin-input30-runtime-20261008-policy-rejected-prerequisite.json`、`early-input-cleanup-20261008.json`。产品/配置未改、侧栏未修复，真实稳定性矩阵仍欠证据；本项不勾选，业务余项、四项目、R12结案及R13不开始。
+
 - [ ] **正式交付阻断项 SIDEBAR-STABILITY-01：侧栏反复灰白/停摆及重建、打开入口无响应问题已解决并通过真实WPS稳定性复验。用户于2026-10-04明确：此问题不解决，不能正式交付。** 当前未解决；重建/重启的临时恢复、服务HTTP200或模拟回归均不能作为关闭证明。关闭条件与证据要求见[问题记录](wps-sidebar-stability-blocker.md)。
 
 - [x] 补验全量`node --test wps-addin/test/*.test.cjs`：**394/394**，失败/跳过均0；含ribbon与恢复模型测试。

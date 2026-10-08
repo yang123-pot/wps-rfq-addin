@@ -42,6 +42,14 @@ H同模板等55秒对照已封存为阴性：实际55008毫秒、前后ID1，最
 
 I/J快速候选已分别封存：I跳过新建路径立即Visible=true，记录Create本机ID1及Width380返回；从Create-before至截止600.057秒内无中性页GET/load、实际Visible读回、Navigate或最终页，属于加载前提缺失，不算最终页停帧阴性。J保留原立即显示，load后实际5030毫秒内完成属性读回true→false→true及同ID1单次Navigate；最终176次心跳/176.001秒仍frames54，超过120秒及root原生计数点击后像素均54/54/0、后台记1，该早期显隐候选未改善。独立`bootstrap-deferred-visible-audit-20261008.json`15/15、`bootstrap-visible-pulse-audit-20261008.json`22/22将预检GET、旧隐藏会话及截止后清理分开，详见调查第12节。本轮未改产品或配置，下一步查实际渲染身份及配置加载链；尚无针对性修复或长期稳定性通过，正式交付继续阻断。
 
+10-08晚续：有效早期原生计数点击发生于ready+16.487秒，实际像素计数更新为1；末次rAF仍约ready+60.004–60.005秒，没有顺延至点击后60秒。超过120秒的第二次原生点击后台记2，前后像素仍60/60/1，该候选未改善。170次心跳经独立25/25及封存读回11/11核对；先前漏过早期窗口与guard拒绝的两次准备分别保留，均无实际早期干预，不作WPS候选结果。
+
+root对7个进程共912字节/64次读取的定界只读缓存采集，经独立48/48核证：仅一个WPS浏览器父进程有已初始化共享缓存，dynamic=true、renderTime=60、renderBlacklist两项计数0/0、discardMode=2、discardWhitelist两项计数4/3；discard时间缓存未初始化。此快照不证明当前pane身份、资格、状态变化或因果。其余guard=0不能解读为false、零值或从未调用，也可能是初始化中止后复位。
+
+DBWIN捕获启动在CreateProcess前被自动审批拒绝，原文`Rejected blocked by policy`，未给具体理由；没有执行shell或生成捕获输出，捕获前提未建立，不能记为原生事件阴性，不重试或绕过。自有唯一空白簿已正常关闭，传播后WPS窗口为空；标准隔离服务恢复原五目录，health/ribbon/main/taskpane均HTTP200，原Create URL与workflow-ui.js恢复、主页面及3段内联脚本编译通过、minimalflag缺席，清理9/9核验通过。
+
+详见[调查第13节](wps-sidebar-stability-investigation-20261005.md)及`early-native-input-audit-20261008.json`、`early-native-input-audit-readback-20261008.json`、`render-flags-live-independent-audit-20261008.json`、`dbwin-input30-runtime-20261008-policy-rejected-prerequisite.json`、`early-input-cleanup-20261008.json`。本轮未改产品或配置，侧栏尚未修复，真实稳定性矩阵仍欠证据；阻断保持，不启动业务余项、四项目、R12结案或R13。
+
 - [ ] 用证据定位失效环节，记录触发条件、原因和修复范围；未证实的判断继续标为假设。
 - [ ] 完成针对性修复，相关回归通过；保留修复前失败与修复后结果。
 - [ ] 在真实WPS中复验已出现的停摆场景，并覆盖长时间运行、文件选择/保存对话框、项目与工作簿切换、侧栏关闭重开和项目恢复。验证时长、轮次、版本与结果须实际记录，不能只凭单次恢复或模拟宿主测试勾选。
