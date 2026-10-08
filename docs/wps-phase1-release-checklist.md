@@ -14,6 +14,18 @@
 
 10-07初始化对照：原配置新纯页A和显式首次右停靠B均约60秒停帧，B观察120秒、后台点击1/像素0；该候选未改善，未改产品。旧纯页约19小时17分仅JS持续，绘制仍60；不计稳定性通过。临时探针已撤下、标准隔离服务恢复；44/44持久项SHA及保护pane保持、5占用件缺失。调查第11节新增单项证据，交付阻断不勾选，仍欠针对性修复和真实稳定性矩阵。
 
+10-07导航拆解（10-08接续核证）：已停绘的纯页上，功能区只Get已有pane.ID1→单次Navigate同URL，无Create/Visible/Width/Dock变更；新GET/ready后425次稀疏心跳逐次前进，ready至末次为424.999秒，root两次原生点击均有像素更新。该限时恢复阳性不计产品修复或长期稳定性。首次Create后立即Navigate候选269次心跳仍frames60、只1次页面GET；中性bootstrap load后约25毫秒由窗格内导航，虽有中性页及最终页各1次GET，最终164次心跳仍frames59，原生点击后台1/像素0。两项初始化候选均为限时阴性，不能替代停绘后导航结果。
+
+三项独立audit分别为本机`navigate-only-audit-20261007.json`、`initial-navigate-audit-20261007.json`、`bootstrap-navigate-audit-20261007.json`（`outputs/sidebar-stability-20261005/`），边界见调查11.4–11.6节。10-08入场旧服务/自有空白宿主已退出，时间与原因未知；旧窗格内部延后导航试验尚无打开窗格及渲染证据。本轮诊断未改产品，继续SIDEBAR-STABILITY-01专包，不推进C06、业务下游、四项目、R12结案或R13，交付阻断继续不勾选。
+
+10-08 E/F：停绘后侧栏内单次Get→Navigate同URL，ID1保持且无Create/显隐/改宽/Dock；最终385次稀疏心跳、385.001秒，frames0→384，两次root原生点击均有像素更新，仅为限时恢复。中性load后等5秒导航实际5021毫秒，最终238次心跳仍frames54，原生点击后台1/像素0，候选未改善。独立`pane-context-navigate-audit-20261008.json`、`bootstrap-delay5-audit-20261008.json`与调查12.1–12.2节分别记录。
+
+G中性load后等65秒单次导航有界阳性：实际65009毫秒，最终349次心跳/349.002秒，frames0→348逐次+1、pending0，两次root原生点击像素147/147/1、337/337/2，超过300秒的点击前截图323/323/1。独立`bootstrap-delay65-audit-20261008.json`21/21，见调查12.3节；中性页无rAF采样，不能写已观察它先停。
+
+H同模板55秒阴性：实际55008毫秒、ID1保持，最终168次心跳/168.012秒仍frames4，超过120秒root原生点击后台1、像素4/4/0。推算末rAF为final ready+4.004秒、中性complete+59.085秒、Create-before+59.253秒，仅支持初始计时锚点假设；独立`bootstrap-delay55-audit-20261008.json`及调查12.4节不认定根因。
+
+I延后首次Visible=true实际未加载：Create本机ID1/Width380后约600秒仍无中性GET/load、Visible实值或Navigate，不算最终停帧阴性。J原立即显示后load+5秒显隐脉冲，属性实值true→false→true、ID1与单次Navigate已核；最终176次心跳/176.001秒停54，超过120秒及原生点击后像素均54/54/0、后台1。独立`bootstrap-deferred-visible-audit-20261008.json`15/15、`bootstrap-visible-pulse-audit-20261008.json`22/22及调查第12节分别记前提缺失和候选阴性。下一步查实际渲染身份/配置加载链；未改产品或配置、未通过长期稳定性验收，交付阻断不勾选，不重复无代码变化的软件回归。
+
 - [ ] **正式交付阻断项 SIDEBAR-STABILITY-01：侧栏反复灰白/停摆及重建、打开入口无响应问题已解决并通过真实WPS稳定性复验。用户于2026-10-04明确：此问题不解决，不能正式交付。** 当前未解决；重建/重启的临时恢复、服务HTTP200或模拟回归均不能作为关闭证明。关闭条件与证据要求见[问题记录](wps-sidebar-stability-blocker.md)。
 
 - [x] 补验全量`node --test wps-addin/test/*.test.cjs`：**394/394**，失败/跳过均0；含ribbon与恢复模型测试。
