@@ -477,3 +477,12 @@ UTC08:00:14.602Z写候选；此前已核WPS窗口0并清理已识别旧后台。
 本机39/39 root核证：localhost-exclusion-root-audit-20261009.json，SHA 8dbde7017cc6fea88934f8b4dabe410dbd7e8d589d59a24186fcdfa622241cd8；代理额度终止后root接手，非独立终审。B原字节前缀7845354字节/SHA 2aca31b8b885209a80cfd030b978a4f3ee7f655690f40abf97a0650e7fc87ffa；A2前缀8332583字节/SHA 728d931e22804cdaf441018743fba8a1f83f073ba0e4e096d3b2a7ffd27f79f0。配置apply/restore、缓存/对象清单及每次读回、原生点击与8张像素封存均位于outputs/sidebar-stability-20261005/localhost-exclusion-*。39项包含root手工画面结论的绑定/文件SHA，不是自动OCR或独立像素审计。
 
 B/A2自有空白窗均正常关闭，WPS窗口0，未保存；最小页标志撤下，标准服务29292及原五目录保持。清理核证12/12：health/ribbon/main/taskpane HTTP200、原Create目标/产品页、main和内联脚本编译、安装原件/四键原值类型/保护pane/回滚助手已退出均通过；原配置A2的无窗口后台允许保留，不冒称全部WPS进程0。08:16:22.077Z保护44/44持久文件SHA、5占用件缺失；安装件338字节原SHA，保护pane6063字节原SHA。五份文档明确清单备份，私有配置、读取器、证据、原资料和保护pane不暂存。正式交付阻断保持，仅续本专包。
+
+
+### 17.1 本机兼容措施候选，待保留授权
+
+对照/恢复里程碑已普通推送并核远程`72942432a2854b179bba99205bd7eaabe704c5e9`；当前安装配置仍338字节原SHA。继续查[官方TaskPane对象](https://open.wps.cn/documents/app-integration-dev/wps365/client/wpsoffice/jsapi/addin-api/TaskPane/obj)，其公开表列Delete/Navigate及DockPosition/Height/ID/Visible/Width，没有列当前pane渲染排除开关。[Application对象](https://open.wps.cn/documents/app-integration-dev/wps365/client/wpsoffice/jsapi/addin-api/Application/obj)列ThisBrowser/BrowserWindow等，但相关细目未能由网页工具取得；限定三个安装文件的只读字符串检索也不证明隐藏接口不存在。因此只记“尚未取得受支持的pane专属控制证据”，不宣称不存在专属控制，也没有猜测API名后盲调。
+
+本机可审阅候选为outputs/sidebar-stability-20261005/localhost-retain-proposal-20261009.md。唯一拟保留字段/候选349字节与获准临时试验完全相同；作用范围仍为所有实际appId127.0.0.1页面，非GUID专属。执行脚本localhost-retain-candidate-20261009.ps1默认Preview无写入，Apply必须新的人类保留授权和全新消费者前提；原字节回退localhost-retain-restore-20261009.ps1遇未知外改拒绝覆盖，独立回执名不覆盖已封存临时试验证据。实际验证Preview及无授权Apply拒绝后安装件仍338字节原SHA，根审准备回执localhost-retain-preparation-root-20261009.json。只准备私有候选，未应用、未修改产品或调用新API。
+
+已向用户提出新的保留范围确认：若批准，保留该本机兼容措施并以真实插件做至少30分钟画面/原生输入、功能区阶段、真实显隐及空白簿正常关闭重开复验，失败原字节恢复，不碰业务文件或续业务包。当前等待答复；此前“临时对照并恢复”未扩展为长期保留。正式修复、长时真实业务稳定性和交付仍阻断。
