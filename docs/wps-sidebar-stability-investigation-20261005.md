@@ -423,3 +423,35 @@ root另封存`taskpane-visible-bridge-root-20261009.json`6项核对：JSA Visibl
 B自有空白簿正常关闭且另核窗口消失，未保存测试簿；01:26:20.046Z标准同五目录服务29292恢复、minimalflag缺席，health/ribbon/main/taskpane均HTTP200、原Create目标及产品页恢复，main及内联脚本编译通过。01:27:23.678Z最新root保护核44/44持久文件SHA/大小、5占用件缺失、pane原SHA、四项值/类型及安装配置原SHA，5项通过；详见`exclusion-final-cleanup-root-20261009.json`与`exclusion-final-protection-root-20261009.json`。首轮保护核验因读取缺失文件后未复位临时变量而误报占用件，已单列为核验准备错误并重算，未改任何保护文件。
 
 下一项需要核实际TaskPane身份、资格与可见性/计时字段的定界只读证据；先确认唯一对象来源、读取边界和离线守卫，再决定实机采集。不得以共享缓存替代当前记录，不再叠加等待/显隐/配置候选，也不把有界导航恢复部署为长期修复。正式交付继续阻断，仅续SIDEBAR-STABILITY-01。
+
+## 16. 10-09下午：实际侧栏记录与60秒停用渲染字段
+
+本轮完整读交接并实际看图01/03，只续SIDEBAR-STABILITY-01。3条并行离线任务提供对象来源、读边界和可见性路径报告；代理额度终止后由root接手编写/复核/采集，不能称独立终审。安装文件固定版本/SHA、PE节及每段指令字节已核；WasHidden路径先反转hidden再送visibility，符合语义，不能当作反转错误。之前的专用kjstpcefhandler静态getter不是当前实际容器身份证据。
+
+私有读器从固定service全局、类型守卫、注册链表最后一个浏览器引用，经已核CToCpp/Capi及原生browser/host/client，再到实际adapter的+9C记录。首轮把叶虚表归为libcef的假设被拒，结果丢弃；root在安装文件核出实际service封装后才另建读器，没有放宽为任意类型、扫描或执行getter。每次明确当前目标、精确创建ticks/Session/映像及模块基址/大小/SHA，清单120秒内，源码/包装器/静态报告哈希封存；前后身份核验，固定窗口两遍字节/地址/顺序相同，短读、变化、越界或超时即unknown丢弃。两遍一致不等于对象加锁，也不能消除ABA风险。仅使用查询和读取权限，无注入、目标写入、调试附加、目标DLL执行或URL采集；被拒的DBWIN路径未重试。
+
+| 私有阶段 | 离线守卫通过 | 实际进展 |
+| --- | --- | --- |
+| 1及叶归属诊断 | 36/36、38/38 | 空注册基线104字节/12读；有侧栏后原叶假设被拒，仅返回已读叶的模块/RVA元数据 |
+| 2、3、4 | 22/22、27/27、32/32 | 四候选Capi/首候选原生browser/host/client；分别488/512/536字节、68/74/80读；仍不是当前pane证据 |
+| 5、6、7 | 38/38、42/42、48/48 | 单候选原始client及类型化记录标志，3节点时第7阶段504字节/70读 |
+| 8身份及已有键输出 | 60/60，扩充后61/61 | 显式索引0–3、只选appId或containerName；QString私有堆16字节头、最长48个UTF16码元、严格解码；最大800字节/88读，运行限90读；不解释未核ref/alloc标志或容许URL字段 |
+
+最初样本15是JSCEFWINDOW_RIBBON，16是KJsApiWebWidget，免休眠标志均1；17才是TaskPannelWidget、appId=127.0.0.1、资格1/免休眠0/visibility0/renderEnabled0。首候选不能冒充侧栏。仅关侧栏X后记录保留，不作为销毁证据。正常关自有空白簿后17消失。
+
+为核归属另建自有空白簿，关旧自有主页后，在打开侧栏前分别采得3条：19 KPreloadDocerPageContainer、20 JSCEFWINDOW_RIBBON、21 KJsApiWebWidget，未有TaskPannelWidget。07:31:33.861Z原生点“打开询价助手”，随后仅新增22 TaskPannelWidget，纯页session `pane-mv0ncv9n-i9fr00l2` ready约07:31:34.09Z；后续键集合读回19/20/21/22，实际截图是新纯页。正常关闭该自有簿后集合19/21/23，22消失（20功能区也随簿关闭，23为主页组件）。受控创建/关闭与已区分容器支持本次自有诊断pane归属；自动读器本身仍保留ActualPaneIdentityProven=false，不能把它扩展成所有其它pane的自动身份证明。
+
+| 同一记录22 | 实际状态 |
+| --- | --- |
+| 07:31:37.222Z，约ready+3秒 | TaskPannelWidget、资格1、optout0、loaded/status1、原生visibility0；renderEnabled/deadlineState=1/1 |
+| 07:32:33.625Z，约ready+59.5秒 | appId实际127.0.0.1；同记录，renderEnabled/deadlineState仍1/1、visibility0 |
+| 07:32:56.820Z，约ready+83秒 | 同记录及身份，renderEnabled/deadlineState变0/0，资格1、visibility0仍在；后台frames60，真实画面60秒/60帧/点击0 |
+| 07:36:02.921Z，约ready+269秒原生点击 | 后台click1，前后真实像素仍60秒/60帧/点击0；封存到约444秒仍frames60，JS heartbeat/visible持续 |
+
+这已把停帧强定位到对应记录的渲染停用变化，并发现可见画面与原生visibility字段不一致。**尚未证明上游可见性通知漏报的具体来源或原生计时回调执行栈；没有针对性产品修复，也没有稳定性通过。** 原配置新增纯页前段也仍停60；业务功能脚本未参与此现象。旧RenderBlacklist.containerName=kjstpcefhandler试验未命中本次实测容器，不能作为该资格路径的有效阴性结论。
+
+本机证据位于outputs/sidebar-stability-20261005：固定文件报告`object-source-20261009.json`、`visibility-route-20261009.json`、`qt-string-layout-20261009.json`；分阶段源码/离线红绿/清单/读回；新pane的initial-success、appid、after60、late-keys四读回及原生截图。`record-identity-stage8-root-audit-20261009.json` SHA `b364aacd816456660eb4d4ffbcadcff59281525964eb49ad21bea4ccf6c21f50`，封存前缀重新计数/读回16/16；root审核，非独立审计。最终读器/包装器SHA分别`b789113973f5673f2986454a6d9d70204b9b98d755b0657e6a99057ab1933c41`、`f3d3cc183078ba2991da7d512636f801bfb992c48a117fb8e42ff6a6fb8d561e`。初始未用字段编译告警、离线RTTI零指针错误（只结束自有离线助手）、包装器替换/PowerShell转义、审计默认GBK等准备问题均与WPS结果分开；瞬时节点超4及原生输入被guard拦截时未创建pane，拒绝/未建前提保留，不算候选试验。
+
+两自有空白簿和主页均正常关闭，WPS窗口0；minimalflag移除，标准服务原五目录，health/ribbon/main/taskpane均HTTP200、原Create目标与产品页恢复，main及内联脚本编译通过，清理root11/11。最新07:39:55.516Z保护44/44 SHA、5占用件缺失；pane6063字节原SHA、安装配置338字节原SHA及四键原值/类型一致。
+
+用户已明确批准下一项临时对照：只把RenderBlacklist.appId的[]改为["127.0.0.1"]，影响范围是其它相同本地主机名的WPS加载项，非GUID专属；新消费者核实际记录资格及180秒以上纯页像素/点击后按原字节恢复。候选349字节/SHA `33d2d104b125fb2028e00876d79295857748ab644e5f5f273e7e72634d20e4fe`及原件副本已准备，详见本机`localhost-render-exclusion-proposal-20261009.md`；本定位里程碑备份时安装件尚未写。仅续本专包，正式交付阻断及业务余项限制保持。
