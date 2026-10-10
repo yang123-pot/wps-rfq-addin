@@ -650,3 +650,12 @@ root离线读回delay65-product-root-audit-20261010.json核两GET、诊断POST0�
 root本机读回twohour-root-audit-20261010.json，核主采样、补充采样、HTTP冻结、19张原生截图SHA及时间边界，非独立审查。结束05:58:42.281Z保护44/44持久文件SHA一致、5占用件缺失；安装JSON原338字节SHA c6649bab…，四键类型/值true(String)/60(DWord)/true(String)/120(DWord)，保护pane6063字节SHA e9a76e21…均保持。服务28280资源50/50、44产品脚本逐字一致且编译通过，结束核查与测试请求分开。证据、脚本、本机配置及运行数据均留ignored outputs/sidebar-stability-20261005/；仅5文档明确清单提交备份，以twohour-backup-receipt-20261010.json与远程SHA一致为准。无产品源码改动，不重复无变化的全量软件回归。
 
 **问题未解决，不能正式交付。** 后续仅定位可快速启动、只作用本插件的受支持渲染修复及对应稳定性验证；65秒等待已被用户拒绝，不再作为待答偏好或产品方案。C06、业务余项、四项目、R12结案和R13均不开始。
+
+
+## 24. 用户提出直接修复或整体重做：运行容器路线评估
+
+两小时结论备份提交bedda819c9d96323c7ee888c488bf130705e08f3已普通推送且远程SHA逐位相同。用户随后提出能否直接修复或整个页面重做以保证稳定；当前仅只读方案评估，无新产品改动或实机输入。纯页也约60秒停帧、排除渲染资格的A/B/A支持宿主渲染停用路径；仅重写DOM/样式不能据此承诺修复。原生visibility0漏报源及插件专属受支持控制仍未完整定位，历史OOM来源亦未唯一识别。
+
+现有main.js通过CreateTaskPane打开页面；host.js直接读取Application.ActiveWorkbook/Worksheets/Value2并定位单元格。普通独立浏览器不能直接复用这条宿主访问链，需要新增工作簿通信层，属于较大架构迁移。WPS官方[TaskPane概述](https://open.wps.cn/documents/app-integration-dev/wps365/client/wpsoffice/jsapi/addin-api/TaskPane/task-pane-overview)描述嵌入式窗格与文档交互；[ShowDialog接口](https://open.wps.cn/documents/app-integration-dev/wps365/client/wpsoffice/jsapi/addin-api/Application/member/ShowDialog)提供Web窗口及modal参数，允许先评估非模态窗口承载同一页面。官方接口存在不等于本版窗口稳定，更不证明它独立于共享CEF或此前OOM。
+
+建议的下一项为容器可行性对照：保留现有页面、模型、七步业务和五隔离目录，只替换本机临时打开入口；先核本版接口可用、页面Application/工作簿身份可正确读回，超过60/120秒导航是否可见、切换工作簿与关闭后焦点能否返回，再做两小时低扰动指标和真实响应检查。任何确认、学习、文件生成仍须遵守既有业务流程与授权，不能把导航对照称完整业务通过。通过才制定迁移的具体设计并更新对应效果图；若仍失败，停止该候选，评估真正独立渲染与通信层，不把浮窗当作已证明修复。此次只提出可审阅方案，不调用ShowDialog、不新增候选或写产品。是否接受独立窗口体验尚待用户评估；65秒启动等待继续不纳方案，正式交付阻断保持。
