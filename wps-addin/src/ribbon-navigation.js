@@ -8,7 +8,8 @@
  // - 侧栏未打开时请求留在存储里，等侧栏打开时第一次检查就应用；侧栏已打开时靠一个低频“导航请求检查”接力。
  //   该检查只读一个存储键、不做页面重载，页面不可见时停掉，所以不是“常驻重载定时器”。
  // - 这里不做任何业务动作：确认、学习、写表、拆分都不在导航路径上触发，阶段自身的前置条件仍由各阶段原按钮判定。
- var KEY='rfq.nav.request',CONSUMED='rfq.nav.consumed';
+ // 与已加载的旧TaskPane隔离，旧页不能消费独立窗口的阶段请求。
+ var KEY='rfq.window.nav.request',CONSUMED='rfq.window.nav.consumed';
  var STAGES=['import','matching','review','categories','brands','inquiry','split'];
  function isStage(stage){return STAGES.indexOf(stage)>=0;}
  function uniqueId(){return 'nav-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);}
@@ -76,28 +77,85 @@
   var base=href.split('?')[0];
   return base.slice(0,base.lastIndexOf('/')+1)+'taskpane.html';
  }
- // 复用既有的“打开/聚焦侧栏”行为：尽量复用已存在的面板，没有才新建，最后显示并设定宽度。
- function ensurePane(application,options){
-  var opts=options||{};
-  if(!application)return null;
-  var id=null;
-  try{id=application.PluginStorage.getItem('rfq.taskpane.id');}catch(_){id=null;}
-  var pane=null;
-  if(id){try{pane=application.GetTaskPane(id);}catch(_){pane=null;}}
-  if(!pane){
-    pane=application.CreateTaskPane(opts.url||defaultPaneUrl());
-    try{application.PluginStorage.setItem('rfq.taskpane.id',pane.ID);}catch(_){}
-  }
-  try{pane.Visible=true;}catch(_){}
-  try{pane.Width=380;}catch(_){}
-  return pane;
+ var WINDOW_ID='rfq.webdialog.id';
+ // 登记与清理同时失败时，在本功能区实例内保留所有权，禁止盲建第二份。
+ var unregisteredWindow=null;
+ function requireWindowApi(application){
+  if(!application||typeof application.CreateWebDialog!=='function'||typeof application.GetWebDialog!=='function')
+   throw Error('当前WPS不支持询价独立窗口，请使用支持CreateWebDialog和GetWebDialog的WPS表格版本。');
+  if(!application.PluginStorage)throw Error('无法访问询价窗口的共享存储。');
  }
- // openStage：只打开/聚焦侧栏并写入导航请求，不执行任何业务动作，不返回材料内容。
+ function forgetWindow(application){
+  var storage=application.PluginStorage;
+  if(typeof storage.removeItem==='function')storage.removeItem(WINDOW_ID);
+  else storage.setItem(WINDOW_ID,'');
+ }
+ // 查询异常代表状态未知，直接报错；只有宿主明确返回不存在时才允许创建。
+ function getWindow(application){
+  requireWindowApi(application);
+  if(unregisteredWindow){
+   if(unregisteredWindow.application!==application)throw Error('询价窗口登记尚未恢复，已停止创建新窗口。');
+   var retained=application.GetWebDialog(unregisteredWindow.id);
+   if(retained){
+    if(Number(retained.ID)!==unregisteredWindow.id)throw Error('询价窗口身份不一致，已停止操作。');
+    application.PluginStorage.setItem(WINDOW_ID,unregisteredWindow.id);
+    unregisteredWindow=null;
+    return retained;
+   }
+   unregisteredWindow=null;
+  }
+  var raw=application.PluginStorage.getItem(WINDOW_ID);
+  if(!raw)return null;
+  var id=Number(raw);
+  if(!Number.isSafeInteger(id)||id<1)throw Error('询价窗口编号无效，请重新加载本插件。');
+  var dialog=application.GetWebDialog(id);
+  if(!dialog){forgetWindow(application);return null;}
+  if(Number(dialog.ID)!==id)throw Error('询价窗口身份不一致，已停止操作。');
+  return dialog;
+ }
+ // 不依赖永久“已打开”标记：关闭后宿主可返回不存在；隐藏但存活的窗口保留页面内存。
+ function ensureWindow(application,options){
+  var opts=options||{};
+  var dialog=getWindow(application),created=false;
+  if(!dialog){
+   dialog=application.CreateWebDialog(opts.url||defaultPaneUrl(),'项目询价',440,720,false);
+   if(!dialog||!Number.isSafeInteger(Number(dialog.ID))||Number(dialog.ID)<1)
+    throw Error('宿主未创建有效的询价独立窗口。');
+   created=true;
+   try{application.PluginStorage.setItem(WINDOW_ID,dialog.ID);}
+   catch(error){
+    unregisteredWindow={application:application,id:Number(dialog.ID)};
+    try{dialog.Delete();unregisteredWindow=null;}catch(_){}
+    throw error;
+   }
+  }
+  try{
+   dialog.Visible=true;
+   if(dialog.Visible!==true)throw Error('宿主未显示询价独立窗口。');
+  }catch(error){
+   if(created){
+    // 只释放本次刚创建的窗口；释放失败保留ID，下一次不得盲建第二份。
+    try{dialog.Delete();forgetWindow(application);}catch(_){}
+   }
+   throw error;
+  }
+  return dialog;
+ }
+ function rebuildWindow(application,options){
+  var opts=options||{},dialog=getWindow(application);
+  if(dialog){
+   if(typeof opts.confirm!=='function'||!opts.confirm())return false;
+   dialog.Delete(); // 失败则保留ID并停止，不创建重复窗口。
+   forgetWindow(application);
+  }
+  return !!ensureWindow(application,opts);
+ }
+ // openStage只显示窗口并写一次导航请求，既有业务前置条件仍由产品页处理。
  function openStage(application,stage,options){
   if(!isStage(stage))return false;
   if(!application)return false;
-  var pane=ensurePane(application,options);
-  if(!pane)return false;
+  var dialog=ensureWindow(application,options);
+  if(!dialog)return false;
   if(!application.PluginStorage)return false;
   return !!request(application.PluginStorage,stage);
  }
@@ -135,6 +193,7 @@
   return {check:check,stop:function(){stopped=true;hold();},isRunning:function(){return !stopped;}};
  }
  window.RfqRibbonNavigation={STAGES:STAGES.slice(),isStage:isStage,stageFromControl:stageFromControl,
-  request:request,readRequest:readRequest,consume:consume,watch:watch,ensurePane:ensurePane,openStage:openStage,
-  KEY:KEY,CONSUMED:CONSUMED};
+  request:request,readRequest:readRequest,consume:consume,watch:watch,
+  getWindow:getWindow,ensureWindow:ensureWindow,rebuildWindow:rebuildWindow,openStage:openStage,
+  KEY:KEY,CONSUMED:CONSUMED,WINDOW_ID:WINDOW_ID};
 }());

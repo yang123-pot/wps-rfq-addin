@@ -199,7 +199,7 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   const navLabels=['导入与合并','自动分类','表内审核','分类工作簿','品牌汇总','询价表','拆分文件'];
   for(let index=0;index<navStages.length;index++){
    await page.evaluate(stage=>{
-    window.Application.PluginStorage.setItem('rfq.nav.request',JSON.stringify({id:'nav-ui-'+Date.now()+'-'+stage,stage:stage}));
+    window.Application.PluginStorage.setItem('rfq.window.nav.request',JSON.stringify({id:'nav-ui-'+Date.now()+'-'+stage,stage:stage}));
     window.dispatchEvent(new Event('focus'));
    },navStages[index]);
    await page.waitForFunction(stage=>{
@@ -208,30 +208,30 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
    },navStages[index]);
    assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current .workflow-step-label').innerText(),
     navLabels[index],'阶段入口应定位到对应步骤');
-   assert.equal(await page.evaluate(()=>window.Application.PluginStorage.getItem('rfq.nav.request')),null,
+   assert.equal(await page.evaluate(()=>window.Application.PluginStorage.getItem('rfq.window.nav.request')),null,
     '导航请求只消费一次，消费后立即移除');
   }
   // 非法阶段：不改变当前阶段，请求被丢弃。
   await page.evaluate(()=>{
-   window.Application.PluginStorage.setItem('rfq.nav.request',JSON.stringify({id:'nav-ui-bad',stage:'not-a-stage'}));
+   window.Application.PluginStorage.setItem('rfq.window.nav.request',JSON.stringify({id:'nav-ui-bad',stage:'not-a-stage'}));
    window.dispatchEvent(new Event('focus'));
   });
   await page.waitForTimeout(900);
   assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage'),'split',
    '非法阶段不得改变当前阶段');
-  assert.equal(await page.evaluate(()=>window.Application.PluginStorage.getItem('rfq.nav.request')),null,'非法请求应被丢弃');
+  assert.equal(await page.evaluate(()=>window.Application.PluginStorage.getItem('rfq.window.nav.request')),null,'非法请求应被丢弃');
   const sideEffects=await page.evaluate(()=>window.__rfqSideEffects);
   assert.deepEqual(sideEffects,{writes:0,confirms:0,fetch:0},'快捷导航不得触发业务动作：'+JSON.stringify(sideEffects));
   // 侧栏重建：未消费的请求在打开时应用；已消费的请求不重播。
   await page.evaluate(()=>{
-   window.Application.PluginStorage.setItem('rfq.nav.request',JSON.stringify({id:'nav-ui-rebuild',stage:'categories'}));
+   window.Application.PluginStorage.setItem('rfq.window.nav.request',JSON.stringify({id:'nav-ui-rebuild',stage:'categories'}));
   });
   await page.reload();
   await page.waitForFunction(()=>{
    const current=document.querySelector('#workflow-nav .workflow-step-button.is-current');
    return !!current&&current.getAttribute('data-stage')==='categories';
   });
-  assert.equal(await page.evaluate(()=>window.Application.PluginStorage.getItem('rfq.nav.request')),null,
+  assert.equal(await page.evaluate(()=>window.Application.PluginStorage.getItem('rfq.window.nav.request')),null,
    '重建后请求只消费一次');
   await page.reload();
   await page.waitForFunction(()=>document.querySelectorAll('#workflow-nav .workflow-step').length===7);

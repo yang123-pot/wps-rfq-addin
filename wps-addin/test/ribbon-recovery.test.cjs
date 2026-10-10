@@ -31,19 +31,18 @@ const STAGE_BUTTONS=[
  ['rfqStageSplit','拆分文件','split']
 ];
 function load(options={}){
- const events=[];let paneVisible=true,paneWidth=380;
+ const events=[];let paneVisible=true,exists=options.hasPane!==false;
  const pane={ID:7,
   get Visible(){return paneVisible;},
-  set Visible(value){if(options.refuseHide&&value===false)throw Error('宿主拒绝隐藏');paneVisible=value;events.push(['visible',value]);},
-  get Width(){return paneWidth;},
-  set Width(value){paneWidth=value;events.push(['width',value]);},
-  Navigate(url){events.push(['navigate',url]);if(options.failNavigate)throw Error('导航失败');}};
+  set Visible(value){if(options.refuseShow)throw Error('宿主拒绝显示');paneVisible=value;events.push(['visible',value]);},
+  Delete(){events.push(['delete']);if(options.failDelete)throw Error('销毁失败');exists=false;}};
  const values=new Map();
- const store={getItem(key){if(key==='rfq.taskpane.id')return options.hasPane===false?null:7;return values.has(key)?values.get(key):null;},
+ if(exists)values.set('rfq.webdialog.id','7');
+ const store={getItem(key){return values.has(key)?values.get(key):null;},
   setItem(key,value){values.set(key,String(value));events.push(['store',key,value]);},
   removeItem(key){values.delete(key);events.push(['remove',key]);}};
- const application={PluginStorage:store,GetTaskPane(){if(options.failGet)throw Error('旧面板不存在');return options.hasPane===false?null:pane;},
-  CreateTaskPane(url){events.push(['create',url]);return pane;}};
+ const application={PluginStorage:store,GetWebDialog(){if(options.failGet)throw Error('窗口查询失败');return exists?pane:null;},
+  CreateWebDialog(url,title,width,height,modal){events.push(['create',url,modal]);exists=true;return pane;}};
  const context={document:{write(){}},window:{Application:application,location:{href:'http://127.0.0.1:38891/main.js'}},
   confirm(){events.push(['confirm']);return options.confirm!==false;},alert(message){events.push(['alert',message]);}};
  if(!options.skipNav)vm.runInNewContext(navCode,context,{filename:'ribbon-navigation.js'});
@@ -51,47 +50,46 @@ function load(options={}){
  return {context,events,pane,store};
 }
 
-test('普通打开复用现有侧栏且不重载页面内存',()=>{
+test('普通打开复用现有窗口且不重载页面内存',()=>{
  const {context,events}=load();
  assert.equal(context[buttonAction('rfqOpenPane')](),true);
  assert.equal(events.some(event=>event[0]==='navigate'),false);
 });
 
-test('恢复按钮由用户确认后重载现有 WPS 侧栏',()=>{
+test('恢复按钮由用户确认后销毁并重建自有窗口',()=>{
  const {context,events}=load();
  assert.equal(context[buttonAction('rfqReloadPane')](),true);
- assert.deepEqual(events,[['confirm'],['visible',false],['visible',true],['width',381],['width',380],
-  ['navigate','http://127.0.0.1:38891/taskpane.html']],'停住后必须按重建处理：先隐藏再显示、改动宽度、最后导航');
+ assert.deepEqual(events,[['confirm'],['delete'],['remove','rfq.webdialog.id'],
+  ['create','http://127.0.0.1:38891/taskpane.html',false],['store','rfq.webdialog.id',7],['visible',true]]);
 });
 
-test('取消恢复保留当前侧栏且不调用 Navigate',()=>{
+test('取消恢复保留当前窗口且不销毁',()=>{
  const {context,events}=load({confirm:false});
  assert.equal(context[buttonAction('rfqReloadPane')](),false);
  assert.deepEqual(events,[['confirm']]);
 });
 
-test('宿主不支持隐藏窗格时仍然导航重载，不让恢复入口失效',()=>{
- const {context,events}=load({refuseHide:true});
- assert.equal(context[buttonAction('rfqReloadPane')](),true);
- assert.deepEqual(events,[['confirm'],['visible',true],['width',381],['width',380],
-  ['navigate','http://127.0.0.1:38891/taskpane.html']]);
+test('宿主拒绝显示时打开入口报告失败',()=>{
+ const {context,events}=load({refuseShow:true});
+ assert.equal(context[buttonAction('rfqOpenPane')](),false);
+ assert.equal(events.some(event=>event[0]==='alert'&&/宿主拒绝显示/.test(event[1])),true);
 });
 
-test('无旧侧栏时恢复按钮创建新侧栏，导航失败则提示失败',()=>{
+test('无旧窗口时恢复按钮创建新窗口，销毁失败则提示失败',()=>{
  const missing=load({hasPane:false});
  assert.equal(missing.context[buttonAction('rfqReloadPane')](),true);
- assert.deepEqual(missing.events,[['create','http://127.0.0.1:38891/taskpane.html'],['store','rfq.taskpane.id',7],
-  ['visible',true],['width',380]]);
- const failed=load({failNavigate:true});
+ assert.deepEqual(missing.events,[['create','http://127.0.0.1:38891/taskpane.html',false],['store','rfq.webdialog.id',7],
+  ['visible',true]]);
+ const failed=load({failDelete:true});
  assert.equal(failed.context[buttonAction('rfqReloadPane')](),false);
- assert.equal(failed.events.some(event=>event[0]==='alert'&&/导航失败/.test(event[1])),true);
+ assert.equal(failed.events.some(event=>event[0]==='alert'&&/销毁失败/.test(event[1])),true);
 });
 
-test('旧面板编号失效时恢复按钮仍可新建侧栏',()=>{
+test('窗口查询异常时明确失败，不能将未知状态当作关闭',()=>{
  const {context,events}=load({failGet:true});
- assert.equal(context[buttonAction('rfqReloadPane')](),true);
- assert.deepEqual(events,[['create','http://127.0.0.1:38891/taskpane.html'],['store','rfq.taskpane.id',7],
-  ['visible',true],['width',380]]);
+ assert.equal(context[buttonAction('rfqReloadPane')](),false);
+ assert.equal(events.some(event=>event[0]==='create'),false);
+ assert.equal(events.some(event=>event[0]==='alert'&&/窗口查询失败/.test(event[1])),true);
 });
 
 // R12-K：功能区补齐与获批图一致的阶段快捷入口，同时保留“打开/重建”入口。
@@ -116,7 +114,7 @@ test('阶段入口只写一次{id,stage}导航请求，不重载也不触发业�
   assert.equal(context.OnGotoStage({tag:entry[2]}),true,entry[2]+'应导航成功');
   const stores=events.filter(function(event){return event[0]==='store';});
   assert.equal(stores.length,1,'每次点击只允许写一个请求');
-  assert.equal(stores[0][1],'rfq.nav.request');
+  assert.equal(stores[0][1],'rfq.window.nav.request');
   const request=JSON.parse(stores[0][2]);
   assert.deepEqual(Object.keys(request).sort(),['id','stage'],'请求只允许带id与stage');
   assert.equal(request.stage,entry[2]);
@@ -140,9 +138,9 @@ test('非法阶段被功能区入口拒绝：不打开侧栏、不写请求',()=
 test('侧栏未打开时阶段入口先打开侧栏再写请求',()=>{
  const {context,events}=load({hasPane:false});
  assert.equal(context.OnGotoStage({tag:'matching'}),true);
- assert.deepEqual(events.slice(0,3),[['create','http://127.0.0.1:38891/taskpane.html'],
-  ['store','rfq.taskpane.id',7],['visible',true]]);
- const request=events.filter(function(event){return event[0]==='store'&&event[1]==='rfq.nav.request';});
+ assert.deepEqual(events.slice(0,3),[['create','http://127.0.0.1:38891/taskpane.html',false],
+  ['store','rfq.webdialog.id',7],['visible',true]]);
+ const request=events.filter(function(event){return event[0]==='store'&&event[1]==='rfq.window.nav.request';});
  assert.equal(request.length,1);
  assert.equal(JSON.parse(request[0][2]).stage,'matching');
 });
@@ -162,18 +160,19 @@ test('阶段入口写入的请求能被侧栏一次消费并只导航',()=>{
  const result=context.window.RfqRibbonNavigation.consume(store,workflow);
  assert.equal(result.stage,'split');
  assert.deepEqual(calls,['split'],'侧栏只导航一次，不触发业务动作');
- assert.equal(store.getItem('rfq.nav.request'),null,'请求只消费一次');
+ assert.equal(store.getItem('rfq.window.nav.request'),null,'请求只消费一次');
 });
 
 // 旧开发服务可能还没提供新增导航脚本：原有打开/重建入口必须不受影响，阶段入口只静默不导航。
-test('未加载导航脚本时打开与重建仍可用，阶段入口静默不产生副作用',()=>{
+test('未加载窗口管理脚本时打开与重建明确失败，阶段入口不产生副作用',()=>{
  const opened=load({skipNav:true});
- assert.equal(opened.context.OnOpenRfqPane(),true,'无导航脚本时打开入口仍必须可用');
- assert.deepEqual(opened.events,[['visible',true],['width',380]]);
+ assert.equal(opened.context.OnOpenRfqPane(),false);
+ assert.equal(opened.events.length,1);
+ assert.equal(opened.events[0][0],'alert');
  const reloaded=load({skipNav:true});
- assert.equal(reloaded.context.OnReloadRfqPane(),true,'无导航脚本时重建入口仍必须可用');
- assert.deepEqual(reloaded.events,[['confirm'],['visible',false],['visible',true],['width',381],['width',380],
-  ['navigate','http://127.0.0.1:38891/taskpane.html']]);
+ assert.equal(reloaded.context.OnReloadRfqPane(),false);
+ assert.equal(reloaded.events.length,1);
+ assert.equal(reloaded.events[0][0],'alert');
  const staged=load({skipNav:true});
  assert.equal(staged.context.OnGotoStage({tag:'split'}),false,'无导航脚本时阶段入口不得误报成功');
  assert.deepEqual(staged.events,[],'无导航脚本时阶段入口不得产生任何宿主操作');
@@ -223,7 +222,7 @@ test('图标回调保留打开入口及未知控件兜底，取图后七阶段�
  STAGE_BUTTONS.forEach(([id,,stage])=>{
   context.GetRfqImage({Id:id});
   assert.equal(context[buttonAction(id)]({Id:id}),true);
-  assert.equal(JSON.parse(context.window.Application.PluginStorage.getItem('rfq.nav.request')).stage,stage);
+  assert.equal(JSON.parse(context.window.Application.PluginStorage.getItem('rfq.window.nav.request')).stage,stage);
  });
  assert.equal(events.filter(event=>event[0]==='store').length,7,'每阶段仍只写一次导航请求');
  assert.equal(events.some(event=>['confirm','navigate','create','alert'].includes(event[0])),false);

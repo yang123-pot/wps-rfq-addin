@@ -39,8 +39,8 @@ async function startup(browser, {request = null, consumed = null, expectedStage 
     window.__RFQ_IMPORT__ = {token:'startup-test-token',browse:true};
     window.__hostWrites = [];
     const storage = window.sessionStorage;
-    if (request) storage.setItem('plugin:rfq.nav.request', JSON.stringify(request));
-    if (consumed) storage.setItem('plugin:rfq.nav.consumed', consumed);
+    if (request) storage.setItem('plugin:rfq.window.nav.request', JSON.stringify(request));
+    if (consumed) storage.setItem('plugin:rfq.window.nav.consumed', consumed);
     const denied = name => function() { window.__hostWrites.push(name); throw Error('unexpected host operation: ' + name); };
     const sheet = {Name:'用户表',UsedRange:{Row:1,Column:1,Rows:{Count:1},Columns:{Count:1}}};
     const book = {Name:'用户文件.xlsx',FullName:'C:\\startup-test\\用户文件.xlsx',
@@ -61,8 +61,8 @@ async function startup(browser, {request = null, consumed = null, expectedStage 
     await page.waitForFunction(() => document.querySelector('#library-message').textContent.includes('已读取'));
     assert.equal(await page.locator('#workflow-nav .is-current').getAttribute('data-stage'), expectedStage);
     assert.equal(await page.locator('#stage-panel-' + expectedStage).isVisible(), true);
-    const storage = await page.evaluate(() => ({request:window.Application.PluginStorage.getItem('rfq.nav.request'),
-      consumed:window.Application.PluginStorage.getItem('rfq.nav.consumed')}));
+    const storage = await page.evaluate(() => ({request:window.Application.PluginStorage.getItem('rfq.window.nav.request'),
+      consumed:window.Application.PluginStorage.getItem('rfq.window.nav.consumed')}));
     assert.equal(storage.request, null, 'the queued request must be removed after one consumption');
     if (request && stages.includes(request.stage)) assert.equal(storage.consumed, request.id);
     // Navigating away makes a replay visible: focus/pageshow and later ticks

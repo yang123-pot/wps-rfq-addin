@@ -38,6 +38,25 @@ function workflowSpy(){
 }
 function plain(value){return JSON.parse(JSON.stringify(value));}
 
+test('新窗口导航不能写入仍存活的旧侧栏消费通道',()=>{
+ const nav=freshModule(),store=storage();
+ nav.request(store,'matching');
+ assert.equal(store.getItem('rfq.nav.request'),null);
+ assert.equal(JSON.parse(store.getItem(nav.KEY)).stage,'matching');
+});
+
+test('新窗口忽略旧侧栏遗留请求和已消费标记',()=>{
+ const nav=freshModule(),store=storage(),spy=workflowSpy();
+ const legacy=JSON.stringify({id:'legacy-1',stage:'split'});
+ store.setItem('rfq.nav.request',legacy);
+ assert.equal(nav.consume(store,spy.spy),null);
+ assert.equal(store.getItem('rfq.nav.request'),legacy);
+ const req=nav.request(store,'review');
+ store.setItem('rfq.nav.consumed',req.id);
+ assert.equal(nav.consume(store,spy.spy).stage,'review');
+ assert.deepEqual(spy.calls,[['goTo','review']]);
+});
+
 test('阶段清单就是既有7个ID，非法stage一律拒绝',()=>{
  const nav=freshModule();
  assert.deepEqual(plain(nav.STAGES),STAGES);
@@ -172,15 +191,15 @@ test('侧栏已打开：低频检查接力，一次导航且不重复',()=>{
  assert.equal(handle.isRunning(),false);
 });
 
-test('openStage只保证侧栏打开并写入请求，非法stage直接拒绝',()=>{
+test('openStage只保证窗口显示并写入请求，非法stage直接拒绝',()=>{
  const nav=freshModule();
  const events=[];
- const pane={ID:7,set Visible(value){events.push(['visible',value]);},set Width(value){events.push(['width',value]);}};
+ const pane={ID:7,get Visible(){return true;},set Visible(value){events.push(['visible',value]);}};
  const appStorage=storage();
- appStorage.setItem('rfq.taskpane.id','7');
- const app={PluginStorage:appStorage,GetTaskPane(){return pane;}};
+ appStorage.setItem('rfq.webdialog.id','7');
+ const app={PluginStorage:appStorage,GetWebDialog(){return pane;},CreateWebDialog(){throw Error('不得重复创建');}};
  assert.equal(nav.openStage(app,'split'),true);
- assert.deepEqual(events,[['visible',true],['width',380]]);
+ assert.deepEqual(events,[['visible',true]]);
  const request=JSON.parse(app.PluginStorage.getItem(nav.KEY));
  assert.equal(request.stage,'split');
  assert.equal(nav.openStage(app,'nope'),false,'非法阶段不得打开侧栏或写请求');

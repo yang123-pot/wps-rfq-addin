@@ -739,3 +739,46 @@ root本机读回twohour-root-audit-20261010.json，核主采样、补充采样�
 本机webdialog-close-focus-supplement-20261010.json及manual-close-before-selection/C3-pass截图、原生追加日志保留。第26节封存时“尚无完成回报”是当时状态，由本节取代；原20条原生记录8384字节另存webdialog-native-twohour-frozen-20261010.jsonl，原前缀SHA 86bd81fe…核对一致，endpoint审计引用该冻结件，原追加日志继续保留补证。361条指标及完成回执未改，原两小时结论不扩大。
 
 仅更新handoff/调查/阻断/发布清单/验收5文档，不运行无源码改动的软件回归；明确暂存审查、普通提交推送并核远程SHA，以本机webdialog-close-focus-backup-receipt-20261010.json为准。下一项仅补独立窗口交互与关闭/再打开设计和验证，不推进业务余项、四项目、R12结案或R13。
+
+## 28. 10-10开机后：单实例非模态窗口修复及最终版长时验证进行中
+
+用户要求测试后继续修复，并批准有限方案：复用七步页，以CreateWebDialog/GetWebDialog管理自有非模态窗口；存活时复用，关闭后复开，手动重建先提示未保存内容。出门前另授权继续操作。完整读handoff并实际看图01/03；默认不合并、成果表内整表确认、品牌在汇总表等业务流程不变，不推进业务余项。
+
+### 对照缺陷和实施依据
+
+真人点击旧对照窗“读取并识别清单”回复扫描1张表、0候选，UTC11:12:21.058截图核同提示；只证明空白簿读取。真人关闭旧“项目询价 · 独立窗口对照”后，11:16:21.445单次功能区打开至11:17:51.132仍无浮窗及新页面请求。临时launcher的永久__rfqWebDialogOpened标记不复位，能解释此次关闭不复开；不是原TaskPane灰白根因。原生记录webdialog-resume-native-20261010.jsonl保留。
+
+官方CreateWebDialog返回WebDialog、初建隐藏须Visible=true，modal=false；GetWebDialog缺失ID返回undefined。WebDialog具有ID、Visible及Delete，不假设Navigate/Close/ShowToFront存在。依据官方[CreateWebDialog](https://open.wps.cn/documents/app-integration-dev/wps365/client/wpsoffice/jsapi/addin-api/Application/member/CreateWebDialog)、[GetWebDialog](https://open.wps.cn/documents/app-integration-dev/wps365/client/wpsoffice/jsapi/addin-api/Application/member/GetWebDialog)及WebDialog元数据；原文JSON仅本机wps-official-*-20261010.json。文档存在不替代本机行为验收。
+
+实现集中在main.js/ribbon-navigation.js：共享rfq.webdialog.id查询管理实例，普通打开仅显隐复用；明确不存在后新建；查询异常、ID不符或不支持API明确失败，不回退旧TaskPane。重建确认后先Delete，再创建；取消/销毁失败保留原实例。创建显示失败清理自有新实例；登记与清理均失败保留本功能区内application/ID，未确认销毁前禁止盲建。导航仅{id,stage}，使用rfq.window.nav.*隔离仍存活旧侧栏消费通道，保留600ms导航请求检查/隐藏暂停，无页面重载。功能区及导入恢复文案改“询价窗口”，页面布局及业务源码未重做。
+
+### 软件验证与审查
+
+新生命周期9项先红0/9，最小实现后绿；复审暴露“登记＋销毁失败丢所有权”，新增该组合及两项旧导航隔离回归先真实红3项，再修正。相关39/39、全量Node450/450、六项主流程浏览器与ui-startup-navigation共7/7通过；日志webdialog-fix-node-final-20261010.log及webdialog-fix-final-ui-*.log。首次浏览器运行因缺NODE_PATH未执行，定位随应用依赖后实际全部通过，不把环境错误记产品失败。独立代码审查先P2，再复审无具体P1/P2；审查只覆盖代码/模拟边界，不能替代真机。
+
+### 实机与当前缺项
+
+原无诊断服务18492创建UTC11:26:48.54304、listen11:26:48.669，同五隔离目录/38891；停止临时13848前核创建时间/命令行，只停本轮服务，未杀共享CEF。source-check-18492-1791631627089.json及最终1791632426099各50资源/44脚本与源码一致、无诊断路径。
+
+| UTC | 动作和实际结果 | 边界 |
+| --- | --- | --- |
+| 11:28:24.379 | 生命周期版快速打开项目询价七步页 | 未验完整读取 |
+| 11:39:55.435 | 真人已关闭后单次原生打开实际复开 | 功能区为11:28版；新导航通道随后正常换自有空白宿主加载 |
+| 11:42:28.180 | 最终版在合成副本中快速打开 | 页面仅一次初始加载 |
+| 11:42:40.651 | 自动分类入口使第1页实际变第2页 | 只导航，不生成或确认 |
+| 11:43:41.399 | 从样本簿切工作簿1，浮窗保留第2页 | 不计活动簿数据读取 |
+| 11:43:55.944 | 换簿后导入入口实际回第1页 | 已超过窗口打开60秒；不替代长时验证 |
+
+测试副本“稳定性读取样本.xlsx”复制自既有合成C补验_独立8行.xlsx，两SHA7069d5ff91e00db3beaf0c6652b66f713a1d88dcb3645ba783e46210dc68468d；真实WPS已打开，未编辑或保存。初始卡片仍显示启动时样本簿名，是taskpane.js仅启动时inspect的静态显示，不能证明后来读取的活动簿归属。必须实际点击读取并核结果后才能确认。
+
+最终版页内“读取并识别”被工具拒绝：point is over wps.exe Chrome Legacy Window, not target window wps.exe 工作簿1 - WPS Office。按规范fresh activate/get一次重试仍同错误；list_apps/list_windows未返回可单独选择的浮窗。停止页内/关闭控件输入，不伪造Window、不绕过。完整有数据读取、切换后的读取归属、最终版关闭复开、重建确认/取消仍欠真机。该限制不是页面卡死或新自动审批拒绝。前轮Esc中断已停止当轮UI输入；本轮依据新授权恢复。
+
+### 两小时验证、保护与接续
+
+最终版窗口打开11:42:28.180；公共聚合采样进程3052创建11:46:13.8979198，首条11:46:14.3609711Z，至少13:46:14.361Z并有真实最终原生导航才可记两小时稀疏导航通过。采样仅固定创建时间的7个wps进程公开聚合指标，不读进程内存、不注入探针。脚本自行达到7200秒后结束；现阶段两小时未完成。新文件webdialog-fix-monitor-20261010.json、webdialog-fix-metrics-20261010.jsonl及completion、webdialog-fix-native-20261010.jsonl保留，旧两小时证据不改。起始一次Start-Process路径不存在未启动，换实际bundled pwsh路径后启动成功；准备错误不算WPS失败。终点UTC按原JSON字符串计算，避免PowerShell自动日期转换误差，当前receipt已核13:46:14.360Z。
+
+当前真实主窗459446，工作簿1与合成副本保留，项目询价窗处于导入页。不重复加载或重建当前长时实例；每次刷新实际WPS窗口，观察后单次点左侧不同阶段入口，保存真实UTC/elapsed/可见结果及截图。静态截图、HTTP200及进程存活不算响应。若工具不可用或用户关机，记录中断与缺项，不补造通过；结束暂停heartbeat，不留无限监视。
+
+UTC11:40:26.184保护44/44及5缺失占用件，原安装JSON338字节/SHA c6649bab…、四键true(String)/60(DWord)/true(String)/120(DWord)、保护pane6063字节/SHA e9a76e21…保持。所有私有文件、outputs与pane不暂存。明确备份15文件：main.js、ribbon.xml、src/ribbon-navigation.js、taskpane.html，test/ribbon-navigation.test.cjs、ribbon-recovery.test.cjs、webdialog-lifecycle.test.cjs、ui-workflow-check.cjs、ui-startup-navigation-check.cjs，docs/wps-user-guide.md及handoff/调查/阻断/发布清单/验收五文档。审查暂存后普通提交推送，结果以webdialog-fix-backup-receipt-20261010.json及实际远程SHA为准。
+
+**修复实现已有，验收未完成；SIDEBAR-STABILITY-01和正式交付仍阻断。** 原临时路线有界两小时结论不扩为最终实现通过，不保证长期稳定或历史OOM已消除。下一项完成本最终版两小时终点和受工具限制的交互缺项，再决定是否关闭稳定性阻断；不进入C06、业务余项、四项目、R12结案或R13。
