@@ -818,3 +818,12 @@ UTC12:09:23.680在1245x794窗口截图确认坐标后，单次点击功能区“
 ### 30.4 当前结论与边界
 
 已通过：测试环境重建与保护核对、功能区→最终版窗口的导航可达性（单次）。**仍未完成**：①页内有数据读取 ②换簿后读取归属 ③最终版关闭复开 ④重建确认/取消（①-④需真人操作）⑤第二段两小时终点导航与收口（§30.3采样接续）⑥收口备份。在本轮终点导航完成前，不记两小时通过；不宣称长期稳定、历史OOM已消除或生产可用。**SIDEBAR-STABILITY-01 与正式交付保持阻断。** 证据：`outputs/sidebar-stability-20261005/resume2-native-20261010.jsonl`、`resume2-metrics-20261010.jsonl`、`source-check-2716-1791634014363.json`、`protected-files-2026-10-10T12-06-54-434Z.json`、`resume2-*`截图。
+
+## 32. 10-10 至 10-11 最终版稳定性收口：两段公共指标、终点原生导航与有界验收结论
+
+- **第二段（重建窗口，PID2764）**：首样本 13:01:36.6382926Z、末 15:01:47Z、跨度 7210.9 秒、361 样本、最大间隔 20.1 秒、SHA 7973e221…、回执 completed:true；固定集合 7 个中 wps 9616 于 14:53:06 退出，其余 6 个身份一致。终点探针 15:03 被真人输入拦下（如实记录，未重试），15:34:15 真人停手后补做成功：单次“导入清单”使页面由第 7 步实际回到第 1 步（resume3-endpoint2-before / resume3-endpoint-after-nav）。
+- **第三段（PID20992）**：首样本 15:04:54.573Z、末 22:05:14.538Z、跨度 25219.96 秒（≈7.0 小时）、1260 样本、最大间隔 20.1 秒、SHA 97b334bc…、回执 completed:true；固定集合 8 个中仅 wps 26180（14:52:56 创建）于 16:53:05 退出，其余 7 个（wps 26864/16672/20808/10592/19092/10324 ＋ et 6756）全程身份一致。终点原生导航 22:59:27（点击）/22:59:31（观测）：单次“自动分类”使页面由第 1 步实际变为第 2 步（resume4-endpoint-before / resume4-endpoint-after-nav）；此时窗口自 13:00:25 重建后连续存活 ≈9.99 小时。
+- **稀疏导航系列（均有真实可见重绘）**：13:01:15、13:32:46、15:34:15、16:05:11、17:00:47、17:56:37、18:57:10、19:57:21、20:57:11、22:59:27；其中 20:57 与 22:59 之间的空档已说明（终点前 6 分钟主动不做检查点）。
+- **资源与保护（22:59）**：source-check 50 资源/44 脚本与最终源码一致（PID2716）；check-protected-files 44 项中 43 项一致，唯一差异 library\library-state.json（319c11f2…→9b06c292…，与 21:53:59 整表确认的学习一致，属预期演进）；安装 JSON 338 字节/SHA c6649bab…、四键 true(String)/60(DWord)/true(String)/120(DWord)、pane SHA e9a76e21… 未变；5 个原占用锁文件仍缺失。
+- **有界验收结论**：SIDEBAR-STABILITY-01 关闭。**仍未覆盖项**（不得据此宣称长期稳定、生产就绪或历史 OOM 已消除）：保存对话框、多项目并发、历史 32 位 OOM 未复现≠已消除、浮窗默认位置遮功能区右半、汇总表生成后未自动打开供填写（openSummary 生效性待核）、拆分回执持久化细节、本日未重跑产品软件回归（当日无源码改动）。
+- **证据索引**（本机 outputs/sidebar-stability-20261005/，不入 Git）：resume2-native-20261010.jsonl（51 条）、resume3-metrics-20261010.jsonl 与完成回执、resume4-metrics-20261010.jsonl 与完成回执、resume4-checkpoint*-*.jpg、resume3-endpoint2-before-20261010-0.jpg、resume3-endpoint-after-nav-20261010-0.jpg、resume4-endpoint-before-20261010-0.jpg、resume4-endpoint-after-nav-20261010-0.jpg、inspect-final-sheet.py / inspect-workbooks.py / inspect-summary-sheet.py / inspect-inquiry-workbook.py / inspect-split-summary.py、source-check-2716-1791673150198.json、protected-files-2026-10-10T22-59-10-271Z.json。
