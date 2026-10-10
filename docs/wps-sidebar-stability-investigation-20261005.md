@@ -794,3 +794,27 @@ UTC11:40:26.184保护44/44及5缺失占用件，原安装JSON338字节/SHA c6649
 UTC11:56:50.041保护44/44一致、5占用锁文件缺失；原安装JSON SHA c6649bab…、四键true(String)/60(DWord)/true(String)/120(DWord)、pane SHA e9a76e21…只读核保持。产品源码无新改动，不重跑已执行的软件回归。修复15文件提交ffeaf2a06b58e3f0e993ea59e89f9aa89d89fb26已普通推送，暂停时远程再次核一致；本次仅专门交接及handoff/调查/阻断/发布清单/验收6文档按明确清单审查提交普通推送，以webdialog-fix-pause-backup-receipt-20261010.json及实际远程SHA为准。所有outputs、本机配置、私有文件和保护pane不上传。
 
 **暂停是用户决定，不是测试失败或完成；修复实现已有，真机验收未完成，SIDEBAR-STABILITY-01及正式交付保持阻断。** 下次仅在用户恢复后从未完成稳定性项接手，不推进业务余项。
+
+## 30. 10-10 20:05–20:12 恢复接续：服务重建、工具归属根因定位与第二段两小时采样
+
+用户要求继续完成侧栏停帧任务，暂停结束，按专包交接第2节顺序接续。本轮不推进C06、业务余项、四项目、R12结案或R13，不改产品源码，不重复已封存试验。
+
+### 30.1 现场核验与测试环境重建
+
+暂停前记录的无诊断服务18492已不存在，38891无人监听，`service-current.json`仍指向旧PID；WPS仍在运行（wps×6、et 6756）。按同一`launcher-no-diagnostics-20261009.cjs`重建**PID2716**（UTC12:06:45.282Z，38891，`product-no-diagnostics`，同五隔离`ui-data`目录），并只读核验：`source-check-2716-1791634014363.json`（50资源/44脚本与最终源码一致，`/dev/pane-diagnostics.js`等诊断路径404）、`protected-files-2026-10-10T12-06-54-434Z.json`（保护44/44、5个原占用锁文件缺失）、安装JSON 338字节/SHA`c6649babebbbb8e3140ab30bec10e9819ce4138167ba4e4660daff9f2482447c`、`HKCU:…\Cef`四键 true(String)/60(DWord)/true(String)/120(DWord)、`pane-diagnostics.js`SHA`e9a76e21…`。未停任何进程、未写配置。
+
+### 30.2 页内不可点原因的准确归属
+
+对最终版浮窗标题栏关闭按钮做element_index点击，被拒绝，原文：`point (1525, 245) is over et.exe "项目询价", not target window wps.exe "工作簿1 - WPS Office"`。此前记录为“Chrome Legacy Window归属不匹配”，本轮定位到**具体归属进程et.exe(PID6756)**：WPS 12的文档、加载项与WebDialog落在et.exe，而自动化工具只把主框架wps.exe窗459446作为可点目标。
+
+按官方恢复路径尝试`sky.launch_app({app:"process:E:\WPS\WPS Office\12.1.0.29161\office6\et.exe"})`，返回`launched app did not expose a targetable window`；随后`list_apps()`仍无et.exe、`list_windows()`仍不含“项目询价”。**结论：页内控件与浮窗自身控件在本工具下不可点，需真人操作**；未伪造Window、未用诊断脚本或其它通道绕过。探测副作用是新开空白宿主窗462584「工作簿2 - WPS Office」，已用`Control_L+w`关闭其文档（标题变为空框架「WPS Office」）后再`Alt+F4`关闭该空框架，`list_windows`恢复为459446/394510/395750/4456466，无残留；未触碰工作簿1、`稳定性读取样本.xlsx`与浮窗。
+
+### 30.3 服务重建后的可达性复核与第二段两小时采样
+
+UTC12:09:23.680在1245x794窗口截图确认坐标后，单次点击功能区“自动分类”（约368,110），最终版浮窗页面由第1步导入实际变为第2步自动分类（“02 自动分类后生成审核成果表”，0导入总行数/0合计行数）——说明服务重建后功能区→隔离导航通道仍能驱动最终版窗口。截图`resume2-before-ribbon-nav-20261010-0.jpg`、`resume2-after-ribbon-nav-20261010-0.jpg`，记录`resume2-native-20261010.jsonl`。浮窗遮住功能区右半，只有「导入清单」(约331,110)与「自动分类」(约368,110)可达，检查点只用这两个。
+
+第二段公开聚合指标：采样PID29140（bundled pwsh，创建UTC12:10:34Z），输出`resume2-metrics-20261010.jsonl`（与已封存`webdialog-fix-metrics-20261010.jsonl`完全分开，不追加），首样本12:10:34.818Z，最早终点14:10:34.818Z，跨度目标≥7200秒，完成回执`resume2-metrics-completion-20261010.json`；本轮固定身份集合为wps×6+et(6756)×1，只读Get-Process公开计数（虚拟/私有/工作集/句柄/CPU），不读进程内存、不注入探针、不做页面诊断。heartbeat `wps-2`（本聊天，30分钟间隔，创建于UTC12:11）负责稀疏导航检查点与终点导航，完成后自置PAUSED；旧heartbeat `wps`保持PAUSED（指向旧聊天01a11e56…），可删。
+
+### 30.4 当前结论与边界
+
+已通过：测试环境重建与保护核对、功能区→最终版窗口的导航可达性（单次）。**仍未完成**：①页内有数据读取 ②换簿后读取归属 ③最终版关闭复开 ④重建确认/取消（①-④需真人操作）⑤第二段两小时终点导航与收口（§30.3采样接续）⑥收口备份。在本轮终点导航完成前，不记两小时通过；不宣称长期稳定、历史OOM已消除或生产可用。**SIDEBAR-STABILITY-01 与正式交付保持阻断。** 证据：`outputs/sidebar-stability-20261005/resume2-native-20261010.jsonl`、`resume2-metrics-20261010.jsonl`、`source-check-2716-1791634014363.json`、`protected-files-2026-10-10T12-06-54-434Z.json`、`resume2-*`截图。

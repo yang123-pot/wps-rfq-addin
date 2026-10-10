@@ -1,5 +1,16 @@
 # SIDEBAR-STABILITY-01 未完成工作交接（2026-10-10暂停）
 
+## 0. 10-10 20:05–20:12 恢复接续（最新，优先于下方暂停记录）
+
+用户要求继续完成侧栏停帧任务，暂停状态结束，按本文第2节顺序接续。本节数值取代第1、5节中的旧现场值。
+
+- 服务：暂停前PID18492已退出（38891无人监听）；已按同一`outputs/sidebar-stability-20261005/launcher-no-diagnostics-20261009.cjs`重建**PID2716**，启动UTC12:06:45.282Z，`product-no-diagnostics`，同五隔离`ui-data`目录。核验：`source-check-2716-1791634014363.json`（50资源/44脚本与最终源码一致、无诊断路径）、`protected-files-2026-10-10T12-06-54-434Z.json`（保护44/44、5个原占用锁文件缺失）；安装JSON 338字节/SHA`c6649bab…`、四键 true(String)/60(DWord)/true(String)/120(DWord)、pane SHA`e9a76e21…`只读核未变。
+- 工具极限定位：对最终版浮窗关闭按钮的element_index点击被拒，原文`point (1525, 245) is over et.exe "项目询价", not target window wps.exe "工作簿1 - WPS Office"`——**浮窗页与浮窗自身控件的归属进程是et.exe(PID6756)**，工具只把主框架(wps.exe窗459446)当可点目标。按官方恢复路径`launch_app(process:…\et.exe)`返回`launched app did not expose a targetable window`，`list_apps`仍无et.exe、`list_windows`仍不含“项目询价”。**页内与浮窗控件因此仍不可点，需真人操作，不得绕过。**
+- 副作用清理：上述探测新开了一个空白宿主窗462584「工作簿2」，已用Control_L+w关闭文档、再Alt+F4关闭空框架，`list_windows`恢复为459446/394510/395750/4456466；未触碰工作簿1、`稳定性读取样本.xlsx`及浮窗。
+- 服务重建后可达性复核：UTC12:09:23.680单次点击功能区“自动分类”（1245x794约368,110），最终版浮窗页面由第1步导入实际变为第2步自动分类；截图`resume2-before-ribbon-nav-20261010-0.jpg`/`resume2-after-ribbon-nav-20261010-0.jpg`，记录`resume2-native-20261010.jsonl`。**浮窗遮住功能区右半，只有左侧「导入清单」(约331,110)与「自动分类」(约368,110)可达**，检查点只用这两个。
+- 两小时复验重启：采样**PID29140**（bundled pwsh，创建UTC12:10:34Z）→`resume2-metrics-20261010.jsonl`，首样本12:10:34.818Z，最早终点14:10:34.818Z，跨度目标≥7200秒，完成回执`resume2-metrics-completion-20261010.json`；本轮把et.exe一并纳入公开聚合计数（不读内存、不注入探针）。heartbeat **`wps-2`**（本聊天`01a125b2-e9bc-76c1-ae39-78c52360b642`，每30分钟）负责稀疏导航检查点与终点导航，完成后自置PAUSED；旧heartbeat`wps`保持PAUSED（指向旧聊天），可删。
+- 剩余未完成项不变，仍按第2节顺序：①页内有数据读取 ②换簿后读取归属 ③最终版关闭复开 ④重建确认/取消（①-④需真人操作）⑤两小时终点导航（本轮采样接续）⑥收口备份。**未完成前SIDEBAR-STABILITY-01与正式交付保持阻断。**
+
 **当前状态：用户明确要求暂停，测试与修复均停止。** 采样于UTC 2026-10-10 11:55:57.865（北京时间19:55:57.865）停止，heartbeat `wps` 已通过应用工具改为PAUSED。WPS及打开的文件未关闭、未保存，原无诊断服务保留。接手者先完整阅读根目录 `handoff.md`，再读本文件和调查第28–29节；未经用户后续恢复指令，不继续实机测试或修复，不自行恢复自动唤醒。
 
 **修复代码已提交，真机验收未完成。SIDEBAR-STABILITY-01未关闭，正式交付仍阻断。** 本文件交接稳定性包，不授权推进C06、业务余项、四项目、R12结案或R13。
