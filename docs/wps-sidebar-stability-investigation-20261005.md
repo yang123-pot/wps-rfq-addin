@@ -740,7 +740,7 @@ root本机读回twohour-root-audit-20261010.json，核主采样、补充采样�
 
 仅更新handoff/调查/阻断/发布清单/验收5文档，不运行无源码改动的软件回归；明确暂存审查、普通提交推送并核远程SHA，以本机webdialog-close-focus-backup-receipt-20261010.json为准。下一项仅补独立窗口交互与关闭/再打开设计和验证，不推进业务余项、四项目、R12结案或R13。
 
-## 28. 10-10开机后：单实例非模态窗口修复及最终版长时验证进行中
+## 28. 10-10开机后：单实例非模态窗口修复及最终版长时验证（暂停前记录）
 
 用户要求测试后继续修复，并批准有限方案：复用七步页，以CreateWebDialog/GetWebDialog管理自有非模态窗口；存活时复用，关闭后复开，手动重建先提示未保存内容。出门前另授权继续操作。完整读handoff并实际看图01/03；默认不合并、成果表内整表确认、品牌在汇总表等业务流程不变，不推进业务余项。
 
@@ -782,3 +782,15 @@ root本机读回twohour-root-audit-20261010.json，核主采样、补充采样�
 UTC11:40:26.184保护44/44及5缺失占用件，原安装JSON338字节/SHA c6649bab…、四键true(String)/60(DWord)/true(String)/120(DWord)、保护pane6063字节/SHA e9a76e21…保持。所有私有文件、outputs与pane不暂存。明确备份15文件：main.js、ribbon.xml、src/ribbon-navigation.js、taskpane.html，test/ribbon-navigation.test.cjs、ribbon-recovery.test.cjs、webdialog-lifecycle.test.cjs、ui-workflow-check.cjs、ui-startup-navigation-check.cjs，docs/wps-user-guide.md及handoff/调查/阻断/发布清单/验收五文档。审查暂存后普通提交推送，结果以webdialog-fix-backup-receipt-20261010.json及实际远程SHA为准。
 
 **修复实现已有，验收未完成；SIDEBAR-STABILITY-01和正式交付仍阻断。** 原临时路线有界两小时结论不扩为最终实现通过，不保证长期稳定或历史OOM已消除。下一项完成本最终版两小时终点和受工具限制的交互缺项，再决定是否关闭稳定性阻断；不进入C06、业务余项、四项目、R12结案或R13。
+
+## 29. 10-10用户要求暂停：中断指标封存与未完成工作交接
+
+用户最新指令“先暂停，将未完成工作写一个交接文档给下一个人接手”覆盖此前继续授权。停止所有测试/修复/UI输入，不继续激活或关闭WPS。UTC11:55:57.8647652核CIM创建11:46:13.8979190、bundled pwsh完整命令与本轮脚本后，只停止采样3052；随后复核该PID不存在。heartbeat wps通过automation_update置PAUSED，TOML读回PAUSED，原名称/提示/周期保留；须用户恢复指令才接续，不自行唤醒。原服务18492的创建11:26:48.5430400及node/launcher-no-diagnostics命令身份复核匹配，保持运行；用户文件、工作簿和浮窗未关闭或保存。
+
+中断后读取完整指标原件共30条，UTC11:46:14.3609711–11:55:55.2855455首尾580.925秒、最大间隔20.063秒；7个固定创建时间身份逐样本一致，无错误/退出标记。这不是两小时、没有最终原生导航，不说明长期无泄漏或灰白已修复。原目标13:46:14.361取消，不以暂停间隔补时。指标SHA964a5ba2daf7c239c527c4448b2d72879828a69ec04e88f4330b5f18b5b884ad；未写完成回执，本机webdialog-fix-pause-20261010.json明确completed:false，monitor已标paused-user-request/targetEarliestUtc:null，原指标不再追加。下一次长时试验必须另建文件并真实连续采满至少7200秒后做原生终点导航。
+
+已写[专门接手文档](wps-sidebar-stability-handover-20261010.md)：包含已完成代码/验证、读取/换簿归属/最终版关闭复开/重建确认取消及连续两小时的未完成清单、工具归属限制、现场身份、保护值、证据索引及继续条件。最终版最后实际可见变化仍为11:43:55.944回导入页，暂停后没有新画面；主窗459446与浮窗当前页仅最后观察值，不能当下次已核现场。
+
+UTC11:56:50.041保护44/44一致、5占用锁文件缺失；原安装JSON SHA c6649bab…、四键true(String)/60(DWord)/true(String)/120(DWord)、pane SHA e9a76e21…只读核保持。产品源码无新改动，不重跑已执行的软件回归。修复15文件提交ffeaf2a06b58e3f0e993ea59e89f9aa89d89fb26已普通推送，暂停时远程再次核一致；本次仅专门交接及handoff/调查/阻断/发布清单/验收6文档按明确清单审查提交普通推送，以webdialog-fix-pause-backup-receipt-20261010.json及实际远程SHA为准。所有outputs、本机配置、私有文件和保护pane不上传。
+
+**暂停是用户决定，不是测试失败或完成；修复实现已有，真机验收未完成，SIDEBAR-STABILITY-01及正式交付保持阻断。** 下次仅在用户恢复后从未完成稳定性项接手，不推进业务余项。
