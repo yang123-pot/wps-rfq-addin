@@ -473,7 +473,11 @@
         var against=RfqClassificationReviewHost.compareSnapshot(read,confirmation);
         if(against&&against.matches===false)
           return {kind:'confirmation',label:'整表确认快照',snapshot:confirmation,result:against};
+        // F2：有效确认是当前已确认状态的依据。确认一致时不能再拿旧草稿判差异——
+        // 否则用户会看到“草稿不同”的误报，并被诱导用旧草稿覆盖已确认结果。
+        return null;
       }
+      // 还没有有效确认（仅草稿）的项目才用草稿判定，供“恢复项目草稿到新副本”。
       var draft=projects.reviewDraft?projects.reviewDraft():null;
       if(draft){
         var againstDraft=RfqClassificationReviewHost.compareSnapshot(read,draft);
@@ -559,6 +563,11 @@
         if(reviewDivergence.kind==='confirmation'){
           banner.textContent='成果表内容与已保存确认不一致';
           banner.className='result-banner';
+          // F2：差异未解决前不得残留“可以生成分类工作簿”。
+          progress.textContent='当前进度 3 / 7 · 成果表与项目已确认内容不一致（'+differences.length+' 处）：'+
+            '先按现表重新整表确认，或恢复项目保存内容到新副本，才能生成分类工作簿。';
+        }else{
+          progress.textContent='当前进度 3 / 7 · 成果表与项目保存的审核草稿不一致（'+differences.length+' 处），尚未整表确认。';
         }
         stats.textContent='项目保存的'+reviewDivergence.label+'与当前成果表（'+
           (diff.source==='open'?'打开簿内容':'磁盘内容')+'）有 '+differences.length+' 处业务差异，SHA一致也不能当作已一致。';
@@ -696,6 +705,8 @@
       if(sheetReviewBusy)return;
       var draft=projects.reviewDraft?projects.reviewDraft():null,confirmation=reviewConfirmation();
       var snapshot=(reviewDivergence&&reviewDivergence.snapshot)||confirmation||draft;
+      // F2：从“有效确认快照”恢复只把绑定切到新副本，内容与已确认一致，不要求重复确认、也不重复学习。
+      var fromConfirmation=!!(confirmation&&snapshot===confirmation&&confirmation.inputKey===matchingKey());
       if(!snapshot||!snapshot.rows||!snapshot.rows.length){sheetTell('没有可恢复的审核快照。',true);return;}
       if(!reviewBinding){sheetTell('缺少审核成果表绑定，无法恢复副本。',true);return;}
       var prepared=null,published=false;
@@ -715,7 +726,9 @@
         await exportRequest('verify',{ticket:prepared.ticket,target:receipt.target,sha256:receipt.sha256});
         reviewBinding=RfqClassificationReviewHost.bindingFor(receipt,restoredModel,{inputKey:matchingKey(),title:name});
         if(options.setReviewBinding)options.setReviewBinding(reviewBinding);
-        sheetTell('已把项目保存的审核内容写成新副本（未覆盖原成果表）：'+receipt.target+'。请核对后整表一次确认。');
+        sheetTell('已把项目保存的审核内容写成新副本（未覆盖原成果表）：'+receipt.target+
+          (fromConfirmation?'。内容与项目已确认的一致，仅把成果表绑定切到新副本，无需重复确认、也不会重复学习。'
+            :'。请核对后整表一次确认。'));
         try{RfqClassificationReviewHost.openForEditing(options.application,receipt.target);}catch(_){}
         refreshReviewRead(true);
       }catch(error){sheetTell('恢复副本未完成：'+error.message,true);}
@@ -876,6 +889,19 @@
       var confirmation=reviewConfirmation();
       if(!reviewFresh()||!confirmation){categoryTell('请先在“表内审核”完成整表确认，再生成分类工作簿。',true);renderCategories();return {ok:false};}
       if(!reviewBinding||!reviewBinding.path){categoryTell('缺少审核成果表绑定，请重新生成审核成果表后整表确认。',true);return {ok:false};}
+      // F2：分类工作簿只能按“当前成果表内容”的整表确认生成。现表与有效确认不一致时（用户改了表还没确认）
+      // 必须先重新整表确认或恢复项目保存内容，否则会把旧确认当成依据生成。
+      var divergence=null;
+      try{divergence=detectReviewDivergence(readReviewSheet());}catch(error){divergence=null;}
+      if(divergence&&divergence.kind==='confirmation'){
+        reviewDivergence=divergence;
+        categoryTell('分类工作簿未生成：审核成果表现表与已保存的整表确认有 '+
+          ((divergence.result.differences||[]).length)+' 处不一致（'+
+          ((divergence.result.differences[0]||{}).message||'')+'）。请先在“表内审核”按现表重新整表确认，'+
+          '或把项目保存的审核内容恢复到新副本，再生成分类工作簿。',true);
+        renderCategories();render();
+        return {ok:false,divergence:divergence};
+      }
       categoryBlocked=null;
       var base=RfqCategoryWorkbooks.rootOf(reviewBinding.path);
       // 首次生成用成果表所在目录（图04：项目名/分类工作簿）；同一版整表确认的续作沿用已记录批次；

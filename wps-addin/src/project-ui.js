@@ -270,13 +270,22 @@
       restoreFutureFields(loaded);
       var audit=await auditRestore(loaded);
       // R12-C：业务内容与确认快照一致、仅另存/格式/排序造成SHA变化时不判外部改写，而是刷新物理校验。
-      var physicalRefreshed=0;
+      // F2：只有写回成功才算刷新；失败（409/写错误）时内存SHA与版本一起回滚，不改持久绑定语义。
+      var physicalRefreshed=0,physicalRefreshFailed=null;
       if(audit.ok&&audit.physicalRefresh&&audit.physicalRefresh.length&&loaded.matching){
-        audit.physicalRefresh.forEach(function(entry){if(entry.stage==='review')loaded.matching.sha256=entry.sha256;});
+        var applied=[];
+        audit.physicalRefresh.forEach(function(entry){
+          if(entry.stage!=='review')return;
+          applied.push(loaded.matching.sha256);
+          loaded.matching.sha256=entry.sha256;
+        });
         try{
           var syncReceipt=await request('save',{project:loaded,expectedRevision:loaded.revision});
           loaded.revision=Number(syncReceipt.revision);physicalRefreshed=audit.physicalRefresh.length;
-        }catch(error){/* 物理刷新写回失败不阻断打开，下次重开仍会再核内容 */}
+        }catch(error){
+          applied.forEach(function(previous){loaded.matching.sha256=previous;});
+          physicalRefreshFailed=error;
+        }
       }
       // 先按恢复后的合并确认键重算一次侧栏，再判阶段；否则会误判为“尚未生成自动分类建议”。
       if(options.afterRestore)options.afterRestore(loaded);
@@ -289,8 +298,10 @@
         (rebuilt?'已按原件SHA校验重建'+rebuilt+'份工作副本。':'工作副本完整。')+
         (audit.ok?'各阶段持久文件已核对。':'有'+audit.issues.length+'项持久文件未核对通过，未恢复为已完成；缺失文件可尝试“重新定位项目文件”。')+
         (physicalRefreshed?'审核成果表仅另存/格式变化，业务内容与已保存审核内容一致，物理校验已更新。':'')+
+        (physicalRefreshFailed?('审核成果表仅另存/格式变化，业务内容与已保存审核内容一致，但物理校验未写回项目记录（'+
+          physicalRefreshFailed.message+'）：已保存的物理校验与内容原样保留，请重试（重新打开项目或保存项目）。'):'')+
         '原件不变，快照可用于继续核对。'+(recomputed?'阶段状态已按当前来源与确认内容重算，保存后写回项目记录。':''),
-        !audit.ok);
+        !audit.ok||!!physicalRefreshFailed);
       return true;
     }catch(error){tell('项目未打开。'+error.message,true);return false;}
     finally{busy=false;if(options.onBusy)options.onBusy(false);}

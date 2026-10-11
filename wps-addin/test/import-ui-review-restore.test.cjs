@@ -5,16 +5,22 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const sample=require('./fixtures/workflow-v3-sample.cjs');
 const project=require('../src/project.js'),collection=require('../src/collection.js');
 const SHA_A='a'.repeat(64),SHA_B='b'.repeat(64),REVIEW_PATH='C:\\fixture\\恢复草稿.xlsx';
+const RESTORE_TARGET='C:\\fixture\\示例园区_分类审核成果_恢复副本.xlsx';
 const copy=value=>JSON.parse(JSON.stringify(value));
 
 function element(id){
-  const listeners={};
   return {id,textContent:'',value:'',checked:false,hidden:false,disabled:false,children:[],parentNode:null,
     classList:{toggle(){}},setAttribute(){},getAttribute(){return null;},focus(){},
-    addEventListener(type,handler){listeners[type]=handler;},
+    addEventListener(type,handler){(this.__listeners=this.__listeners||{})[type]=handler;},
     appendChild(child){this.children.push(child);child.parentNode=this;return child;},
     insertBefore(child){return this.appendChild(child);},
     querySelector(){return null;},get options(){return this.children;}};
+}
+// 表格内审核面板的按钮只在夹具里点击；handler由生产代码注册，与真实DOM一致。
+function click(elements,id){
+  const target=elements[id],handler=target&&target.__listeners&&target.__listeners.click;
+  assert.equal(typeof handler,'function','缺少 '+id+' 的点击处理器');
+  return handler({});
 }
 function fixture(){
   const col=sample.buildCollection(),preview=collection.preview(col,true);
@@ -49,8 +55,9 @@ function fixture(){
   return {value,rows};
 }
 async function boot(config={}){
-  const {value,rows}=fixture(),elements={},calls=[],saves=[],wpsCalls=[];
+  const {value,rows}=fixture(),elements={},calls=[],saves=[],prepares=[],wpsCalls=[];
   if(config.project)config.project(value);
+  let workflowOptions=null;
   const sheetRows=copy(rows);
   if(config.sheet)config.sheet(sheetRows);
   const order=config.ascending?sheetRows:sheetRows.reverse();
@@ -69,6 +76,7 @@ async function boot(config={}){
   const context=vm.createContext({console,setTimeout,clearTimeout,
     document:{getElementById(id){return elements[id]||(elements[id]=element(id));},
       createElement(tag){return element(tag);}},
+    RfqPathPicker:{open(options){options.onConfirm({target:config.restoreTarget||RESTORE_TARGET});}},
     async fetch(url,init){
       const route=String(url),body=JSON.parse(init&&init.body||'{}');calls.push(route);
       let result;
@@ -79,10 +87,19 @@ async function boot(config={}){
       else if(route==='/api/export/inspect')result={target:body.target,exists:true,sha256:config.sameSha?SHA_A:SHA_B};
       else if(route==='/api/project/save'){
         saves.push(copy(body));result={path:'fixture',revision:body.expectedRevision+1};
-      }else throw Error('Unexpected HTTP boundary: '+route);
+      }else if(route==='/api/export/prepare'){
+        prepares.push(copy(body));result={ticket:'fixture-ticket',stagePath:body.target+'.staging'};
+      }else if(route==='/api/export/commit')result={ticket:body.ticket,target:RESTORE_TARGET,sha256:SHA_B,bytes:12000};
+      else if(route==='/api/export/verify')result={ok:true,matches:true};
+      else if(route==='/api/export/discard')result={ok:true,discarded:true};
+      else throw Error('Unexpected HTTP boundary: '+route);
       return {ok:true,status:200,json:async()=>result,text:async()=>JSON.stringify(result)};
     }});
   context.window=context;context.__RFQ_IMPORT__={token:'fixture-only'};
+  // 七步导航面板与导入预览一样是与本用例无关的可选界面：这里只捕获阶段切换回调。
+  context.RfqWorkflowUI={create(options){workflowOptions=options;
+    return {goTo(){},current(){return 'import';},setStats(){},setStageState(){},startRibbonNavigation(){},
+      refresh(){}};}};
   const modules={RfqCollection:'collection',RfqProject:'project',RfqProjectRestore:'project-restore',
     RfqClassification:'classification',RfqCategoryLibrary:'category-library',RfqCategoryMemory:'category-memory',
     RfqClassify:'classify',RfqClassificationReviewModel:'classification-review-model',
@@ -99,7 +116,9 @@ async function boot(config={}){
   await new Promise(resolve=>setImmediate(resolve));
   const opened=await panel.open(value.projectId);
   assert.equal(opened,true,'production restore should open the valid fixture project: '+elements['project-message'].textContent);
-  return {panel,value,elements,calls,saves,wpsCalls,application};
+  return {panel,value,elements,calls,saves,prepares,wpsCalls,application,context,
+    stageChanged(stage){assert.ok(workflowOptions,'import-ui must register a stage-change handler');
+      return workflowOptions.onStageChange(stage);}};
 }
 function assertDraftOnly(result){
   const {panel,value,calls}=result;
@@ -225,4 +244,82 @@ test('production restore: existing confirmation takes priority over a newer conf
   }});
   assert.equal(result.panel.restoreAudit().ok,true,'matching confirmation remains the authoritative snapshot');
   assert.equal(result.saves.length,0);
+});
+
+// F2/D03：打开项目后直接进入第3步（不重开项目）时，确认与草稿的取舍必须和项目重开一致。
+function confirmedProject(value){
+  value.review=Object.assign(copy(value.reviewDraft),{confirmedAt:'2026-10-03T09:00:00.000Z',revision:1});
+}
+
+test('F2第3步：现表等于有效确认、仅旧草稿不同——不报草稿差异、仍可生成',async()=>{
+  const result=await boot({sameSha:true,project(value){
+    confirmedProject(value);
+    value.reviewDraft.rows.find(r=>r.index==='7').note='旧草稿不同';
+  }});
+  const {panel,elements}=result;
+  result.stageChanged('review');
+  assert.equal(elements['sheet-review-banner'].textContent,'整表已确认');
+  assert.match(elements['sheet-review-progress'].textContent,/可以生成分类工作簿/);
+  assert.equal(elements['sheet-review-use-sheet'].hidden,true,'确认一致时不得提示草稿差异');
+  assert.equal(elements['sheet-review-restore-copy'].hidden,true,'确认一致时不得提供草稿恢复入口');
+  assert.equal(/草稿/.test(elements['sheet-review-stats'].textContent+elements['sheet-review-status'].textContent),false,
+    '旧草稿不覆盖有效确认，不得把草稿差异报给用户');
+  assert.equal(panel.assessment().review.ready,true,'确认快照仍是表内审核的依据');
+  assert.equal(result.saves.length,0,'只看差异不写项目记录');
+});
+
+test('F2第3步：现表不同于有效确认——明确差异、不残留“可以生成”并阻止按旧确认生成',async()=>{
+  const result=await boot({sameSha:true,project(value){confirmedProject(value);},
+    sheet(rows){rows[6].categoryId='strong-electric';rows[6].categoryName='强电';}});
+  const {panel,elements}=result;
+  result.stageChanged('review');
+  assert.equal(elements['sheet-review-banner'].textContent,'成果表内容与已保存确认不一致');
+  assert.equal(/可以生成/.test(elements['sheet-review-progress'].textContent),false,'差异存在时不得残留可以生成');
+  assert.equal(elements['sheet-review-use-sheet'].hidden,false,'必须给出按现表重新确认入口');
+  assert.equal(elements['sheet-review-restore-copy'].hidden,false,'必须给出恢复项目已确认内容到新副本入口');
+  assert.match(elements['sheet-review-status'].textContent,/现表|恢复/);
+  assert.equal(panel.assessment().review.ready,false,'业务内容不一致时不得把表内审核判为已确认');
+  assert.match(String(panel.assessment().review.detail||''),/业务内容/,'必须带出业务差异说明');
+  click(elements,'categories-generate');
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(result.calls.includes('/api/export/prepare'),false,'现表与确认不一致时不得按旧确认生成分类工作簿');
+  assert.match(elements['categories-message'].textContent,/不一致|差异/);
+});
+
+test('F2第3步：仅草稿项目——报出草稿差异、保留恢复入口、不确认不学习',async()=>{
+  const result=await boot({sameSha:true,sheet(rows){rows[6].categoryId='strong-electric';rows[6].categoryName='强电';}});
+  const {panel,elements}=result;
+  result.stageChanged('review');
+  assert.equal(panel.reviewConfirmation(),null,'草稿不等于已确认');
+  assert.equal(elements['sheet-review-use-sheet'].hidden,false,'草稿项目仍可选用现表重新确认');
+  assert.equal(elements['sheet-review-restore-copy'].hidden,false,'草稿项目仍可恢复到新副本');
+  assert.match(elements['sheet-review-stats'].textContent+elements['sheet-review-status'].textContent,/审核草稿/);
+  assert.equal(/可以生成/.test(elements['sheet-review-progress'].textContent),false,'未整表确认时不得显示可以生成');
+  assert.equal(panel.assessment().review.ready,false,'草稿项目保持未确认');
+  assertDraftOnly(result);
+});
+
+// 宿主写入本身由 host/export 用例覆盖；这里只核“从已确认快照恢复只更新绑定”的接线与提示。
+test('F2：从已确认快照恢复副本——只更新绑定、不重复确认、不重复学习、不覆盖当前成果表',async()=>{
+  const host=require('../src/classification-review-host.js');
+  const result=await boot({sameSha:true,project(value){confirmedProject(value);},
+    sheet(rows){rows[6].categoryId='strong-electric';rows[6].categoryName='强电';}});
+  const {panel,elements}=result,before=panel.reviewConfirmation();
+  const originalWrite=host.write,writes=[];
+  host.write=async function(application,model,stagePath,options){writes.push({model,stagePath,options});};
+  try{
+    result.stageChanged('review');
+    assert.equal(elements['sheet-review-restore-copy'].hidden,false);
+    await click(elements,'sheet-review-restore-copy');
+  }finally{host.write=originalWrite;}
+  assert.equal(writes.length,1,'只写一次新副本');
+  assert.equal(writes[0].model.rows.find(row=>row.rowId===before.rows.find(r=>r.index==='7').rowId)
+    .finalCategoryName,'汽车充电桩','写的是项目已确认内容，不是现表“强电”');
+  assert.equal(result.prepares.length,1);
+  assert.equal(result.prepares[0].target,RESTORE_TARGET);
+  assert.match(elements['sheet-review-message'].textContent,/未覆盖/);
+  assert.match(elements['sheet-review-message'].textContent,/无需重复确认/);
+  assert.equal(panel.reviewConfirmation(),before,'恢复副本不得改写已保存确认快照');
+  assert.equal(result.calls.some(route=>route==='/api/library/save'),false,'恢复副本不得重新学习');
+  assert.equal(result.saves.length,0,'恢复副本只切绑定，不写项目记录');
 });

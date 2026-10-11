@@ -305,6 +305,28 @@ async function run(options={}){
   // 复原文件版本与表内值，供后续步骤继续。
   await fs.writeFile(reviewFile,JSON.stringify(conflictBase,null,2));
   await page.evaluate(({row})=>{window.__setCell(row,8,'阀门');},{row:FAN_ROW});
+  // F2/D03：现表与有效确认不一致时——第3步必须明确差异、不残留“可以生成”，并阻止按旧确认生成分类工作簿。
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="matching"]').click();
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="review"]').click();
+  await page.waitForFunction(()=>document.querySelector('#sheet-review-banner').textContent.includes('整表已确认'));
+  assert.equal(/可以生成/.test(await page.locator('#sheet-review-progress').innerText()),true,'确认一致时允许生成');
+  await page.evaluate(({row})=>{window.__setCell(row,8,'强电');},{row:FAN_ROW});
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="matching"]').click();
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="review"]').click();
+  await page.waitForFunction(()=>document.querySelector('#sheet-review-banner').textContent.includes('不一致'));
+  assert.equal(await page.locator('#sheet-review-banner').innerText(),'成果表内容与已保存确认不一致');
+  assert.equal(/可以生成/.test(await page.locator('#sheet-review-progress').innerText()),false,'差异存在时不得残留可以生成');
+  assert.match(await page.locator('#sheet-review-progress').innerText(),/不一致/);
+  assert.equal(await page.locator('#sheet-review-use-sheet').isVisible(),true,'必须给出按现表重新确认入口');
+  assert.equal(await page.locator('#sheet-review-restore-copy').isVisible(),true,'必须给出恢复到新副本入口');
+  page.on('dialog',dialog=>dialog.accept());
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="categories"]').click();
+  await page.locator('#categories-generate').click();
+  await page.waitForFunction(()=>document.querySelector('#categories-message').textContent.includes('不一致'));
+  assert.match(await page.locator('#categories-message').innerText(),/分类工作簿未生成/);
+  assert.match(await page.locator('#categories-message').innerText(),/重新整表确认/);
+  // 复原表内值，回到与已确认一致的状态继续后面的用例。
+  await page.evaluate(({row})=>{window.__setCell(row,8,'阀门');},{row:FAN_ROW});
   // 恢复已确认项目只读回分类，不重复学习、不改写记忆文件。
   const memoryBeforeRestore=await fs.readFile(path.join(root,'library','library-state.json'),'utf8');
   await page.reload();
@@ -342,7 +364,8 @@ async function run(options={}){
   assert.ok(narrow.scrollWidth<=narrow.clientWidth+1,'窄侧栏不得出现横向滚动：'+JSON.stringify(narrow));
   assert.deepEqual(errors,[]);
   console.log('PASS: 图03表内审核：草稿不确认不学习、整表校验定位单元格、一次确认先落盘再学习、'+
-   '重复确认幂等、改确认只撤销该行来源、旧inputKey拒绝且不覆盖已保存快照。');
+   '重复确认幂等、改确认只撤销该行来源、旧inputKey拒绝且不覆盖已保存快照；'+
+   'F2：现表不同于有效确认时报差异、不残留“可以生成”并阻止按旧确认生成分类工作簿。');
  }finally{await browser.close();await new Promise(resolve=>server.close(resolve));await fs.rm(root,{recursive:true,force:true});}
 }
 module.exports={run,initScript,DRAIN,MEP,REVIEW_VALUES};

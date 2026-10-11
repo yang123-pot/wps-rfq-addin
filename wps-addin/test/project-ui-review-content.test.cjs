@@ -152,3 +152,51 @@ test('R12-C：草稿保存只写reviewDraft，不改已存确认与confirmedAt',
   assert.equal(panel.reviewConfirmation(),before,'草稿保存不得改动已存确认');
   assert.equal(panel.reviewConfirmation().confirmedAt,'2026-09-27T10:01:15.871Z','confirmedAt保持不变');
 });
+
+// F2/D02：物理SHA刷新必须先写回项目记录才算生效；写回失败（409/写错误）时内存SHA与版本一起回滚，
+// 内容照旧可用并给出可见重试提示，不能把没保存的新SHA当成当前持久绑定。
+for(const failure of [{status:409,error:'项目已被其他窗口保存'},{status:500,error:'项目记录写入失败'}])
+test('F2：物理刷新写回失败('+failure.status+')——内存SHA与版本回滚、内容保留、提示重试',async()=>{
+  const {project,ui,elements}=boot(),live={},value=record(project),saves=[];
+  installFetch([
+    {match:'/api/project/load',handle:function(){return {project:value};}},
+    {match:'/api/project/restore-copy',handle:function(body){return {copyPath:body.source.copyPath};}},
+    {match:'/api/export/inspect',handle:function(){return {target:REVIEW_PATH,exists:true,sha256:SHA('b')};}},
+    {match:'/api/project/save',handle:function(){return {status:failure.status,error:failure.error};}},
+    {match:'/api/project/list',handle:function(){return {projects:[]};}}],saves);
+  const panel=ui.create(options(live,{compareReviewContent:function(){
+    return {matches:true,source:'disk',differences:[]};}}));
+  assert.equal(await panel.open('p-ui-r12c-0001'),true,'写回失败不得阻断打开，项目内容仍可用');
+  const audit=panel.restoreAudit();
+  assert.equal(audit.ok,true,'业务内容与已保存审核一致，核对本身仍然通过');
+  assert.equal(audit.physicalRefresh.length,1);
+  assert.equal(saves.length,0,'失败时没有成功写回');
+  assert.equal(panel.current().matching.sha256,SHA('a'),'未写回的新SHA不得留在内存绑定里');
+  assert.equal(live.matching.sha256,SHA('a'),'绑定对象同一份内存状态也要回滚');
+  assert.equal(panel.current().revision,4,'版本不得递增');
+  assert.equal(panel.current().review.rows.length,8,'已保存审核确认快照保留');
+  const message=elements['project-message'].textContent;
+  assert.match(message,/物理校验/,'必须提示物理校验未写回');
+  assert.match(message,/重试/,'必须给出可见的重试提示');
+});
+
+// F2/D02：写回成功时版本与SHA同步更新，且只写一次（不重复保存、不改确认快照）。
+test('F2：物理刷新写回成功——版本与SHA同步递增、确认快照不变',async()=>{
+  const {project,ui,elements}=boot(),live={},value=record(project),saves=[];
+  installFetch([
+    {match:'/api/project/load',handle:function(){return {project:value};}},
+    {match:'/api/project/restore-copy',handle:function(body){return {copyPath:body.source.copyPath};}},
+    {match:'/api/export/inspect',handle:function(){return {target:REVIEW_PATH,exists:true,sha256:SHA('b')};}},
+    {match:'/api/project/save',handle:function(body){return {path:'mock',revision:Number(body.expectedRevision||0)+1};}},
+    {match:'/api/project/list',handle:function(){return {projects:[]};}}],saves);
+  const panel=ui.create(options(live,{compareReviewContent:function(){
+    return {matches:true,source:'disk',differences:[]};}}));
+  assert.equal(await panel.open('p-ui-r12c-0001'),true);
+  assert.equal(panel.current().matching.sha256,SHA('b'),'业务一致时按新SHA刷新物理校验');
+  assert.equal(panel.current().revision,5,'版本与SHA同步更新');
+  assert.equal(saves.length,1,'物理刷新只写一次');
+  assert.equal(saves[0].expectedRevision,4);
+  assert.equal(saves[0].project.matching.sha256,SHA('b'));
+  assert.equal(saves[0].project.review.confirmedAt,'2026-09-27T10:01:15.871Z','确认快照随写回保留');
+  assert.equal(/重试/.test(elements['project-message'].textContent),false,'写回成功不得提示重试');
+});
