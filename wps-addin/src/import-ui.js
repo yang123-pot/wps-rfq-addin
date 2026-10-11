@@ -307,7 +307,19 @@
     confirmMerge.addEventListener('click',function(){
       if(busy)return;
       var result=collection.entries.length?RfqCollection.preview(collection,merge.checked):null;
-      if(!result||!result.canFinalize){tell('还有待核对问题，请先处理来源问题再确认预览。',true);return;}
+      if(!result||!result.canFinalize){tell('还有必须处理的问题，请先处理来源问题再确认预览。',true);return;}
+      // 2026-10-11 用户确认（A2a）：来源/区段“待核对”类问题确认后放行——必须由用户显式确认，并记入本次确认。
+      if(result.needsReviewAck){
+        var reviewLines=result.issues.filter(function(issue){
+          return ['source-unresolved','source-inferred','section-ambiguous','feature-continuation'].indexOf(issue.code)>=0;});
+        var head=reviewLines.slice(0,8).map(function(issue){
+          return '· '+issue.file+' / '+issue.sheet+' 第'+issue.row+'行：'+issue.message;}).join('\n');
+        var more=reviewLines.length>8?('\n…另有 '+(reviewLines.length-8)+' 条'):'';
+        var agree=window.confirm('本次导入有 '+reviewLines.length+' 条“来源/区段待核对”（不影响材料名称、单位与工程量）：\n\n'+
+          head+more+'\n\n这些行会带“来源待核对”标记进入后续步骤，工程/专业仅作参考、不参与分类。\n确认“已知悉并继续”吗？');
+        if(!agree){tell('已取消：'+(result.reviewIssueCount)+' 条来源/区段待核对未确认，未进入自动分类。',true);return;}
+        tell('已确认 '+reviewLines.length+' 条来源/区段待核对，按现状继续。');
+      }
       mergeConfirmedKey=RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,groups:result.groups});
       render();
       if(workflow)workflow.goTo('matching');

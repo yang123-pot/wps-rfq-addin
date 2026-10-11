@@ -6,6 +6,9 @@
 }(typeof window === 'object' ? window : globalThis, function (decimal) {
   'use strict';
   function pathKey(value) { return String(value || '').replace(/[\\/]+/g, '/').toLowerCase(); }
+  // 只“待核对来源/区段”的问题，可经用户确认后放行；其余问题仍阻断确认。
+  // feature-continuation（续行未归属）会丢材料文字，属于真问题，保持阻断，不列入可放行集合。
+  var REVIEW_CODES = ['source-unresolved', 'source-inferred', 'section-ambiguous'];
   var normalize = decimal.normalize, addDecimal = decimal.add;
   function preview(books, options) {
     if (!Array.isArray(books) || !books.length) throw new Error('请先添加解析后的工作簿。');
@@ -90,7 +93,13 @@
       });
     });
     result.outputCount = result.groups.length;
-    result.canFinalize = result.inputCount > 0 && result.issues.length === 0;
+    // 2026-10-11 用户确认（A2a）：来源/区段“待核对”类问题不再阻断导入，改为确认后放行；
+    // 破坏数据本身的问题（缺名称/缺单位/工程量不可解析/来源行重复等）仍然阻断。
+    var blocking = result.issues.filter(function (issue) { return REVIEW_CODES.indexOf(issue.code) < 0; });
+    result.blockingIssueCount = blocking.length;
+    result.reviewIssueCount = result.issues.length - blocking.length;
+    result.canFinalize = result.inputCount > 0 && blocking.length === 0;
+    result.needsReviewAck = result.canFinalize && result.reviewIssueCount > 0;
     return result;
   }
   return { preview: preview };

@@ -66,10 +66,13 @@ test('duplicate source row and overlapping continuation provenance are rejected'
   assert.throws(()=>preview([book([material(3),material(3)])]),/重复.*来源|来源.*重复/);
   assert.throws(()=>preview([book([material(3,{source:{...material(3).source,rows:[3,4]}}),material(4)])]),/重复.*来源|来源.*重复/);
 });
-test('parser issues remain visible and stop finalization even if group quantities are valid',()=>{
+// 2026-10-11 用户确认（A2a）：来源/区段“待核对”类问题不再阻断导入，但必须显式确认（needsReviewAck）。
+test('parser review issues remain visible, no longer block import, and demand explicit acknowledgement',()=>{
   const input=book([material(3,{issueCodes:['source-inferred']})],{issues:[{code:'source-inferred',severity:'review',sheet:'给排水',row:3,column:3,message:'按名称推断'}]});
   const result=preview([input],{mergeIdentical:true});
-  assert.equal(result.canFinalize,false);assert.equal(result.issues[0].code,'source-inferred');
+  assert.equal(result.canFinalize,true);assert.equal(result.needsReviewAck,true);
+  assert.equal(result.reviewIssueCount,1);assert.equal(result.blockingIssueCount,0);
+  assert.equal(result.issues[0].code,'source-inferred');
   assert.equal(result.issues[0].file,input.name);assert.equal(result.groups[0].sources[0].professionBasis,'section');
 });
 test('empty inputs, malformed material fields and already aggregated outputs are rejected',()=>{
@@ -82,7 +85,8 @@ test('unresolved source labels remain explicit and never disappear through displ
   const m=material(3);m.source.engineering='';m.source.profession='';
   const result=preview([book([m])]);
   assert.deepEqual(result.groups[0].sourceLabels,['工程待核对—专业待核对']);
-  assert.equal(result.canFinalize,false);
+  assert.equal(result.canFinalize,true);assert.equal(result.needsReviewAck,true,'来源待核对必须显式确认后才放行');
+  assert.equal(result.reviewIssueCount,1);
 });
 test('missing original identity or raw quantity is refused even with otherwise valid totals',()=>{
   const missingId=material(3);delete missingId.id;
@@ -93,7 +97,8 @@ test('missing original identity or raw quantity is refused even with otherwise v
 test('whitespace-only source labels cannot satisfy finalization',()=>{
   const item=material(3);item.source.engineering=' ';item.source.profession='\t';
   const result=preview([book([item])]);
-  assert.equal(result.canFinalize,false);
+  assert.equal(result.canFinalize,true);assert.equal(result.needsReviewAck,true,'空白来源标签同样只能确认后放行');
+  assert.equal(result.reviewIssueCount,1);
   assert.deepEqual(result.groups[0].sourceLabels,['工程待核对—专业待核对']);
 });
 test('dot path aliases are rejected until the importer resolves a canonical path',()=>{
