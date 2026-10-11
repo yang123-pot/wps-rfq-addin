@@ -161,7 +161,10 @@ async function summaryFlow(){
      values:model.sheets[0].values.map(row=>row.slice()),
      rows:model.sheets[0].values.slice(model.firstRow-1,model.lastRow).map(row=>row.slice(0,10))});
     await window.__writeSummaryFixture(stagePath,'summary');};
-   window.RfqBrandHost.openSummary=function(app,filePath){window.__summaryOpened.push(filePath);return {path:filePath,opened:true};};
+   // F3：自动打开与手动入口共用同一 openSummary；夹具可注入一次打开失败。
+   window.RfqBrandHost.openSummary=function(app,filePath){
+    if(window.__openSummaryFails){window.__openSummaryFails=false;throw Error('fixture 打开汇总表失败');}
+    window.__summaryOpened.push(filePath);return {path:filePath,opened:true};};
   });
   const openProject=async()=>{
    await page.locator('#aux-section > summary').click();
@@ -261,9 +264,14 @@ async function summaryFlow(){
  assert.match(await page.locator('#project-status').textContent(),
    /品牌汇总：未完成（分类汇总表已生成（4 类，品牌、供应商分列），请在表内填写品牌与供应商后点“填写完成，生成询价表”读回）/,
    '生成汇总表但未读回填写内容前，品牌汇总阶段不得误报完成');
+  // F3：发布校验与项目绑定保存完成后自动打开一次最终文件，供用户直接表内填写。
+  assert.deepEqual(await page.evaluate(()=>window.__summaryOpened.map(item=>String(item).toLowerCase())),
+   [String(receipt.summary.path).toLowerCase()],'分列布局生成成功后必须自动打开一次最终汇总表（无需再点按钮）');
+  // 手动“打开汇总表”入口保留：自动打开之外仍可再次打开同一文件。
   await page.locator('#brands-open').click();
   assert.deepEqual(await page.evaluate(()=>window.__summaryOpened.map(item=>String(item).toLowerCase())),
-   [String(receipt.summary.path).toLowerCase()],'打开汇总表指向已生成的真实文件');
+   [String(receipt.summary.path).toLowerCase(),String(receipt.summary.path).toLowerCase()],
+   '手动入口保留且指向已生成的真实文件');
   await shot(SUMMARY_SHOT&&SUMMARY_SHOT.replace(/\.png$/,'-separated.png'));
  await dumpEvidence('summary-binding-separated.json',receipt.summary);
  await dumpEvidence('summary-files.json',(await fs.readdir(root)).filter(name=>name.startsWith('分类汇总表')));
@@ -328,6 +336,10 @@ async function summaryFlow(){
   assert.notEqual(path.resolve(receipt2.summary.path).toLowerCase(),path.resolve(summaryTarget).toLowerCase(),
    '同格布局必须另存新文件');
   assert.ok((await fs.readdir(root)).filter(name=>name.startsWith('分类汇总表')).length>=2,'两份汇总表文件同时保留');
+  // F3：同格布局生成成功后同样只自动打开一次新文件；上一次的自动/手动打开不重复累积。
+  assert.deepEqual(await page.evaluate(()=>window.__summaryOpened.map(item=>String(item).toLowerCase())),
+   [String(separatedPath).toLowerCase(),String(separatedPath).toLowerCase(),String(receipt2.summary.path).toLowerCase()],
+   '同格布局也必须自动打开一次，且不重复打开旧文件');
   // R8：同格布局同样读回，解析口径必须与分列布局等价、仍为5份。
   const combinedPath=receipt2.summary.path;
   await page.evaluate(({file,values})=>window.__seedSummary(file,values),
@@ -355,6 +367,66 @@ async function summaryFlow(){
   assert.equal(await page.locator('#brands-list > li').count(),4);
   assert.equal(await page.locator('#brands-layout').inputValue(),'combined','恢复后布局必须与项目记录一致');
   assert.match(await page.locator('#project-status').textContent(),/品牌汇总：已确认/,'读回的品牌组随项目保存并恢复');
+  // F3：自动打开只在发布校验与项目绑定保存完成后发生；失败路径不自动打开，也不虚报。
+  const summaryFiles=async()=>(await fs.readdir(root)).filter(name=>name.startsWith('分类汇总表'));
+  // (1) 仅打开失败：成果与手动入口保留，提示“已生成、未打开”，不重新发布、不改写成未生成。
+  const openedBefore=await page.evaluate(()=>window.__summaryOpened.length),
+   modelsBefore=await page.evaluate(()=>window.__summaryModels.length),
+   filesBefore=(await summaryFiles()).length;
+  await page.evaluate(()=>{window.__openSummaryFails=true;});
+  await page.waitForTimeout(1100); // 另存名带秒级时间戳：保证本次生成名与上一份不同，不引入命名冲突干扰
+  await page.locator('#brands-generate').click();
+  await page.waitForFunction(()=>/已生成、未打开/.test(document.querySelector('#brands-message').textContent));
+  assert.match(await page.locator('#brands-message').textContent(),/已生成、未打开/,
+   '只有打开失败才提示“已生成、未打开”');
+  assert.doesNotMatch(await page.locator('#brands-message').textContent(),/未生成/,
+   '打开失败不得虚报“未生成”');
+  const afterOpenFail=await projectRecord();
+  assert.notEqual(path.resolve(afterOpenFail.summary.path).toLowerCase(),path.resolve(combinedPath).toLowerCase(),
+   '打开失败前成果已另存新文件并完成项目绑定保存');
+  assert.equal((await summaryFiles()).length,filesBefore+1,'打开失败不影响已发布成果文件');
+  assert.equal(await page.evaluate(()=>window.__summaryOpened.length),openedBefore,'打开失败不得记成已打开');
+  assert.equal(await page.evaluate(()=>window.__summaryModels.length),modelsBefore+1,'打开失败不得重新发布');
+  assert.equal(await page.locator('#brands-open').isEnabled(),true,'打开失败后手动打开入口必须保留');
+  await page.locator('#brands-open').click();
+  await page.waitForFunction(()=>/已打开分类汇总表/.test(document.querySelector('#brands-message').textContent));
+  assert.equal(await page.evaluate(()=>window.__summaryOpened.length),openedBefore+1,
+   '打开失败后仍可手动打开同一成果文件');
+  // (2) 生成失败（写入失败）：不自动打开，不新增或覆盖成果文件。
+  const filesBeforeWriteFail=(await summaryFiles()).length,
+   openedBeforeWriteFail=await page.evaluate(()=>window.__summaryOpened.length);
+  await page.evaluate(()=>{const native=window.RfqBrandHost.summaryWrite;
+   window.RfqBrandHost.summaryWrite=async function(){window.RfqBrandHost.summaryWrite=native;
+    throw Error('fixture 写入失败');};});
+  await page.waitForTimeout(1100);
+  await page.locator('#brands-generate').click();
+  await page.waitForFunction(()=>/未生成/.test(document.querySelector('#brands-message').textContent));
+  assert.match(await page.locator('#brands-message').textContent(),/fixture 写入失败/,
+   '生成失败必须来自注入的写入失败');
+  assert.equal((await summaryFiles()).length,filesBeforeWriteFail,'生成失败不得新增或覆盖成果文件');
+  assert.equal(await page.evaluate(()=>window.__summaryOpened.length),openedBeforeWriteFail,'生成失败不得自动打开');
+  // (3) 项目绑定保存失败：已发布成果保留，但不自动打开，也不谎称“未生成”。
+  const filesBeforeSaveFail=(await summaryFiles()).length,
+   openedBeforeSaveFail=await page.evaluate(()=>window.__summaryOpened.length);
+  await page.evaluate(()=>{const native=window.fetch;
+   window.fetch=async function(...args){
+    if(window.__failProjectSaveOnce&&String(args[0])==='/api/project/save'){
+     window.__failProjectSaveOnce=false;throw Error('fixture 项目保存失败');}
+    return native(...args);};
+   window.__failProjectSaveOnce=true;});
+  await page.waitForTimeout(1100);
+  await page.locator('#brands-generate').click();
+  try{
+   await page.waitForFunction(()=>/项目绑定未保存/.test(document.querySelector('#brands-message').textContent));
+  }catch(error){
+   throw Error('等待“项目绑定未保存”提示超时，当前提示为：'+await page.locator('#brands-message').textContent());
+  }
+  assert.match(await page.locator('#brands-message').textContent(),/已生成并校验/,
+   '发布成功但绑定保存失败时不得虚报“未生成”');
+  assert.doesNotMatch(await page.locator('#brands-message').textContent(),/未生成/,
+   '发布成功但绑定保存失败时不得虚报“未生成”');
+  assert.equal((await summaryFiles()).length,filesBeforeSaveFail+1,'已发布成果文件保留');
+  assert.equal(await page.evaluate(()=>window.__summaryOpened.length),openedBeforeSaveFail,'绑定保存失败不得自动打开');
   assert.deepEqual(errors,[]);
   console.log('PASS(R7+R8): 图05A/05B分类汇总表——一类一行、双布局可用、4名称链接指向正确独立分类工作簿；R8按稳定类别ID读回、半组定位单元格、多品牌按组保留、预计5份、双布局等价并随项目保存恢复。');
 }finally{await browser.close();await new Promise(r=>server.close(r));await fs.rm(root,{recursive:true,force:true});}

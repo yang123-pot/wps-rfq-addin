@@ -77,9 +77,87 @@
   var base=href.split('?')[0];
   return base.slice(0,base.lastIndexOf('/')+1)+'taskpane.html';
  }
+ // 创建窗口：先按宿主文档的完整参数（含位置）创建；只认旧版最小签名的宿主会失败或返回无效对象，
+ // 这时退回不定位的最小调用——定位能力缺失绝不能导致询价窗口打不开。
+ function createDialog(application,url,target){
+  var attempts=[];
+  if(target)attempts.push({name:'extended',args:[url,'项目询价',target.width,target.height,false,
+   true,2,'',0,true,false,target.x,target.y]});
+  attempts.push({name:'minimal',args:[url,'项目询价',WINDOW_WIDTH,WINDOW_HEIGHT,false]});
+  var lastError=null;
+  for(var index=0;index<attempts.length;index++){
+   try{
+    var dialog=application.CreateWebDialog.apply(application,attempts[index].args);
+    if(dialog&&Number.isSafeInteger(Number(dialog.ID))&&Number(dialog.ID)>0)
+     return {dialog:dialog,createdWith:attempts[index].name};
+    lastError=Error('宿主未返回有效的询价独立窗口。');
+   }catch(error){lastError=error;}
+  }
+  throw lastError||Error('宿主未创建有效的询价独立窗口。');
+ }
  var WINDOW_ID='rfq.webdialog.id';
  // 登记与清理同时失败时，在本功能区实例内保留所有权，禁止盲建第二份。
  var unregisteredWindow=null;
+ // F3：询价窗口的位置/尺寸。宿主文档的CreateWebDialog(url,appName,width,height,modal,hasCaption,
+ // resizeEdge,errorUrl,loadingTimeout,isChildWindow,isUseCookie,xPox,yPox,popupMode)支持位置参数，
+ // WebDialog另有Move/Resize与只读Width/Height/Xpos/Ypos；不同版本可能忽略其中一部分，所以只
+ // “尝试”定位并读回核对：核对不上就如实标记未定位，窗口仍照常打开，绝不因定位失败拒绝显示。
+ var WINDOW_WIDTH=440,WINDOW_HEIGHT=720,WINDOW_MARGIN=16,RIBBON_CLEARANCE=180,BOUNDS_TOLERANCE=4;
+ var lastPlacement=null;
+ function screenArea(){
+  var screen=(typeof window!=='undefined'&&window.screen)?window.screen:null;
+  if(!screen)return null;
+  var width=Number(screen.availWidth),height=Number(screen.availHeight);
+  if(!(width>0)||!(height>0))return null;
+  return {left:Number(screen.availLeft)||0,top:Number(screen.availTop)||0,width:width,height:height};
+ }
+ // 可复现布局：右边贴齐可用区域、顶边让出功能区/编辑栏，窗口绝不会盖住顶部关键入口；
+ // 可用高度不足时按剩余空间收窄窗口高度（不低于360），保证窗口整体落在屏幕内。
+ function placementFor(width,height,options){
+  var opts=options||{},area=opts.area||screenArea();
+  if(!area)return null;
+  var margin=Number(opts.margin)>=0?Number(opts.margin):WINDOW_MARGIN;
+  var clearance=Number(opts.ribbonClearance)>=0?Number(opts.ribbonClearance):RIBBON_CLEARANCE;
+  var x=area.left+area.width-width-margin;
+  var y=area.top+clearance;
+  if(x<area.left+margin)x=area.left+margin;
+  var available=area.top+area.height-margin-y,safeHeight=height;
+  if(available<height)safeHeight=Math.max(360,available);
+  return {x:Math.round(x),y:Math.round(y),width:width,height:Math.round(safeHeight)};
+ }
+ // 只读宿主几何属性；宿主不提供（undefined/NaN）时返回null，不能把读不到当成已定位。
+ function dialogBounds(dialog){
+  if(!dialog)return null;
+  var x=Number(dialog.Xpos),y=Number(dialog.Ypos),width=Number(dialog.Width),height=Number(dialog.Height);
+  if(!isFinite(x)||!isFinite(y)||!isFinite(width)||!isFinite(height))return null;
+  return {x:x,y:y,width:width,height:height};
+ }
+ function boundsMatch(bounds,target){
+  if(!bounds||!target)return false;
+  return Math.abs(bounds.x-target.x)<=BOUNDS_TOLERANCE&&Math.abs(bounds.y-target.y)<=BOUNDS_TOLERANCE;
+ }
+ function callDialog(dialog,name,a,b){
+  if(typeof dialog[name]!=='function')return false;
+  if(b===undefined)dialog[name](a);else dialog[name](a,b);
+  return true;
+ }
+ // 定位尝试：创建时的位置参数已生效即通过；否则用Move/Resize兜底；读不回来或对不上都记为未定位。
+ function attemptPlacement(dialog,target){
+  if(!target)return {placed:false,verified:false,reason:'no-screen',bounds:dialogBounds(dialog)};
+  var bounds=dialogBounds(dialog);
+  if(boundsMatch(bounds,target))
+   return {placed:true,verified:true,via:'create',requested:target,bounds:bounds};
+  var attempted=false;
+  try{
+   attempted=callDialog(dialog,'Resize',target.width,target.height);
+   attempted=callDialog(dialog,'Move',target.x,target.y)||attempted;
+  }catch(_){attempted=true;}
+  bounds=dialogBounds(dialog);
+  if(attempted&&boundsMatch(bounds,target))
+   return {placed:true,verified:true,via:'move',requested:target,bounds:bounds};
+  if(!bounds)return {placed:false,verified:false,reason:'host-unsupported',requested:target,bounds:null};
+  return {placed:false,verified:false,reason:'readback-mismatch',requested:target,bounds:bounds};
+ }
  function requireWindowApi(application){
   if(!application||typeof application.CreateWebDialog!=='function'||typeof application.GetWebDialog!=='function')
    throw Error('当前WPS不支持询价独立窗口，请使用支持CreateWebDialog和GetWebDialog的WPS表格版本。');
@@ -118,9 +196,13 @@
   var opts=options||{};
   var dialog=getWindow(application),created=false;
   if(!dialog){
-   dialog=application.CreateWebDialog(opts.url||defaultPaneUrl(),'项目询价',440,720,false);
+   // F3：先按可复现布局请求右下位置；宿主不支持位置参数时忽略即可，随后再尝试Move/Resize并读回核对。
+   var target=placementFor(WINDOW_WIDTH,WINDOW_HEIGHT,opts);
+   var creation=createDialog(application,opts.url||defaultPaneUrl(),target);
+   dialog=creation.dialog;
    if(!dialog||!Number.isSafeInteger(Number(dialog.ID))||Number(dialog.ID)<1)
     throw Error('宿主未创建有效的询价独立窗口。');
+   lastPlacement=Object.assign(attemptPlacement(dialog,target),{createdWith:creation.createdWith});
    created=true;
    try{application.PluginStorage.setItem(WINDOW_ID,dialog.ID);}
    catch(error){
@@ -195,5 +277,7 @@
  window.RfqRibbonNavigation={STAGES:STAGES.slice(),isStage:isStage,stageFromControl:stageFromControl,
   request:request,readRequest:readRequest,consume:consume,watch:watch,
   getWindow:getWindow,ensureWindow:ensureWindow,rebuildWindow:rebuildWindow,openStage:openStage,
+  // F3：窗口位置/尺寸能力与最近一次定位结果（供真机核对与测试读取，不参与业务判定）。
+  placementFor:placementFor,screenArea:screenArea,placementReport:function(){return lastPlacement;},
   KEY:KEY,CONSUMED:CONSUMED,WINDOW_ID:WINDOW_ID};
 }());

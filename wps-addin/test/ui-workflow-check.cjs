@@ -179,6 +179,57 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage'),'matching',
    '取消不得改变当前阶段');
 
+  // F3 三态（missing）：未完成的阶段必须有可见提示，且阶段导航不得解锁主操作、绕过业务前置条件。
+  // 表内审核的“整表确认”是动作级校验入口（按钮可用但必须按现表逐行通过才确认），不属于被导航解锁的
+  // 下游动作，因此只核对它的可见“未完成”提示，不对它做禁用断言。
+  const missingGates=[['review','表内审核',[],false],
+   ['categories','分类工作簿',['categories-generate','categories-summary','categories-layout'],true],
+   ['brands','品牌汇总',['brands-generate','brands-confirm','brands-layout'],true],
+   ['inquiry','询价表',['inquiry-generate','inquiry-next'],true],
+   ['split','拆分文件',['split-run'],true]];
+  // 未完成/过期阶段里任何可见的“生成/确认/拆分/重试/写入”按钮都必须保持禁用，不能被导航解锁。
+  const visibleActionButtons=async stage=>page.evaluate(target=>{
+   const panel=document.getElementById('stage-panel-'+target);
+   return [...panel.querySelectorAll('button')].filter(button=>!button.hidden&&button.offsetParent!==null)
+    .map(button=>({id:button.id,text:button.textContent.trim(),disabled:button.disabled}));
+  },stage);
+  for(const [stage,label,controls,generic] of missingGates){
+   await page.locator('#workflow-nav .workflow-step-button[data-stage="'+stage+'"]').click();
+   await page.waitForFunction(target=>document.querySelector('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage')===target,stage);
+   assert.match(await page.locator('#project-status').innerText(),new RegExp(label+'：未完成'),
+    '第'+label+'阶段未完成时必须有可见的“未完成”提示');
+   for(const control of controls)
+    assert.equal(await page.locator('#'+control).isDisabled(),true,
+     '未完成阶段的“'+control+'”必须保持禁用，阶段导航不得绕过前置条件');
+   if(generic)for(const button of await visibleActionButtons(stage))
+    if(/生成|确认|拆分|重试|重建|写入/.test(button.text))
+     assert.equal(button.disabled,true,'未完成阶段不得暴露可用的动作按钮：'+JSON.stringify(button));
+  }
+  assert.match(await page.locator('#project-status').innerText(),/自动分类：已确认/,'已完成阶段仍显示已确认');
+
+  // F3 三态（stale）：改回“分别保留”再次确认后，下游已确认阶段必须显示“已过期”且主操作仍未解锁。
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="import"]').click();
+  await page.locator('#merge-separate').check();
+  await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='10');
+  await page.locator('#confirm-merge').click();
+  await page.waitForFunction(()=>/自动匹配完成|尚未自动分类/.test(document.querySelector('#classification-review-banner').textContent));
+  await page.waitForFunction(()=>/分类工作簿：(已过期|未完成)/.test(document.querySelector('#project-status').textContent));
+  const staleStatus=await page.locator('#project-status').innerText();
+  assert.doesNotMatch(staleStatus,/分类工作簿：已确认/,'上游变化后下游阶段不得继续显示已确认');
+  assert.doesNotMatch(staleStatus,/品牌汇总：已确认/,'上游变化后下游阶段不得继续显示已确认');
+  for(const [stage,label,controls,generic] of missingGates){
+   await page.locator('#workflow-nav .workflow-step-button[data-stage="'+stage+'"]').click();
+   await page.waitForFunction(target=>document.querySelector('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage')===target,stage);
+   assert.match(await page.locator('#project-status').innerText(),new RegExp(label+'：(已过期|未完成)'),
+    '上游变化后第'+label+'阶段必须有可见的过期/未完成提示');
+   for(const control of controls)
+    assert.equal(await page.locator('#'+control).isDisabled(),true,
+     '过期阶段的“'+control+'”必须保持禁用，阶段导航不得绕过前置条件');
+   if(generic)for(const button of await visibleActionButtons(stage))
+    if(/生成|确认|拆分|重试|重建|写入/.test(button.text))
+     assert.equal(button.disabled,true,'过期阶段不得暴露可用的动作按钮：'+JSON.stringify(button));
+  }
+
   // R12-K：功能区阶段快捷入口只导航，不触发确认/学习/写表/拆分。
   await page.evaluate(()=>{
    window.__rfqSideEffects={writes:0,confirms:0,fetch:0};
@@ -223,14 +274,26 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   const sideEffects=await page.evaluate(()=>window.__rfqSideEffects);
   assert.deepEqual(sideEffects,{writes:0,confirms:0,fetch:0},'快捷导航不得触发业务动作：'+JSON.stringify(sideEffects));
   // 侧栏重建：未消费的请求在打开时应用；已消费的请求不重播。
-  await page.evaluate(()=>{
-   window.Application.PluginStorage.setItem('rfq.window.nav.request',JSON.stringify({id:'nav-ui-rebuild',stage:'categories'}));
+  // 请求在重建页初始化前写入共享存储（sessionStorage键plugin:rfq.window.nav.request），避免加载页内的
+  // 低频检查在重建前抢先消费；只播种一次，第二次重建不得再写入。
+  await page.addInitScript(()=>{
+   const seeded='plugin:f3.nav.seeded';
+   if(window.sessionStorage.getItem(seeded))return;
+   window.sessionStorage.setItem(seeded,'1');
+   window.sessionStorage.setItem('plugin:rfq.window.nav.request',
+    JSON.stringify({id:'nav-ui-rebuild',stage:'categories'}));
   });
   await page.reload();
-  await page.waitForFunction(()=>{
-   const current=document.querySelector('#workflow-nav .workflow-step-button.is-current');
-   return !!current&&current.getAttribute('data-stage')==='categories';
-  });
+  try{
+   await page.waitForFunction(()=>{
+    const current=document.querySelector('#workflow-nav .workflow-step-button.is-current');
+    return !!current&&current.getAttribute('data-stage')==='categories';
+   },null,{timeout:10000});
+  }catch(error){
+   throw Error('重建后未应用未消费请求：当前阶段='+await page.locator('#workflow-nav .workflow-step-button.is-current')
+    .getAttribute('data-stage')+'，请求='+await page.evaluate(()=>window.Application.PluginStorage.getItem('rfq.window.nav.request'))
+    +'，页面错误='+JSON.stringify(errors));
+  }
   assert.equal(await page.evaluate(()=>window.Application.PluginStorage.getItem('rfq.window.nav.request')),null,
    '重建后请求只消费一次');
   await page.reload();
@@ -238,12 +301,36 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage'),'import',
    '侧栏重建不得重播已消费的导航请求');
 
-  // 窄侧栏可用：无横向滚动，七个步骤都在。
-  await page.setViewportSize({width:340,height:900});
-  const narrow=await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,clientWidth:document.documentElement.clientWidth,
-   steps:document.querySelectorAll('#workflow-nav .workflow-step').length}));
+  // F3：精确CSS320窄宽。用视口宽度＝CSS像素320核对（不是窗口外框320）：七阶段主按钮必须换行、
+  // 标签不被裁切、没有横向滚动，且主按钮区可以真实滚到。
+  await page.setViewportSize({width:320,height:900});
+  await page.waitForFunction(()=>document.querySelectorAll('#workflow-nav .workflow-step').length===7);
+  const narrow=await page.evaluate(()=>{
+   const rects=[...document.querySelectorAll('#workflow-nav .workflow-step-button')].map(button=>{
+    const box=button.getBoundingClientRect();
+    return {stage:button.getAttribute('data-stage'),left:box.left,right:box.right,top:Math.round(box.top),width:box.width};});
+   const labels=[...document.querySelectorAll('#workflow-nav .workflow-step-label')].map(label=>{
+    const box=label.getBoundingClientRect();
+    return {text:label.textContent,clipped:label.scrollWidth>label.clientWidth+1,left:box.left,right:box.right};});
+   return {cssWidth:window.innerWidth,devicePixelRatio:window.devicePixelRatio,
+    scrollWidth:document.documentElement.scrollWidth,clientWidth:document.documentElement.clientWidth,
+    scrollHeight:document.documentElement.scrollHeight,innerHeight:window.innerHeight,
+    steps:document.querySelectorAll('#workflow-nav .workflow-step').length,rows:new Set(rects.map(item=>item.top)).size,
+    rects,labels};});
+  assert.equal(narrow.cssWidth,320,'必须按CSS像素320核对，不能用窗口外框宽度');
   assert.equal(narrow.steps,7);
-  assert.ok(narrow.scrollWidth<=narrow.clientWidth+1,'窄侧栏不得出现横向滚动：'+JSON.stringify(narrow));
+  assert.ok(narrow.rows>=2,'CSS320下七阶段主按钮必须换行：'+JSON.stringify(narrow.rects));
+  assert.ok(narrow.rects.every(item=>item.left>=-0.5&&item.right<=320.5),
+   'CSS320下按钮不得超出视口：'+JSON.stringify(narrow.rects));
+  assert.ok(narrow.labels.every(item=>!item.clipped),'CSS320下阶段标签不得被裁切：'+JSON.stringify(narrow.labels));
+  assert.ok(narrow.scrollWidth<=narrow.clientWidth+1,'CSS320下不得出现横向滚动：'+JSON.stringify(narrow));
+  assert.ok(narrow.scrollHeight>narrow.innerHeight,'CSS320下内容应可纵向滚动');
+  const scrolled=await page.evaluate(()=>{window.scrollTo(0,document.documentElement.scrollHeight);return window.scrollY;});
+  assert.ok(scrolled>0,'CSS320下必须能真实滚到主按钮区');
+  await page.evaluate(()=>window.scrollTo(0,0));
+  if(process.env.RFQ_UI_WORKFLOW_SCREENSHOT)await page.screenshot({path:process.env.RFQ_UI_WORKFLOW_SCREENSHOT});
+  if(process.env.RFQ_UI_WORKFLOW_EVIDENCE)await fs.writeFile(path.join(process.env.RFQ_UI_WORKFLOW_EVIDENCE,'css320-narrow.json'),
+   JSON.stringify(narrow,null,2));
   assert.deepEqual(errors,[]);
   console.log('PASS: 七步导航＋图01导入合并选择：默认分别保留、选择合并才更新精确预览、确认前不匹配、取消不推进。');
  }finally{await browser.close();await new Promise(r=>server.close(r));await fs.rm(root,{recursive:true,force:true});}

@@ -1193,6 +1193,20 @@
       if(layoutSelect){layoutSelect.disabled=!categories.ready;layoutSelect.value=selectedLayout();}
       if(status&&!state.ok&&state.reason&&record)status.textContent=(status.textContent?status.textContent+' · ':'')+state.reason;
     }
+    // F3：汇总表生成成功后的自动打开。只打开已发布并已保存项目绑定的最终文件；打开失败不改成果、
+    // 不重新发布、也不虚报“未生成”，只提示“已生成、未打开”并保留手动打开入口。
+    function autoOpenSummary(path,layoutName,categoryCount){
+      try{
+        RfqBrandHost.openSummary(options.application,path);
+      }catch(error){
+        summaryTell('分类汇总表已生成、未打开：'+path+'（'+(error&&error.message||error)+'）。'+
+          '成果文件与项目绑定已保留，可点“打开汇总表”手动打开，不需要重新生成。',true);
+        return {ok:false};
+      }
+      summaryTell('已生成并校验分类汇总表（'+categoryCount+' 类，'+summaryLayoutLabel(layoutName)+'）：'+path+
+        '，已自动打开，请在黄色区域直接填写品牌与供应商。');
+      return {ok:true};
+    }
     async function generateSummary(){
       if(summaryBusy)return {ok:false,busy:true};
       if(!options.application){summaryTell('请在WPS内打开侧栏，才能生成分类汇总表。',true);return {ok:false};}
@@ -1226,12 +1240,25 @@
           createdAt:new Date().toISOString(),status:'complete'});
         // 重新生成（含改布局另存新文件）后旧读回结果一律作废，必须重新读回才算完成。
         summaryRead=null;summaryIssues=[];
-        await projects.save();
-        summaryTell('已生成并校验分类汇总表（'+summaryReceipt.categories.length+' 类，'+summaryLayoutLabel(layoutName)+
-          '）：'+summaryReceipt.path+'。请在黄色区域填写品牌与供应商。');
+        // F3：项目绑定保存是自动打开的前置条件；保存未成功（返回空）时不打开，也不谎称“未生成”。
+        if(!await projects.save()){
+          summaryTell('分类汇总表已生成并校验，但项目绑定未保存：'+summaryReceipt.path+
+            '。成果文件已保留，可点“打开汇总表”手动打开；本次未自动打开，请保存项目后重新读回。',true);
+          renderBrands();render();
+          return {ok:false,bindingSaved:false,receipt:summaryReceipt};
+        }
         renderBrands();render();
+        // F3：发布校验与项目绑定保存完成后，分列/同格两种布局各自动打开一次最终文件供表内填写。
+        autoOpenSummary(summaryReceipt.path,layoutName,summaryReceipt.categories.length);
         return {ok:true,receipt:summaryReceipt};
-      }catch(error){summaryTell('分类汇总表未生成：'+error.message,true);return {ok:false};}
+      }catch(error){
+        // F3：已发布的成果不能因为绑定保存失败就被说成“未生成”；保留成果与手动入口，但不自动打开。
+        summaryTell(published?('分类汇总表已生成并校验，但项目绑定未保存：'+error.message+
+          '。成果文件已保留，可点“打开汇总表”手动打开；未自动打开。')
+          :('分类汇总表未生成：'+error.message),true);
+        renderBrands();render();
+        return {ok:false};
+      }
       finally{
         // 未发布就失败/被取消时清掉本次相邻暂存，避免分类工作簿目录里留下点号临时文件。
         if(prepared&&!published){try{await exportRequest('discard',{ticket:prepared.ticket});}catch(_){}}
