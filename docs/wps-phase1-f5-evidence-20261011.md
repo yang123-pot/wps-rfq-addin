@@ -190,3 +190,19 @@
 | 历史 32 类迁入 | **迁入首版**：隔离库新增类别 12 个、与四项目重名 20 个，记忆 1458 条；不写生产库 |
 
 隔离验收库文件（本机）：`library.json`（类别 104 个＝四项目 92 ＋ 历史新增 12）、`memory.json`（1458 条记忆）、`decision-record.md`（本表全文）。风险：以上均未在生产库生效，四项目仍需按“项目1→3→4→2”逐个真实跑通并整表确认，方可计入 F5 完成。
+
+## 15. 源码修复：最终分类允许输入新类别（2026-10-11 用户新增要求）
+
+用户要求：图03「最终分类」在保留下拉的同时**允许直接输入下拉以外的类别名**，整表一次确认时按新类别接收，**同时写类别库与经验库**，同名去重、**直接生效**（不设待审核态）。按 F5 “必要源码修复归入所属模块测试后再续本项目”，先实现并跑通模块测试，再开项目1。
+
+| 文件 | 改动 |
+| --- | --- |
+| `workbook-layout.js` | `listValidation` 增 `allowOtherInput`（缺省 false，其他下拉不受影响）；版式校验/构建保留该标记 |
+| `classification-review-model.js` | `mainSheet` 的最终分类下拉带 `allowOtherInput:true`；`validateRead` 增 `allowNewCategories`/`newCategoryIds` 与 `pendingNewCategoryNames`、行级 `newCategory`；新增 `adoptNewCategories`（按名称去重、复用既有编号、返回新库不改原对象），空分类仍阻断 |
+| `export-host.js` | 写入时对 `allowOtherInput` 置 `Validation.ShowError=false`（保留下拉）；读回校验只在 `ShowError===true` 时报“未允许输入下拉以外的值” |
+| `classification-ui.js` | 新增 `adoptCategories`：校验新库后建类、`notifyMemory`、经既有 `/api/library/save` 落盘（乐观锁版本不变） |
+| `import-ui.js` | 整表确认路径两段式：先按库外名建类落盘，再用 `newCategoryIds` 重新校验并把新类别编号写进确认快照；成功提示带“已把新类别加入类别库（N 个）” |
+
+验证（本机 2026-10-11）：`workbook-layout`＋`export-host` **42/42**、`classification-review-model` **16/16**、全量 Node **474/474**（F4 为 472）；受影响浏览器检查 `ui-sheet-review-check` **PASS**（覆盖：库外名不再报“最终分类无效”、确认时新类别同时进类别库与经验库、确认快照用新编号、同名不重复建类、恢复正常选择后继续走下游）；`ui-workflow-check`／`ui-category-check`／`ui-project-check`／`ui-classification-check`／`ui-library-check`／`ui-project-restore-check` **6 项 PASS**。效果图变更说明见 [图03变更说明](mockups/approved-20260926/amendments-20261011.md)（原 PNG 不重绘，以变更说明＋用户真实截图为准）。
+
+边界：只放开「最终分类」一列；其他下拉（如汇总表“询价生成方式”）仍只允许库内值。真实 WPS 窗口内手输新类别、以及新类别被下次项目的自动建议采纳，需在四项目验收中实测并记录点击者。

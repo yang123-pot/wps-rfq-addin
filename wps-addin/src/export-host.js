@@ -133,11 +133,14 @@
       range.Validation.Add(3,1,1,formula,'');
       range.Validation.InCellDropdown=rule.inCellDropdown!==false;
       range.Validation.IgnoreBlank=rule.allowBlank!==false;
+      // 2026-10-11：最终分类列保留下拉但允许直接输入新类别名（关闭校验错误提示＝“允许其他值”）。
+      if(rule.allowOtherInput===true)range.Validation.ShowError=false;
       if(!formulaMatches(range.Validation.Formula1,formula)){
         // 实测WPS表格不接受带等号的区域引用时回读为空：改写成不带等号的同一区域再确认一次。
         try{range.Validation.Add(3,1,1,formula.replace(/^=/,''),'');}catch(_){}
         range.Validation.InCellDropdown=rule.inCellDropdown!==false;
         range.Validation.IgnoreBlank=rule.allowBlank!==false;
+        if(rule.allowOtherInput===true)range.Validation.ShowError=false;
       }
       // 真机实测：WPS 12.1.0.29161 会把区域引用的单引号/等号写法归一化后原样回读，因此必须读回等价区域。
       // 类型为 3 只说明“这里是下拉”，不能证明来源正确；指到别的区域同样要拒绝，不能靠类型放行。
@@ -246,6 +249,8 @@
         var typeOk=!!(range.Validation&&(range.Validation.Type==null||Number(range.Validation.Type)===3));
         if(!(typeOk&&formulaMatches(range.Validation&&range.Validation.Formula1,formula)))
           throw Error('“'+s.name+'”分类下拉读回不一致：'+address(rule));
+        if(rule.allowOtherInput===true&&range.Validation&&range.Validation.ShowError===true)
+          throw Error('“'+s.name+'”最终分类未允许输入下拉以外的值：'+address(rule));
       });
       if(spec.print){
         var page=sheet.PageSetup;

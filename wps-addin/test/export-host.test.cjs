@@ -622,6 +622,32 @@ test('下拉来源：简单表名不加引号，含空格/特殊字符的表名�
  assert.equal(writeWith("It's 选项"),"='It''s 选项'!$A$1:$A$5",'名称里的单引号按公式语法双写');
 });
 
+// 2026-10-11 用户要求：最终分类列保留下拉，但允许直接输入下拉以外的类别名。
+test('最终分类下拉允许输入其他值：关闭校验错误提示，其他下拉不受影响',()=>{
+  const layoutModule=require('../src/workbook-layout.js');
+  const values=layoutModule.equalize([['示例园区_分类审核成果.xlsx'],['自动匹配仅供参考'],
+   ['序号','项目名称','规格','单位','工程量','自动建议','匹配情况','最终分类','审核备注','','行标识'],
+   ['1','水泵','DN50','台','2','水泵','匹配成功','水泵','','','row-1']],11);
+  const spec=layoutModule.build({columns:[{index:1,width:6},{index:2,width:16},{index:3,width:22},{index:4,width:8},
+    {index:5,width:10},{index:6,width:14},{index:7,width:12},{index:8,width:16},{index:9,width:20},{index:10,width:3},
+    {index:11,width:26,hidden:true}],
+   headerRows:[3],validations:[layoutModule.listValidation(4,8,1,1,'内部选项','$B$2:$B$7',{allowOtherInput:true})],
+   metadata:{profile:'classification-review'}},{rowCount:values.length,columnCount:11});
+  const h=layoutFixture();
+  host.write(h.app,{sheets:[{name:'分类审核成果',values:values,layout:spec}]},'C:\\temp\\rfq-layout.xlsx');
+  const validation=h.sheets[0].Range('H4:H4').Validation;
+  assert.equal(validation.Type,3,'保留下拉');
+  assert.equal(validation.InCellDropdown,true,'保留下拉箭头');
+  assert.equal(validation.ShowError,false,'允许输入下拉以外的值');
+  assert.equal(h.saved,true);
+  const plain=layoutModule.build({columns:[{index:1,width:8},{index:2,width:20}],headerRows:[1],
+   validations:[layoutModule.listValidation(2,2,1,1,'内部选项','$A$1:$A$5')]},{rowCount:2,columnCount:2});
+  const h2=layoutFixture();
+  host.write(h2.app,{sheets:[{name:'材料明细',values:[['序号','类别'],['1','阀门']],layout:plain}]},'C:\\temp\\rfq-plain.xlsx');
+  assert.notEqual(h2.sheets[0].Range('B2:B2').Validation.ShowError,false,
+    '缺省下拉仍要拦住下拉以外的值（回归保护）');
+});
+
 // R12-L：跨表下拉依赖真实选项页；不能让不存在的“未来工作表”在夹具里自动成功。
 function reviewWorkbookWithOptions(){
  const sample=require('./fixtures/workflow-v3-sample.cjs'),collection=require('../src/collection.js');

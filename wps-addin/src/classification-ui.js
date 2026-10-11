@@ -109,6 +109,23 @@
    });
    return persist();
   }
+  // 2026-10-11 用户要求：整表确认时用户在“最终分类”里输入的新类别名同时进类别库（同名去重）。
+  // 这里只负责建类与落盘；调用方拿到 idByName 后再解析行类别，避免行与库对不上。
+  function adoptCategories(names){
+   var list=Array.isArray(names)?names:[];
+   if(!libraryReady())return Promise.reject(Error('当前会话未启用本机分类库。'));
+   var plan=RfqClassificationReviewModel.adoptNewCategories(library,list);
+   var check=RfqCategoryLibrary.validate(plan.library);
+   if(!check.ok)return Promise.reject(Error(check.errors.join('；')));
+   var created=plan.assigned.filter(function(item){return item.created;});
+   if(!created.length)return Promise.resolve({idByName:plan.idByName,categories:library.categories,created:[]});
+   library=plan.library;
+   notifyMemory();
+   return persist().then(function(){
+    return {idByName:plan.idByName,categories:library.categories,
+     created:created.map(function(item){return item.name;})};
+   });
+  }
   function remember(row,rowId,previous,record){
    if(!libraryReady()||!record)return;
    var context=sourceContext(row,rowId);
@@ -279,6 +296,7 @@
    snapshot:function(){return state;},
    memory:function(){return memoryState;},
    learnConfirmations:learnConfirmations,
+   adoptCategories:adoptCategories,
    retryMemory:retryMemory,
    memoryPending:function(){return unsavedMemory;},
     library:function(){return library;},

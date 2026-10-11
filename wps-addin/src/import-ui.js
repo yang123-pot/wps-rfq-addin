@@ -584,7 +584,8 @@
       if(!reviewBinding||!selectionConfirmed()){lastReviewRead=null;reviewDivergence=null;renderSheetReview();return;}
       try{
         var read=readReviewSheet();
-        lastReviewRead=RfqClassificationReviewModel.validateRead(read,{categories:reviewBinding.categories});
+        lastReviewRead=RfqClassificationReviewModel.validateRead(read,{categories:reviewBinding.categories,
+          allowNewCategories:true});
         reviewDivergence=detectReviewDivergence(read);
         if(!silent&&!lastReviewRead.ok)renderReviewIssues(lastReviewRead.errors);
       }catch(error){
@@ -599,7 +600,8 @@
         var read=readReviewSheet();
         var result=RfqClassificationReviewModel.draft(read,{inputKey:matchingKey(),projectId:projects.identity(),
           binding:reviewBinding});
-        var checked=RfqClassificationReviewModel.validateRead(read,{categories:reviewBinding.categories});
+        var checked=RfqClassificationReviewModel.validateRead(read,{categories:reviewBinding.categories,
+          allowNewCategories:true});
         lastReviewRead=checked;
         if(!result.ok){
           renderReviewIssues(result.errors);renderSheetReview();
@@ -630,7 +632,16 @@
       var previous=reviewConfirmation();
       try{
         var read=readReviewSheet();
-        var checked=RfqClassificationReviewModel.validateRead(read,{categories:reviewBinding.categories});
+        // 2026-10-11 用户要求：允许在“最终分类”直接输入库外的新类别名；确认时按新类别接收并同时进类别库。
+        var checked=RfqClassificationReviewModel.validateRead(read,{categories:reviewBinding.categories,allowNewCategories:true}),
+          newCategoryNote='';
+        if(checked.ok&&checked.newCategoryNames.length){
+          var plan=await classifier.adoptCategories(checked.newCategoryNames);
+          checked=RfqClassificationReviewModel.validateRead(read,{categories:plan.categories,
+            allowNewCategories:true,newCategoryIds:plan.idByName});
+          if(plan.created&&plan.created.length)
+            newCategoryNote='已把新类别加入类别库（'+plan.created.length+' 个）：'+plan.created.join('、')+'；';
+        }
         lastReviewRead=checked;
         renderSheetReview();
         if(!checked.ok){
@@ -677,7 +688,7 @@
         var matchNote=refreshed&&!refreshed.error&&refreshed.updated>0?
           ('“匹配情况”列已刷新 '+refreshed.updated+' 处（未保存文件）。'):'';
         if(learned.ok)
-          sheetTell('整表已确认（'+next.rows.length+' 行）：'+(checked.counts.consistent)+' 行与自动建议一致、'+
+          sheetTell('整表已确认（'+next.rows.length+' 行）：'+newCategoryNote+(checked.counts.consistent)+' 行与自动建议一致、'+
             checked.counts.different+' 行存在差异；分类习惯已保存。'+matchNote+'下一步生成分类工作簿。');
         else
           sheetTell('整表已确认并保存快照；分类习惯未保存，可点“习惯保存重试”：'+learned.error.message,'true');

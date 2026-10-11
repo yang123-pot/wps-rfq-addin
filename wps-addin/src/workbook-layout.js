@@ -157,9 +157,12 @@
  function linkFont(row,column,rowSpan,columnSpan){
   return {row:row,column:column,rowSpan:rowSpan||1,columnSpan:columnSpan||1,color:COLORS.link,underline:true};
  }
- function listValidation(row,column,rowSpan,columnSpan,listSheet,listRange){
+ // allowOtherInput：保留下拉，但允许用户直接输入下拉以外的值（最终分类列用；2026-10-11 用户要求）。
+ function listValidation(row,column,rowSpan,columnSpan,listSheet,listRange,options){
+  var extra=options||{};
   return {row:row,column:column,rowSpan:rowSpan,columnSpan:columnSpan,listSheet:listSheet,listRange:listRange,
-   allowBlank:true,inCellDropdown:true};
+   allowBlank:extra.allowBlank!==false,inCellDropdown:extra.inCellDropdown!==false,
+   allowOtherInput:extra.allowOtherInput===true};
  }
  return {SCHEMA_VERSION:SCHEMA_VERSION,COLORS:COLORS,FONT_SIZE:FONT_SIZE,equalize:equalize,guardValues:guardValues,validate:validate,
   assertValid:assertValid,build:build,toColor:toColor,headerFill:headerFill,inputFill:inputFill,linkFont:linkFont,

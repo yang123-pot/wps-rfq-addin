@@ -196,11 +196,10 @@ async function run(options={}){
   await page.waitForFunction(()=>document.querySelector('#sheet-review-issues').textContent.includes('最终分类为空'));
   assert.match(await page.locator('#sheet-review-issues').innerText(),new RegExp('第'+PUMP_ROW+'行'));
   assert.deepEqual((await page.evaluate(()=>window.__selected[window.__selected.length-1])).slice(0,2),[PUMP_ROW,8]);
-  await page.evaluate(({row})=>{window.__setCell(row,8,'临时类别');},{row:PUMP_ROW});
-  await page.locator('#sheet-review-confirm').click();
-  await page.waitForFunction(()=>document.querySelector('#sheet-review-issues').textContent.includes('最终分类无效'));
-  assert.match(await page.locator('#sheet-review-issues').innerText(),/不在当前分类库里/);
-  assert.equal(await page.evaluate(()=>document.querySelector('#sheet-review-message').textContent.includes('整表未通过校验')),true);
+  // 2026-10-11 用户要求：库外类别名不再判断为“最终分类无效”，改为确认时按新类别接收（见本文件后面的新类别用例）。
+  assert.equal(await page.evaluate(()=>window.__written.layout.validations[0].allowOtherInput),true,
+   '最终分类下拉必须允许输入下拉以外的值');
+  assert.equal(await page.evaluate(()=>window.__written.layout.validations[0].inCellDropdown),true,'仍保留下拉');
   // 修回正确类别后整表一次确认：先落盘快照，再学习，并进入下一步。
   await page.evaluate(({row})=>{window.__setCell(row,8,'水泵');},{row:PUMP_ROW});
   await page.locator('#sheet-review-confirm').click();
@@ -286,6 +285,32 @@ async function run(options={}){
   assert.equal(reconfirmed.review.revision,2);
   assert.equal(reconfirmed.review.rows.filter(row=>row.categoryId==='valve').length,3);
   assert.equal(reconfirmed.review.rows.filter(row=>row.categoryId==='fan').length,1);
+  // 2026-10-11 用户要求：最终分类允许直接输入库外类别名——确认时按新类别接收，同时进类别库与经验库（同名去重）。
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="review"]').click();
+  await page.waitForFunction(()=>!document.querySelector('#stage-panel-review').hidden);
+  const pumpDn50=REVIEW_VALUES.findIndex(row=>row[1]==='水泵'&&row[2]==='DN50')+1;
+  assert.equal((await store.load()).library.categories.some(item=>item.name==='临时类别'),false,
+   '前置：库里本来没有该类别');
+  await page.evaluate(({row})=>{window.__setCell(row,8,'临时类别');},{row:pumpDn50});
+  await page.locator('#sheet-review-confirm').click();
+  await page.waitForFunction(()=>document.querySelector('#sheet-review-message').textContent.includes('已把新类别加入类别库'));
+  assert.match(await page.locator('#sheet-review-message').innerText(),/已把新类别加入类别库/,'侧栏必须明确告知新类别已入库');
+  const adopted=await store.load();
+  const created=adopted.library.categories.filter(item=>item.name==='临时类别');
+  assert.equal(created.length,1,'用户输入的新类别必须同时进类别库，且同名不重复建类');
+  assert.equal(created[0].state,'active');
+  const adoptedRow=(await projectRecord()).review.rows.filter(row=>row.name==='水泵'&&row.feature==='DN50')[0];
+  assert.equal(adoptedRow.categoryName,'临时类别','确认快照保存用户输入的类别名');
+  assert.equal(adoptedRow.categoryId,created[0].id,'确认快照使用类别库里的新编号');
+  assert.equal(adopted.memory.memories.filter(record=>record.categoryId===created[0].id&&record.state==='active').length,1,
+   '新类别同时进入经验库，供下次自动建议使用');
+  // 复原为用户原本的选择，后面用例继续按已确认状态走。
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="review"]').click();
+  await page.waitForFunction(()=>!document.querySelector('#stage-panel-review').hidden);
+  await page.evaluate(({row})=>{window.__setCell(row,8,'水泵');},{row:pumpDn50});
+  await page.locator('#sheet-review-confirm').click();
+  await page.waitForFunction(()=>{const text=document.querySelector('#sheet-review-message').textContent;
+    return text.includes('整表已确认（8 行）')&&!text.includes('已把新类别加入类别库');});
  // 整表确认成功后侧栏会进入下一步（分类工作簿）；409 负例要回到“表内审核”再点整表确认。
  await page.locator('#workflow-nav .workflow-step-button[data-stage="review"]').click();
  await page.waitForFunction(()=>!document.querySelector('#stage-panel-review').hidden);
@@ -355,7 +380,7 @@ async function run(options={}){
   assert.match(await page.locator('#sheet-review-message').innerText(),/重新生成审核成果表/);
   const untouched=await projectRecord();
   assert.equal(untouched.review.rows.length,8,'拒绝时必须保留原确认快照，不拿旧成果表覆盖');
-  assert.equal(untouched.review.revision,2);
+  assert.equal(untouched.review.revision,stale.review.revision,'拒绝时必须保留原确认快照，不拿旧成果表覆盖');
   // 窄侧栏可用，且没有脚本错误。
   await page.setViewportSize({width:340,height:900});
   const narrow=await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,
@@ -365,7 +390,8 @@ async function run(options={}){
   assert.deepEqual(errors,[]);
   console.log('PASS: 图03表内审核：草稿不确认不学习、整表校验定位单元格、一次确认先落盘再学习、'+
    '重复确认幂等、改确认只撤销该行来源、旧inputKey拒绝且不覆盖已保存快照；'+
-   'F2：现表不同于有效确认时报差异、不残留“可以生成”并阻止按旧确认生成分类工作簿。');
+   'F2：现表不同于有效确认时报差异、不残留“可以生成”并阻止按旧确认生成分类工作簿；'+
+   '2026-10-11：最终分类允许直接输入库外类别名，确认时按新类别入库并学习（同名去重）。');
  }finally{await browser.close();await new Promise(resolve=>server.close(resolve));await fs.rm(root,{recursive:true,force:true});}
 }
 module.exports={run,initScript,DRAIN,MEP,REVIEW_VALUES};

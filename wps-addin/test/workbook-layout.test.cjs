@@ -78,7 +78,14 @@ test('便捷区域统一表头/填写区颜色，便于图02–07复用同一套
  assert.equal(layout.inputFill(4,7,1,1,layout.COLORS.accent).color,'#FDE9D9');
  const rule=layout.listValidation(4,8,1,4,'内部选项','$A$1:$A$5');
  assert.deepEqual(rule,{row:4,column:8,rowSpan:1,columnSpan:4,listSheet:'内部选项',listRange:'$A$1:$A$5',
-  allowBlank:true,inCellDropdown:true});
+  allowBlank:true,inCellDropdown:true,allowOtherInput:false});
+ const typed=layout.listValidation(4,8,1,1,'内部选项','$A$1:$A$5',{allowOtherInput:true});
+ assert.equal(typed.allowOtherInput,true,'最终分类允许输入下拉以外的值');
+ assert.equal(typed.inCellDropdown,true,'保留下拉');
+ assert.equal(layout.listValidation(4,8,1,1,'内部选项','$A$1:$A$5').allowOtherInput,false,
+   '缺省仍只允许下拉内的值，避免影响其他下拉');
+ assert.equal(layout.build({columns:[{index:1,width:8}],validations:[typed]},{rowCount:2,columnCount:1})
+   .validations[0].allowOtherInput,true,'版式构建保留该标记');
 });
 
 // F1：工作表级隐藏（内部选项/内部绑定）由版式表达，缺省必须可见；非法取值在写盘前拒绝。

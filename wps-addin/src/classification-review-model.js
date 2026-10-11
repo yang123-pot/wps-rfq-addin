@@ -112,28 +112,57 @@
  }
  // R5整表读回校验：只接收“最终分类”“审核备注”，其余列按固定字段快照核对（由host.readSheet给出问题）。
  // 空分类、未知分类、损坏行都带工作表单元格位置，整表不完整绝不放行。
+ // 2026-10-11 用户要求：允许用户在“最终分类”直接输入库里没有的类别名，确认时按新类别接收。
+ // 启用 allowNewCategories 时，未知名称不再算错误，而是进 newCategoryNames 交给上层建类；
+ // 上层建类后可用 newCategoryIds（名称→类别编号）再次调用，把新名称解析成最终类别编号。
  function validateRead(readResult,options){
-  var input=options||{},source=input.categories||(input.model&&input.model.categories)||[];
+  var input=options||{},source=input.categories||(input.model&&input.model.categories)||[],
+    allowNew=input.allowNewCategories===true,idByName=input.newCategoryIds||null;
   if(!readResult||!Array.isArray(readResult.rows))throw Error('整表审核需要成果表的读回结果。');
-  var known={},errors=[],rows=[];
+  var known={},errors=[],rows=[],newNames=[];
   source.forEach(function(category){known[text(category&&category.id)]=true;});
   ((readResult&&readResult.issues)||[]).forEach(function(issue){errors.push(mapIssue(issue));});
   readResult.rows.forEach(function(record){
    var name=text(record.name)||'（名称待补）',where='第'+record.row+'行',categoryName=text(record.finalCategoryName),
-     categoryId=text(record.finalCategoryId);
+     categoryId=text(record.finalCategoryId),typedNew=false;
    if(!categoryName)errors.push({row:record.row,column:FINAL_COLUMN,code:'category-empty',title:issueTitle('category-empty'),
     message:where+'“最终分类”为空：'+name+' 还没有选择类别或“无需询价”。'});
-   else if(!categoryId||!known[categoryId])errors.push({row:record.row,column:FINAL_COLUMN,code:'category-unknown',
+   else if(categoryId&&known[categoryId]){/* 库内既有类别：直接放行 */}
+   else if(allowNew){
+    var assigned=idByName?text(idByName[categoryName]):'';
+    if(assigned)categoryId=assigned;
+    typedNew=true;   // 用户自行输入的库外类别名（建类后才有编号）
+    if(newNames.indexOf(categoryName)<0)newNames.push(categoryName);
+   }else errors.push({row:record.row,column:FINAL_COLUMN,code:'category-unknown',
     title:issueTitle('category-unknown'),message:where+'“最终分类”“'+categoryName+'”不在当前分类库里，请用下拉重新选择。'});
    rows.push({rowId:text(record.rowId),row:record.row,index:text(record.index),name:name,feature:text(record.feature),
     unit:text(record.unit),quantity:text(record.quantity),
     autoCategoryId:text(record.autoCategoryId)||null,autoCategoryName:text(record.autoCategoryName),
     categoryId:categoryId,categoryName:categoryName,skip:categoryId===library.DECISION,
+    newCategory:typedNew,
     note:text(record.reviewNote),match:matchLabel(record.autoCategoryId,categoryId)});
   });
-  var counts=countRows(rows);
-  return {ok:errors.length===0,errors:errors,rows:rows,counts:counts,
+  var counts=countRows(rows),pending=allowNew?newNames.filter(function(item){return !(idByName&&idByName[item]);}):[];
+  return {ok:errors.length===0,errors:errors,rows:rows,counts:counts,newCategoryNames:newNames,
+   pendingNewCategoryNames:pending,
    summary:counts.rows+' 行 · 已填 '+counts.filled+' · 与建议不同 '+counts.different+' · 无需询价 '+counts.noInquiry};
+ }
+ // 用户输入的新类别：按名称去重（库里已有同名则复用其编号），为其余名称生成新编号并返回新库。
+ function adoptNewCategories(current,names){
+  // 兼容两种入参：分类库对象，或直接给类别数组。
+  var source=Array.isArray(current)?{categories:current,rules:[]}:(current||{}),
+    categories=Array.isArray(source.categories)?source.categories.slice():[],
+    assigned=[],idByName={};
+  (names||[]).forEach(function(raw){
+   var name=text(raw).trim();
+   if(!name||idByName[name])return;
+   var found=categories.filter(function(category){return text(category&&category.name).trim()===name;})[0];
+   if(found){idByName[name]=text(found.id);assigned.push({name:name,id:text(found.id),created:false});return;}
+   var record={id:library.newId(source,'category'),name:name,state:'active'};
+   categories.push(record);idByName[name]=record.id;assigned.push({name:name,id:record.id,created:true});
+  });
+  return {library:{version:source.version,categories:categories,rules:(source.rules||[]).slice()},
+   assigned:assigned,idByName:idByName,created:assigned.filter(function(item){return item.created;}).length};
  }
  // 整表确认快照：先落盘再学习，是分类工作簿（R6）与下游的唯一依据；行按集合保存，排序/筛选不影响。
  function confirmation(rows,options){
@@ -262,8 +291,9 @@ function fromSnapshot(snapshot,binding,options){
    if(!row.abnormal)return;
    fills.push({row:FIRST_ROW+index,column:1,rowSpan:1,columnSpan:COLUMNS.length,color:layout.COLORS.accent});
   });
+  // 2026-10-11 用户要求：最终分类保留下拉，但允许直接输入下拉以外的类别名（确认时按新类别接收）。
   var validations=model.rows.length?[layout.listValidation(FIRST_ROW,8,model.rows.length,1,
-   OPTIONS_SHEET,'$B$2:$B$'+String(model.categories.length+1))]:[];
+   OPTIONS_SHEET,'$B$2:$B$'+String(model.categories.length+1),{allowOtherInput:true})]:[];
   var spec=layout.build({columns:columns,headerRows:[HEADER_ROW],
    rows:[{index:TITLE_ROW,height:24}],merges:merges,fills:fills,validations:validations,
    freeze:{row:FIRST_ROW,column:1},
@@ -311,5 +341,6 @@ function fromSnapshot(snapshot,binding,options){
   MATCH:MATCH,MATCH_COLUMN:MATCH_COLUMN,FINAL_COLUMN:FINAL_COLUMN,NOTE_COLUMN:NOTE_COLUMN,AUTO_COLUMN:AUTO_COLUMN,
   BLOCKING_ISSUES:BLOCKING_ISSUES.slice(),autoLabel:autoLabel,matchLabel:matchLabel,
   validateRead:validateRead,confirmation:confirmation,draft:draft,sameRows:sameRows,changedRows:changedRows,
+  adoptNewCategories:adoptNewCategories,
   bindingState:bindingState,fromSnapshot:fromSnapshot};
 }));

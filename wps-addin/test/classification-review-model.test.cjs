@@ -391,3 +391,46 @@ test('F1额外材料行属于阻断问题：确认与草稿都要先修好，并
   assert.equal(model.validateRead({rows:read.rows,issues:[]},{categories:[{id:'pump',name:'水泵'}]}).ok,true,
     '没有额外材料行时确认不受影响');
 });
+
+test('新类别：允许直接输入库外类别名，按名称去重建类后解析为最终类别',()=>{
+  const {result}=built();
+  const read=readResult(result,state=>{
+    const conflict=state.row('充电桩配电箱');
+    conflict.finalCategoryName='汽车充电桩';conflict.finalCategoryId='ev-charger';
+    const row=state.row('阀门','DN50');
+    row.finalCategoryName='临时类别';row.finalCategoryId='';
+  });
+  const blocked=model.validateRead(read,{categories:result.categories});
+  assert.equal(blocked.ok,false,'未开启新类别时仍按未知分类阻断');
+  assert.equal(blocked.errors[0].code,'category-unknown');
+  const allowed=model.validateRead(read,{categories:result.categories,allowNewCategories:true});
+  assert.equal(allowed.ok,true,'开启新类别后不再报未知分类');
+  assert.deepEqual(allowed.newCategoryNames,['临时类别']);
+  assert.deepEqual(allowed.pendingNewCategoryNames,['临时类别'],'未建类前仍待建类');
+  const typed=allowed.rows.filter(item=>item.categoryName==='临时类别')[0];
+  assert.equal(typed.categoryId,'','未建类前不伪造类别编号');
+  assert.equal(typed.newCategory,true,'用户自行输入的库外类别名可追溯');
+  const before=JSON.stringify(result.categories);
+  const plan=model.adoptNewCategories(result.categories,['临时类别','临时类别']);
+  assert.equal(plan.created,1,'同名只建一个类别');
+  assert.equal(plan.assigned.length,1);
+  assert.equal(JSON.stringify(result.categories),before,'建类必须返回新库，不改调用方对象');
+  const reused=model.adoptNewCategories(plan.library.categories,['临时类别','水泵']);
+  assert.equal(reused.created,0,'已有同名类别不重复建');
+  const byName={};reused.assigned.forEach(item=>{byName[item.name]=item.id;});
+  const existing=result.categories.filter(item=>item.name==='水泵')[0];
+  assert.equal(byName['水泵'],existing.id,'库内既有类别复用原编号');
+  assert.equal(byName['临时类别'],plan.idByName['临时类别']);
+  const resolved=model.validateRead(read,{categories:plan.library.categories,allowNewCategories:true,
+    newCategoryIds:plan.idByName});
+  assert.equal(resolved.ok,true);
+  assert.deepEqual(resolved.pendingNewCategoryNames,[]);
+  const fixed=resolved.rows.filter(item=>item.categoryName==='临时类别')[0];
+  assert.equal(fixed.categoryId,plan.idByName['临时类别'],'建类后解析为真实类别编号');
+  assert.equal(fixed.newCategory,true,'新类别行可追溯');
+  assert.equal(fixed.skip,false,'新类别不是无需询价');
+  const snapshot=model.confirmation(resolved.rows,{projectId:'p-sample01',inputKey:'k-new'});
+  const saved=snapshot.rows.filter(item=>item.categoryName==='临时类别')[0];
+  assert.equal(saved.categoryId,plan.idByName['临时类别'],'确认快照保存新类别编号');
+  assert.equal(JSON.stringify(model.expectedRows(result)).includes('临时类别'),false,'新类别不进入固定字段快照');
+});
