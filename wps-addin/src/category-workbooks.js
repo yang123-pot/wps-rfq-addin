@@ -16,6 +16,17 @@
   return text(value).replace(/[\\/:*?"<>|]/g,'_').replace(/[. ]+$/,'').trim()||'未命名类别';
  }
  function fileNameFor(categoryName){return safeName(categoryName)+'.xlsx';}
+// 2026-10-11（图04/05变更）：分类工作簿由“每类一份文件”改为“一本多页”，页名＝类别名。
+// Excel 页名规则：最长 31 字符，不得含 : \ / ? * [ ]，且簿内不得重名。
+function safeSheetName(value,taken){
+ var name=text(value).replace(/[:\\\/\?\*\[\]]/g,'_').replace(/^'+|'+$/g,'').trim();
+ if(!name)name='分类';
+ if(name.length>31)name=name.slice(0,31);
+ var used=taken||{},key=name.toLowerCase(),index=2;
+ while(used[key]){var suffix='('+index+')';name=(name.length+suffix.length>31?name.slice(0,31-suffix.length):name)+suffix;
+  key=name.toLowerCase();index++;}
+ return name;
+}
  function directoryOf(filePath){
   var value=text(filePath).replace(/[\\/]+$/,'');
   return value.replace(/[\\/][^\\/]*$/,'');
@@ -88,11 +99,22 @@ function batchDirectory(reviewPath){return workbookDirectory(rootOf(reviewPath))
    else taken[key]=entry.categoryName;
    files.push(entry);
   });
+ // 一本多页：页名＝类别名（经页名规则清洗），簿内重名自动加尾号而不是阻断。
+ var sheetTaken={};
+ files.forEach(function(entry){
+  entry.sheetName=safeSheetName(entry.categoryName,sheetTaken);
+  sheetTaken[entry.sheetName.toLowerCase()]=entry.categoryName;
+ });
+ var projectName=text(input.projectName);
+ var workbookName=safeName(projectName||'分类工作簿')+'_分类工作簿.xlsx';
   var inquiryRows=files.reduce(function(total,entry){return total+entry.rowCount;},0);
   return {schemaVersion:SCHEMA_VERSION,sheet:SHEET,folder:FOLDER,
    inputKey:input.inputKey==null?null:text(input.inputKey),
    root:input.root==null?directoryOf(directory):text(input.root),
    batchId:input.batchId==null?null:text(input.batchId),
+  file:workbookName,path:directory+'\\'+workbookName,
+  sheets:files.map(function(entry){return {categoryId:entry.categoryId,categoryName:entry.categoryName,
+   sheetName:entry.sheetName,rowCount:entry.rowCount,rowIds:entry.rowIds.slice()};}),
    directory:directory,files:files,issues:issues,ok:issues.length===0,
    counts:{categories:files.length,inquiryRows:inquiryRows,noInquiryRows:noInquiryRows,
     totalRows:confirmation.rows.length}};
@@ -121,7 +143,10 @@ function summarize(record){
    root:input.root==null?null:text(input.root),batchId:input.batchId==null?null:text(input.batchId),
    directory:input.directory==null?null:text(input.directory),layout:input.layout||'separated',
    createdAt:input.createdAt==null?null:text(input.createdAt),updatedAt:null,status:'none',
-   counts:{categories:0,inquiryRows:0,noInquiryRows:input.noInquiryRows||0,totalRows:input.totalRows||0},files:[]};
+  counts:{categories:0,inquiryRows:0,noInquiryRows:input.noInquiryRows||0,totalRows:input.totalRows||0},
+  // 一本多页：file/path 指向那一个分类工作簿；files 仍逐类保存，便于逐页核对与续作。
+  file:input.file==null?null:text(input.file),path:input.path==null?null:text(input.path),
+  sha256:null,bytes:0,sheets:[],files:[]};
  }
  // 持久回执：路径/SHA/状态/批次随项目保存；局部成功必须显示为未全部完成。
  function receipt(planValue,options){
@@ -130,6 +155,12 @@ function summarize(record){
   empty.createdAt=input.createdAt==null?new Date().toISOString():text(input.createdAt);
   empty.updatedAt=empty.createdAt;empty.layout=input.layout||'separated';
   empty.counts.categories=planValue.files.length;empty.counts.inquiryRows=planValue.counts.inquiryRows;
+  empty.file=planValue.file==null?null:text(planValue.file);
+  empty.path=planValue.path==null?null:text(planValue.path);
+  empty.sheets=(planValue.sheets||[]).map(function(sheet){
+   return {categoryId:sheet.categoryId,categoryName:sheet.categoryName,sheetName:sheet.sheetName,
+    rowCount:sheet.rowCount,rowIds:(sheet.rowIds||[]).slice(),status:'pending',error:null};
+  });
   empty.files=planValue.files.map(function(entry){
    return {categoryId:entry.categoryId,categoryName:entry.categoryName,name:entry.file,path:entry.path,
     rowCount:entry.rowCount,rowIds:entry.rowIds.slice(),sha256:null,bytes:0,status:'pending',error:null};
@@ -170,6 +201,20 @@ function summarize(record){
   exportHost.write(app,model,stagePath);
   return model;
  }
+// 2026-10-11（图04/05变更）：一本多页写入——第 1 页＝分类汇总页（由调用方给出），其后每类一页，页名＝类别名。
+function writeAll(app,planValue,stagePath,options){
+ var input=options||{},sheets=[];
+ if(input.summarySheet)sheets.push(input.summarySheet);
+ (planValue.files||[]).forEach(function(entry){
+  var model=mainSheet(entry,input.sheetOptions||{});
+  model.name=text(entry.sheetName)||text(entry.categoryName)||model.name;
+  sheets.push(model);
+ });
+ if(!sheets.length)throw Error('没有可写入的分类工作簿页。');
+ var model={sheets:sheets};
+ exportHost.write(app,model,stagePath);
+ return model;
+}
  // 生成后按图04习惯打开各分类工作簿供查看；宏安全值与活动簿的处理与成果表一致。
  function openForEditing(app,filePath){
   if(!isAbsolute(filePath)||!/^.+\.xlsx$/i.test(text(filePath)))throw Error('分类工作簿路径无效，未打开。');
@@ -198,6 +243,8 @@ function summarize(record){
   text:text,safeName:safeName,fileNameFor:fileNameFor,directoryOf:directoryOf,
   batchDirectory:batchDirectory,workbookDirectory:workbookDirectory,rootOf:rootOf,
   plan:plan,summarize:summarize,receipt:receipt,emptyReceipt:emptyReceipt,
+ sheetNameFor:safeSheetName,
+ writeAll:writeAll,
   statusOf:statusOf,
   mainSheet:mainSheet,workbook:workbook,write:write,openForEditing:openForEditing};
 }));
