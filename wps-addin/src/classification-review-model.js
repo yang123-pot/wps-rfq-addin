@@ -14,7 +14,8 @@
  var MATCH={consistent:'一致',different:'存在差异'};
  var MATCH_COLUMN=7,FINAL_COLUMN=8,NOTE_COLUMN=9,AUTO_COLUMN=6;
  // 这些读回问题无法可靠定位到材料行或说明绑定已失效，草稿与整表确认都必须先修好。
- var BLOCKING_ISSUES=['row-id-missing','row-id-duplicate','row-id-unknown','row-missing','field-changed'];
+ // F1：“row-extra”是绑定末行之外的材料行——漏检材料等于丢行，和缺行、重复行一样必须先修好再确认/存草稿。
+ var BLOCKING_ISSUES=['row-id-missing','row-id-duplicate','row-id-unknown','row-missing','field-changed','row-extra'];
  function text(value){return value==null?'':String(value);}
  function quantityText(value){return value==null?'':String(value);}
  function autoLabel(row){return text(row&&row.autoCategoryName)||'待核对';}
@@ -87,7 +88,7 @@
  function issueTitle(code){
   return {suggested:null,'category-empty':'最终分类为空','category-unknown':'最终分类无效',
    'row-id-missing':'缺少行标识','row-id-duplicate':'行标识重复','row-id-unknown':'行标识不属于本次成果表',
-   'row-missing':'材料行缺失','field-changed':'固定字段被改动'}[code]||'读回问题';
+   'row-missing':'材料行缺失','field-changed':'固定字段被改动','row-extra':'绑定以外的材料行'}[code]||'读回问题';
  }
  function mapIssue(issue){
   return {row:issue&&issue.row!=null?issue.row:null,column:issue&&issue.column!=null?issue.column:null,
@@ -273,11 +274,12 @@ function fromSnapshot(snapshot,binding,options){
   return {name:SHEET,values:values,layout:spec};
  }
  // 下拉选项放在内部表，用区域引用避免带标点类别名被拆开。
+ // F1：内部选项/内部绑定只是技术页，随版式隐藏（图03标签栏只应有“分类审核成果”一张公开页）。
  function optionsSheet(model){
   var values=[['类别编号','类别名称']];
   model.categories.forEach(function(category){values.push([category.id,category.name]);});
   var spec=layout.build({columns:[{index:1,width:20},{index:2,width:20}],headerRows:[1],
-   metadata:{profile:'internal-options'}},{rowCount:values.length,columnCount:2});
+   hidden:true,metadata:{profile:'internal-options'}},{rowCount:values.length,columnCount:2});
   return {name:OPTIONS_SHEET,values:values,layout:spec};
  }
  // 内部绑定：rowId、固定字段快照与库版本，供整表读回校验；不进入公开列。
@@ -288,7 +290,7 @@ function fromSnapshot(snapshot,binding,options){
     row.scopeId,row.sourceIds.join(' '),row.libraryVersion]);
   });
   var spec=layout.build({columns:Array.from({length:10},function(_,index){return {index:index+1};}),headerRows:[1],
-   metadata:{profile:'internal-binding'}},{rowCount:values.length,columnCount:10});
+   hidden:true,metadata:{profile:'internal-binding'}},{rowCount:values.length,columnCount:10});
   return {name:BINDING_SHEET,values:values,layout:spec};
  }
  function workbook(model,options){

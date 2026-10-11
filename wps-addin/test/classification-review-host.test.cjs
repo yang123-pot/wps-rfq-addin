@@ -283,3 +283,62 @@ test('R12-C比较：固定字段、备注、缺行与多余行都按rowId给出�
     finalCategoryId:'pump',reviewNote:''}]),issues:[]},snapshot);
   assert.equal(extra.differences.filter(function(item){return item.code==='row-extra';}).length,1);
 });
+
+// F1：绑定末行之外仍可能有材料行（用户追加或整行复制）。这类行过去被静默忽略，等于“漏检材料”，
+// 必须在整表确认/草稿之前拒绝并定位；只有“被格式化但仍为空”的尾行才算无害。
+test('F1末行后追加的无标识材料行必须拒绝、定位并阻断确认与草稿',()=>{
+  const {result,binding}=bound();
+  const sheet=model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'});
+  const read=host.readSheet(readerOf(sheet.values,grid=>{
+    grid[binding.lastRow]=['9','钢索','规格C','m','10','无需询价','匹配成功','无需询价',''];
+  }),binding);
+  const extra=read.issues.filter(item=>item.code==='row-extra');
+  assert.equal(extra.length,1,'末行后追加的材料行必须报出，不能静默忽略');
+  assert.equal(extra[0].row,binding.lastRow+1);
+  assert.equal(extra[0].column,2,'定位到用户可见的项目名称单元格，不指向隐藏的行标识列');
+  assert.match(extra[0].message,/第12行/);
+  assert.match(extra[0].message,/钢索/);
+  assert.equal(read.rows.length,8,'额外行不得混进绑定行');
+  const checked=model.validateRead(read,{categories:binding.categories});
+  assert.equal(checked.ok,false,'有待清理的额外材料行时不得整表确认');
+  assert.equal(checked.errors.some(item=>item.code==='row-extra'),true);
+  const saved=model.draft(read,{binding:binding});
+  assert.equal(saved.ok,false,'有待清理的额外材料行时不得存草稿');
+  assert.equal(saved.errors.some(item=>item.code==='row-extra'),true);
+});
+
+test('F1末行后整行复制（含行标识）必须拒绝并指出被复制的绑定行',()=>{
+  const {result,binding}=bound();
+  const sheet=model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'});
+  const read=host.readSheet(readerOf(sheet.values,grid=>{
+    grid[binding.lastRow]=grid[3].slice();
+  }),binding);
+  const extra=read.issues.filter(item=>item.code==='row-extra');
+  assert.equal(extra.length,1,'复制到绑定范围之外的材料行必须报出');
+  assert.equal(extra[0].row,12);
+  assert.match(extra[0].message,/第4行/,'必须指出同标识的绑定行，便于用户删除复制件');
+  assert.match(extra[0].message,/复制/);
+});
+
+test('F1格式化的空白尾行不误报，额外行扫描有界且保留原有绑定校验',()=>{
+  const {result,binding}=bound();
+  const sheet=model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'});
+  const blank=host.readSheet(readerOf(sheet.values,grid=>{
+    for(let row=binding.lastRow+1;row<=binding.lastRow+300;row++)grid[row-1]=new Array(11).fill(' ');
+  }),binding);
+  assert.deepEqual(blank.issues,[],'仅被格式化的空白尾行（含空格）不得误报');
+  const far=host.readSheet(readerOf(sheet.values,grid=>{
+    grid[400]=['9','远处的行','规格X','m','1','水泵','匹配成功','水泵',''];
+  }),binding);
+  assert.equal(far.rows.length,8);
+  assert.deepEqual(far.issues,[],'扫描窗口之外的行不作为绑定材料行处理，也不得让读回崩溃');
+  const sortedThenAppended=host.readSheet(readerOf(sheet.values,grid=>{
+    const head=grid.slice(0,3),data=grid.slice(3).reverse();
+    head.forEach((row,index)=>{grid[index]=row;});
+    data.forEach((row,index)=>{grid[3+index]=row;});
+    grid[11]=['9','钢索','规格C','m','10','无需询价','匹配成功','无需询价',''];
+  }),binding);
+  assert.equal(sortedThenAppended.rows.length,8,'表内排序后绑定行仍按rowId全部对上');
+  assert.equal(sortedThenAppended.issues.filter(item=>item.code==='row-extra').length,1,
+    '排序后追加的材料行仍要被报出');
+});

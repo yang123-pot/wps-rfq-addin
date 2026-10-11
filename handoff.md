@@ -1,8 +1,10 @@
 # WPS询价插件：已批准效果图、执行计划与交接文档
 
+> **10-11 F1完成（当前入口，下一包F2）：** 按[完成计划](docs/superpowers/plans/2026-10-11-wps-phase1-completion.md)F1落地两处行为变更——①审核成果表**末行之外的材料行不再漏检**：表尾追加或整行复制（连K列行标识）都报`row-extra`、定位到用户可见的项目名称单元格并进入阻断集合，整表确认与存草稿都必须先修好；②**内部选项/内部绑定页随版式隐藏**，标签栏只留公开“分类审核成果”页（图03口径），跨表下拉仍指向被隐藏的选项页，宿主缺少`Worksheet.Visible`或隐藏未落地时明确失败、不产出“看起来已隐藏”的文件。**行高实测结论：不写死行高**——真实宿主按内容自动撑高，354字长特征行396pt且与该行AutoFit结果一致，短行24pt，标题行1保持24pt；历史观察的84不作为固定值，也不额外加AutoFit代码。相关四文件Node **74/74**、全量 **458/458**；真机WPS **12.1.0.29161**（独立隐藏COM实例）完成生成→读回隐藏/下拉/冻结/打印→追加复制行与无标识行→拒绝定位→删除恢复（逐格一致）核对，截图与JSON在`outputs/wps-phase1-F1/`，详见[F1证据](docs/wps-phase1-f1-evidence-20261011.md)。**边界：真机部分是按同一模型复刻写入步骤并读回，不是插件窗口内点按；本机缺playwright，`ui-*`浏览器检查本轮未跑。** SIDEBAR-STABILITY-01保持已关闭口径；R12仍未结案、四项目0/4、R13未执行，一期未正式交付。下一包**F2恢复状态一致性**（物理SHA刷新失败回滚、确认/旧草稿一致性与恢复提示）。
+>
 > **2026-10-11整体核对与完成计划（当前入口）：** 主体功能已实现、合成七步真实WPS链已跑通；SIDEBAR-STABILITY-01已按有界口径关闭。**R12未结案、四项目新流程0/4完成、R13真实生命周期与用户交接未执行，一期未正式交付。** 本轮仅审计与文档，无产品/配置/WPS操作；8图分两批实际查看，独立Node子集368/368通过（不是重跑全量450项）。详见[整体进度核对](docs/wps-project-progress-audit-20261011.md)及[当前完成计划F1–F8](docs/superpowers/plans/2026-10-11-wps-phase1-completion.md)。
 >
-> **下一实施包F1，随后F2：** 审核末行外材料检测/内部页与行高→恢复SHA写回失败回滚及确认/草稿提示→汇总自动打开和窗口可用性→C06/完整下游失效/回执与对话框多项目补验→四项目→R12结案→R13安装/用户交接。预计11–20个有效工程工作日，另留2–4天返修；人工决定和等待环境单列。安装脚本仍有身份、回退、升级生效及DataRoot差额，不只缺实机证据。已授权实施无需重复询问，本轮按用户要求到计划和备份为止。
+> **剩余顺序：** F1已完成并备份；随后F2恢复SHA写回失败回滚及确认/草稿提示→F3汇总自动打开和窗口可用性→F4 C06/完整下游失效/回执与对话框多项目补验→F5四项目→F6 R12结案→F7 R13安装→F8用户交接。预计剩余10–18个有效工程工作日，另留2–4天返修；人工决定和等待环境单列。安装脚本仍有身份、回退、升级生效及DataRoot差额，不只缺实机证据。已授权实施无需重复询问。
 >
 > **历史状态解释：** 下列逐日记录保留原发生时间；其中“暂停/稳定性未解决/C05未补/K七入口未做/H–J未开始”等已由后续证据取代，不作为当前待办。原R0–R13业务规格不变，当前剩余顺序以F1–F8为准。默认承载为10-10获准的单个非模态窗口，不恢复旧TaskPane。原入场`pane-diagnostics.js`保持不动、不暂存。
 
@@ -698,8 +700,8 @@ node wps-addin/test/ui-project-check.cjs
 | R1 | v2、业务键、revision、v1副本已有；I/J版本/409/恢复证据有效 | 四项目及最终全链失效F4/F5 |
 | R2 | B/D清理票据/链接/下拉、G打印、J故障/搬移已有 | F1内部页/显示边界及受影响宿主复验 |
 | R3 | 七步/默认不合并/主表预览/七入口已有，承载已改非模态窗口 | F3位置/窄宽/三态；F4保存对话框/多项目 |
-| R4 | 成果表与绑定/下拉真实生成已有 | F1范围外材料和内部页/行高；不重做主成功路径 |
-| R5 | 整表确认、草稿、C05及C07–C13多数分项已有 | F1/F2边界修复、F4的C06新事件与完整下游失效 |
+| R4 | 成果表与绑定/下拉真实生成已有 | **F1已完成**末行外材料检测、内部页隐藏与行高实测；不重做主成功路径 |
+| R5 | 整表确认、草稿、C05及C07–C13多数分项已有 | F1已完成结构/显示边界；剩F2确认与草稿一致性、F4的C06新事件与完整下游失效 |
 | R6 | 独立分类簿、逐值核对及J失败续作已有 | F4变更后新批次；F5四项目规模验收 |
 | R7 | 双布局及名称链接、H同格、J重开/搬移已有 | F3生成后自动打开；F5四项目 |
 | R8 | 多品牌、一次读回、H等价、I边界已有 | F4最终链路上游变更；F5真实品牌决定 |
@@ -712,6 +714,8 @@ node wps-addin/test/ui-project-check.cjs
 下一包按0.2与详细计划执行。R12-I完成不合并/全跳过/边界数据：新增`test/r12i-boundaries.test.cjs`8项（Node 370/370），并在隔离真实WPS上跑完不合并完整链（4分类簿4/2/2/1、9条询价、5份拆分）、全部无需询价（不落空文件）、精度与文本隔离（前导零/长小数/长中文特征/2页重复表头/超单格拒绝）；本包源码只加`workbook-layout.guardValues`超长单格防护。R12-A只做现场保护与接续检查点，没有新增真机通过或源码修复；R12-B已收敛4个入场修改（`export-files.cjs`/`server.cjs`/`import-ui.js`/`export-files.test.cjs`），`export-host.js`及其测试留R12-D；R12-C新增`compareSnapshot`/`fromSnapshot`、恢复审计的业务内容判定与草稿恢复提示，并用真实受保护文件留只读证据（H11 SHA相同、比较报差异、旧审计ok=true/新审计ok=false），Node 340/340；R12-D完成汇总写入次序/下拉来源/链接目标/预览归属与双布局，用独立隐藏COM实例实测链接并截图，Node 344/344；R12-E完成拆分待核对内容证明与UI显式核对，并用独立隔离WPS真机写/读回真实供应商拆分文件、跑真实文件SHA下的待核对状态机，Node 356/356、`ui-split-check` PASS；R12-F重建公开输出审计，Node 361/361、Python 8/8，并用隔离污染件逐格留证、按纯值清单只读核对R12-E真实供应商件。R12-D/E/F/I的真机补充与只读文件核对均未在插件UI内点按完成，不把模拟宿主、原生COM读回或文件只读审计写成插件UI真机通过。R12-J（2026-10-02）在隔离隐藏WPS 12.1.0.29161上按真实插件代码＋真实`dev/server`管线跑完异常/恢复矩阵**21/21项、0失败**（取消/关闭、目标已存在/竞争/只读目录、分类与拆分各注入第二份失败并只重试未完成、发布前中断/响应丢失/回执失败与服务重启、删除与外改、键过期、暂存清理、五恢复检查点、409冲突与用户打开的簿/宏安全值、关闭重开点链接、整树搬移后重定位、侧栏出帧与重建），Node **371/371**、Python 8/8、`ui-*`17/17；**产品源码改动很小**——只读目录补强`wps-addin/dev/export-files.cjs`（`prepare`先探测目标目录可写：只读目录预检即拒绝、写入0份；先写失败用例再最小实现，端到端J3c记录`EPERM`、用户文件SHA不变）＋新增浏览器检查`wps-addin/test/ui-cancel-check.cjs`；另有3个浏览器夹具（`ui-sheet-review`/`ui-memory`/`ui-category`）按R12-C内容语义修好，属夹具过期非产品缺陷、断言未删。同样未在插件UI内点按完成。
 
 ### 7.2 每包Git备份
+
+F1（2026-10-11）明确清单为4源码＋4测试＋4文档共12文件：`wps-addin/src/classification-review-host.js`（末行外有界扫描`scanExtraRows`与`row-extra`）、`wps-addin/src/classification-review-model.js`（`row-extra`进入阻断集合与问题标题、两个内部页`hidden:true`）、`wps-addin/src/workbook-layout.js`（工作表级`hidden`）、`wps-addin/src/export-host.js`（落地并读回工作表隐藏）、`wps-addin/test/classification-review-host.test.cjs`、`wps-addin/test/classification-review-model.test.cjs`、`wps-addin/test/workbook-layout.test.cjs`、`wps-addin/test/export-host.test.cjs`、`docs/wps-phase1-f1-evidence-20261011.md`、`docs/wps-workflow-v3-acceptance.md`、`docs/wps-phase1-release-checklist.md`、`handoff.md`（以实际提交与远程SHA为准）。本机真机脚本/JSON/截图/xlsx在`outputs/wps-phase1-F1/`，不入Git；入场未提交修改`wps-addin/dev/pane-diagnostics.js`原样保留、不暂存。
 
 2026-10-11整体核对文档包明确清单：`handoff.md`、`docs/wps-project-progress-audit-20261011.md`、`docs/superpowers/plans/2026-10-11-wps-phase1-completion.md`、`docs/superpowers/plans/2026-09-27-wps-phase1-completion.md`、`docs/wps-workflow-v3-acceptance.md`、`docs/wps-phase1-release-checklist.md`。只更新当前状态/计划及摘要纠错；不暂存产品或本机数据。文档检查6份/135链接/8图SHA通过，回执`outputs/wps-progress-audit-20261011/document-verification.json`；备份以本轮实际普通推送、远程SHA及同目录`backup-receipt.json`为准。以下均为历史备份记录。
 
@@ -767,6 +771,7 @@ git ls-remote origin refs/heads/feat/wps-phase1
 ### 7.3 历史及本机证据
 
 - [2026-10-11整体进度核对](docs/wps-project-progress-audit-20261011.md)：当前里程碑、原包状态、D01–D12差额、本轮368项子集与证据边界。
+- [2026-10-11 F1证据](docs/wps-phase1-f1-evidence-20261011.md)：末行外材料行拒绝与定位、内部页隐藏写盘/读回、行高实测（354字→396pt与AutoFit一致）、真机追加-拒绝-恢复与截图索引。
 - [2026-10-11完成计划F1–F8](docs/superpowers/plans/2026-10-11-wps-phase1-completion.md)：当前剩余顺序、依赖、工期、文件/验证与验收出口；替代09-27计划的旧待办顺序。
 - [2026-09-27整体方向核对](docs/wps-workflow-v3-direction-audit-20260927.md)：R0–R13详细步骤、8图、确定缺陷/待核风险及本轮322测试边界。
 - [原详细实施计划（09-27历史规格）](docs/superpowers/plans/2026-09-27-wps-phase1-completion.md)：保留原包文件/接口/验证/真机出口；剩余状态与执行顺序已由10-11完成计划取代。

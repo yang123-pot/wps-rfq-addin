@@ -189,7 +189,7 @@ function layoutFixture(overrides){
  function newSheet(name){
   const cells=new Map();
   const prefix='sheet'+sheets.length+'!';
-  const sheet={Name:name||'Sheet',Activate(){activeSheet=sheet;},Range(address){return rangeFor(address,sheet);},
+  const sheet={Name:name||'Sheet',Visible:-1,Activate(){activeSheet=sheet;},Range(address){return rangeFor(address,sheet);},
    Cells:{Item(row,column){const address=colName(column)+row;if(!cells.has(address))cells.set(address,rangeFor(address,sheet));return cells.get(address);}},
    // 实测WPS表格（同Excel）：隐藏列的ColumnWidth恒为0，读不回原宽度，必须按Hidden核隐藏。
    Columns:{Item(index){const key=prefix+'col'+index;if(!columnWidths.has(key)){columnWidths.set(key,{_w:null,_h:false,
@@ -209,6 +209,8 @@ function layoutFixture(overrides){
    }};
   }
   if(options.noSheetActivation)delete sheet.Activate;
+  // 真实宿主若缺少 Worksheet.Visible 或静默忽略写入，隐藏内部页就没落地，生成必须明确失败。
+  if(options.sheetVisibilityIgnored)Object.defineProperty(sheet,'Visible',{get(){return -1;},set(){},configurable:true});
   return sheet;
  }
  function anchorKey(anchor){return String(anchor.__address||'').split(':')[0];}
@@ -678,4 +680,24 @@ test('需要冻结的审核页缺少工作表激活API时拒绝保存',()=>{
  assert.equal(h.closed,1);
  assert.equal(h.app.AutomationSecurity,1);
  assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx');
+});
+
+// F1：内部选项/内部绑定必须在生成时真的隐藏（保存重开仍隐藏），公开审核页与跨表下拉不受影响。
+test('F1生成审核成果时隐藏内部页，重开读回仍隐藏且下拉仍指向选项页',()=>{
+ const workbook=reviewWorkbookWithOptions(),h=layoutFixture({validationRequiresExistingSheet:true,validationEchoBare:true});
+ host.write(h.app,workbook,'C:\\temp\\rfq-layout.xlsx');
+ assert.equal(h.saved,true);
+ assert.notEqual(h.book.Worksheets.Item('分类审核成果').Visible,0,'公开审核页必须可见');
+ assert.equal(h.book.Worksheets.Item('内部选项').Visible,0,'内部选项页必须隐藏');
+ assert.equal(h.book.Worksheets.Item('内部绑定').Visible,0,'内部绑定页必须隐藏');
+ assert.equal(h.book.Worksheets.Item('分类审核成果').Range('H4:H11').Validation.Formula1,'内部选项!$B$2:$B$7',
+  '隐藏选项页仍是分类下拉来源');
+ assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx','隐藏内部页不得打乱用户活动工作簿');
+});
+test('F1宿主不支持或静默忽略工作表隐藏时明确失败，不产出未隐藏的内部页',()=>{
+ const workbook=reviewWorkbookWithOptions(),h=layoutFixture({sheetVisibilityIgnored:true,validationEchoBare:true});
+ assert.throws(()=>host.write(h.app,workbook,'C:\\temp\\rfq-layout.xlsx'),/未隐藏|工作表隐藏/);
+ assert.equal(h.saved,false,'隐藏未落地不得保存成果表');
+ assert.equal(h.app.AutomationSecurity,1,'失败后仍要恢复宏安全值');
+ assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx','失败后不得留下用户簿被置后');
 });

@@ -80,3 +80,15 @@ test('便捷区域统一表头/填写区颜色，便于图02–07复用同一套
  assert.deepEqual(rule,{row:4,column:8,rowSpan:1,columnSpan:4,listSheet:'内部选项',listRange:'$A$1:$A$5',
   allowBlank:true,inCellDropdown:true});
 });
+
+// F1：工作表级隐藏（内部选项/内部绑定）由版式表达，缺省必须可见；非法取值在写盘前拒绝。
+test('F1版式支持工作表隐藏标记，缺省可见且非法取值直接拒绝',()=>{
+ const hidden=layout.build({columns:[{index:1,width:10}],hidden:true},{rowCount:2,columnCount:1});
+ assert.equal(hidden.hidden,true);
+ const visible=layout.build({columns:[{index:1,width:10}]},{rowCount:2,columnCount:1});
+ assert.equal(visible.hidden,false,'缺省必须保持可见');
+ assert.equal(layout.validate(hidden,{rowCount:2,columnCount:1}).ok,true);
+ const broken=layout.validate(Object.assign({},hidden,{hidden:'yes'}));
+ assert.equal(broken.ok,false);
+ assert.match(broken.errors.join('；'),/隐藏/);
+});

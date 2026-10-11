@@ -58,6 +58,7 @@
   if(!isObject(layout))return {ok:false,errors:['版式不是有效对象。']};
   if(layout.schemaVersion!==SCHEMA_VERSION)errors.push('版式版本不支持：'+String(layout.schemaVersion));
   if(!Array.isArray(layout.columns))errors.push('版式缺少列定义。');
+  if(layout.hidden!=null&&typeof layout.hidden!=='boolean')errors.push('工作表隐藏设置无效。');
   (layout.columns||[]).forEach(function(column,index){
    var at='第'+(index+1)+'列';
    if(!isObject(column)||!integer(column.index)){errors.push(at+'缺少列号。');return;}
@@ -145,6 +146,7 @@
    hyperlinks:(input.hyperlinks||[]).map(function(link){return Object.assign({rowSpan:1,columnSpan:1},link);}),
    validations:(input.validations||[]).map(function(rule){
     return Object.assign({rowSpan:1,columnSpan:1,allowBlank:true,inCellDropdown:true},rule);}),
+   hidden:input.hidden===true,
    print:input.print||null,metadata:input.metadata||null};
   return assertValid(layout,input.bounds);
  }

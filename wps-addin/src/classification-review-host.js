@@ -54,6 +54,43 @@
   var found=((binding&&binding.categories)||[]).filter(function(item){return item.name===name;})[0];
   return found?found.id:'';
  }
+ // F1：绑定末行之后仍可能出现材料行——用户直接在表尾追加，或整行复制含行标识的材料行。
+ // 只读 firstRow..lastRow 会让这类行被静默忽略，等于“已经确认过的材料之外又多了材料”，因此必须报出。
+ // 扫描必须“有界且贴住数据”：只扫末行之后的固定窗口，连续空白即停，绝不按格式化UsedRange做无界逐格扫描。
+ var EXTRA_SCAN_ROWS=200,EXTRA_BLANK_ROWS=20,EXTRA_REPORT_LIMIT=20,EXTRA_PROBE_COLUMNS=[2,3,4,5];
+ var MAX_SHEET_ROW=1048576;
+ function scanExtraRows(read,binding,seen,issues){
+  var blank=0,reported=0,suppressed=0;
+  for(var offset=1;offset<=EXTRA_SCAN_ROWS;offset++){
+   var row=binding.lastRow+offset;
+   if(row>MAX_SHEET_ROW)return;          // 绑定末行已贴表尾时不再向表外读，避免宿主报错
+   var filled=[];
+   EXTRA_PROBE_COLUMNS.concat([binding.rowIdColumn]).forEach(function(column){
+    var value=text(read(row,column)).trim();
+    if(value!=='')filled.push({column:column,value:value});
+   });
+   if(!filled.length){
+    blank++;
+    if(blank>=EXTRA_BLANK_ROWS)return;
+    continue;
+   }
+   blank=0;
+   if(reported>=EXTRA_REPORT_LIMIT){suppressed++;continue;}
+   reported++;
+   var rowId='';
+   filled.forEach(function(item){if(item.column===binding.rowIdColumn)rowId=item.value;});
+   var owner=rowId?seen[rowId]:null,first=filled[0];
+   issues.push({row:row,column:first.column,code:'row-extra',
+    message:owner?
+     ('第'+row+'行与第'+owner+'行使用了同一行标识，疑似整行复制，且超出本次审核成果表的绑定范围：'+first.value+
+      '。请删除该行，或重新生成审核成果表后再审核。'):
+     ('第'+row+'行有本次审核成果表绑定以外的材料行（没有随行行标识，疑似新增行）：'+first.value+
+      '。请删除该行，或重新生成审核成果表后再审核。')});
+  }
+  if(suppressed)issues.push({row:null,column:null,code:'row-extra',
+   message:'绑定范围之外还有'+suppressed+'行材料未逐行列出（每次最多列出'+EXTRA_REPORT_LIMIT+
+    '行，扫描上限'+EXTRA_SCAN_ROWS+'行），请一并清理。'});
+ }
  // 纯读回：按稳定rowId逐行核对固定字段，行序变化不影响，筛选隐藏行也会被读到。
  function readSheet(read,binding){
   validateBinding(binding);
@@ -103,6 +140,7 @@
     issues.push({row:null,column:null,code:'row-missing',
      message:'成果表缺少材料行：'+field.name+' / '+field.feature});
   });
+  scanExtraRows(read,binding,seen,issues);
   return {rows:rows,issues:issues};
  }
  // R12-C：把读回结果（磁盘/打开簿）与项目保存的审核快照按rowId比较业务内容。

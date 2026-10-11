@@ -50,6 +50,22 @@
     if(Number(book.Worksheets.Count)!==model.sheets.length)throw Error('输出工作表数量不一致。');
     model.sheets.forEach(function(s){chunks(book.Worksheets.Item(s.name),s.values,false);});
   }
+  // F1：内部技术页（内部选项/内部绑定）只服务于读回校验与跨表下拉来源，必须在生成时真正隐藏，
+  // 让用户只看到公开页（图03标签栏一张表）。隐藏前先激活第一张公开页：宿主不允许隐藏活动工作表。
+  // 宿主缺少Worksheet.Visible或写入未落地时明确失败，绝不产出“看起来已隐藏”的成果表。
+  function applySheetVisibility(book,model){
+    var hidden=model.sheets.filter(function(s){return s.layout&&s.layout.hidden===true;});
+    if(!hidden.length)return;
+    var first=book.Worksheets.Item(1);
+    if(typeof first.Activate==='function')first.Activate();
+    hidden.forEach(function(s){
+      var sheet=book.Worksheets.Item(s.name);
+      if(typeof sheet.Visible==='undefined')
+        throw Error('当前WPS不支持工作表隐藏API（Worksheet.Visible），未按获批版式输出“'+s.name+'”。');
+      sheet.Visible=0;
+      if(Number(sheet.Visible)!==0)throw Error('“'+s.name+'”内部工作表未隐藏，未保存文件。');
+    });
+  }
   function deep(model,sheet){return model.sheets.filter(function(item){return item.name===sheet.Name;})[0]||null;}
   // 版式落地：等宽矩阵之上再写列宽、行高、合并、浅色填充、冻结、打印、原生链接与区域下拉。
   // 宿主缺API时明确报出具体缺哪一个，绝不静默产出“看起来像获批版式”的文件。
@@ -176,6 +192,13 @@
       var spec=s.layout;
       if(!spec)return;
       var sheet=book.Worksheets.Item(s.name);
+      if(typeof sheet.Visible!=='undefined'){
+        // 可见的编码在不同宿主上可能是-1或1，所以只核“该隐藏的确实隐藏、该可见的确实可见”。
+        var wantHidden=spec.hidden===true;
+        if((Number(sheet.Visible)===0)!==wantHidden)
+          throw Error('“'+s.name+'”工作表隐藏状态读回不一致：期望'+(wantHidden?'隐藏':'可见')+
+           '，实际'+String(sheet.Visible));
+      }
       if(typeof sheet.Columns!=='object'||typeof sheet.Columns.Item!=='function')return;
       (spec.columns||[]).forEach(function(column){
         var target=sheet.Columns.Item(column.index);
@@ -271,6 +294,7 @@
           throw Error('当前WPS不支持工作表激活API（Worksheet.Activate），未冻结“'+s.name+'”。');
         applyLayout(app,sheet,model,s.layout);
       });
+      applySheetVisibility(created,model);
       verify(created,model);
       created.SaveAs(stagePath,51);created.Close(false);created=null;
       app.AutomationSecurity=3;if(app.AutomationSecurity!==3)throw Error('无法禁用自动宏，未重新打开暂存文件。');
@@ -379,6 +403,7 @@
         if(app.ActiveWindow)app.ActiveWindow.FreezePanes=false;
         applyLayout(app,sheet,model,s.layout);
       });
+      applySheetVisibility(book,model);
       verify(book,model);
       var first=book.Worksheets.Item(1);if(typeof first.Activate==='function')first.Activate();
       rememberPreview(app,book);

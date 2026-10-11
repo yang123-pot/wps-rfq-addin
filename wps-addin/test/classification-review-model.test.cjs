@@ -357,3 +357,37 @@ test('R12-C：按已保存快照重建成果副本，类别/备注取快照、�
   assert.equal(host.compareSnapshot(back,snapshot).matches,true,'重建副本业务内容与快照一致');
   assert.throws(()=>model.fromSnapshot({rows:[]},binding,{}),/快照/);
 });
+
+// F1：内部选项/内部绑定只是技术页，必须随版式隐藏（图03标签栏只有公开审核页一张），
+// 公开审核页保持可见，隐藏的选项页仍作为最终分类下拉的来源。
+test('F1内部选项与内部绑定页按版式隐藏，公开审核页与下拉来源不变',()=>{
+  const {result}=built();
+  const workbook=model.workbook(result,{title:'示例园区_分类审核成果.xlsx'});
+  assert.deepEqual(workbook.sheets.map(sheet=>sheet.name),['分类审核成果','内部选项','内部绑定']);
+  assert.notEqual(workbook.sheets[0].layout.hidden,true,'公开审核页必须可见');
+  assert.equal(workbook.sheets[1].layout.hidden,true,'内部选项页必须隐藏');
+  assert.equal(workbook.sheets[2].layout.hidden,true,'内部绑定页必须隐藏');
+  assert.equal(workbook.sheets[0].layout.validations[0].listSheet,model.OPTIONS_SHEET,'隐藏选项页仍是下拉来源');
+  const binding=workbook.sheets[2];
+  assert.equal(layout.validate(binding.layout,{rowCount:binding.values.length,columnCount:10}).ok,true,
+    '隐藏标记不得让内部绑定页版式失效');
+});
+
+// F1：额外材料行是阻断问题，必须走既有的问题定位与“先修好再确认/存草稿”的口径。
+test('F1额外材料行属于阻断问题：确认与草稿都要先修好，并带可定位的行列',()=>{
+  assert.equal(model.BLOCKING_ISSUES.includes('row-extra'),true);
+  const read={rows:[{rowId:'row-1',row:4,index:'1',name:'水泵',feature:'DN50',unit:'台',quantity:'2',
+    autoCategoryId:'pump',autoCategoryName:'水泵',finalCategoryName:'水泵',finalCategoryId:'pump',reviewNote:''}],
+   issues:[{row:5,column:2,code:'row-extra',message:'第5行有本次审核成果表绑定以外的材料行：钢索'}]};
+  const checked=model.validateRead(read,{categories:[{id:'pump',name:'水泵'}]});
+  assert.equal(checked.ok,false);
+  const issue=checked.errors.filter(item=>item.code==='row-extra')[0];
+  assert.ok(issue,'确认校验必须保留额外材料行问题');
+  assert.equal(issue.title,'绑定以外的材料行');
+  assert.equal(issue.row,5);assert.equal(issue.column,2);
+  const saved=model.draft(read,{binding:null});
+  assert.equal(saved.ok,false);
+  assert.equal(saved.errors[0].code,'row-extra');
+  assert.equal(model.validateRead({rows:read.rows,issues:[]},{categories:[{id:'pump',name:'水泵'}]}).ok,true,
+    '没有额外材料行时确认不受影响');
+});

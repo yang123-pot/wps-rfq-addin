@@ -55,7 +55,8 @@ DBWIN启动在CreateProcess前被自动审批拒绝`Rejected blocked by policy`�
 详见[调查第13节](wps-sidebar-stability-investigation-20261005.md)及`early-native-input-audit-20261008.json`、`early-native-input-audit-readback-20261008.json`、`render-flags-live-independent-audit-20261008.json`、`dbwin-input30-runtime-20261008-policy-rejected-prerequisite.json`、`early-input-cleanup-20261008.json`。产品/配置未改、侧栏未修复，真实稳定性矩阵仍欠证据；本项不勾选，业务余项、四项目、R12结案及R13不开始。
 
 - [x] **SIDEBAR-STABILITY-01已于10-11按有界口径验收通过并关闭。** 最终非模态窗口四项真人操作、七步业务链、两小时和约7小时指标及两段终点可见导航齐备。该结论不扩展为长期稳定、历史OOM消除或正式发布；保存对话框/多项目等余项继续单列。见[问题记录](wps-sidebar-stability-blocker.md)。
-- [ ] F1/F2：审核末行外材料检测、内部页/行高核对；物理SHA刷新失败回滚、确认/旧草稿一致性及恢复提示收口。
+- [x] F1（2026-10-11）：审核末行外材料检测与定位、内部技术页隐藏、行高实测结论。相关四文件Node 74/74、全量458/458；真机WPS 12.1.0.29161读回隐藏/下拉/冻结/打印并完成追加-拒绝-恢复核对。证据见[F1证据](wps-phase1-f1-evidence-20261011.md)；仍是本机COM复刻写入，不是插件窗口内点按。
+- [ ] F2：物理SHA刷新失败回滚、确认/旧草稿一致性及恢复提示收口（下一包）。
 - [ ] F3：分列/同格汇总生成后自动打开、失败保留成果和手动入口；默认窗口遮挡、精确窄宽及三态出口。
 
 - [x] 补验全量`node --test wps-addin/test/*.test.cjs`：**394/394**，失败/跳过均0；含ribbon与恢复模型测试。
@@ -100,7 +101,7 @@ DBWIN启动在CreateProcess前被自动审批拒绝`Rejected blocked by policy`�
 - [ ] 支持版本只列实测；另一WPS版本环境及正式词表/迁入政策待定，不扩大声明范围。
 - [ ] main合并或发布版本另按明确安排执行。
 
-当前下一实施包为**F1审核结构与显示边界，随后F2恢复一致性**，再按F3–F8推进；四项目业务决定可并行准备。详细代码差额和时间估算见当前计划；只有实际推送和远程SHA相等才报告同步。本轮仅文档核对，不执行上述产品包。
+当前下一实施包为**F2恢复状态一致性**（F1已于2026-10-11完成并备份），再按F3–F8推进；四项目业务决定可并行准备。详细代码差额和时间估算见当前计划；只有实际推送和远程SHA相等才报告同步。
 
 历史时点（原始Ribbon服务恢复前）：图标/恢复/导航记录已推送 `6a8e159`、`27d8091`、`3a065ee`、`9587a0a`，各核远程SHA。当时磁盘为1项目revision1、0学习来源、库revision0；输入/复制件/故障审核簿/库及保护pane SHA不变。诊断37452使用同隔离五目录，旧paneSession为`eadac314d28bf8a8`；当时修复后真人重载待答。
 
