@@ -67,6 +67,7 @@ node outputs/wps-phase1-F1/scripts/check-extra-rows.cjs         # 真实读回�
 - 隐藏状态以读回JSON为准；截图未包含底部标签栏，不用它证明“只剩一张表”。
 - `row-extra`只覆盖“末行之后”；表头以上插入行、结构性错行仍按既有`field-changed`/`row-missing`报出，未在本包扩大范围。
 - 浏览器`ui-*`、保存对话框、多项目并发、完整下游失效、四项目属F2–F6，未在本包结论内。
+- **进程观察（如实记录）**：本轮用独立隐藏COM实例（首查：`Visible=False`、`Workbooks.Count=0`，用户可见窗口未受影响），脚本结束调`Quit()`清理自建实例。之后`wps`进程集合中PID 10592（10-10 22:52:56创建）已不在，无法证实与本轮调用有关；用户可见窗口（PID 16672，“分类汇总表.xlsx”）与其他进程保持，本轮未停任何用户进程。下一包开始时仍按handoff要求先核实际进程与端口，不盲用PID。
 
 ## 6. 证据文件（本机`outputs/wps-phase1-F1/`，不入Git）
 
