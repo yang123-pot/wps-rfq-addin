@@ -1,5 +1,7 @@
 # WPS询价插件一期剩余工作详细实施计划
 
+> **2026-10-11状态说明：** 本文件保留09-27原包规格与实现细节，复选框和当时基线不作为当前完成率。已有B/D/E/F/G/H/I/J、C多数分项、K七入口及稳定性有界收口证据；当前差额与接续顺序以[整体核对](../../wps-project-progress-audit-20261011.md)、[F1–F8完成计划](2026-10-11-wps-phase1-completion.md)及最新handoff为准。禁止按旧顺序重复开发已完成包。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 沿用用户已确定的当前会话逐包执行方式；一个会话只推进一个工作包，不另开代理。当前这轮只核对和写计划，不开始下列实现。
 
 **Goal:** 在保留已通过成果的前提下，修正核对发现的问题，完成图03缺项、图05–07及R12全部出口，再完成R13安装和用户交接。
