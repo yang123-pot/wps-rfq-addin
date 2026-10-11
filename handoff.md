@@ -822,3 +822,5 @@ git ls-remote origin refs/heads/feat/wps-phase1
 - 本机outputs/nudge-report.txt保留强制重画/CEF改宽无效证据；有效恢复使用功能区重建。
 - 原资料分类/、运行数据outputs/、LocalAppData下WpsRfqAddin项目/库/模板均不纳Git。
 - [旧设计v2](docs/wps-addin-phase1-design-v2.md)、[用户说明](docs/wps-user-guide.md)、[安装说明](docs/wps-install-guide.md)、[发布清单](docs/wps-phase1-release-checklist.md)发生冲突时，以本文件及已批准效果图为准；正式新版说明随R13完成。
+> **10-11 方案变更（进行中）：分类工作簿改为“一本多页”** 用户要求：第4步不再按类别拆成多个 WPS 文件、也不自动全部打开（卡顿＋逐份关闭麻烦），改为生成**一个**分类工作簿——**每类一页、页名＝类别名、汇总表放最前**；分类汇总表“名称”列改为**文件内跳转**；**不再保留**单类导出入口；文件名 `<项目名称>_分类工作簿.xlsx`。不变：公开 10 列、品牌/报价单价/金额留空、每类行数与内容、无公式与内部追溯；**一键拆分仍从询价总表走，不受影响**。已登记到[图04/05变更说明](docs/mockups/approved-20260926/amendments-20261011.md)与manifest。**待做**：改图完成后的代码改动（`category-workbooks`／`summary-links`／`export-host`／`ui-category-check` 及相关测试、项目阶段业务键），模块测试＋全量回归（基线474/474），再按新口径重跑项目1 第4步及其下游。项目1 已生成的 23 份独立分类工作簿为**旧口径产物，不计入新口径验收**；第6/7步产物为**示例品牌与示例抬头**，仅技术验证，真实供应商名录到手后须重填重生成，项目1 才正式通过。R12未结案、四项目0/4正式通过、R13未执行。
+>

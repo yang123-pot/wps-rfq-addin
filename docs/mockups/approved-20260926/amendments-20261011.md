@@ -20,3 +20,17 @@
 **落地与验证：** `workbook-layout.js`（`listValidation` 增 `allowOtherInput`）、`classification-review-model.js`（`validateRead` 增 `allowNewCategories`/`newCategoryIds`，新增 `adoptNewCategories`）、`export-host.js`（写入 `ShowError=false` 与读回检查）、`classification-ui.js`（`adoptCategories` 建类并落盘）、`import-ui.js`（确认路径先建类再解析）。模块测试：`workbook-layout`／`classification-review-model`／`export-host`；浏览器检查：`ui-sheet-review-check`（覆盖建类、入库、学习与同名去重）。
 
 **边界：** 只改「最终分类」这一列的下拉行为；其他下拉（如汇总表“询价生成方式”）仍只允许库内值。真实 WPS 窗口内的手输行为待四项目验收时按项目实测并在证据中记录点击者。
+
+## 图04／图05：分类工作簿改为“一本多页”，汇总表名称改为文件内跳转
+
+**变更内容（用户 2026-10-11 要求）：** 第 4 步生成分类工作簿时，**不再按类别拆成多个独立 WPS 文件、也不再自动全部打开**（会造成卡顿与逐份关闭的麻烦），改为生成**一个**分类工作簿：
+
+- **一个文件**、**每类一页**，**页名＝类别名**（不改名、不编号）；
+- **汇总表放在最前面**（第一页）；
+- 分类汇总表“名称”列的链接由“指向各独立分类工作簿的相对链接”改为**文件内跳转到对应页**；
+- **不再保留**“把某一类单独导出成独立文件”的入口；
+- 文件名沿用产品命名习惯：`<项目名称>_分类工作簿.xlsx`。
+
+**不变的部分：** 分类内容与列（公开 10 列、品牌/报价单价/金额留空）、每类行数、无公式、无内部追溯；**一键拆分仍从询价总表拆分**，拆分件数量与命名不受本次变更影响。
+
+**影响面（须同步改动与验收）：** 图04、图05；`category-workbooks`／`summary-links`／`export-host`／`ui-category-check` 及相关测试；项目阶段业务键（分类阶段产物由多文件变为单文件）；四项目验收中“分类工作簿文件数”由 N 份改为 1 份，改为**逐页核行数**与**页内跳转是否真跳到对应页**。

@@ -8,6 +8,12 @@
       "file": "amendments-20261011.md",
       "images": ["03-sheet-review.png"],
       "summary": "用户要求：图03「最终分类」保留下拉但允许直接输入新类别名；整表确认时按新类别接收并同时进类别库与经验库，同名去重、直接生效。原PNG不重绘，以变更说明＋用户真实截图为准。"
+    },
+    {
+      "date": "2026-10-11",
+      "file": "amendments-20261011.md",
+      "images": ["04-category-workbooks.png", "05a-summary-separated.png", "05b-summary-combined.png"],
+      "summary": "用户要求：第4步分类工作簿改为“一个文件、每类一页、页名=类别名、汇总表在最前”，不再拆成多份、不再自动全部打开；汇总表名称列改为文件内跳转；不再保留单类导出入口。原PNG不重绘，以变更说明为准。"
     }
   ],
   "files": [
