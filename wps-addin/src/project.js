@@ -23,9 +23,11 @@
  var FUTURE_FIELDS=['matching','review','reviewDraft','categories','summary','brands','inquiry','split','header'];
  // R1过渡期旧侧栏仍在使用的暂存字段；内部版本未知时同样必须拒绝，防止误读。
  var INTERIM_FIELDS=['classification','assignments','generation'];
- // 每个阶段的业务键包含哪些确认内容；所有键都含来源、合并方式与材料行。
- var KEY_CONTENT={import:[],matching:[],review:['review'],categories:['review'],
-  brands:['review'],inquiry:['review','brands','header'],split:['review','brands','header']};
+  // 每个阶段的业务键包含哪些确认内容；所有键都含来源、合并方式与材料行。
+  // 2026-10-11（图04/05变更“一本多页”）：分类与汇总阶段的输出是同一本工作簿，
+  // 业务键改为“1 文件 + 逐页行数（含第 1 页汇总页）”，文件或任一页行数变化都必须让汇总及下游过期。
+  var KEY_CONTENT={import:[],matching:[],review:['review'],categories:['review','output'],
+   summary:['review','output'],brands:['review'],inquiry:['review','brands','header'],split:['review','brands','header']};
  var BRAND_COVERAGE=['pending','alternative-quotes','material-subsets'];
  var ID_PATTERN=/^[a-z0-9-]{8,64}$/;
 
@@ -280,6 +282,14 @@
   return Array.isArray(list)&&list.every(function(item){
    return isObject(item)&&(item.categoryId!=null||item.groups!=null);});
  }
+  // 一本多页的产物快照：只留“1 文件 + 逐页行数（页名与顺序固定）”，表内排序/格式不影响业务键。
+  function normalizeOutput(value){
+   var source=isObject(value)?value:{};
+   var sheets=(Array.isArray(source.sheets)?source.sheets:[]).map(function(item){
+    var sheet=isObject(item)?item:{};
+    return {name:text(sheet.sheetName||sheet.name),rowCount:Number(sheet.rowCount)||0};});
+   return {file:text(source.file),sheets:sheets};
+  }
  function normalizeBrands(source){
   if(!source)return [];
   var list;
@@ -311,6 +321,7 @@
   if(includes.indexOf('review')>=0)snapshot.review=normalizeRows(input.review||input.classification);
   if(includes.indexOf('brands')>=0)snapshot.brands=normalizeBrands(input.brands||input.assignments);
   if(includes.indexOf('header')>=0)snapshot.header=canonical(input.header||null);
+  if(includes.indexOf('output')>=0)snapshot.output=normalizeOutput(input.output||input.categories||input.summary);
   return canonical(snapshot);
  }
  function contentKey(options){return 'ck2-'+digest(JSON.stringify(contentSnapshot(options)));}
@@ -342,11 +353,15 @@
   var inquiryReady=brandsReady&&!!(input.inquiry&&input.inquiry.ready===true);
   var splitReady=inquiryReady&&!!(input.split&&input.split.ready===true);
   var reviewSource=input.review&&input.review.rows?input.review:(input.review||input.classification);
+  // 分类/汇总阶段的生产物就是那一本分类工作簿：1 文件＋逐页行数（含第 1 页汇总页）。
+  var output=normalizeOutput(input.categories||input.summary);
   var key={collection:source,mergeIdentical:mergeIdentical,groups:rows,review:reviewSource,
-   brands:input.brands&&input.brands.rows?input.brands:input.brands||input.assignments,header:input.header||null};
+   brands:input.brands&&input.brands.rows?input.brands:input.brands||input.assignments,header:input.header||null,
+   output:output};
   var matchingKey=contentKey(Object.assign({},key,{stage:'matching'}));
   var reviewKey=contentKey(Object.assign({},key,{stage:'review'}));
   var categoriesKey=contentKey(Object.assign({},key,{stage:'categories'}));
+  var summaryKey=contentKey(Object.assign({},key,{stage:'summary'}));
   var brandsKey=contentKey(Object.assign({},key,{stage:'brands'}));
   var inquiryKey=contentKey(Object.assign({},key,{stage:'inquiry'}));
   var splitKey=contentKey(Object.assign({},key,{stage:'split'}));
@@ -361,7 +376,7 @@
    inquiry:stageInfo(brandsReady,input.inquiry,'询价表已生成并校验','尚未生成询价表','品牌汇总未完成'),
    split:stageInfo(inquiryReady,input.split,'拆分已完成并核对','尚未完成拆分','询价表未生成'),
    mergeKey:mergeKey,matchingKey:matchingKey,reviewKey:reviewKey,categoriesKey:categoriesKey,
-   brandsKey:brandsKey,inquiryKey:inquiryKey,splitKey:splitKey,
+   summaryKey:summaryKey,brandsKey:brandsKey,inquiryKey:inquiryKey,splitKey:splitKey,
    brandKey:reviewKey,generationKey:inquiryKey,
    mergeIdentical:mergeIdentical,rowCount:rows.length,rows:rows};
  }
@@ -390,6 +405,6 @@
   create:create,validate:validate,assertValid:assertValid,assertEditable:assertEditable,isLegacy:isLegacy,schemaOf:schemaOf,
   stageState:stageState,confirm:confirm,invalidate:invalidate,invalidateStage:invalidateStage,
   compareSources:compareSources,refresh:refresh,upgradeV1:upgradeV1,newId:newId,
-  rowsFromPreview:rowsFromPreview,contentSnapshot:contentSnapshot,contentKey:contentKey,assess:assess,sync:sync,
+ rowsFromPreview:rowsFromPreview,normalizeOutput:normalizeOutput,contentSnapshot:contentSnapshot,contentKey:contentKey,assess:assess,sync:sync,
   OWNER:OWNER,KIND_OF_STAGE:KIND_OF_STAGE,BRAND_COVERAGE:BRAND_COVERAGE.slice()};
 }));

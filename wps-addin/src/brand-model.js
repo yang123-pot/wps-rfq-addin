@@ -165,6 +165,13 @@
  function splitPath(value){
   return text(value).replace(/\//g,'\\').split('\\').filter(function(part){return part!=='';});
  }
+  // 一本多页（2026-10-11）：汇总表名称列改为“文件内跳转到对应分类页”，地址形如 页名!A1。
+  // 与导出宿主同一口径：简单页名（中文/字母/数字/下划线/点/连字符）不加单引号，含顿号等字符的页名必须加引号。
+  function sheetReference(name){
+   var raw=text(name);
+   return /^[0-9A-Za-z_\u4e00-\u9fff.\-]+$/.test(raw)?raw:"'"+raw.replace(/'/g,"''")+"'";
+  }
+  function internalSubAddress(sheetName){return sheetReference(sheetName)+'!A1';}
  // 从汇总表目录到分类工作簿的“相对链接地址”：整目录搬移后仍能点开同一份文件。
  function relativePath(fromDirectory,toPath){
   var from=splitPath(fromDirectory),to=splitPath(toPath),drive=/^[a-z]:$/i;
@@ -190,9 +197,10 @@
    ['','','','品牌','供应商','品牌','供应商','品牌','供应商','']];
  }
  function put(row,index,value){while(row.length<index)row.push('');row[index-1]=value;}
- // 分类清单：来自R6已核实的回执（每类一个独立工作簿）。先校验类别、路径与清洗后重名，再生成汇总。
+ // 分类清单：来自R6已核实的回执。一本多页（internal）时每类是同一本工作簿里的一页，
+ // 名称列改成文件内跳转；独立文件模式沿用相对链接。两种模式都先校验类别与重名，再生成汇总。
  function summaryPlan(categories,options){
-  var input=options||{},directory=text(input.directory);
+  var input=options||{},directory=text(input.directory),internal=input.internal===true;
   if(!/^(?:[a-z]:[\\/]|\\\\)/i.test(directory))throw Error('分类汇总表目录无效，请先确认成果批次目录。');
   if(!Array.isArray(categories)||!categories.length)throw Error('没有需要询价的类别，未生成分类汇总表。');
   var issues=[],seen={},taken={},list=[];
@@ -200,23 +208,30 @@
    var entry=item||{},categoryId=text(entry.categoryId),categoryName=text(entry.categoryName),path=text(entry.path);
    if(!categoryId){issues.push(summaryIssue('category-id-missing','缺少类别标识','有一个分类工作簿缺少稳定类别标识，不能生成汇总表。'));return;}
    if(!categoryName){issues.push(summaryIssue('category-name-missing','类别名称为空','类别 '+categoryId+' 没有名称，不能生成汇总表。',categoryId));return;}
-   if(!/^(?:[a-z]:[\\/]|\\\\)/i.test(path)||!/^.+\.xlsx$/i.test(path)){
-    issues.push(summaryIssue('category-path-invalid','分类工作簿路径无效','类别“'+categoryName+'”的分类工作簿路径无效，不能生成汇总表。',categoryId));return;}
    if(seen[categoryId]){issues.push(summaryIssue('category-duplicate','类别重复','类别标识 '+categoryId+' 在清单里出现多次，不能生成汇总表。',categoryId));return;}
    seen[categoryId]=true;
-   var file=text(path).replace(/[\\/]+$/,'').replace(/[\\/][^\\/]*$/,'').replace(/[\\/]/g,'\\');
-   var fileName=text(path).replace(/[\\/]+$/,'').split(/[\\/]/).pop(),relative;
-   try{relative=relativePath(directory,path);}
-   catch(error){issues.push(summaryIssue('category-relative-failed','无法生成相对链接',error.message,categoryId));return;}
+   var fileName=path.replace(/[\\/]+$/,'').split(/[\\/]/).pop(),relative,subAddress=null,sheetName=text(entry.sheetName);
+   if(internal){
+    if(!sheetName){issues.push(summaryIssue('category-sheet-missing','缺少分类页名',
+     '类别“'+categoryName+'”没有对应的分类页名，不能生成汇总表。',categoryId));return;}
+    subAddress=internalSubAddress(sheetName);
+    relative=subAddress;                 // 隐藏绑定列保存页内跳转地址
+   }else{
+    if(!/^(?:[a-z]:[\\/]|\\\\)/i.test(path)||!/^.+\.xlsx$/i.test(path)){
+     issues.push(summaryIssue('category-path-invalid','分类工作簿路径无效','类别“'+categoryName+'”的分类工作簿路径无效，不能生成汇总表。',categoryId));return;}
+    try{relative=relativePath(directory,path);}
+    catch(error){issues.push(summaryIssue('category-relative-failed','无法生成相对链接',error.message,categoryId));return;}
+   }
    var key=relative.toLowerCase();
-   if(taken[key])issues.push(summaryIssue('category-name-collision','分类工作簿重名',
+   if(taken[key])issues.push(summaryIssue('category-name-collision',internal?'分类页名重复':'分类工作簿重名',
     '类别“'+categoryName+'”与“'+taken[key]+'”的链接地址相同（'+relative+'），请先修改后再生成。',categoryId));
    else taken[key]=categoryName;
    list.push({categoryId:categoryId,categoryName:categoryName,rowCount:Number(entry.rowCount)||0,
-    path:text(path),file:fileName,relative:relative,sha256:entry.sha256==null?null:text(entry.sha256)});
+    path:path,file:fileName,relative:relative,sheetName:sheetName,subAddress:subAddress,internal:internal,
+    sha256:entry.sha256==null?null:text(entry.sha256)});
   });
   return {schemaVersion:SUMMARY_SCHEMA_VERSION,inputKey:input.inputKey==null?null:text(input.inputKey),
-   directory:directory,layout:summaryLayoutFor(input.layout).name,projectName:text(input.projectName),
+   directory:directory,layout:summaryLayoutFor(input.layout).name,projectName:text(input.projectName),internal:internal,
    categories:list,issues:issues,ok:issues.length===0};
  }
  // 生成分类汇总表工作簿：可见区一类一行，隐藏列保存稳定类别标识与相对链接，选项表供“询价生成方式”下拉。
@@ -246,11 +261,13 @@
   // 方式下拉的选项列表放在隐藏列，保持单页、不新增工作表页签（与获批图一致）。
   put(values[0],spec.auxOptions,SUMMARY_MODES[0].label);
   put(values[1],spec.auxOptions,SUMMARY_MODES[1].label);
-  // 底部一行操作说明：点击名称打开对应分类工作簿；同格布局另说明两行填写格式。
-  var first=plan.categories[0];
+  // 底部一行操作说明：一本多页时点击名称跳转到同一本工作簿的对应分类页；独立文件模式仍是打开对应工作簿。
+  var first=plan.categories[0],internal=first.internal===true;
+  var linkHint=internal?('点击名称跳转到同一本工作簿的对应分类页，例如：'+first.categoryName+' → '+first.sheetName)
+   :('点击名称打开对应分类工作簿，例如：'+first.categoryName+' → '+first.file);
   put(values[hintRow-1],1,spec.name==='combined'
-   ?'单格按两行填写：第一行“品牌：…”，第二行“供应商：…”。点击名称打开对应分类工作簿，例如：'+first.categoryName+' → '+first.file
-   :'点击名称打开对应分类工作簿，例如：'+first.categoryName+' → '+first.file);
+   ?'单格按两行填写：第一行“品牌：…”，第二行“供应商：…”。'+linkHint
+   :linkHint);
   values=layout.equalize(values,width);
   layout.guardValues(SUMMARY_SHEET,values);          // 汇总表类别名/链接也不得超宿主单格上限
   var baseWidth=spec.name==='combined'?[6,20,10,26,26,26,22]:[6,20,10,16,18,16,18,16,18,20];
@@ -282,8 +299,12 @@
   merges.push({row:hintRow,column:1,columnSpan:spec.width});
   plan.categories.forEach(function(entry,index){
    var row=spec.firstRow+index;
-   hyperlinks.push({row:row,column:2,address:entry.relative,display:entry.categoryName,relative:true,
-    screenTip:'打开分类工作簿：'+entry.file});
+   if(entry.internal===true)
+    hyperlinks.push({row:row,column:2,address:'',subAddress:entry.subAddress,internal:true,
+     display:entry.categoryName,screenTip:'跳转到本工作簿的分类页：'+entry.sheetName});
+   else
+    hyperlinks.push({row:row,column:2,address:entry.relative,display:entry.categoryName,relative:true,
+     screenTip:'打开分类工作簿：'+entry.file});
    fonts.push(layout.linkFont(row,2));
   });
   var optionsRange='$'+columnLetter(spec.auxOptions)+'$1:$'+columnLetter(spec.auxOptions)+'$2';
@@ -297,7 +318,7 @@
     categoryIds:plan.categories.map(function(entry){return entry.categoryId;})}},
    {rowCount:values.length,columnCount:width});
   return {schemaVersion:SUMMARY_SCHEMA_VERSION,inputKey:plan.inputKey,directory:plan.directory,layout:spec.name,
-   projectName:plan.projectName,sheet:SUMMARY_SHEET,headerRow:spec.headerRow,firstRow:spec.firstRow,lastRow:lastRow,
+   projectName:plan.projectName,sheet:SUMMARY_SHEET,internal:plan.internal===true,headerRow:spec.headerRow,firstRow:spec.firstRow,lastRow:lastRow,
    modeColumn:spec.modeColumn,auxCategory:spec.auxCategory,auxFile:spec.auxFile,
    auxOptions:spec.auxOptions,
    categories:plan.categories.map(function(entry){return Object.assign({},entry);}),
@@ -311,13 +332,14 @@
    throw Error('分类汇总表路径无效，请选择新的xlsx绝对路径。');
   var source=workbook||{};
   return {schemaVersion:SUMMARY_SCHEMA_VERSION,path:target,sheet:source.sheet||SUMMARY_SHEET,
-   layout:source.layout||'separated',headerRow:source.headerRow||2,firstRow:source.firstRow||4,lastRow:source.lastRow||3,
+    layout:source.layout||'separated',internal:source.internal===true,
+    headerRow:source.headerRow||2,firstRow:source.firstRow||4,lastRow:source.lastRow||3,
    modeColumn:source.modeColumn||10,auxCategory:source.auxCategory||null,auxFile:source.auxFile||null,
    inputKey:source.inputKey==null?null:text(source.inputKey),
    projectName:source.projectName==null?'':text(source.projectName),
    categories:(source.categories||[]).map(function(entry){
     return {categoryId:text(entry.categoryId),categoryName:text(entry.categoryName),rowCount:Number(entry.rowCount)||0,
-     file:text(entry.file),relative:text(entry.relative),path:text(entry.path)};})};
+      file:text(entry.file),relative:text(entry.relative),path:text(entry.path),sheetName:text(entry.sheetName)};})};
  }
  function validateSummaryBinding(binding){
   var errors=[];
@@ -508,7 +530,8 @@
   SUMMARY_SCHEMA_VERSION:SUMMARY_SCHEMA_VERSION,SUMMARY_SHEET:SUMMARY_SHEET,SUMMARY_LAYOUTS:SUMMARY_LAYOUTS.slice(),
   SUMMARY_MODES:SUMMARY_MODES.map(function(item){return Object.assign({},item);}),
   summaryLayoutFor:summaryLayoutFor,summaryModeLabel:summaryModeLabel,summaryModeValue:summaryModeValue,
-  relativePath:relativePath,summaryPlan:summaryPlan,buildSummary:buildSummary,
+  relativePath:relativePath,sheetReference:sheetReference,internalSubAddress:internalSubAddress,
+  summaryPlan:summaryPlan,buildSummary:buildSummary,
   summaryBindingFor:summaryBindingFor,validateSummaryBinding:validateSummaryBinding,
   parseSummary:parseSummary,summaryReadRecord:summaryReadRecord,
   summarySheetCount:summarySheetCount,summaryCountsText:summaryCountsText};

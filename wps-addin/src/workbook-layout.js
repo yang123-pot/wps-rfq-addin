@@ -86,7 +86,11 @@
   (layout.hyperlinks||[]).forEach(function(link,index){
    rect(link,'第'+(index+1)+'个链接',errors);
    if(!isObject(link))return;
-   if(typeof link.address!=='string'||!link.address.trim())errors.push('第'+(index+1)+'个链接缺少地址。');
+   // 一本多页（2026-10-11）：文件内跳转没有外部地址，必须有 SubAddress（页名!单元格）；
+   // 独立文件链接仍要求有地址，两种写法都不许“什么都没有”。
+   if(link.internal===true){
+    if(typeof link.subAddress!=='string'||!link.subAddress.trim())errors.push('第'+(index+1)+'个链接缺少文件内跳转地址。');
+   }else if(typeof link.address!=='string'||!link.address.trim())errors.push('第'+(index+1)+'个链接缺少地址。');
    if(typeof (link.display==null?'':link.display)==='object')errors.push('第'+(index+1)+'个链接显示文本无效。');
   });
   (layout.validations||[]).forEach(function(rule,index){

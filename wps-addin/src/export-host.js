@@ -110,7 +110,8 @@
       if(!sheet.Hyperlinks||typeof sheet.Hyperlinks.Add!=='function')
         throw Error('当前WPS不支持原生超链接API（Hyperlinks.Add），未按获批版式输出“'+sheet.Name+'”。');
       var anchor=sheet.Range(address(link));
-      // 用原生超链接，不用HYPERLINK公式：显示类别名，地址指向对应分类工作簿。
+        // 用原生超链接，不用HYPERLINK公式：显示类别名。独立文件模式地址指向对应分类工作簿；
+        // 一本多页模式地址留空、用 SubAddress＝页名!A1 做文件内跳转（用户要求：汇总表名称跳到对应分类页）。
       sheet.Hyperlinks.Add(anchor,link.address,link.subAddress||'',link.screenTip||'',link.display==null?'':String(link.display));
       if(anchor.Hyperlinks&&typeof anchor.Hyperlinks.Count==='number'&&anchor.Hyperlinks.Count<1)
         throw Error('“'+sheet.Name+'”超链接未生效：'+address(link));
@@ -185,6 +186,11 @@
     if(/^(?:[a-z]:[\\/]|\\\\)/i.test(value))return normalizeTarget(value);
     return normalizeTarget(baseDirectory+'\\'+value);
   }
+  // 一本多页（2026-10-11）：汇总表名称列改为文件内跳转（Address 为空、SubAddress＝页名!A1）。
+  // 读回只认“同一个工作簿内的同一页同一格”，宿主把 SubAddress 归一化成等价写法（去引号/去空白）仍算通过。
+  function normalizeSubAddress(value){
+    return String(value==null?'':value).replace(/[\s\u3000]+/g,'').replace(/'/g,'').toUpperCase();
+  }
   function verifyLayout(app,book,model,stagePath){
     // 相对链接要按“这份工作簿最终落盘的目录”解析；模型声明的 directory 是汇总表最终目录，
     // 实际读回地址按暂存文件当前所在目录解析，两者都归一到完整目标再比对。
@@ -235,7 +241,17 @@
         var count=anchor.Hyperlinks&&anchor.Hyperlinks.Count;
         if(count==null)throw Error('“'+s.name+'”无法读回超链接，未确认获批版式：'+address(link));
         if(Number(count)<1)throw Error('“'+s.name+'”超链接读回缺失：'+address(link));
-        var actual=anchor.Hyperlinks.Item(1).Address;
+        var item=anchor.Hyperlinks.Item(1);
+        if(link.internal===true){
+          var expectedSub=normalizeSubAddress(link.subAddress),actualSub=normalizeSubAddress(item.SubAddress);
+          if(!expectedSub||actualSub!==expectedSub)
+            throw Error('“'+s.name+'”文件内跳转读回不一致：期望'+link.subAddress+'，实际'+String(item.SubAddress));
+          var storedAddress=String(item.Address==null?'':item.Address);
+          if(storedAddress&&normalizeTarget(storedAddress)!==normalizeTarget(String(book.FullName||stagePath)))
+            throw Error('“'+s.name+'”文件内跳转被写成外部地址：'+storedAddress+'，未确认获批版式：'+address(link));
+          return;
+        }
+        var actual=item.Address;
         // 相对链接按目录整体搬移仍可用：读回可能是原样相对路径，也可能是WPS解析后的绝对路径。
         // 但两者都要从本文件所在目录解析成完整目标再比对，别处目录的同名文件不能蒙混通过。
         var expected=resolveTarget(finalBase,link.address),resolved=resolveTarget(actualBase,actual);

@@ -49,7 +49,8 @@ function confirmedFlow(mergeIdentical) {
     confirmation: confirmation, categories: categories, decisions: decisions };
 }
 
-// 图05 填写（与6.1节相同的品牌模式）：水泵2组按品牌分别生成、阀门2组合成、风机/充电桩各1组。
+// 图05（2026-10-11一本多页变更）：汇总表＝分类工作簿第 1 页，名称列文件内跳转到对应分类页。
+// 填写模式与6.1节相同：水泵2组按品牌分别生成、阀门2组合成、风机/充电桩各1组。
 function fillSummary(summary, plan) {
   const combos = {
     pump: [['青源', '华川设备'], ['恒流', '启明机电']],
@@ -76,17 +77,18 @@ function fillSummary(summary, plan) {
 
 function summaryAndInquiry(flow, layout) {
   const categoryPlan = categoryWorkbooks.plan(flow.confirmation, { binding: flow.binding,
-    directory: ROOT + '\\分类工作簿', inputKey: INPUT_KEY, root: ROOT });
+    directory: ROOT + '\\分类工作簿', inputKey: INPUT_KEY, root: ROOT, projectName: '示例园区不合并' });
   assert.equal(categoryPlan.ok, true, (categoryPlan.issues[0] || {}).message);
   const categories = categoryPlan.files.map(function (file) {
     return { categoryId: file.categoryId, categoryName: file.categoryName, rowCount: file.rowCount,
-      path: file.path, sha256: null };
+      sheetName: file.sheetName, file: categoryPlan.file, path: categoryPlan.path, sha256: null };
   });
-  const plan = brandModel.summaryPlan(categories, { directory: ROOT, inputKey: INPUT_KEY,
-    layout: layout, projectName: '示例园区不合并' });
+  const plan = brandModel.summaryPlan(categories, { directory: categoryPlan.directory, inputKey: INPUT_KEY,
+    layout: layout, projectName: '示例园区不合并', internal: true });
   assert.equal(plan.ok, true, (plan.issues[0] || {}).message);
   const summary = fillSummary(brandModel.buildSummary(plan, {}), plan);
-  const read = brandModel.parseSummary(summary.sheets[0].values, brandModel.summaryBindingFor(ROOT + '\\分类汇总表.xlsx', summary));
+  const read = brandModel.parseSummary(summary.sheets[0].values,
+    brandModel.summaryBindingFor(categoryPlan.path, summary));
   assert.equal(read.ok, true, (read.issues[0] || {}).message);
   const model = inquiry.build({ brands: brandModel.summaryReadRecord(read), groups: flow.groups,
     classification: { decisions: flow.decisions }, header: HEADER, inputKey: INPUT_KEY });

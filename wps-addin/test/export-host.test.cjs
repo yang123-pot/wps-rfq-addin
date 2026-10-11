@@ -330,8 +330,61 @@ test('落地获批版式：等宽矩阵、列宽、表头填充、冻结、打�
  assert.equal(h.app.AutomationSecurity,1,'宏安全设置恢复');
 });
 
+// 2026-10-11（图04/05变更）：分类工作簿由“每类一份文件”改为一本多页——一次写入第 1 页汇总页＋逐类页，
+// 页名＝类别名，汇总页“名称”列改为文件内跳转（地址留空、SubAddress＝页名!A1）。
+function multiPagePlan(){
+  function page(categoryId,categoryName,sheetName,rows){
+    return {categoryId:categoryId,categoryName:categoryName,sheetName:sheetName,rowCount:rows.length,
+      rowIds:rows.map(function(row,index){return 'r-'+categoryId+'-'+index;}),
+      rows:rows.map(function(row,index){
+        return {rowId:'r-'+categoryId+'-'+index,index:String(index+1),code:row[0],name:row[1],feature:row[2],
+          unit:row[3],quantity:row[4],scopeId:'combined',categoryId:categoryId,categoryName:categoryName};})};
+  }
+  const files=[
+   page('pump','水泵','水泵',[['SB-001','水泵','DN50','台','2'],['SB-002','水泵','DN65','台','3']]),
+   page('valve','阀门','阀门',[['FM-001','阀门','DN50','个','20'],['FM-002','阀门','DN65','个','12']]),
+   page('fan','风机','风口、风阀',[['FJ-001','送风机','规格A','台','2'],['FJ-002','排风机','规格B','台','3']]),
+   page('ev-charger','汽车充电桩','汽车充电桩',[['CD-101','充电桩配电箱','充电桩配套','台','1']])];
+  const directory='C:\\out\\示例园区\\分类工作簿';
+  return {file:'示例园区_分类工作簿.xlsx',directory:directory,path:directory+'\\示例园区_分类工作簿.xlsx',
+   sheets:files.map(function(entry){return {categoryId:entry.categoryId,categoryName:entry.categoryName,
+     sheetName:entry.sheetName,rowCount:entry.rowCount,rowIds:entry.rowIds.slice()};}),files:files};
+}
+test('一本多页：一次写入“第 1 页汇总＋逐类页”，页名＝类别名，名称列是文件内跳转',()=>{
+  const books=require('../src/category-workbooks.js'),brandModel=require('../src/brand-model.js');
+  const plan=multiPagePlan();
+  const summaryPlan=brandModel.summaryPlan(plan.files.map(function(entry){
+    return {categoryId:entry.categoryId,categoryName:entry.categoryName,rowCount:entry.rowCount,sheetName:entry.sheetName};}),
+    {directory:plan.directory,inputKey:'ck2-multipage',layout:'combined',projectName:'示例园区',internal:true});
+  assert.equal(summaryPlan.ok,true,(summaryPlan.issues[0]||{}).message);
+  const summary=brandModel.buildSummary(summaryPlan,{});
+  const h=layoutFixture();
+  const model=books.writeAll(h.app,plan,'C:\\temp\\rfq-layout.xlsx',{summarySheet:summary.sheets[0]});
+  assert.deepEqual(model.sheets.map(sheet=>sheet.name),
+    ['分类汇总表','水泵','阀门','风口、风阀','汽车充电桩'],'第 1 页是汇总页，其后每类一页且页名＝类别名');
+  assert.deepEqual(h.sheets.map(sheet=>sheet.Name),
+    ['分类汇总表','水泵','阀门','风口、风阀','汽车充电桩'],'页顺序与页名真正落到宿主工作表上');
+  // 同格布局：第 1 行标题、第 4 行表头、第 5 行起一类一行；名称列是内部跳转。
+  assert.deepEqual(h.links['B5'].map(item=>[item.Address,item.SubAddress,item.TextToDisplay]),
+    [['',"水泵!A1",'水泵']],'名称列地址留空、SubAddress 指向同一本工作簿的对应页 A1');
+  assert.deepEqual(h.links['B6'].map(item=>item.Address),[''],'不指向任何外部文件');
+  assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx','用户工作簿保持活动');
+  assert.equal(h.app.AutomationSecurity,1,'宏安全设置恢复');
+  // 逐类页仍是公开10列＋隐藏rowId，品牌/报价/金额留空；页名含顿号也照样独立成页。
+  const fanSheet=h.sheets.find(sheet=>sheet.Name==='风口、风阀');
+  const fanValues=fanSheet.Range('A1:K3').Value2;
+  assert.equal(fanValues.length,3,'表头＋2行材料');
+  assert.equal(fanValues.slice(1).every(row=>row[6]===''&&row[7]===''&&row[8]===''),true,'品牌/报价单价/金额留空');
+  assert.equal(fanValues.slice(1).every(row=>!!row[10]),true,'每页仍带隐藏rowId列');
+  // 跳转被写成外部地址或指错页：整本拒绝保存，不产出“看起来能跳”的文件。
+  const external=layoutFixture({rewriteLinkAddress:(address)=>address===''?'C:\\out\\别的册.xlsx':address});
+  assert.throws(()=>books.writeAll(external.app,plan,'C:\\temp\\rfq-layout.xlsx',{summarySheet:summary.sheets[0]}),
+    /文件内跳转被写成外部地址|文件内跳转读回不一致/);
+  assert.equal(external.app.ActiveWorkbook.FullName,'C:\\user.xlsx','核对失败也必须把用户工作簿恢复为活动簿');
+});
+
 test('版式读回缺失或宿主缺API时明确报错，不产出“看起来像”的文件',()=>{
- const layoutModule=require('../src/workbook-layout.js');
+  const layoutModule=require('../src/workbook-layout.js');
  const values=layoutModule.equalize([['清单'],['序号','项目编码','项目名称','项目特征描述','单位','工程量','品牌','报价单价','金额','备注'],
   ['1','FM-001','阀门','DN50','个','20','通达','','','']],10);
  const spec=layoutModule.build({columns:values[1].map(function(_,i){return {index:i+1};}),headerRows:[2],

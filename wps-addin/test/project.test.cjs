@@ -127,6 +127,42 @@ test('contentKey is a stable v2 business snapshot key that ignores UI, time and 
  assert.equal(report.brandKey,reviewKey,'品牌表上游键只含清单、合并与分类确认');
  assert.equal(report.generationKey,inquiryKey,'生成与拆分键再加入品牌与抬头');
 });
+// 2026-10-11（图04/05变更“一本多页”）：分类/汇总阶段的业务键＝1 文件＋逐页行数（含第 1 页汇总页），
+// 文件或任一页行数变化都必须换键（让汇总与下游过期），只改界面/格式不得换键。
+test('一本多页业务键：1文件＋逐页行数（含汇总页），文件或任一页行数变化即换键',()=>{
+ const base=fixture(),groups=rowsOf(base,false);
+ const sheets=[{sheetName:'分类汇总表',rowCount:9},{sheetName:'水泵',rowCount:2},{sheetName:'阀门',rowCount:2}];
+ const keyOf=(file,list)=>project.contentKey({stage:'categories',collection:base,mergeIdentical:false,groups:groups,
+  review:{ready:true},output:{file:file,sheets:list}});
+ const dataKey=keyOf('示例园区_分类工作簿.xlsx',sheets);
+ assert.match(dataKey,/^ck2-[0-9a-f]{16}$/);
+ assert.equal(keyOf('示例园区_分类工作簿.xlsx',sheets.map(sheet=>Object.assign({},sheet))),dataKey,
+  '相同页行数（对象副本、无关字段）必须同键');
+ assert.equal(keyOf('示例园区_分类工作簿.xlsx',sheets.map(sheet=>({name:sheet.sheetName,rowCount:sheet.rowCount}))),dataKey,
+  '页名/行数相同、字段写法不同不得换键');
+ assert.notEqual(keyOf('示例园区_分类工作簿.xlsx',sheets.map((sheet,index)=>index?sheet:Object.assign({},sheet,{rowCount:10}))),
+  dataKey,'第 1 页（汇总页）行数变化必须换键');
+ assert.notEqual(keyOf('示例园区_分类工作簿.xlsx',sheets.map((sheet,index)=>index===2?Object.assign({},sheet,{rowCount:3}):sheet)),
+  dataKey,'任一类别页行数变化必须换键');
+ assert.notEqual(keyOf('别的_分类工作簿.xlsx',sheets),dataKey,'换文件必须换键');
+ assert.notEqual(keyOf('示例园区_分类工作簿.xlsx',sheets.slice(0,2)),dataKey,'少一页必须换键');
+ const preview=collection.preview(base,false),bare=project.assess({collection:base,mergeIdentical:false,preview:preview,groups:groups});
+ const common={collection:base,mergeIdentical:false,preview:preview,groups:groups,mergeConfirmedKey:bare.mergeKey,
+  matching:{ready:true},review:{ready:true}};
+ const output={ready:true,file:'示例园区_分类工作簿.xlsx',sheets:sheets};
+ const report=project.assess(Object.assign({},common,{categories:output}));
+ assert.equal(report.categoriesKey,dataKey,'assess 的分类键必须按同口径计算');
+ assert.equal(report.summaryKey,project.contentKey({stage:'summary',collection:base,mergeIdentical:false,groups:groups,
+  review:{ready:true},output:{file:'示例园区_分类工作簿.xlsx',sheets:sheets}}),'汇总阶段用同一份1文件＋逐页行数');
+ assert.equal(report.brandsKey,project.contentKey({stage:'brands',collection:base,mergeIdentical:false,groups:groups,
+  review:{ready:true}}),'分类工作簿的页行数不进入品牌阶段键');
+ const changed=project.assess(Object.assign({},common,{categories:Object.assign({},output,
+  {sheets:sheets.map((sheet,index)=>index===2?Object.assign({},sheet,{rowCount:3}):sheet)})}));
+ assert.notEqual(changed.categoriesKey,report.categoriesKey);
+ assert.notEqual(changed.summaryKey,report.summaryKey);
+ assert.deepEqual(project.normalizeOutput({file:'a.xlsx',sheets:[{sheetName:'分类汇总表',rowCount:9},{name:'水泵',rowCount:2}]}),
+  {file:'a.xlsx',sheets:[{name:'分类汇总表',rowCount:9},{name:'水泵',rowCount:2}]},'页名字段兼容 sheetName/name');
+});
 test('stage readiness comes from real content, never from a non-empty field',()=>{
  const base=fixture(),preview=collection.preview(base,false),groups=rowsOf(base,false);
  const bare=project.assess({collection:base,mergeIdentical:false,preview:preview,groups:groups});

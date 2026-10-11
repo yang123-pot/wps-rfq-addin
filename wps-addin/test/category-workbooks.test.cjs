@@ -26,7 +26,8 @@ const ROOT='C:\\out\\示例园区';
 const DIRECTORY=books.workbookDirectory(ROOT);
 function planned(overrides){
   const {binding,confirmation}=confirmed();
-  return books.plan(confirmation,Object.assign({binding,directory:DIRECTORY,inputKey:'ck2-0123456789abcdef',root:ROOT},overrides));
+  return books.plan(confirmation,Object.assign({binding,directory:DIRECTORY,inputKey:'ck2-0123456789abcdef',root:ROOT,
+    projectName:'示例园区'},overrides));
 }
 function renamedCategory(confirmation,categoryId,name){
   return Object.assign({},confirmation,{rows:confirmation.rows.map(row=>
@@ -50,11 +51,15 @@ test('plan：按确认快照categoryId分组、排除无需询价、保留rowId/
   assert.deepEqual(plan.issues,[]);
   assert.equal(plan.ok,true);
   assert.deepEqual(plan.counts,{categories:4,inquiryRows:7,noInquiryRows:1,totalRows:8});
-  assert.deepEqual(plan.files.map(file=>[file.categoryName,file.file,file.rowCount]),
-    [['水泵','水泵.xlsx',2],['阀门','阀门.xlsx',2],['风机','风机.xlsx',2],['汽车充电桩','汽车充电桩.xlsx',1]],
-    '每个询价类别一个独立文件，行数与图04一致');
-  assert.deepEqual(plan.files.map(file=>file.path),
-    ['水泵.xlsx','阀门.xlsx','风机.xlsx','汽车充电桩.xlsx'].map(name=>DIRECTORY+'\\'+name));
+  // 一本多页：逐类条目共用同一个工作簿文件；页名＝类别名，行数与图04一致。
+  assert.deepEqual(plan.files.map(file=>[file.categoryName,file.sheetName,file.rowCount]),
+    [['水泵','水泵',2],['阀门','阀门',2],['风机','风机',2],['汽车充电桩','汽车充电桩',1]]);
+  assert.equal(plan.file,'示例园区_分类工作簿.xlsx','文件名＝<项目名称>_分类工作簿.xlsx');
+  assert.equal(plan.path,DIRECTORY+'\\'+plan.file);
+  assert.deepEqual(plan.files.map(file=>file.file),['示例园区_分类工作簿.xlsx','示例园区_分类工作簿.xlsx','示例园区_分类工作簿.xlsx','示例园区_分类工作簿.xlsx'],
+    '所有类别页都写进这一本工作簿');
+  assert.deepEqual(plan.files.map(file=>file.path),[plan.path,plan.path,plan.path,plan.path]);
+  assert.deepEqual(plan.sheets.map(sheet=>[sheet.sheetName,sheet.rowCount]),[['水泵',2],['阀门',2],['风机',2],['汽车充电桩',1]]);
   const pump=plan.files[0];
   assert.equal(pump.rowIds.length,2);
   assert.equal(pump.rows.every(row=>!!row.rowId),true,'rowId必须保留，供汇总/询价关联');
@@ -82,7 +87,8 @@ test('plan先检查全部目标：缺绑定、缺类别、行标识不属于本�
   assert.equal(unknown.issues[0].code,'row-id-unknown');
   const illegals=books.plan(renamedCategory(confirmation,'pump','水泵/阀门'),{binding,directory:DIRECTORY,root:ROOT});
   assert.equal(illegals.ok,true);
-  assert.equal(illegals.files[0].file,'水泵_阀门.xlsx','非法字符必须清洗');
+  assert.equal(illegals.files[0].sheetName,'水泵_阀门','非法页名字符必须清洗');
+  assert.equal(illegals.files[0].categoryFile,'水泵_阀门.xlsx','类别文件名仍按同一清洗规则（用于重名检查）');
   const clash=books.plan(renamedCategory(renamedCategory(confirmation,'pump','水泵 1'),'valve','水泵 1'),
     {binding,directory:DIRECTORY,root:ROOT});
   assert.equal(clash.ok,false,'两个类别清洗后同名必须在写第一份前阻断');
@@ -122,28 +128,43 @@ test('每类一个工作簿：单一“材料明细”页、10个公开列、品
     '持久回执记录不含材料行，直接写入必须明确拒绝');
 });
 
-test('receipt/summarize：局部成功不算完成，全部成功才complete，全部无需询价为空批次',()=>{
-  const plan=planned(),receipt=books.receipt(plan,{layout:'separated'});
+test('receipt/summarize：逐页未完成不算完成，整本通过才complete，全部无需询价为空批次',()=>{
+  const plan=planned(),receipt=books.receipt(plan,{layout:'separated',
+    summary:{sheetName:'分类汇总表',rowCount:9}});
   assert.equal(receipt.status,'pending');
   assert.equal(receipt.files.length,4);
+  assert.equal(receipt.file,plan.file);
+  assert.equal(receipt.path,plan.path);
+  assert.deepEqual(receipt.sheets.map(sheet=>[sheet.sheetName,sheet.rowCount,sheet.isSummary===true,sheet.status]),
+    [['分类汇总表',9,true,'pending'],['水泵',2,false,'pending'],['阀门',2,false,'pending'],
+     ['风机',2,false,'pending'],['汽车充电桩',1,false,'pending']],
+    '第 1 页＝汇总页，其后每类一页（页名＝类别名），逐页都待生成');
   assert.deepEqual(receipt.counts,{categories:4,inquiryRows:7,noInquiryRows:1,totalRows:8});
   assert.equal(receipt.files.every(file=>file.status==='pending'&&file.sha256===null),true);
   assert.deepEqual(receipt.files[0].rowIds,plan.files[0].rowIds);
   assert.equal(books.summarize(receipt).status,'pending');
   assert.equal(books.statusOf(receipt),'pending');
-  receipt.files[0].status='succeeded';receipt.files[0].sha256='b'.repeat(64);
+  // 只把第 1 页（汇总页）标成功：还有类别页未通过，绝不能显示全部完成。
+  receipt.sheets[0].status='succeeded';
   const half=books.summarize(receipt);
-  assert.equal(half.status,'partial','局部成功绝不能显示全部完成');
-  assert.equal(books.statusOf(receipt),'partial','回执状态必须与每份文件的真实状态一致');
+  assert.equal(half.status,'partial','逐页有未完成绝不能显示全部完成');
+  assert.equal(books.statusOf(receipt),'partial','回执状态必须与逐页的真实状态一致');
   assert.equal(half.generated,1);
-  assert.equal(half.text,'1 个分类工作簿已生成');
+  assert.equal(half.categories,4,'categories 只数类别页');
+  assert.equal(half.pages,5,'pages 含第 1 页汇总页');
+  assert.equal(half.text,'分类工作簿已生成（1 本 · 4 页）');
   assert.equal(half.detail,'7 行纳入询价 · 1 行无需询价');
-  receipt.files.forEach(file=>{file.status='succeeded';file.sha256='c'.repeat(64);});
+  // 整本一次写入：所有页与整文件一起成功/失败。
+  receipt.sha256='c'.repeat(64);receipt.bytes=1234;
+  books.setSheetsStatus(receipt,'succeeded');
+  assert.equal(receipt.status,'complete');
   assert.equal(books.summarize(receipt).status,'complete');
-  assert.equal(books.statusOf(receipt),'complete');
-  receipt.files[3].status='failed';receipt.files[3].error='写入失败';
-  assert.equal(books.summarize(receipt).failed,1);
-  assert.equal(books.statusOf(receipt),'partial','有一份失败时回执不得写complete');
+  assert.equal(receipt.sheets.every(sheet=>sheet.status==='succeeded'),true);
+  assert.equal(receipt.files.every(file=>file.status==='succeeded'&&file.sha256==='c'.repeat(64)),true,
+    '整本写入成功后逐份记录同步指向同一个文件SHA');
+  books.setSheetsStatus(receipt,'failed','写入失败');
+  assert.equal(books.summarize(receipt).failed,5);
+  assert.equal(books.statusOf(receipt),'pending','整本失败时回执不得写complete');
   assert.equal(books.statusOf({files:[],counts:{inquiryRows:0}}),'empty');
   assert.equal(books.statusOf({files:[],counts:{inquiryRows:7}}),'pending');
   const {binding,confirmation}=confirmed();
@@ -278,3 +299,35 @@ test('openForEditing复用已打开的同路径工作簿，未打开则只读打
   assert.throws(()=>books.openForEditing({AutomationSecurity:null,Workbooks:{Count:0}},filePath),/宏安全设置/);
   assert.throws(()=>books.openForEditing(app,'relative.xlsx'),/路径无效/);
 });
+
+// 2026-10-11（图04/05变更）：一本多页写入必须“有页可写”，发布后按页读回核页名与行数。
+test('一本多页：空清单明确拒绝写入；发布后按页读回页名/行数，页名或行数不对都报错',()=>{
+  assert.throws(()=>books.writeAll({}, planWithPages([]), 'C:\\stage\\x.xlsx', {}),/没有可写入的分类工作簿页/);
+  const expected=[{sheetName:'分类汇总表',rowCount:9},{sheetName:'水泵',rowCount:3},{sheetName:'阀门',rowCount:3}],
+    file='C:\\out\\示例园区\\分类工作簿\\示例园区_分类工作簿.xlsx';
+  const good=sheetApp([{name:'分类汇总表',rows:9},{name:'水泵',rows:3},{name:'阀门',rows:3}]);
+  const result=books.verifySheets(good,file,expected);
+  assert.equal(result.ok,true,(result.issues||[]).join('；'));
+  assert.deepEqual(result.sheets.map(sheet=>[sheet.sheetName,sheet.rowCount]),
+    [['分类汇总表',9],['水泵',3],['阀门',3]]);
+  assert.equal(good.closed,1,'读回打开的工作簿在核对后关闭');
+  assert.equal(good.AutomationSecurity,1,'宏安全值恢复');
+  assert.match(books.verifySheets(sheetApp([{name:'水泵',rows:3},{name:'分类汇总表',rows:9},{name:'阀门',rows:3}]),file,expected)
+    .issues.join('；'),/第 1 页应为“分类汇总表”/,'汇总页必须就在第 1 页');
+  assert.match(books.verifySheets(sheetApp([{name:'分类汇总表',rows:9},{name:'水泵',rows:1},{name:'阀门',rows:3}]),file,expected)
+    .issues.join('；'),/“水泵”行数不足/,'少写材料行必须报错');
+  assert.match(books.verifySheets(sheetApp([{name:'分类汇总表',rows:9}]),file,expected).issues.join('；'),/工作表页数不一致/);
+  assert.throws(()=>books.verifySheets(good,'relative.xlsx',expected),/路径无效/);
+  assert.throws(()=>books.readSheets({AutomationSecurity:null,Workbooks:{Count:0}},file),/宏安全设置/);
+});
+function planWithPages(files){return {file:'示例园区_分类工作簿.xlsx',path:'C:\\out\\示例园区\\分类工作簿\\示例园区_分类工作簿.xlsx',files:files};}
+function sheetApp(sheets){
+  const app={AutomationSecurity:1,closed:0,
+    Workbooks:{Count:1,Item(){return null;},
+      Open(file,links,readonly){
+        assert.equal(links,0);assert.equal(readonly,true);assert.equal(app.AutomationSecurity,3);
+        return {FullName:file,Worksheets:{get Count(){return sheets.length;},
+          Item(index){const sheet=sheets[index-1];return {Name:sheet.name,UsedRange:{Rows:{Count:sheet.rows}}};}},
+          Close(save){assert.equal(save,false);app.closed++;}};}}};
+  return app;
+}

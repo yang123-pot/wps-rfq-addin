@@ -136,19 +136,24 @@ async function run(){
   await page.exposeFunction('__writeInquiryFixture',async function(file,payload){
    await fs.writeFile(file,Buffer.concat([Buffer.from([0x50,0x4b,3,4]),Buffer.from(String(payload))]));});
   const installStubs=function(){return page.evaluate(function(){
-   window.RfqCategoryWorkbooks.write=async function(app,entry,stagePath){
-    window.__categoryWrites.push({path:stagePath,categoryId:entry.categoryId,file:entry.file});
-    await window.__writeCategoryFixture(stagePath,entry.file);};
-   window.RfqBrandHost.summaryWrite=async function(app,model,stagePath){
-    const spec=model.sheets[0].layout;
-    window.__summaryModels.push({stagePath:stagePath,layout:model.layout,firstRow:model.firstRow,lastRow:model.lastRow,
-     modeColumn:model.modeColumn,auxCategory:model.auxCategory,auxFile:model.auxFile,
-     categories:model.categories.map(function(item){return {categoryId:item.categoryId,categoryName:item.categoryName,
-      rowCount:item.rowCount,relative:item.relative,file:item.file};}),
-     hyperlinks:spec.hyperlinks.map(function(link){return {address:link.address,display:link.display};}),
-     values:model.sheets[0].values.map(function(row){return row.slice();}),
-     rows:model.sheets[0].values.slice(model.firstRow-1,model.lastRow).map(function(row){return row.slice(0,10);})});
-    await window.__writeSummaryFixture(stagePath,'summary');};
+   // 一本多页（2026-10-11变更）：第4步一次写入“第 1 页汇总＋逐类页”，第5步汇总表＝同一本工作簿第 1 页。
+   window.RfqCategoryWorkbooks.writeAll=async function(app,plan,stagePath,options){
+    const summary=options&&options.summarySheet,spec=summary.layout,meta=spec.metadata||{};
+    window.__categoryWrites.push({path:stagePath,file:plan.file,planPath:plan.path});
+    window.__summaryModels.push({stagePath:stagePath,layout:meta.layout,firstRow:meta.firstRow,lastRow:meta.lastRow,
+     modeColumn:meta.modeColumn,auxCategory:meta.auxCategory,auxFile:meta.auxFile,
+     categories:(plan.files||[]).map(function(entry){return {categoryId:entry.categoryId,categoryName:entry.categoryName,
+      rowCount:entry.rowCount,sheetName:entry.sheetName,file:plan.file};}),
+     hyperlinks:spec.hyperlinks.map(function(link){return {address:link.address,subAddress:link.subAddress,
+      internal:link.internal===true,display:link.display};}),
+     values:summary.values.map(function(row){return row.slice();}),
+     rows:summary.values.slice(meta.firstRow-1,meta.lastRow).map(function(row){return row.slice(0,10);})});
+    await window.__writeCategoryFixture(stagePath,'workbook:'+(plan.files||[]).length);};
+   // 发布后按页读回：本夹具只记录期望页（真实读回逻辑见 category-workbooks 单测与真机复刻）。
+   window.RfqCategoryWorkbooks.verifySheets=function(app,filePath,expected){
+    window.__categoryVerify=(window.__categoryVerify||[]).concat([{path:filePath,expected:expected}]);
+    return {ok:true,issues:[],sheets:expected.map(function(item,index){
+     return {index:index+1,sheetName:item.sheetName,rowCount:item.rowCount};})};};
    window.RfqBrandHost.openSummary=function(app,filePath){window.__summaryOpened.push(filePath);return {path:filePath,opened:true};};
    window.RfqBrandHost.selectTarget=function(app,suggested){
     window.__suggested=suggested;return window.__inquiryTarget;};
@@ -167,7 +172,7 @@ async function run(){
    await fs.mkdir(EVIDENCE,{recursive:true});
    await fs.writeFile(path.join(EVIDENCE,name),JSON.stringify(value,null,2));
   };
-  // 图01→图04：导入、合并确认、整表确认（改选汽车充电桩）、生成4份独立分类工作簿。
+  // 图01→图04：导入、合并确认、整表确认（改选汽车充电桩）、生成一本多页分类工作簿。
   await page.locator('#import-files').click();
   await page.waitForFunction(function(){return document.querySelectorAll('#imported-books > li').length===2;});
   await page.locator('#merge-identical').check();
@@ -190,17 +195,20 @@ async function run(){
   await page.evaluate(function(args){window.__setCell(args.row,8,'汽车充电桩');window.__setCell(args.row,9,'充电桩配套');},{row:CONFLICT_ROW});
   await page.locator('#sheet-review-confirm').click();
   await page.waitForFunction(function(){return /整表已确认（8 行）/.test(document.querySelector('#sheet-review-message').textContent);});
-  await page.waitForFunction(function(){return /4 个分类工作簿已生成/.test(document.querySelector('#categories-banner').textContent);});
-  assert.deepEqual((await fs.readdir(workbookDirectory)).sort(),
-   ['汽车充电桩.xlsx','水泵.xlsx','阀门.xlsx','风机.xlsx'].sort(),'4份独立分类工作簿已真实发布');
-  // 图05A：生成分类汇总表（默认分列），一类一行，名称是蓝色下划线相对链接。
+  await page.waitForFunction(function(){return /分类工作簿已生成（1 本 · 4 页）/.test(document.querySelector('#categories-banner').textContent);});
+  assert.deepEqual((await fs.readdir(workbookDirectory)).sort(),['示例园区_分类工作簿.xlsx'],
+   '第4步只发布一本分类工作簿');
+  // 图05A：分类汇总表＝同一本工作簿第 1 页（默认分列），一类一行，名称是文件内跳转链接。
   await page.locator('#workflow-nav .workflow-step-button[data-stage="brands"]').click();
   await page.waitForFunction(function(){return document.querySelector('#brands-banner').textContent.includes('尚未生成分类汇总表');});
   await page.locator('#brands-generate').click();
   await page.waitForFunction(function(){return window.__summaryModels.length>=1&&
-   /已生成并校验分类汇总表/.test(document.querySelector('#brands-message').textContent);});
+   /已生成并校验分类汇总表/.test(document.querySelector('#brands-message').textContent)&&
+   /分类汇总表已生成（4 类）/.test(document.querySelector('#brands-banner').textContent);});
   const summary=await page.evaluate(function(){return window.__summaryModels[0];});
   const receipt=await projectRecord();
+  assert.equal(require('node:path').resolve(receipt.summary.path).toLowerCase(),
+   require('node:path').resolve(receipt.categories.path).toLowerCase(),'汇总表与分类工作簿是同一本文件');
   await page.evaluate(function(args){window.__seedSummary(args.file,args.values);},
    {file:receipt.summary.path,values:fillSummaryGrid(summary,SUMMARY_FILLS)});
   // 用户保存已填汇总后，读回必须刷新物理SHA，不能沿用生成时的空表SHA。

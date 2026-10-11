@@ -217,7 +217,9 @@ function summaryApp(options){
     const stored=settings.resolveLinks&&!/^(?:[a-z]:[\\/]|\\\\)/i.test(address)
      ? 'C:\\out\\示例园区\\'+String(address).replace(/\\/g,'\\') : address;
     const final=settings.rewriteLinkAddress?settings.rewriteLinkAddress(address,stored):stored;
-    list.push({Address:final,SubAddress:subAddress,ScreenTip:screenTip,TextToDisplay:display});}}};
+    // 内部跳转的 SubAddress 也可能被宿主归一化（去引号/改写页名），读回必须按同一口径核对。
+    const finalSub=settings.rewriteSubAddress?settings.rewriteSubAddress(address,subAddress):subAddress;
+    list.push({Address:final,SubAddress:finalSub,ScreenTip:screenTip,TextToDisplay:display});}}};
   return sheet;
  }
  function makeBook(){
@@ -293,4 +295,74 @@ test('打开汇总表：已打开的同路径工作簿直接复用，未打开�
  assert.equal(active,target,'汇总表打开后置前供填写');
  assert.throws(()=>host.openSummary({AutomationSecurity:null,Workbooks:{Count:0}},filePath),/宏安全设置/);
  assert.throws(()=>host.openSummary(fresh,'relative.xlsx'),/路径无效/);
+});
+
+// 2026-10-11（图04/05变更“一本多页”）：汇总表就是那本分类工作簿的第 1 页，
+// 名称列由“指向独立文件的相对链接”改为“文件内跳转到对应分类页”。
+const SHARED_PATH=CATEGORY_DIRECTORY+'\\示例园区_分类工作簿.xlsx';
+const INTERNAL_CATEGORIES=[
+ {categoryId:'pump',categoryName:'水泵',rowCount:2,sheetName:'水泵',file:'示例园区_分类工作簿.xlsx',path:SHARED_PATH},
+ {categoryId:'valve',categoryName:'阀门',rowCount:2,sheetName:'阀门',file:'示例园区_分类工作簿.xlsx',path:SHARED_PATH},
+ {categoryId:'fan',categoryName:'风机',rowCount:2,sheetName:'风口、风阀',file:'示例园区_分类工作簿.xlsx',path:SHARED_PATH},
+ {categoryId:'ev-charger',categoryName:'汽车充电桩',rowCount:1,sheetName:'汽车充电桩',file:'示例园区_分类工作簿.xlsx',path:SHARED_PATH}];
+function internalPlan(){
+ return model.summaryPlan(INTERNAL_CATEGORIES,{directory:DIRECTORY,inputKey:INPUT_KEY,layout:'separated',
+  projectName:'示例园区',internal:true});
+}
+test('一本多页-plan：同一本工作簿里每类一页，名称列是页内跳转地址；缺页名/页名重复都阻断',()=>{
+ const plan=internalPlan();
+ assert.equal(plan.ok,true,(plan.issues[0]||{}).message);
+ assert.equal(plan.internal,true);
+ assert.deepEqual(plan.categories.map(item=>[item.categoryName,item.sheetName,item.subAddress,item.relative]),
+  [['水泵','水泵','水泵!A1','水泵!A1'],['阀门','阀门','阀门!A1','阀门!A1'],
+   ['风机','风口、风阀',"'风口、风阀'!A1","'风口、风阀'!A1"],['汽车充电桩','汽车充电桩','汽车充电桩!A1','汽车充电桩!A1']],
+  '简单页名不加引号，含顿号的页名必须加单引号；同一本工作簿里的地址必须带页名');
+ assert.equal(plan.categories.every(item=>item.internal===true),true);
+ const missing=model.summaryPlan(INTERNAL_CATEGORIES.map((item,index)=>index?item:Object.assign({},item,{sheetName:''})),
+  {directory:DIRECTORY,inputKey:INPUT_KEY,internal:true});
+ assert.equal(missing.ok,false);
+ assert.equal(missing.issues[0].code,'category-sheet-missing');
+ const collide=model.summaryPlan(INTERNAL_CATEGORIES.map((item,index)=>index===1?Object.assign({},item,{sheetName:'水泵'}):item),
+  {directory:DIRECTORY,inputKey:INPUT_KEY,internal:true});
+ assert.equal(collide.ok,false);
+ assert.match(collide.issues[0].title,/分类页名重复/);
+});
+test('一本多页-汇总页：名称列是内部跳转（地址空＋页名!A1），说明改为“跳转到对应分类页”',()=>{
+ const plan=internalPlan(),workbook=model.buildSummary(plan,{}),sheet=workbook.sheets[0],spec=sheet.layout;
+ assert.equal(workbook.internal,true);
+ assert.deepEqual(spec.hyperlinks.map(link=>[addr(link),link.address,link.subAddress,link.internal===true,link.display]),
+  [['B4:B4','',"水泵!A1",true,'水泵'],['B5:B5','',"阀门!A1",true,'阀门'],
+   ['B6:B6','',"'风口、风阀'!A1",true,'风机'],['B7:B7','',"汽车充电桩!A1",true,'汽车充电桩']],
+  '名称列不指向外部文件，只跳到本工作簿的对应页');
+ assert.equal(spec.hyperlinks.every(link=>!('relative' in link)),true);
+ assert.equal(visibleRow(workbook,4)[11],"水泵!A1",'隐藏绑定列保存页内跳转地址');
+ assert.match(visibleRow(workbook,workbook.lastRow+2)[0],/点击名称跳转到同一本工作簿的对应分类页/,'底部说明同步改口径');
+ assert.equal(workbook.categories.every(item=>item.path===SHARED_PATH),true,'一类一行仍指向同一本工作簿');
+ const binding=model.summaryBindingFor(SHARED_PATH,workbook);
+ assert.equal(binding.internal,true);
+ assert.equal(binding.path,SHARED_PATH);
+ assert.equal(binding.categories[0].sheetName,'水泵');
+ assert.deepEqual(model.validateSummaryBinding(binding),{ok:true,errors:[]});
+ // 读回仍按稳定类别ID解析：内部跳转不改读回口径，品牌列照常逐格校验。
+ const read=model.parseSummary(workbook.sheets[0].values.map(row=>row.slice()),binding);
+ assert.equal(read.ok,false,'未填写品牌供应商时读回必须报缺组');
+ assert.equal(read.issues[0].code,'group-empty');
+});
+test('一本多页-模拟宿主：内部跳转真落地（地址空、SubAddress＝页名!A1）并重开读回一致',()=>{
+ const plan=internalPlan(),workbook=model.buildSummary(plan,{}),fixture=summaryApp(),
+  stage='C:\\out\\示例园区\\分类工作簿\\.示例园区_分类工作簿.tmp.xlsx';
+ host.summaryWrite(fixture.app,workbook,stage);
+ assert.equal(fixture.state.created,1,'一本多页只建一个工作簿');
+ assert.equal(fixture.state.opened,1,'保存后必须重开核对');
+ assert.deepEqual(fixture.links.get('B4').map(item=>[item.Address,item.SubAddress,item.TextToDisplay]),
+  [['',"水泵!A1",'水泵']],'内部跳转地址为空、SubAddress 指向对应页 A1');
+ assert.deepEqual(fixture.links.get('B6').map(item=>item.SubAddress),["'风口、风阀'!A1"],'含顿号页名带单引号');
+ // 宿主把跳转写成外部文件、或跳到别的页：都必须拒绝，绝不产出“看起来能跳”的表。
+ const external=summaryApp({rewriteLinkAddress:(address)=>address===''?'C:\\out\\别的册.xlsx':address});
+ assert.throws(()=>host.summaryWrite(external.app,workbook,stage),/文件内跳转被写成外部地址|文件内跳转读回不一致/);
+ const wrongSheet=summaryApp({rewriteSubAddress:(address,sub)=>address===''?String(sub).replace('水泵','阀门'):sub});
+ assert.throws(()=>host.summaryWrite(wrongSheet.app,workbook,stage),/文件内跳转读回不一致/);
+ // 宿主把 SubAddress 归一化成去引号写法（等价）仍须通过。
+ const normalized=summaryApp({rewriteSubAddress:(address,sub)=>address===''?String(sub).replace(/'/g,''):sub});
+ host.summaryWrite(normalized.app,workbook,stage);
 });

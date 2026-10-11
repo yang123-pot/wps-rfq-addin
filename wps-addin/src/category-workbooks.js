@@ -88,14 +88,17 @@ function batchDirectory(reviewPath){return workbookDirectory(rootOf(reviewPath))
     scopeId:text(field.scopeId),sourceIds:((field.sourceIds||[]).map(function(id){return text(id);})),
     categoryId:categoryId,categoryName:categoryName,skip:false,note:''});
   });
-  // 重名检查按清洗后的文件名做，避免“水泵 / 水泵 ”或含非法字符的两个类别撞到一个文件。
+  // 一本多页：所有类别页都写进同一个工作簿，逐类条目共用这一个文件；page 名仍按类别名规则清洗。
+  var projectName=text(input.projectName);
+  var workbookName=safeName(projectName||'分类工作簿')+'_分类工作簿.xlsx',
+   workbookPath=directory+'\\'+workbookName;
   var files=[],taken={};
   order.forEach(function(entry){
-   var file=fileNameFor(entry.categoryName),key=file.toLowerCase();
-   entry.file=file;entry.path=directory+'\\'+file;entry.rowCount=entry.rows.length;
-   entry.rowIds=entry.rows.map(function(row){return row.rowId;});
+   var categoryFile=fileNameFor(entry.categoryName),key=categoryFile.toLowerCase();
+   entry.file=workbookName;entry.path=workbookPath;entry.categoryFile=categoryFile;
+   entry.rowCount=entry.rows.length;entry.rowIds=entry.rows.map(function(row){return row.rowId;});
    if(taken[key])issues.push(issue('name-collision','类别名称重名',
-    '类别“'+entry.categoryName+'”与“'+taken[key]+'”按文件名清洗后都是 '+file+'，请先修改类别名称再生成。'));
+    '类别“'+entry.categoryName+'”与“'+taken[key]+'”按文件名清洗后都是 '+categoryFile+'，请先修改类别名称再生成。'));
    else taken[key]=entry.categoryName;
    files.push(entry);
   });
@@ -105,8 +108,6 @@ function batchDirectory(reviewPath){return workbookDirectory(rootOf(reviewPath))
   entry.sheetName=safeSheetName(entry.categoryName,sheetTaken);
   sheetTaken[entry.sheetName.toLowerCase()]=entry.categoryName;
  });
- var projectName=text(input.projectName);
- var workbookName=safeName(projectName||'分类工作簿')+'_分类工作簿.xlsx';
   var inquiryRows=files.reduce(function(total,entry){return total+entry.rowCount;},0);
   return {schemaVersion:SCHEMA_VERSION,sheet:SHEET,folder:FOLDER,
    inputKey:input.inputKey==null?null:text(input.inputKey),
@@ -119,48 +120,72 @@ function batchDirectory(reviewPath){return workbookDirectory(rootOf(reviewPath))
    counts:{categories:files.length,inquiryRows:inquiryRows,noInquiryRows:noInquiryRows,
     totalRows:confirmation.rows.length}};
  }
-// 回执状态只由每份文件的真实状态推导：只要还有未完成，就绝不能显示全部完成。
-function statusOf(record){
-  var source=record||{},files=(source.files||[]);
-  if(!files.length)return source.counts&&source.counts.inquiryRows?'pending':'empty';
-  var done=files.filter(function(file){return file&&file.status==='succeeded';}).length;
-  return done===files.length?'complete':(done?'partial':'pending');
+// 一本多页：状态以逐页 sheets 为准（含第 1 页汇总页）；旧记录没有 sheets 时退回逐份 files（兼容历史回执）。
+function statusItems(record){
+  var source=record||{};
+  if(Array.isArray(source.sheets)&&source.sheets.length)return source.sheets;
+  return source.files||[];
 }
-// 图04的侧栏口径：已生成份数、纳入询价行、无需询价行。
+// 回执状态只由每页的真实状态推导：只要还有未完成，就绝不能显示全部完成。
+function statusOf(record){
+  var source=record||{},items=statusItems(source);
+  if(!items.length)return source.counts&&source.counts.inquiryRows?'pending':'empty';
+  var done=items.filter(function(item){return item&&item.status==='succeeded';}).length;
+  return done===items.length?'complete':(done?'partial':'pending');
+}
+function sheetEntry(item){
+  var value=item||{};
+  return {categoryId:value.categoryId==null?null:text(value.categoryId),categoryName:text(value.categoryName),
+   sheetName:text(value.sheetName),rowCount:Number(value.rowCount)||0,rowIds:(value.rowIds||[]).slice(),
+   isSummary:value.isSummary===true,status:'pending',error:null};
+}
+// 图04的侧栏口径：一本多页——类别页数、纳入询价行、无需询价行。
 function summarize(record){
-  var source=record||{},files=(source.files||[]);
-  var generated=files.filter(function(file){return file&&file.status==='succeeded';}).length;
-  var failed=files.filter(function(file){return file&&(file.status==='failed'||file.status==='needs-verification');}).length;
-  var counts=source.counts||{},status=statusOf(source);
-  return {status:status,categories:files.length,generated:generated,pending:files.length-generated,
-   failed:failed,inquiryRows:counts.inquiryRows||0,noInquiryRows:counts.noInquiryRows||0,totalRows:counts.totalRows||0,
-   text:generated+' 个分类工作簿已生成',
+  var source=record||{},items=statusItems(source),
+   categoryPages=items.filter(function(item){return item&&item.isSummary!==true;}).length;
+  var generated=items.filter(function(item){return item&&item.status==='succeeded';}).length;
+  var failed=items.filter(function(item){return item&&(item.status==='failed'||item.status==='needs-verification');}).length;
+  var counts=source.counts||{},status=statusOf(source),file=source.file==null?null:text(source.file);
+  return {status:status,categories:categoryPages,generated:generated,pending:items.length-generated,
+   failed:failed,pages:items.length,file:file,
+   inquiryRows:counts.inquiryRows||0,noInquiryRows:counts.noInquiryRows||0,totalRows:counts.totalRows||0,
+   text:file?('分类工作簿已生成（1 本 · '+categoryPages+' 页）'):(generated+' 个分类工作簿已生成'),
    detail:(counts.inquiryRows||0)+' 行纳入询价 · '+(counts.noInquiryRows||0)+' 行无需询价'};
- }
- function emptyReceipt(options){
+}
+// 回执里的逐页状态随整本写入结果一起更新：一本多页只有“整本成功/整本未通过”两种真实结果。
+function setSheetsStatus(record,status,error){
+  var source=record||{},value=text(status)||'pending';
+  (source.sheets||[]).forEach(function(sheet){
+   sheet.status=value;sheet.error=error==null?null:text(error);});
+  (source.files||[]).forEach(function(file){
+   file.status=value;file.error=error==null?null:text(error);
+   if(value==='succeeded'){file.sha256=source.sha256==null?file.sha256:text(source.sha256);file.bytes=source.bytes||0;}});
+  source.status=statusOf(source);
+  return source;
+}
+function emptyReceipt(options){
   var input=options||{};
   return {schemaVersion:SCHEMA_VERSION,inputKey:input.inputKey==null?null:text(input.inputKey),
    root:input.root==null?null:text(input.root),batchId:input.batchId==null?null:text(input.batchId),
    directory:input.directory==null?null:text(input.directory),layout:input.layout||'separated',
    createdAt:input.createdAt==null?null:text(input.createdAt),updatedAt:null,status:'none',
   counts:{categories:0,inquiryRows:0,noInquiryRows:input.noInquiryRows||0,totalRows:input.totalRows||0},
-  // 一本多页：file/path 指向那一个分类工作簿；files 仍逐类保存，便于逐页核对与续作。
+  // 一本多页：file/path 指向那一个分类工作簿；sheets 逐页保存（第 1 页＝汇总页），files 仍逐类保存便于续作。
   file:input.file==null?null:text(input.file),path:input.path==null?null:text(input.path),
-  sha256:null,bytes:0,sheets:[],files:[]};
+  sha256:null,bytes:0,sheets:(input.sheets||[]).map(sheetEntry),files:[]};
  }
- // 持久回执：路径/SHA/状态/批次随项目保存；局部成功必须显示为未全部完成。
+ // 持久回执：路径/SHA/状态/批次随项目保存；一本多页时逐页状态都必须核实通过才算完成。
+ // options.summary＝第 1 页汇总页（{sheetName,rowCount}）；汇总页永远排在第 1 页。
  function receipt(planValue,options){
-  var input=options||{},empty=emptyReceipt({inputKey:planValue.inputKey,root:planValue.root,batchId:planValue.batchId,
-   directory:planValue.directory,noInquiryRows:planValue.counts.noInquiryRows,totalRows:planValue.counts.totalRows});
+  var input=options||{},summary=input.summary?[Object.assign({},input.summary,{isSummary:true})]:[];
+  var empty=emptyReceipt({inputKey:planValue.inputKey,root:planValue.root,batchId:planValue.batchId,
+   directory:planValue.directory,noInquiryRows:planValue.counts.noInquiryRows,totalRows:planValue.counts.totalRows,
+   sheets:summary.concat(planValue.sheets||[])});
   empty.createdAt=input.createdAt==null?new Date().toISOString():text(input.createdAt);
   empty.updatedAt=empty.createdAt;empty.layout=input.layout||'separated';
   empty.counts.categories=planValue.files.length;empty.counts.inquiryRows=planValue.counts.inquiryRows;
   empty.file=planValue.file==null?null:text(planValue.file);
   empty.path=planValue.path==null?null:text(planValue.path);
-  empty.sheets=(planValue.sheets||[]).map(function(sheet){
-   return {categoryId:sheet.categoryId,categoryName:sheet.categoryName,sheetName:sheet.sheetName,
-    rowCount:sheet.rowCount,rowIds:(sheet.rowIds||[]).slice(),status:'pending',error:null};
-  });
   empty.files=planValue.files.map(function(entry){
    return {categoryId:entry.categoryId,categoryName:entry.categoryName,name:entry.file,path:entry.path,
     rowCount:entry.rowCount,rowIds:entry.rowIds.slice(),sha256:null,bytes:0,status:'pending',error:null};
@@ -238,6 +263,58 @@ function writeAll(app,planValue,stagePath,options){
   if(error)throw error;
   return {path:filePath,opened:true,reused:false};
  }
+// 2026-10-11（图04/05变更）：一本多页发布后按页读回——逐页核“页名与顺序”和“本页行数是否都在”。
+function keyOf(value){return text(value).replace(/[\\/]+/g,'/').toLowerCase();}
+function readSheets(app,filePath){
+ if(!isAbsolute(filePath)||!/^.+\.xlsx$/i.test(text(filePath)))throw Error('分类工作簿路径无效，未读回核对。');
+ if(!app||typeof app.Workbooks!=='object')throw Error('读回分类工作簿需要连接WPS。');
+ var security=null,opened=null,book=null,error=null,list=[],index;
+ try{
+  var count=Number(app.Workbooks.Count)||0;
+  for(index=1;index<=count;index++){
+   var candidate=app.Workbooks.Item(index);
+   if(candidate&&keyOf(candidate.FullName)===keyOf(filePath)){book=candidate;break;}
+  }
+  if(!book){
+   security=app.AutomationSecurity;
+   if(typeof security!=='number')throw Error('不能读取宏安全设置，未读回分类工作簿。');
+   app.AutomationSecurity=3;
+   if(app.AutomationSecurity!==3)throw Error('无法禁用自动宏，未读回分类工作簿。');
+   opened=app.Workbooks.Open(filePath,0,true);
+   if(!opened||keyOf(opened.FullName)!==keyOf(filePath))throw Error('WPS未返回指定分类工作簿。');
+   book=opened;
+  }
+  var total=Number(book.Worksheets.Count)||0;
+  for(index=1;index<=total;index++){
+   var sheet=book.Worksheets.Item(index),used=sheet&&sheet.UsedRange;
+   list.push({index:index,sheetName:sheet?text(sheet.Name):'',rowCount:used&&used.Rows?Number(used.Rows.Count)||0:0});
+  }
+ }catch(problem){error=problem;}
+ finally{
+  try{if(opened)opened.Close(false);}catch(problem){error=error||Error('读回后关闭分类工作簿失败：'+problem.message);}
+  if(security!=null)try{app.AutomationSecurity=security;}catch(problem){error=error||Error('宏安全设置恢复失败：'+problem.message);}
+ }
+ if(error)throw error;
+ return list;
+}
+function verifySheets(app,filePath,sheets){
+ var expected=(sheets||[]).map(function(item){
+  return {sheetName:text(item.sheetName),rowCount:Number(item.rowCount)||0};});
+ var actual=readSheets(app,filePath),issues=[];
+ if(actual.length!==expected.length)
+  issues.push('工作表页数不一致：期望 '+expected.length+' 页，实际 '+actual.length+' 页。');
+ // 值逐格一致由导出宿主在写入阶段（保存重开逐值核）与发布SHA证明；这里补的是逐页结构与行数。
+ // 宿主可能在已用区域尾部多算空行，因此只把“比写下的行数少”当作失败，页名与顺序必须完全一致。
+ expected.forEach(function(item,index){
+  var got=actual[index];
+  if(!got)return;
+  if(got.sheetName!==item.sheetName)
+   issues.push('第 '+(index+1)+' 页应为“'+item.sheetName+'”，实际“'+got.sheetName+'”。');
+  if(Number(got.rowCount)<item.rowCount)
+   issues.push('“'+item.sheetName+'”行数不足：期望至少 '+item.rowCount+' 行，实际 '+got.rowCount+' 行。');
+ });
+ return {ok:issues.length===0,issues:issues,sheets:actual};
+}
  return {SCHEMA_VERSION:SCHEMA_VERSION,SHEET:SHEET,FOLDER:FOLDER,NO_INQUIRY:NO_INQUIRY,
   COLUMNS:COLUMNS.slice(),ROW_ID_COLUMN:ROW_ID_COLUMN,HEADER_ROW:HEADER_ROW,FIRST_ROW:FIRST_ROW,
   text:text,safeName:safeName,fileNameFor:fileNameFor,directoryOf:directoryOf,
@@ -245,6 +322,7 @@ function writeAll(app,planValue,stagePath,options){
   plan:plan,summarize:summarize,receipt:receipt,emptyReceipt:emptyReceipt,
  sheetNameFor:safeSheetName,
  writeAll:writeAll,
-  statusOf:statusOf,
+  statusOf:statusOf,statusItems:statusItems,setSheetsStatus:setSheetsStatus,
+  readSheets:readSheets,verifySheets:verifySheets,
   mainSheet:mainSheet,workbook:workbook,write:write,openForEditing:openForEditing};
 }));
