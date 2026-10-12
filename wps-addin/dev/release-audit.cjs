@@ -183,7 +183,8 @@ function expandExpected(sheetManifest) {
     (material.rows || []).forEach(function (row, rowIndex) {
       (row || []).forEach(function (raw, columnIndex) {
         const item = entryValue(raw);
-        add(address(Number(material.firstDataRow) + rowIndex, columnIndex + 1), item.value, { role: 'material', type: item.type });
+        add(address(Number(material.firstDataRow) + rowIndex, columnIndex + 1), item.value, { role: 'material', type: item.type,
+          projectCode: text(entryValue((material.header || [])[columnIndex]).value) === '项目编码' });
       });
     });
   }
@@ -310,7 +311,11 @@ function audit(input) {
         if (hasPath) report.pathLeaks.push({ sheet: name, cell: key, row: position.row, column: position.column, text: info.text });
         if (hasSha) report.shaLeaks.push({ sheet: name, cell: key, row: position.row, column: position.column, text: info.text });
         if (hasContact) {
-          const allowed = !!(expected && expected.contact === true && text(expected.value) === info.text);
+          // F5实际12位清单编码会撞座机正则；仅放行完整清单声明的项目编码列、逐值一致的12位编码。
+          // 合并后的编码以全角分号连接。其它列、不同源值及真正电话仍报告，不全局弱化正则。
+          const allowedCode = !!(expected && expected.projectCode === true && text(expected.value) === info.text &&
+            /^[0-9]{12}(?:；[0-9]{12})*$/.test(info.text));
+          const allowed = allowedCode || !!(expected && expected.contact === true && text(expected.value) === info.text);
           if (!allowed) report.personalLeaks.push({ sheet: name, cell: key, row: position.row, column: position.column, text: info.text });
         }
       }

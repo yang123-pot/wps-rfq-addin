@@ -51,6 +51,36 @@ function supplierManifest(){
 }
 function cellText(report,list,cell){return list.filter(function(item){return item.cell===cell;});}
 
+test('F5：完整清单中项目编码列的12位编码及合并编码不误报电话',()=>{
+ for(const code of ['030402011015','030402011015；030402011017']){
+  const workbook=supplierWorkbook(),manifest=supplierManifest();
+  setCell(workbook.sheets[0],6,1,code);manifest.sheets[0].material.rows[0][1]=code;
+  const report=audit.audit({workbook,expectedManifest:manifest});
+  assert.equal(report.ok,true,JSON.stringify(report.personalLeaks));
+  assert.deepEqual(report.personalLeaks,[]);
+ }
+});
+test('F5：编码例外不放过不同源值、改列名、备注复制及真正电话',()=>{
+ for(const scenario of ['changed-value','wrong-header','remark-copy','phone-in-code']){
+  const workbook=supplierWorkbook(),manifest=supplierManifest(),code='030402011015';
+  setCell(workbook.sheets[0],6,1,code);manifest.sheets[0].material.rows[0][1]=code;
+  let cell='B7';
+  if(scenario==='changed-value')setCell(workbook.sheets[0],6,1,'030402011017');
+  if(scenario==='wrong-header'){
+   setCell(workbook.sheets[0],5,1,'电话');manifest.sheets[0].material.header[1]='电话';
+  }
+  if(scenario==='remark-copy'){
+   cell='J7';setCell(workbook.sheets[0],6,9,code);manifest.sheets[0].material.rows[0][9]=code;
+  }
+  if(scenario==='phone-in-code'){
+   setCell(workbook.sheets[0],6,1,'010-12345678');manifest.sheets[0].material.rows[0][1]='010-12345678';
+  }
+  const report=audit.audit({workbook,expectedManifest:manifest});
+  assert.equal(report.ok,false,scenario);
+  assert.ok(report.personalLeaks.some(x=>x.cell===cell),scenario);
+ }
+});
+
 test('supplier file passes with declared rise-header contact and long code',()=>{
  const workbook=supplierWorkbook();
  setCell(workbook.sheets[0],6,1,'00012345678901234567');

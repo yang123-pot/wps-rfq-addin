@@ -127,8 +127,10 @@ def expand_expected(sheet_manifest):
         for row_index, row in enumerate(material.get("rows", [])):
             for column_index, raw in enumerate(row):
                 item = entry_value(raw)
+                headers = material.get("header", [])
+                code_column = column_index < len(headers) and text(entry_value(headers[column_index])["value"]) == "项目编码"
                 add(_address(first_data_row + row_index, column_index + 1), item["value"],
-                    role="material", type=item["type"])
+                    role="material", type=item["type"], projectCode=code_column)
     return cells
 
 
@@ -204,7 +206,10 @@ def _pattern_scan(sheet_name, cell_ref, info, expected, report):
         report["sha"].append({"sheet": sheet_name, "cell": cell_ref, "row": position["row"],
                               "column": position["column"], "text": info["text"]})
     if CONTACT_RE.search(info["text"]) or EMAIL_RE.search(info["text"]):
-        allowed = bool(expected and expected.get("contact") is True and expected.get("value") == info["text"])
+        # 编码字段语义＋预期原值＋12位编码格式三者齐备，才排除与座机正则重合的编码。
+        allowed_code = bool(expected and expected.get("projectCode") is True and expected.get("value") == info["text"]
+                            and re.fullmatch(r"[0-9]{12}(?:；[0-9]{12})*", info["text"]))
+        allowed = allowed_code or bool(expected and expected.get("contact") is True and expected.get("value") == info["text"])
         if not allowed:
             report["personal"].append({"sheet": sheet_name, "cell": cell_ref, "row": position["row"],
                                        "column": position["column"], "text": info["text"]})

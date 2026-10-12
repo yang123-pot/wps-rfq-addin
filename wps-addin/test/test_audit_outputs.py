@@ -120,6 +120,36 @@ class AuditOutputsTest(unittest.TestCase):
         self.addCleanup(self._temp.cleanup)
         self.dir = Path(self._temp.name)
 
+    def test_project_code_and_joined_codes_do_not_become_phone_leaks(self):
+        for index, code in enumerate(["030402011015", "030402011015；030402011017"]):
+            path = write_supplier(self.dir / f"code-{index}.xlsx", long_code=code)
+            report = audit_outputs.audit(str(path), supplier_manifest(long_code=code), profile="supplier")
+            self.assertTrue(report["ok"], report["personal"])
+            self.assertEqual(report["personal"], [])
+
+    def test_code_exception_still_rejects_changed_values_headers_copies_and_phones(self):
+        code = "030402011015"
+        for scenario in ["changed-value", "wrong-header", "remark-copy", "phone-in-code"]:
+            manifest = supplier_manifest(long_code=code)
+            material = manifest["sheets"][0]["material"]
+            actual, extra, cell = code, {}, "B7"
+            if scenario == "changed-value": actual = "030402011017"
+            if scenario == "wrong-header":
+                extra["B6"] = "电话"
+                material["header"] = list(material["header"])
+                material["header"][1] = "电话"
+            if scenario == "remark-copy":
+                extra["J7"] = code
+                material["rows"][0][9] = code
+                cell = "J7"
+            if scenario == "phone-in-code":
+                actual = "010-12345678"
+                material["rows"][0][1] = actual
+            path = write_supplier(self.dir / (scenario+".xlsx"), long_code=actual, extra=extra)
+            report = audit_outputs.audit(str(path), manifest, profile="supplier")
+            self.assertFalse(report["ok"], scenario)
+            self.assertTrue(any(x["cell"] == cell for x in report["personal"]), scenario)
+
     def test_supplier_file_with_allowed_contact_and_long_code_passes(self):
         path = write_supplier(self.dir / "ok.xlsx", long_code=LONG_CODE)
         report = audit_outputs.audit(str(path), supplier_manifest(long_code=LONG_CODE), profile="supplier")
