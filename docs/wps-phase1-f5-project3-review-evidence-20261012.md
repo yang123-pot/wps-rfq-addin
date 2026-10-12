@@ -1,6 +1,6 @@
 # F5项目3审核与同格汇总证据（2026-10-12）
 
-**项目3已完成本人整表确认与分类/同格汇总生成，品牌读回及下游待做，F5仍1/4。** 已通过项目1保持；项目3→4→2继续，F6未开始，R12未结案，R13未开始。下方初始审核准备记录保留当时边界，最新状态见新增小节。
+**项目3已完成本人确认、分类/同格汇总、品牌读回、总询价及50件拆分双F审计；重开待核，F5仍1/4。** 已通过项目1保持；项目3→4→2继续，F6未开始，R12未结案，R13未开始。下方初始审核准备记录保留当时边界，最新状态见新增小节。
 
 ## 实际产品操作与独立核对
 
@@ -52,3 +52,25 @@
 用户明确复制源是“Codex右侧预览”。原artifact-tool填写簿已独立核90组格内LF存在，不能把预览复制后的单行文本算成正确同格输入。没有为此放宽产品标签解析，也没有重新确认或重新生成分类文件。
 
 已请求用户在WPS软件中Ctrl+O打开原始测试填写簿，原生复制A4:D51，回当前同格首页D5仅粘贴值；恢复G5:G52序列，来源`=分类汇总表!$J$1:$J$2`，保存再点读回。**恢复尚未完成，不计48类/90组/50份通过。** 本机证据：`project3-summary-click-read.json`（保存值＋只读绑定）、`project3-summary-newline-error.png`（真实WPS错误列表）。保护pane SHA保持，产品源码未改。
+
+## 填写恢复、品牌读回与总询价生成通过
+
+用户改用WPS原始文件复制，按截图设置序列来源与下拉；随后反馈按钮忙时变灰，再报告跳转第6步。项目revision7已存品牌读回：48类/90组/预计50份。Python读实际保存值192格与准备值零差异，G5:G52为list、Formula1=`分类汇总表!$J$1:$J$2`；Node产品解析读回与项目品牌组、模式和预期数据逐组一致，9项核对通过。填写后SHA `e3d03fe5ed13e9ee5c71f376c5ba533e7ad77b9f47aaba47d9f328dd68005d71`；整本49页/14697格/48链接、1422行审核/来源、冻结/合并再核均通过。上节阻断是此前失败时点，现已恢复；没有改产品解析、再次确认或重新生成分类。
+
+用户真实第06步生成50张询价页，实际另存到旧测试默认目录`outputs/wps-acceptance-20261003/R12-L-supplement/c-preparation/ui-data/out/stability-20261010/项目3_询价总表_JSA测试.xlsx`，项目generation记录真实路径，未移动或重做。SHA `c97e509326e69c1f6ee7c92074d55b7d606b6952d59749049efbd04de93188af`，项目revision8；50询价＋内部追溯/处理记录＝52页，独立31454格检查，公开值及内部追溯逐值一致，报价金额空白，无公式，逐页冻结/合并一致。
+
+内部时间为ISO文本`2026-10-12T07:48:23.176Z`，发布回执取时`07:48:53.938Z`；与项目1相同，独立检查该格的类型/格式，没有生成前的独立时间快照，不将52页全格称为严格逐值相同。抬头为虚拟测试单位/经办人/电话；项目名称按用户实际输入留存（含开头中文左引号），各公开页与模型一致，不清洗用户文本。
+
+新本机证据：`project3-summary-filled-input.json`、`project3-summary-filled-independent-audit.json`、`project3-summary-book-filled-audit.json`、`project3-inquiry-audit-input.json`、`project3-inquiry-independent-audit.json`。已建立项目3新空供应商目录并请求用户真实拆分50份；**拆分、正式双F审计及重开恢复尚待执行，不计项目3整链通过**。
+
+## 50件拆分、双F审计与保护通过（重开待核）
+
+用户真实选择项目3新目录`outputs/wps-phase1-F5/project-3/供应商件_JSA测试/`并点击一键拆分，反馈50完成/0失败。项目revision60、拆分batch `p-mv4ydwnc-2x2ygxv5`，服务只读load回执revision52与项目逐件记录完全一致；50件均`succeeded/verifiedBy=publish`，绑定当前inputKey与总簿SHA。
+
+Python独立读取50个实际文件：18150格逐值零差异，逐件SHA、目录文件集合、单页10公开列、冻结/合并一致，报价单价与金额空白，无公式、隐藏内部页列、超链接或批注。基于完整预期矩阵的正式Python与Node F审计各50/50 `value-verified`，实际xlsx由Python读盘后提供Node审计，不把模型自己与自己比较视为真实通过。
+
+1422个确认行各自存在一条active且类别/确认revision正确的学习来源，隔离库revision4；没有为了核对再次学习。8原件与8安全副本SHA全部保持，保护pane保持原SHA。产品源码未改，不重跑与本次文件核对无关的已通过软件回归。
+
+本机证据：`project3-split-audit-input.json`、`project3-split-independent-audit.json`、`project3-split-f-python-report.json`、`project3-split-f-node-report.json`、`project3-learning-source-audit.json`、`project3-final-protection-audit.json`。
+
+已请求用户关闭拆分结果框、关闭/重开浮窗，在项目状态打开“项目三清单”（1422行），核分类/汇总/总询价状态及50完成/0失败/0待处理。**重开恢复尚未留证，项目3不计整链通过；F5仍1/4。** 恢复通过后继续项目4→2；项目4仍有63条续行归属待本人确认，R12结案前不开始R13。
