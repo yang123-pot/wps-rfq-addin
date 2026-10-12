@@ -19,7 +19,7 @@
       var id=key(m.originalPath),fingerprint=m.fingerprint.toLowerCase();
       if(paths.has(id)||fingerprints.has(fingerprint))throw new Error('重复导入工作簿：'+m.originalName);
       paths.add(id);fingerprints.add(fingerprint);
-      s=clone(s);var record=review.create(s);
+      s=clone(s);var record=input.record==null?review.create(s):clone(input.record);
       return {id:id,metadata:clone(m),snapshot:s,record:record,parsed:parse(s,record),dirty:false};
     });
     return {entries:collection.entries.concat(added)};

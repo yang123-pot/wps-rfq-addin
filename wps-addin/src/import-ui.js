@@ -88,7 +88,11 @@
       getSplit:function(){return splitPanel?splitPanel.receipt():null;},
       restoreSplit:function(value){if(splitPanel)splitPanel.restore(value);},
       getSplitVerdict:function(){return splitPanel?splitPanel.verdict():null;},
-      onBusy:function(value){busy=value;options.onBusy(value);}});
+      onBusy:function(value){
+        busy=value;options.onBusy(value);
+        // 项目恢复在忙状态下重绘；结束时单独恢复主按钮，不重绘或再次读写成果。
+        confirmMerge.disabled=busy||!collection.entries.length||!RfqCollection.preview(collection,merge.checked).canFinalize;
+      }});
     var libraryPanel=null,brandPanel=null,headerPanel=null,inquiryPanel=null,splitPanel=null;
     // 品牌与供应商面板的输入：当前清单、合并方式、来源校验结果、逐行分类确认与合并预览确认键。
     // R1过渡期：把侧栏旧的逐行分类/品牌/生成结论映射到v2阶段；分类工作簿等未实现阶段保持未完成。
@@ -168,7 +172,7 @@
     function tell(text,error){message.textContent=text;message.className=error?'error':'';}
     function restoreProject(project){
       var inputs=(project.sources||[]).map(function(source){
-        return {metadata:{originalPath:source.originalPath,originalName:source.originalName,copyPath:source.copyPath,fingerprint:source.fingerprint},snapshot:source.snapshot};
+        return {metadata:{originalPath:source.originalPath,originalName:source.originalName,copyPath:source.copyPath,fingerprint:source.fingerprint},snapshot:source.snapshot,record:source.reviewRecord};
       });
       if(!inputs.length)throw Error('项目记录里没有来源清单，无法恢复。');
       collection=RfqCollection.add(RfqCollection.create(),inputs);

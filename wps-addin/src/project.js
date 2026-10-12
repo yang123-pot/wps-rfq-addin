@@ -1,8 +1,8 @@
 (function(root,factory){
  'use strict';
- if(typeof module==='object'&&module.exports)module.exports=factory();
- else root.RfqProject=factory();
-}(typeof window==='object'?window:globalThis,function(){
+ if(typeof module==='object'&&module.exports)module.exports=factory(require('./review.js'));
+ else root.RfqProject=factory(root.RfqReview);
+}(typeof window==='object'?window:globalThis,function(sourceReview){
  'use strict';
  // v2：7阶段（导入与合并/自动分类/表内审核/分类工作簿/品牌汇总/询价表/拆分文件）。
  // v1记录仍可读取，但只能作为副本继续，原文件不被改写。
@@ -51,10 +51,13 @@
  function sourcesOf(collection){
   return ((collection&&collection.entries)||[]).map(function(entry){
    var meta=entry.metadata||{},snapshot=entry.snapshot||{};
-   return {id:entry.id,originalPath:meta.originalPath,originalName:meta.originalName,copyPath:meta.copyPath,
+   var source={id:entry.id,originalPath:meta.originalPath,originalName:meta.originalName,copyPath:meta.copyPath,
     fingerprint:meta.fingerprint,scopeId:text(entry.id),
     sheetCount:(snapshot.sheets||[]).length,materialCount:(snapshot.materials||[]).length,
     issueCount:(snapshot.issues||[]).length,snapshot:snapshot};
+   // 来源核对与整表分类确认各自保存；无核对的旧项目保持原结构。
+   if(entry.record&&entry.record.decisions&&entry.record.decisions.length)source.reviewRecord=copy(entry.record);
+   return source;
   });
  }
  function blankRecord(name,mergeIdentical,options){
@@ -94,6 +97,10 @@
    if(typeof source.originalName!=='string'||!source.originalName)errors.push(at+'缺少原件名称。');
    if(typeof source.copyPath!=='string'||!source.copyPath)errors.push(at+'缺少工作副本路径。');
    if(typeof source.fingerprint!=='string'||!/^[a-f\d]{64}$/i.test(source.fingerprint))errors.push(at+'指纹无效。');
+   if(source.reviewRecord!=null){
+    try{sourceReview.apply(source.snapshot,source.reviewRecord);}
+    catch(error){errors.push(at+'来源核对记录无效：'+error.message);}
+   }
   });
  }
  function validateStages(project,names,errors){
