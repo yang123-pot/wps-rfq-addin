@@ -41,6 +41,21 @@
       if(write){range.NumberFormat='@';range.Value2=rows;}
       var actual=range.Value2;
       if(range.HasFormula!==false)throw Error('输出检测到公式或无法确认公式状态，已停止另存。');
+      // F5最终JSA实测：即使NumberFormat='@'，Value2仍把文本开头的单引号当输入前缀吞掉。
+      // 仅在本次新簿写入且读回恰好少了这一个字符时补一个输入前缀，再按原矩阵逐值核对。
+      // 已保存文件的核对不修写；其它差异也不归一化，业务原文与模型始终保留。
+      if(write&&Array.isArray(actual)&&actual.length===rows.length){
+        var repair=false,escaped=rows.map(function(row,r){
+          return row.map(function(v,c){
+            if(typeof v==='string'&&v.charAt(0)==="'"&&Array.isArray(actual[r])&&actual[r][c]===v.slice(1)){
+              repair=true;return "'"+v;
+            }
+            return v;
+          });
+        });
+        if(repair){range.Value2=escaped;actual=range.Value2;
+          if(range.HasFormula!==false)throw Error('输出检测到公式或无法确认公式状态，已停止另存。');}
+      }
       if(!Array.isArray(actual)||actual.length!==rows.length||rows.some(function(row,r){
         return !Array.isArray(actual[r])||actual[r].length!==row.length||row.some(function(v,c){return (actual[r][c]==null?'':actual[r][c])!==v;});
       })){

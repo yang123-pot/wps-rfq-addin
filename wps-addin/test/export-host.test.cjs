@@ -150,7 +150,13 @@ function layoutFixture(overrides){
   const range={Font:{Size:null,Bold:false},NumberFormat:null,value:null,WrapText:null,HasFormula:false,MergeCells:false,
    Rows:{AutoFit(){this.autoFitCount=(this.autoFitCount||0)+1;}},
    get Value2(){return this.value;},
-   set Value2(rows){this.value=rows.map(r=>r.map(v=>options.stripFirstQuote&&typeof v==='string'&&v[0]==="'"?v.slice(1):v));},
+   set Value2(rows){this.value=rows.map(r=>r.map(v=>{
+    if(typeof v==='string'&&v[0]==="'"){
+     if(options.corruptQuotedText)return '被宿主改写';
+     if(options.stripFirstQuote)return v.slice(1);
+    }
+    return v;
+   }));},
    // 真实WPS/Excel不会把单格区域(A5:A5)标成已合并；单格合并没有版式意义，写入/读回都必须跳过。
    Merge(){if(options.mergeFails)throw Error('merge failed');
     const parts=String(address).split(':'),multi=parts.length===2&&parts[0]!==parts[1];
@@ -486,11 +492,27 @@ function freezeBook(){
   {rowCount:4,columnCount:2})}]};
 }
 test('文本被宿主改写时指出首个差异单元格及期望/读回值',()=>{
- const h=layoutFixture({stripFirstQuote:true});
+ const h=layoutFixture({corruptQuotedText:true});
  const book={sheets:[{name:'分类汇总表',values:[['名称','跳转'],['风口、风阀',"'风口、风阀'!A1"]]}]};
  assert.throws(()=>host.write(h.app,book,'C:\\temp\\rfq-layout.xlsx'),
   /保存值与预览不一致.*B2.*期望.*读回/);
  assert.equal(h.saved,false);
+});
+test('F5：JSA吞掉首引号时保留汇总跳转原文，跨块写入与保存重开均逐值一致',()=>{
+ const values=Array.from({length:502},(_,r)=>Array.from({length:13},(_,c)=>r===0?'字段'+c:''));
+ values[16][11]="'风口、风阀'!A1";
+ values[500][11]="'甲''乙'!A1";
+ values[501][0]="''两引号原文";
+ values[501][1]='000123';values[501][2]='=1+1';values[501][3]='12345678901234567890.1';
+ const book={sheets:[{name:'分类汇总表',values}]},before=JSON.stringify(book);
+ for(const stripFirstQuote of [false,true]){
+  const h=layoutFixture({stripFirstQuote});
+  assert.doesNotThrow(()=>host.write(h.app,book,'C:\\temp\\rfq-layout.xlsx'));
+  assert.equal(h.saved,true);
+  assert.deepEqual(h.sheets[0].Range('A1:M500').Value2,values.slice(0,500));
+  assert.deepEqual(h.sheets[0].Range('A501:M502').Value2,values.slice(500));
+ }
+ assert.equal(JSON.stringify(book),before,'输出修复不得改掉模型中的原始跳转或材料文本');
 });
 test('冻结标志为true但位置错误时拒绝保存',()=>{
  const h=layoutFixture({wrongFreezePosition:{row:1,column:0}});
