@@ -150,7 +150,7 @@ function layoutFixture(overrides){
   const range={Font:{Size:null,Bold:false},NumberFormat:null,value:null,WrapText:null,HasFormula:false,MergeCells:false,
    Rows:{AutoFit(){this.autoFitCount=(this.autoFitCount||0)+1;}},
    get Value2(){return this.value;},
-   set Value2(rows){this.value=rows.map(r=>r.slice());},
+   set Value2(rows){this.value=rows.map(r=>r.map(v=>options.stripFirstQuote&&typeof v==='string'&&v[0]==="'"?v.slice(1):v));},
    // 真实WPS/Excel不会把单格区域(A5:A5)标成已合并；单格合并没有版式意义，写入/读回都必须跳过。
    Merge(){if(options.mergeFails)throw Error('merge failed');
     const parts=String(address).split(':'),multi=parts.length===2&&parts[0]!==parts[1];
@@ -184,7 +184,7 @@ function layoutFixture(overrides){
   const list=links[address]||(links[address]=[]);
   return {get Count(){return list.length;},Item(index){return list[index-1]||{};}};
  }
- const ranges=new Map(),frozenSheets=new Map();let selected='',activeSheet=null,frozen=false;
+ const ranges=new Map(),frozenSheets=new Map(),freezePositions=new Map();let selected='',activeSheet=null,frozen=false;
  const sheets=[];
  function newSheet(name){
   const cells=new Map();
@@ -226,12 +226,23 @@ function layoutFixture(overrides){
  let closed=0,saved=false;
  const app={AutomationSecurity:1,FileSystem:{Exists:()=>false},ActiveWindow:{
    get FreezePanes(){return options.requireActiveSheet?frozenSheets.get(activeSheet)===true:frozen;},
-   set FreezePanes(value){if(options.requireActiveSheet)frozenSheets.set(activeSheet,value===true);else frozen=value===true;},
+   set FreezePanes(value){
+    if(options.requireActiveSheet)frozenSheets.set(activeSheet,value===true);else frozen=value===true;
+    if(value===true){
+     const anchor=/^([A-Z]+)(\d+)$/.exec(selected);
+     const column=anchor?Array.from(anchor[1]).reduce((n,c)=>n*26+c.charCodeAt(0)-64,0):1;
+     freezePositions.set(activeSheet,options.wrongFreezePosition||{row:anchor?Number(anchor[2])-1:0,column:column-1});
+    }
+   },
+   get SplitRow(){return options.noFreezePositionRead?undefined:(freezePositions.get(activeSheet)||{row:0}).row;},
+   get SplitColumn(){return options.noFreezePositionRead?undefined:(freezePositions.get(activeSheet)||{column:0}).column;},
    get Frozen(){return this.FreezePanes;}},
   get ActiveWorkbook(){return app._active;},Workbooks:{Count:1,Item(){return previous;},
    Add(){app._active=book;const s=newSheet();sheets.push(s);activeSheet=s;return book;},
    Open(file){
     app._active=book;
+    if(options.reopenFreezePosition)freezePositions.forEach((_,sheet)=>freezePositions.set(sheet,options.reopenFreezePosition));
+    if(options.loseFreezeOnReopen){frozen=false;frozenSheets.clear();}
     if(options.validationLiteralOnReopen)ranges.forEach(function(range){
      if(range.Validation.Type===3)range.Validation.Formula1='"'+String(range.Validation.Formula1).replace(/^=/,'')+'"';
     });
@@ -467,6 +478,42 @@ test('无layout的旧模型仍按原行为写出，版式校验拦住越界区�
   ['第1个合并超出工作表列范围。'],'越界合并必须在写盘前被拦住');
 });
 
+function freezeBook(){
+ const layout=require('../src/workbook-layout.js');
+ const values=[['标题',''],['说明',''],['字段一','字段二'],['值一','值二']];
+ return {sheets:[{name:'汇总',values,layout:layout.build({columns:[{index:1},{index:2}],freeze:{row:4,column:1}},
+  {rowCount:4,columnCount:2})},{name:'明细',values,layout:layout.build({columns:[{index:1},{index:2}],freeze:{row:2,column:2}},
+  {rowCount:4,columnCount:2})}]};
+}
+test('文本被宿主改写时指出首个差异单元格及期望/读回值',()=>{
+ const h=layoutFixture({stripFirstQuote:true});
+ const book={sheets:[{name:'分类汇总表',values:[['名称','跳转'],['风口、风阀',"'风口、风阀'!A1"]]}]};
+ assert.throws(()=>host.write(h.app,book,'C:\\temp\\rfq-layout.xlsx'),
+  /保存值与预览不一致.*B2.*期望.*读回/);
+ assert.equal(h.saved,false);
+});
+test('冻结标志为true但位置错误时拒绝保存',()=>{
+ const h=layoutFixture({wrongFreezePosition:{row:1,column:0}});
+ assert.throws(()=>host.write(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'),/冻结.*位置.*不一致/);
+ assert.equal(h.saved,false,'A4被宿主收缩成A2时不得保存并继续发布');
+});
+test('每页保存重开后冻结位置或标志丢失时不报告生成成功',()=>{
+ for(const options of [{requireActiveSheet:true,reopenFreezePosition:{row:1,column:0}},
+  {requireActiveSheet:true,loseFreezeOnReopen:true}]){
+  const h=layoutFixture(options);
+  assert.throws(()=>host.write(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'),/冻结.*(位置.*不一致|未生效)/);
+  assert.equal(h.saved,true,'该失败来自真实写入后的重开核对边界');
+ }
+ const valid=layoutFixture({requireActiveSheet:true});
+ assert.doesNotThrow(()=>host.write(valid.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'),
+  '汇总A4和明细B2须逐页激活核对，不能按最后活动页核所有页');
+});
+test('无法读回冻结位置时明确拒绝保存',()=>{
+ const h=layoutFixture({noFreezePositionRead:true});
+ assert.throws(()=>host.write(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'),/冻结.*位置.*(API|读回)/);
+ assert.equal(h.saved,false);
+});
+
 test('publishing stops before creating a workbook when the staging file already exists',()=>{
  const h=writingFixture({stageExists:true});
  assert.throws(()=>host.write(h.app,model,stage),/已存在/);
@@ -581,6 +628,19 @@ test('R12-E verifyExistingOutput只认内容逐值一致的已有文件，核对
  assert.equal(h.app.AutomationSecurity,1,'核对后恢复宏安全设置');
  assert.equal(h.closed,1,'只关闭插件自己打开的文件');
 });
+test('已有供应商件值与SHA一致也必须核对冻结位置',async()=>{
+ for(const anchor of ['A2','A4']){
+  const h=verifyFixture(),sheet=h.sheets[0];
+  sheet.Activate();sheet.Range(anchor).Select();h.app.ActiveWindow.FreezePanes=true;
+  h.expected.layout.freeze={row:4,column:1};
+  const result=await host.verifyExistingOutput(h.app,{fileId:'file-a',target:h.target},h.expected,
+   ()=>Promise.resolve({exists:true,sha256:'2'.repeat(64)}));
+  assert.equal(result.ok,anchor==='A4','A2不能以值或SHA相同冒充要求的A4冻结');
+  if(anchor==='A2')assert.ok(result.layoutIssues.some(issue=>/冻结.*位置.*不一致/.test(issue)));
+  else assert.deepEqual(result.layoutIssues,[]);
+ }
+});
+
 test('R12-E verifyExistingOutput拒绝同名异内容，不把外部文件当成功',async()=>{
  const h=verifyFixture();
  h.sheets[0].Range('A1:J4').Value2=h.expected.values.map(function(row,index){

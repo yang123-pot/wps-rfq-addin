@@ -43,7 +43,23 @@
       if(range.HasFormula!==false)throw Error('输出检测到公式或无法确认公式状态，已停止另存。');
       if(!Array.isArray(actual)||actual.length!==rows.length||rows.some(function(row,r){
         return !Array.isArray(actual[r])||actual[r].length!==row.length||row.some(function(v,c){return (actual[r][c]==null?'':actual[r][c])!==v;});
-      }))throw Error('“'+sheet.Name+'”保存值与预览不一致，已停止另存。');
+      })){
+        var detail='';
+        if(Array.isArray(actual)){
+          for(var r=0;r<rows.length&&!detail;r++){
+            if(!Array.isArray(actual[r]))continue;
+            for(var c=0;c<rows[r].length;c++){
+              var value=actual[r][c]==null?'':actual[r][c];
+              if(value!==rows[r][c]){
+                detail='（首个差异：'+columnName(c+1)+(start+r+1)+'，期望'+
+                  JSON.stringify(String(rows[r][c]).slice(0,120))+'，读回'+JSON.stringify(String(value).slice(0,120))+'）';
+                break;
+              }
+            }
+          }
+        }
+        throw Error('“'+sheet.Name+'”保存值与预览不一致'+detail+'，已停止另存。');
+      }
     }
   }
   function verify(book,model){
@@ -67,6 +83,19 @@
     });
   }
   function deep(model,sheet){return model.sheets.filter(function(item){return item.name===sheet.Name;})[0]||null;}
+  // FreezePanes=true不能证明冻结在要求的表头处：F5隔离宿主曾把A4/A10收缩成A2。
+  // 写入后及保存重开后都核对实际分割行/列；读不回位置就不能确认获批版式。
+  function verifyFreeze(app,sheet,freeze){
+    var window=app.ActiveWindow;
+    if(!window||window.FreezePanes!==true)throw Error('“'+sheet.Name+'”冻结窗格未生效。');
+    var row=window.SplitRow,column=window.SplitColumn;
+    if(row==null||column==null||!isFinite(Number(row))||!isFinite(Number(column)))
+      throw Error('当前WPS不支持冻结位置读回API（Window.SplitRow/SplitColumn），未确认“'+sheet.Name+'”版式。');
+    var expectedRow=(freeze.row||1)-1,expectedColumn=(freeze.column||1)-1;
+    if(Number(row)!==expectedRow||Number(column)!==expectedColumn)
+      throw Error('“'+sheet.Name+'”冻结位置读回不一致：期望行/列'+expectedRow+'/'+expectedColumn+
+        '，实际'+row+'/'+column+'。');
+  }
   // 版式落地：等宽矩阵之上再写列宽、行高、合并、浅色填充、冻结、打印、原生链接与区域下拉。
   // 宿主缺API时明确报出具体缺哪一个，绝不静默产出“看起来像获批版式”的文件。
   function applyLayout(app,sheet,model,spec){
@@ -104,7 +133,7 @@
       if(typeof anchor.Select!=='function')throw Error('当前WPS不支持定位单元格API（Range.Select），未按获批版式输出“'+sheet.Name+'”。');
       anchor.Select();
       if(spec.freeze.column||spec.freeze.row)window.FreezePanes=true;
-      if(window.FreezePanes!==true)throw Error('“'+sheet.Name+'”冻结窗格未生效。');
+      verifyFreeze(app,sheet,spec.freeze);
     }
     (spec.hyperlinks||[]).forEach(function(link){
       if(!sheet.Hyperlinks||typeof sheet.Hyperlinks.Add!=='function')
@@ -201,6 +230,10 @@
       var spec=s.layout;
       if(!spec)return;
       var sheet=book.Worksheets.Item(s.name);
+      if(spec.freeze){
+        if(typeof sheet.Activate!=='function')throw Error('当前WPS不支持工作表激活API，无法读回“'+s.name+'”冻结位置。');
+        sheet.Activate();verifyFreeze(app,sheet,spec.freeze);
+      }
       if(typeof sheet.Visible!=='undefined'){
         // 可见的编码在不同宿主上可能是-1或1，所以只核“该隐藏的确实隐藏、该可见的确实可见”。
         var wantHidden=spec.hidden===true;
@@ -505,6 +538,12 @@
           try{mismatches=mismatches.concat(comparePublicValues(sheet,expectedSheet.values));}
           catch(readError){mismatches.push(readError.message);}
           var spec=expectedSheet.layout||{};
+          if(spec.freeze){
+            try{
+              if(typeof sheet.Activate!=='function')throw Error('当前WPS不支持工作表激活API，无法读回冻结位置。');
+              sheet.Activate();verifyFreeze(app,sheet,spec.freeze);
+            }catch(freezeError){layoutIssues.push(freezeError.message);}
+          }
           if(typeof sheet.Columns==='object'&&typeof sheet.Columns.Item==='function'){
             (spec.columns||[]).forEach(function(column,position){
               var index=column.index||position+1,actualColumn=sheet.Columns.Item(index);

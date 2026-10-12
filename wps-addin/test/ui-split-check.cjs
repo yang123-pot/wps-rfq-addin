@@ -61,7 +61,9 @@ async function run(){
        Font:{},Interior:{},Validation:{Type:null,Formula1:null},Hyperlinks:{Count:0},
        Rows:{AutoFit(){}},Merge(){merges[address]=true;}};
      }
-     const sheet={Name:spec.name,Range:rangeFor,Columns:{Item(i){return {Hidden:(spec.hidden||[]).indexOf(i)>=0};}}};
+     const sheet={Name:spec.name,Range:rangeFor,
+      Activate(){window.Application.ActiveWindow=spec.freeze||{};},
+      Columns:{Item(i){return {Hidden:(spec.hidden||[]).indexOf(i)>=0};}}};
      const book={FullName:file,Worksheets:{get Count(){return 1;},
        Item(i){return typeof i==='number'?sheet:(sheet.Name===i?sheet:undefined);}},
       Close(save){if(save)throw Error('核对已有文件必须只读关闭');window.__closedOwned++;
@@ -182,7 +184,8 @@ async function run(){
   const wrongValues=expectedSheet.values.map(function(row,index){
    return index===expectedSheet.values.length-1?row.map(function(value,column){return column===5?'999':value;}):row.slice();});
   await page.evaluate(function(args){
-   window.__existingBooks[args.target.toLowerCase()]={name:args.name,values:args.values,merges:args.merges,hidden:[]};
+   window.__existingBooks[args.target.toLowerCase()]={name:args.name,values:args.values,merges:args.merges,hidden:[],
+    freeze:{FreezePanes:true,SplitRow:6,SplitColumn:0}};
   },{target:firstTarget,name:expectedSheet.name,values:wrongValues,merges:mergeAddresses(expectedSheet.layout)});
   await page.evaluate(function(){document.getElementById('split-retry').click();});
   await page.waitForFunction(function(){return /待核对1份/.test(document.getElementById('split-message').textContent)&&
@@ -190,9 +193,21 @@ async function run(){
   assert.equal(await page.evaluate(function(){return window.__splitPanel.receipt().files[0].state;}),'needs-verification');
   assert.equal(await page.evaluate(function(){return window.__splitPanel.receipt().files[0].verifiedBy;}),null);
   assert.deepEqual(await fs.readFile(firstTarget),externalBytes,'核对不通过时原文件保持不变');
-  // 内容逐值一致且SHA稳定：显式核对通过后才记为成功（verifiedBy=content-check）。
+  // F5：公开值及SHA相同，但冻结在A2而不是水泵单品牌表的A7，仍须保持待核对。
   await page.evaluate(function(args){
-   window.__existingBooks[args.target.toLowerCase()]={name:args.name,values:args.values,merges:args.merges,hidden:[]};
+   window.__existingBooks[args.target.toLowerCase()]={name:args.name,values:args.values,merges:args.merges,hidden:[],
+    freeze:{FreezePanes:true,SplitRow:1,SplitColumn:0}};
+  },{target:firstTarget,name:expectedSheet.name,values:expectedSheet.values,merges:mergeAddresses(expectedSheet.layout)});
+  await page.evaluate(function(){document.getElementById('split-retry').click();});
+  await page.waitForFunction(function(){return /冻结位置读回不一致/.test(
+   window.__splitPanel.receipt().files[0].error||'')&&!document.getElementById('split-retry').disabled;});
+  assert.equal(await page.evaluate(function(){return window.__splitPanel.receipt().files[0].state;}),'needs-verification');
+  assert.equal(await page.evaluate(function(){return window.__splitPanel.receipt().files[0].verifiedBy;}),null);
+  assert.deepEqual(await fs.readFile(firstTarget),externalBytes,'冻结差异核对失败也不得覆盖原文件');
+  // 内容逐值一致、冻结正确且SHA稳定：显式核对通过后才记为成功（verifiedBy=content-check）。
+  await page.evaluate(function(args){
+   window.__existingBooks[args.target.toLowerCase()]={name:args.name,values:args.values,merges:args.merges,hidden:[],
+    freeze:{FreezePanes:true,SplitRow:6,SplitColumn:0}};
   },{target:firstTarget,name:expectedSheet.name,values:expectedSheet.values,merges:mergeAddresses(expectedSheet.layout)});
   await page.evaluate(function(){document.getElementById('split-retry').click();});
   await page.waitForFunction(function(){return /完成5份，失败0份/.test(document.getElementById('split-message').textContent)&&

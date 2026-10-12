@@ -197,7 +197,9 @@ function summaryApp(options){
   if(ranges.has(address))return ranges.get(address);
   const target={__address:address,Font:{Size:null,Bold:false,Color:null,Underline:null},NumberFormat:null,value:null,
    WrapText:null,HasFormula:false,MergeCells:false,Interior:{Color:null},Rows:{AutoFit(){}},
-   Select(){assert.equal(activeSheet,sheet,'只能在当前工作表选择冻结锚点');},
+   Select(){assert.equal(activeSheet,sheet,'只能在当前工作表选择冻结锚点');
+    const match=/^([A-Z]+)(\d+)$/.exec(address);
+    sheet.__freeze={row:Number(match[2])-1,column:Array.from(match[1]).reduce((n,c)=>n*26+c.charCodeAt(0)-64,0)-1};},
    Merge(){this.MergeCells=true;merges.set(address,true);},
    get Value2(){return this.value;},set Value2(values){this.value=values.map(row=>row.slice());},
    Validation:{Formula1:null,InCellDropdown:null,IgnoreBlank:null,Delete(){this.Formula1=null;},
@@ -234,6 +236,8 @@ function summaryApp(options){
    Activate(){active=this;},__sheets:sheets};
  }
  const app={AutomationSecurity:1,FileSystem:{Exists:()=>false},ActiveWindow:{
+   get SplitRow(){return (activeSheet.__freeze||{row:0}).row;},
+   get SplitColumn(){return (activeSheet.__freeze||{column:0}).column;},
    get FreezePanes(){return frozen;},set FreezePanes(value){
     assert.ok(activeSheet,'冻结前必须有活动工作表');frozen=value===true;state.frozenSheet=activeSheet.Name;
    }},
