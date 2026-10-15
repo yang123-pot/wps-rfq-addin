@@ -100,16 +100,25 @@
   function deep(model,sheet){return model.sheets.filter(function(item){return item.name===sheet.Name;})[0]||null;}
   // FreezePanes=true不能证明冻结在要求的表头处：F5隔离宿主曾把A4/A10收缩成A2。
   // 写入后及保存重开后都核对实际分割行/列；读不回位置就不能确认获批版式。
-  function verifyFreeze(app,sheet,freeze){
+  function freezePosition(window){return String(window.SplitRow)+'/'+String(window.SplitColumn);}
+  function freezeFailureContext(window,context){
+    var details=context?String(context):'';
+    // Failure-only window metadata; no material content, paths or recurring probes.
+    try{if(window.ScrollRow!=null)details+='；滚动行='+window.ScrollRow;}catch(_){}
+    try{if(window.ScrollColumn!=null)details+='；滚动列='+window.ScrollColumn;}catch(_){}
+    try{if(window.Zoom!=null)details+='；缩放='+window.Zoom;}catch(_){}
+    return details?'（'+details+'）':'';
+  }
+  function verifyFreeze(app,sheet,freeze,context){
     var window=app.ActiveWindow;
-    if(!window||window.FreezePanes!==true)throw Error('“'+sheet.Name+'”冻结窗格未生效。');
+    if(!window||window.FreezePanes!==true)throw Error('“'+sheet.Name+'”冻结窗格未生效。'+(window?freezeFailureContext(window,context):''));
     var row=window.SplitRow,column=window.SplitColumn;
     if(row==null||column==null||!isFinite(Number(row))||!isFinite(Number(column)))
       throw Error('当前WPS不支持冻结位置读回API（Window.SplitRow/SplitColumn），未确认“'+sheet.Name+'”版式。');
     var expectedRow=(freeze.row||1)-1,expectedColumn=(freeze.column||1)-1;
     if(Number(row)!==expectedRow||Number(column)!==expectedColumn)
       throw Error('“'+sheet.Name+'”冻结位置读回不一致：期望行/列'+expectedRow+'/'+expectedColumn+
-        '，实际'+row+'/'+column+'。');
+        '，实际'+row+'/'+column+'。'+freezeFailureContext(window,context));
   }
   // 版式落地：等宽矩阵之上再写列宽、行高、合并、浅色填充、冻结、打印、原生链接与区域下拉。
   // 宿主缺API时明确报出具体缺哪一个，绝不静默产出“看起来像获批版式”的文件。
@@ -150,11 +159,16 @@
       // Selection alone can freeze one row short in WPS. Write the model's exact split before freezing.
       if(window.SplitRow==null||window.SplitColumn==null)
         throw Error('当前WPS不支持冻结位置读回API（Window.SplitRow/SplitColumn），未确认“'+sheet.Name+'”版式。');
+      var freezeTrace=['阶段=写入冻结','选中后'+freezePosition(window)];
       window.FreezePanes=false;
+      freezeTrace.push('取消后'+freezePosition(window));
       window.SplitRow=(spec.freeze.row||1)-1;
+      freezeTrace.push('设置行后'+freezePosition(window));
       window.SplitColumn=(spec.freeze.column||1)-1;
+      freezeTrace.push('设置列后'+freezePosition(window));
       if(spec.freeze.column||spec.freeze.row)window.FreezePanes=true;
-      verifyFreeze(app,sheet,spec.freeze);
+      freezeTrace.push('启用后'+freezePosition(window));
+      verifyFreeze(app,sheet,spec.freeze,freezeTrace.join('；'));
     }
     (spec.hyperlinks||[]).forEach(function(link){
       if(!sheet.Hyperlinks||typeof sheet.Hyperlinks.Add!=='function')
@@ -253,7 +267,7 @@
       var sheet=book.Worksheets.Item(s.name);
       if(spec.freeze){
         if(typeof sheet.Activate!=='function')throw Error('当前WPS不支持工作表激活API，无法读回“'+s.name+'”冻结位置。');
-        sheet.Activate();verifyFreeze(app,sheet,spec.freeze);
+        sheet.Activate();verifyFreeze(app,sheet,spec.freeze,'阶段=保存重开');
       }
       if(typeof sheet.Visible!=='undefined'){
         // 可见的编码在不同宿主上可能是-1或1，所以只核“该隐藏的确实隐藏、该可见的确实可见”。
@@ -562,7 +576,7 @@
           if(spec.freeze){
             try{
               if(typeof sheet.Activate!=='function')throw Error('当前WPS不支持工作表激活API，无法读回冻结位置。');
-              sheet.Activate();verifyFreeze(app,sheet,spec.freeze);
+              sheet.Activate();verifyFreeze(app,sheet,spec.freeze,'阶段=已有文件核对');
             }catch(freezeError){layoutIssues.push(freezeError.message);}
           }
           if(typeof sheet.Columns==='object'&&typeof sheet.Columns.Item==='function'){

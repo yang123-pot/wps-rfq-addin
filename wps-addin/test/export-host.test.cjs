@@ -519,7 +519,12 @@ test('F5：JSA吞掉首引号时保留汇总跳转原文，跨块写入与保存
 });
 test('冻结标志为true但位置错误时拒绝保存',()=>{
  const h=layoutFixture({wrongFreezePosition:{row:1,column:0}});
- assert.throws(()=>host.write(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'),/冻结.*位置.*不一致/);
+ assert.throws(()=>host.write(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'),error=>{
+  assert.match(error.message,/冻结.*位置.*不一致/);
+  assert.match(error.message,/阶段=写入冻结/);
+  assert.match(error.message,/设置行后.*设置列后.*启用后/);
+  return true;
+ });
  assert.equal(h.saved,false,'A4被宿主收缩成A2时不得保存并继续发布');
 });
 
@@ -540,7 +545,11 @@ test('每页保存重开后冻结位置或标志丢失时不报告生成成功',
  for(const options of [{requireActiveSheet:true,reopenFreezePosition:{row:1,column:0}},
   {requireActiveSheet:true,loseFreezeOnReopen:true}]){
   const h=layoutFixture(options);
-  assert.throws(()=>host.write(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'),/冻结.*(位置.*不一致|未生效)/);
+  assert.throws(()=>host.write(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'),error=>{
+   assert.match(error.message,/冻结.*(位置.*不一致|未生效)/);
+   assert.match(error.message,/阶段=保存重开/);
+   return true;
+  });
   assert.equal(h.saved,true,'该失败来自真实写入后的重开核对边界');
  }
  const valid=layoutFixture({requireActiveSheet:true});
