@@ -121,9 +121,11 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
       if (req.headers['x-rfq-import-token'] !== importToken ||
           !/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) return json(403,{error:'分类库会话失效，请重新打开侧栏。'});
       try {
+        // Multi-project learned features exceed 4 MiB; keep a bounded budget like split receipts.
+        const limit=33554432;
         let size=0; const chunks=[];
-        for await (const chunk of req) { size+=chunk.length; if(size<=4194304)chunks.push(chunk); }
-        if(size>4194304)return json(413,{error:'分类库请求过大，未保存。'});
+        for await (const chunk of req) { size+=chunk.length; if(size<=limit)chunks.push(chunk); }
+        if(size>limit)return json(413,{error:'分类库请求过大，未保存。'});
         let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'分类库请求无效。'});}
         if(!data||Array.isArray(data))return json(400,{error:'分类库请求无效。'});
         if(url.pathname==='/api/library/load')return json(200,await libraries.load());

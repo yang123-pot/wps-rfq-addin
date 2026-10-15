@@ -241,7 +241,9 @@ function fakeApp(){
   const app={AutomationSecurity:1,FileSystem:{Exists:()=>false},
     get ActiveWorkbook(){return active;},ActiveWindow:{
       get SplitRow(){return (activeSheet.__freeze||{row:0}).row;},
+      set SplitRow(value){activeSheet.__freeze={...(activeSheet.__freeze||{column:0}),row:value};},
       get SplitColumn(){return (activeSheet.__freeze||{column:0}).column;},
+      set SplitColumn(value){activeSheet.__freeze={...(activeSheet.__freeze||{row:0}),column:value};},
       get FreezePanes(){return frozen;},set FreezePanes(value){
         assert.ok(activeSheet,'冻结前必须有活动工作表');frozen=value===true;state.frozenSheet=activeSheet.Name;
       }},

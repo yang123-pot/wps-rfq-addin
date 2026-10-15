@@ -190,7 +190,7 @@ function layoutFixture(overrides){
   const list=links[address]||(links[address]=[]);
   return {get Count(){return list.length;},Item(index){return list[index-1]||{};}};
  }
- const ranges=new Map(),frozenSheets=new Map(),freezePositions=new Map();let selected='',activeSheet=null,frozen=false;
+ const ranges=new Map(),frozenSheets=new Map(),freezePositions=new Map(),explicitSplits=new Map();let selected='',activeSheet=null,frozen=false;
  const sheets=[];
  function newSheet(name){
   const cells=new Map();
@@ -237,11 +237,14 @@ function layoutFixture(overrides){
     if(value===true){
      const anchor=/^([A-Z]+)(\d+)$/.exec(selected);
      const column=anchor?Array.from(anchor[1]).reduce((n,c)=>n*26+c.charCodeAt(0)-64,0):1;
-     freezePositions.set(activeSheet,options.wrongFreezePosition||{row:anchor?Number(anchor[2])-1:0,column:column-1});
+     const inferred={row:anchor?Number(anchor[2])-1-(options.selectionFreezeOffset||0):0,column:column-1};
+     freezePositions.set(activeSheet,options.wrongFreezePosition||explicitSplits.get(activeSheet)||inferred);
     }
    },
    get SplitRow(){return options.noFreezePositionRead?undefined:(freezePositions.get(activeSheet)||{row:0}).row;},
+   set SplitRow(value){if(!options.ignoreSplitWrites)explicitSplits.set(activeSheet,{...(explicitSplits.get(activeSheet)||{column:0}),row:value});},
    get SplitColumn(){return options.noFreezePositionRead?undefined:(freezePositions.get(activeSheet)||{column:0}).column;},
+   set SplitColumn(value){if(!options.ignoreSplitWrites)explicitSplits.set(activeSheet,{...(explicitSplits.get(activeSheet)||{row:0}),column:value});},
    get Frozen(){return this.FreezePanes;}},
   get ActiveWorkbook(){return app._active;},Workbooks:{Count:1,Item(){return previous;},
    Add(){app._active=book;const s=newSheet();sheets.push(s);activeSheet=s;return book;},
@@ -518,6 +521,20 @@ test('冻结标志为true但位置错误时拒绝保存',()=>{
  const h=layoutFixture({wrongFreezePosition:{row:1,column:0}});
  assert.throws(()=>host.write(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'),/冻结.*位置.*不一致/);
  assert.equal(h.saved,false,'A4被宿主收缩成A2时不得保存并继续发布');
+});
+
+test('selection-derived freeze offset is avoided by explicit row and column splits',()=>{
+ const h=layoutFixture({requireActiveSheet:true,selectionFreezeOffset:1});
+ assert.doesNotThrow(()=>host.write(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'));
+ assert.equal(h.saved,true);
+ assert.equal(h.isFrozen('汇总'),true);
+ assert.equal(h.isFrozen('明细'),true);
+});
+
+test('ignored explicit freeze placement still blocks publication when the selected split is wrong',()=>{
+ const h=layoutFixture({selectionFreezeOffset:1,ignoreSplitWrites:true});
+ assert.throws(()=>host.write(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'),/冻结.*位置.*不一致/);
+ assert.equal(h.saved,false);
 });
 test('每页保存重开后冻结位置或标志丢失时不报告生成成功',()=>{
  for(const options of [{requireActiveSheet:true,reopenFreezePosition:{row:1,column:0}},
