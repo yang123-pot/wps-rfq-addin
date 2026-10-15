@@ -4,6 +4,12 @@
   "status": "用户已批准的方案效果图；软件尚未按此实施",
   "amendments": [
     {
+      "date": "2026-10-15",
+      "file": "amendments-20261015.md",
+      "images": ["01-import-merge.png", "03-sheet-review.png"],
+      "summary": "用户授权本轮四项目按既有规则自动评审，含项目4连续续行自动归属测试；一期优先完整功能，分类准确率后续通过用户实际使用修正学习。标明自动评审，不冒记本人审核，不改生产习惯库，保留表内修改和整表确认流程。"
+    },
+    {
       "date": "2026-10-11",
       "file": "amendments-20261011.md",
       "images": ["03-sheet-review.png"],
