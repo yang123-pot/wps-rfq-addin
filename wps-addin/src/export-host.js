@@ -168,14 +168,6 @@
       freezeTrace.push('设置列后'+freezePosition(window));
       if(spec.freeze.column||spec.freeze.row)window.FreezePanes=true;
       freezeTrace.push('启用后'+freezePosition(window));
-      // Some WPS unfrozen splits read back at a neighbouring row. Compare the same
-      // model coordinates in frozen mode once; never compensate by changing the requested row.
-      if(Number(window.SplitRow)!==(spec.freeze.row||1)-1||Number(window.SplitColumn)!==(spec.freeze.column||1)-1){
-        window.SplitRow=(spec.freeze.row||1)-1;
-        freezeTrace.push('冻结内设置行后'+freezePosition(window));
-        window.SplitColumn=(spec.freeze.column||1)-1;
-        freezeTrace.push('冻结内设置列后'+freezePosition(window));
-      }
       verifyFreeze(app,sheet,spec.freeze,freezeTrace.join('；'));
     }
     (spec.hyperlinks||[]).forEach(function(link){

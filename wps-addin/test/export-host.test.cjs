@@ -242,18 +242,9 @@ function layoutFixture(overrides){
     }
    },
    get SplitRow(){return options.noFreezePositionRead?undefined:(freezePositions.get(activeSheet)||{row:0}).row;},
-   set SplitRow(value){
-    if(options.ignoreSplitWrites)return;
-    const isFrozen=options.requireActiveSheet?frozenSheets.get(activeSheet)===true:frozen;
-    const position={...(explicitSplits.get(activeSheet)||{column:0}),row:value+(!isFrozen?(options.unfrozenSplitOffset||0):0)};
-    explicitSplits.set(activeSheet,position);freezePositions.set(activeSheet,options.wrongFreezePosition||position);
-   },
+   set SplitRow(value){if(!options.ignoreSplitWrites)explicitSplits.set(activeSheet,{...(explicitSplits.get(activeSheet)||{column:0}),row:value});},
    get SplitColumn(){return options.noFreezePositionRead?undefined:(freezePositions.get(activeSheet)||{column:0}).column;},
-   set SplitColumn(value){
-    if(options.ignoreSplitWrites)return;
-    const position={...(explicitSplits.get(activeSheet)||{row:0}),column:value};
-    explicitSplits.set(activeSheet,position);freezePositions.set(activeSheet,options.wrongFreezePosition||position);
-   },
+   set SplitColumn(value){if(!options.ignoreSplitWrites)explicitSplits.set(activeSheet,{...(explicitSplits.get(activeSheet)||{row:0}),column:value});},
    get Frozen(){return this.FreezePanes;}},
   get ActiveWorkbook(){return app._active;},Workbooks:{Count:1,Item(){return previous;},
    Add(){app._active=book;const s=newSheet();sheets.push(s);activeSheet=s;return book;},
@@ -549,14 +540,6 @@ test('ignored explicit freeze placement still blocks publication when the select
  const h=layoutFixture({selectionFreezeOffset:1,ignoreSplitWrites:true});
  assert.throws(()=>host.write(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'),/冻结.*位置.*不一致/);
  assert.equal(h.saved,false);
-});
-
-test('a rounded unfrozen split can be set to the exact model row while already frozen',()=>{
- const h=layoutFixture({requireActiveSheet:true,unfrozenSplitOffset:1});
- assert.doesNotThrow(()=>host.write(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'));
- assert.equal(h.saved,true);
- assert.equal(h.isFrozen('汇总'),true);
- assert.equal(h.isFrozen('明细'),true);
 });
 test('每页保存重开后冻结位置或标志丢失时不报告生成成功',()=>{
  for(const options of [{requireActiveSheet:true,reopenFreezePosition:{row:1,column:0}},
