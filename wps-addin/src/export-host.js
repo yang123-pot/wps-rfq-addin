@@ -156,6 +156,9 @@
       var anchor=sheet.Cells.Item(spec.freeze.row||1,spec.freeze.column||1);
       if(typeof anchor.Select!=='function')throw Error('当前WPS不支持定位单元格API（Range.Select），未按获批版式输出“'+sheet.Name+'”。');
       anchor.Select();
+      // Native F5: selecting a tall wrapped row can scroll the viewport and shift FreezePanes.
+      // Restore the origin before setting the model's split; keep strict position checks below.
+      window.ScrollRow=1;
       // Selection alone can freeze one row short in WPS. Write the model's exact split before freezing.
       if(window.SplitRow==null||window.SplitColumn==null)
         throw Error('当前WPS不支持冻结位置读回API（Window.SplitRow/SplitColumn），未确认“'+sheet.Name+'”版式。');

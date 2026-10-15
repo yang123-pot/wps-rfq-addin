@@ -165,6 +165,7 @@ function layoutFixture(overrides){
    Select(){
     if(options.requireActiveSheet&&activeSheet!==sheet)throw Error('cannot select cells on inactive sheet: '+sheet.Name);
     selected=address;
+    if(options.selectionScrollRow)scrollRow=options.selectionScrollRow;
    },
    Validation:{Formula1:null,Type:null,InCellDropdown:null,IgnoreBlank:null,
     Add(type,style,operator,formula1){if(options.validationFails)throw Error('validation failed');
@@ -190,7 +191,7 @@ function layoutFixture(overrides){
   const list=links[address]||(links[address]=[]);
   return {get Count(){return list.length;},Item(index){return list[index-1]||{};}};
  }
- const ranges=new Map(),frozenSheets=new Map(),freezePositions=new Map(),explicitSplits=new Map();let selected='',activeSheet=null,frozen=false;
+ const ranges=new Map(),frozenSheets=new Map(),freezePositions=new Map(),explicitSplits=new Map();let selected='',activeSheet=null,frozen=false,scrollRow=1;
  const sheets=[];
  function newSheet(name){
   const cells=new Map();
@@ -231,6 +232,8 @@ function layoutFixture(overrides){
   Activate(){app._active=this;}};
  let closed=0,saved=false;
  const app={AutomationSecurity:1,FileSystem:{Exists:()=>false},ActiveWindow:{
+   get ScrollRow(){return scrollRow;},
+   set ScrollRow(value){if(!options.ignoreScrollRowWrite)scrollRow=value;},
    get FreezePanes(){return options.requireActiveSheet?frozenSheets.get(activeSheet)===true:frozen;},
    set FreezePanes(value){
     if(options.requireActiveSheet)frozenSheets.set(activeSheet,value===true);else frozen=value===true;
@@ -238,7 +241,8 @@ function layoutFixture(overrides){
      const anchor=/^([A-Z]+)(\d+)$/.exec(selected);
      const column=anchor?Array.from(anchor[1]).reduce((n,c)=>n*26+c.charCodeAt(0)-64,0):1;
      const inferred={row:anchor?Number(anchor[2])-1-(options.selectionFreezeOffset||0):0,column:column-1};
-     freezePositions.set(activeSheet,options.wrongFreezePosition||explicitSplits.get(activeSheet)||inferred);
+     const actual=options.wrongFreezePosition||explicitSplits.get(activeSheet)||inferred;
+     freezePositions.set(activeSheet,options.scrolledFreezePosition&&scrollRow!==1?options.scrolledFreezePosition:actual);
     }
    },
    get SplitRow(){return options.noFreezePositionRead?undefined:(freezePositions.get(activeSheet)||{row:0}).row;},
@@ -538,6 +542,20 @@ test('selection-derived freeze offset is avoided by explicit row and column spli
 
 test('ignored explicit freeze placement still blocks publication when the selected split is wrong',()=>{
  const h=layoutFixture({selectionFreezeOffset:1,ignoreSplitWrites:true});
+ assert.throws(()=>host.write(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'),/冻结.*位置.*不一致/);
+ assert.equal(h.saved,false);
+});
+
+test('F5: selecting past a tall row must not shift the frozen header after enabling panes',()=>{
+ const h=layoutFixture({requireActiveSheet:true,selectionScrollRow:8,scrolledFreezePosition:{row:1,column:0}});
+ assert.doesNotThrow(()=>host.write(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'));
+ assert.equal(h.saved,true);
+ assert.equal(h.isFrozen('汇总'),true);
+ assert.equal(h.isFrozen('明细'),true);
+});
+
+test('F5: a host that ignores scroll restoration still cannot publish a shifted frozen header',()=>{
+ const h=layoutFixture({selectionScrollRow:8,scrolledFreezePosition:{row:1,column:0},ignoreScrollRowWrite:true});
  assert.throws(()=>host.write(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx'),/冻结.*位置.*不一致/);
  assert.equal(h.saved,false);
 });
