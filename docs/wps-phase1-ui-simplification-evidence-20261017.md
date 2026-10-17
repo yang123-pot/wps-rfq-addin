@@ -77,5 +77,5 @@ node wps-addin/test/ui-simple-check.cjs
 
 ## 6. 未完成
 
-- 真实 WPS 七步新窗口截图（功能区已加载）；
-- 最终提交、普通推送与远程 SHA 核对。
+- 真实 WPS 七步新窗口截图（功能区已加载，仍需关闭重开当前旧窗口）；
+- UI1 源码/清单已提交并普通推送：源码 `9fb09ca74ac409f26273238747e1bed9838276a2`，清单 `4c311907aa91d9982b364a433e23ea8a19167801`；最终文档提交与远程 SHA 以本机 `outputs/wps-phase1-ui-simplify-20261017/backup-receipt-ui1.json` 及最终报告为准。
