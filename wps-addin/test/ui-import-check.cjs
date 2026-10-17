@@ -37,7 +37,12 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
   assert.equal(await page.locator('#merge-identical').isChecked(),false);
+  assert.match(await page.locator('#multi-workbook-hint').innerText(),/所有工作簿默认归入当前项目/);
+  assert.match(await page.locator('#multi-workbook-hint').innerText(),/同一份审核成果/);
+  assert.match(await page.locator('#merge-separate').locator('..').innerText(),/按工作簿、工作表保留来源/);
+  assert.match(await page.locator('#merge-summary').innerText(),/2 份清单归入当前项目/);
   assert.match(await page.locator('#merge-summary').innerText(),/2.*2/);
+  if(process.env.RFQ_IMPORT_DEFAULT_SCREENSHOT)await page.screenshot({path:process.env.RFQ_IMPORT_DEFAULT_SCREENSHOT,fullPage:true});
   assert.equal(await page.evaluate(()=>window.__closed.length),2);
   assert.equal(await page.evaluate(()=>window.Application.ActiveWorkbook.Name),'用户文件.xlsx');
   assert.match(await page.locator('#processing-status').innerText(),/阻断/);

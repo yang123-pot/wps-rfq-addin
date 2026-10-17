@@ -4,6 +4,12 @@
   "status": "用户已批准的方案效果图；软件尚未按此实施",
   "amendments": [
     {
+      "date": "2026-10-18",
+      "file": "amendments-20261018.md",
+      "images": ["01-import-merge.png"],
+      "summary": "用户确认一次导入对应一个项目，多个工作簿默认归入同一份材料清单和审核成果；图01选项只控制是否累加完全相同材料，选择分别保留时仍按工作簿、工作表分组保留来源。原PNG不重绘。"
+    },
+    {
       "date": "2026-10-15",
       "file": "amendments-20261015.md",
       "images": ["01-import-merge.png", "03-sheet-review.png"],

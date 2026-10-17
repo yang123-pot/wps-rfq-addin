@@ -76,6 +76,9 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
   assert.match(await page.locator('#workflow-note').innerText(),/已成功导入 2 个文件，共 10 行数据/);
+  assert.match(await page.locator('#workflow-note').innerText(),/全部归入当前项目/);
+  assert.match(await page.locator('#workflow-note').innerText(),/合并完全相同的材料/);
+  if(process.env.RFQ_WORKFLOW_MULTI_SCREENSHOT)await page.locator('#merge-section').screenshot({path:process.env.RFQ_WORKFLOW_MULTI_SCREENSHOT});
   assert.equal(await page.locator('#workflow-rows').innerText(),'10','导入总行数');
   assert.equal(await page.locator('#workflow-merged').innerText(),'10','未合并时预览行数保持10');
   assert.deepEqual(await page.evaluate(()=>window.__previews[0].sheets.map(s=>s.name)),['导入预览','合并明细'],

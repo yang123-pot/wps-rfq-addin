@@ -15,7 +15,7 @@
   values.push(['','合计','',String(preview.inputCount),'','']);
   values.push([]);
   merges.push({row:values.length+1,column:1,columnSpan:6});
-  values.push(['二、合并预览（'+(combined?'仅显示将被合并的完全相同项':'分别保留清单，不进行合并')+'）']);
+  values.push(['二、材料处理预览（'+(combined?'仅显示将被合并的完全相同项':'按来源分别保留，同一项目')+'）']);
   heads.push(values.length+1);
   values.push(['来源文件','项目名称','项目特征描述','单位','工程量','合并结果']);
   var fills=heads.map(function(row){return layout.headerFill(row,6);});
@@ -27,10 +27,11 @@
    merges.push({row:first,column:6,rowSpan:group.sources.length});
    fills.push({row:first,column:6,rowSpan:group.sources.length,color:'#E2F0D9'});
   });
-  if(!duplicates.length)values.push([combined?'没有完全相同且可合并的项目。':'当前分别保留每条材料及来源。']);
+  if(!duplicates.length)values.push([combined?'没有完全相同且可合并的项目。':'全部材料进入当前项目，按工作簿和工作表分别保留来源。']);
   values.push([]);
-  ['三、说明','输入 '+preview.inputCount+' 行 → '+(combined?'合并后':'分别保留')+' '+preview.outputCount+' 行。',
-   '仅项目名称、项目特征描述、单位完全一致时合并；十进制精确累加。',
+  ['三、说明','输入 '+preview.inputCount+' 行 → '+(combined?'合并完全相同项后':'按来源分别保留')+' '+preview.outputCount+' 行。',
+   '所有工作簿默认进入当前项目，生成同一份审核成果；分别保留只影响相同材料是否累加。',
+   combined?'仅项目名称、项目特征描述、单位完全一致时合并；数量精确累加。':'逐条保留材料，并记录来自哪个工作簿、工作表和来源行。',
    '预览随侧栏选择刷新，请在侧栏确认选择后开始自动分类。',
    '此预览不作为填写表；原始文件和导入副本保持不变。'].forEach(function(note){
     merges.push({row:values.length+1,column:1,columnSpan:6});values.push([note]);

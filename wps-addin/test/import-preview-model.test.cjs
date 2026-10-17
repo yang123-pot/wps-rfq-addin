@@ -19,7 +19,8 @@ test('图01主工作表：两个文件10行、精确合并8行且明细保留逐
 test('默认分别保留10行，预览不声称已经合并或已经分类',()=>{
  const result=model.build(sample.buildCollection(),false,{projectName:'示例园区'});
  assert.equal(result.outputCount,10);
- assert.equal(result.sheets[0].values.some(row=>row.join('').includes('分别保留')),true);
+ assert.equal(result.sheets[0].values.some(row=>row.join('').includes('按来源分别保留，同一项目')),true);
+ assert.equal(result.sheets[0].values.some(row=>row.join('').includes('所有工作簿默认进入当前项目')),true);
  assert.equal(result.sheets[0].values.some(row=>row[5]==='1 + 1 = 2'),false);
  assert.equal(result.sheets[0].values.every(row=>row.length===6),true);
 });

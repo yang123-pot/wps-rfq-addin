@@ -10,6 +10,20 @@
     var merge=document.getElementById('merge-identical');merge.checked=false;
     var mergeSeparate=document.getElementById('merge-separate');
     var mergeDetail=document.getElementById('merge-detail');
+    var multiWorkbookHint=document.getElementById('multi-workbook-hint');
+    var mergeSeparateTitle=document.getElementById('merge-separate-title');
+    var mergeSeparateNote=document.getElementById('merge-separate-note');
+    var mergeIdenticalTitle=document.getElementById('merge-identical-title');
+    var mergeIdenticalNote=document.getElementById('merge-identical-note');
+    function isMultiSource(){
+      return collection.entries.length>1||collection.entries.some(function(entry){
+        return !!(entry.snapshot&&Array.isArray(entry.snapshot.sheets)&&entry.snapshot.sheets.length>1);
+      });
+    }
+    function modeLabels(){
+      var multi=isMultiSource();
+      return {multi:multi,merge:'合并完全相同项',separate:'分别保留（按工作簿分组）'};
+    }
     // 切到“表内审核”时自动按稳定rowId读回成果表，侧栏直接显示当前填写进度（读不到就明确提示，不猜）。
     var workflow=window.RfqWorkflowUI?window.RfqWorkflowUI.create({onStageChange:function(stage){
       if(stage==='review')refreshReviewRead();
@@ -229,6 +243,21 @@
         }));list.appendChild(li);
       });
       document.getElementById('merge-section').hidden=!collection.entries.length;
+      var labels=modeLabels();
+      if(multiWorkbookHint){
+        multiWorkbookHint.hidden=!labels.multi;
+        multiWorkbookHint.textContent=labels.multi?('检测到 '+collection.entries.length+' 份清单、共 '+
+          collection.entries.reduce(function(count,entry){return count+((entry.snapshot&&entry.snapshot.sheets&&entry.snapshot.sheets.length)||0);},0)+
+          ' 个工作表。所有工作簿默认归入当前项目，汇总为同一份审核成果；请选择是否合并完全相同的材料。'):'';
+      }
+      if(mergeSeparateTitle)mergeSeparateTitle.textContent=labels.separate;
+      if(mergeSeparateNote)mergeSeparateNote.textContent=labels.multi?
+        '保留全部材料行，不累加重复项；仍生成同一份审核成果，并按工作簿、工作表保留来源。':
+        '保留全部材料行，不累加重复项；适用于需要保留原始明细的场景。';
+      if(mergeIdenticalTitle)mergeIdenticalTitle.textContent=labels.merge;
+      if(mergeIdenticalNote)mergeIdenticalNote.textContent=labels.multi?
+        '所有工作簿中项目名称＋项目特征描述＋单位完全相同的材料合并，数量精确累加；仍属于当前项目。':
+        '仅当 项目名称＋项目特征描述＋单位 完全相同时合并，不进行模糊匹配；数量精确累加。';
       projects.refresh();
       if(!collection.entries.length){
         exporter.refresh({canFinalize:false});classifier.refresh({groups:[]});
@@ -256,7 +285,8 @@
       if(headerPanel)headerPanel.refresh();
       if(inquiryPanel)inquiryPanel.refresh();
       if(splitPanel)splitPanel.refresh();
-      document.getElementById('merge-summary').textContent='原始 '+result.inputCount+' 项 → 预览 '+result.outputCount+' 项 · '+(merge.checked?'已选择精确合并':'按来源分别保留');
+      document.getElementById('merge-summary').textContent=collection.entries.length+' 份清单归入当前项目 · 原始 '+result.inputCount+
+        ' 项 → 预览 '+result.outputCount+' 项 · '+(merge.checked?'已选择合并完全相同项':'已选择按来源分别保留');
       confirmMerge.disabled=busy||!result.canFinalize;
       confirmMerge.textContent=mergeConfirmed?'已确认本次选择（可重新确认并继续）':'确认选择，开始自动分类';
       document.getElementById('merge-status').textContent=(result.canFinalize?'本次校验通过，预览尚未另存。':
@@ -275,7 +305,7 @@
       document.getElementById('merge-pages').textContent=(page+1)+' / '+pages+' 页';
       document.getElementById('merge-prev').disabled=page===0;document.getElementById('merge-next').disabled=page+1>=pages;
     }
-    // 图01的两个选项互斥：默认“分别保留清单”，勾选“合并完全相同项”才更新精确预览。
+    // 图01的两个选项互斥：工作簿统一归入当前项目；默认按来源分别保留，勾选“合并完全相同项”才累加重复材料。
     function syncMergeChoices(){
       if(mergeSeparate)mergeSeparate.checked=!merge.checked;
       var separateRow=mergeSeparate&&mergeSeparate.parentNode,combinedRow=merge&&merge.parentNode;
@@ -286,8 +316,13 @@
       merge.checked=combined===true;
       page=0;render();
     }
-    merge.addEventListener('change',function(){chooseMode(merge.checked);tell(merge.checked?'已选择“合并完全相同项”，下方预览按精确合并更新；确认后才进入自动分类。':'已选择“分别保留清单”，不做合并；确认后才进入自动分类。');});
-    if(mergeSeparate)mergeSeparate.addEventListener('change',function(){chooseMode(false);tell('已选择“分别保留清单”，不做合并；确认后才进入自动分类。');});
+    function modeTell(combined){
+      var labels=modeLabels();
+      tell(combined?'已选择“'+labels.merge+'”，下方预览按精确合并更新；确认后才进入自动分类。':
+        '已选择“'+labels.separate+'”，全部材料仍汇入当前项目，审核成果按工作簿分组保留来源；确认后才进入自动分类。');
+    }
+    merge.addEventListener('change',function(){chooseMode(merge.checked);modeTell(merge.checked);});
+    if(mergeSeparate)mergeSeparate.addEventListener('change',function(){chooseMode(false);modeTell(false);});
     if(mergeDetail)mergeDetail.addEventListener('click',function(){
       syncImportPreview(true);
       tell('合并预览明细：请查看主工作簿中的“导入预览”和“合并明细”；原件不变，确认选择后才开始分类。');
@@ -1416,7 +1451,7 @@
         }
         var next=RfqCollection.add(collection,entries);collection=next;added=true;render();
         if(!selected)activate(collection.entries[0].id);
-        tell('已导入 '+entries.length+' 份清单。原件未打开；是否合并由下方选项决定。');
+        tell('已导入 '+entries.length+' 份清单，全部归入当前项目。原件未打开；下方只选择相同材料是否累加。');
       }catch(error){tell((added?'文件已加入，但界面更新失败，请重新选择文件核对。':'本批未加入，已有列表保留。')+error.message,true);}
       // 导入结束后必须再渲染一次：导入过程中的渲染发生在busy=true时，控件会保持禁用。
       finally{busy=false;options.onBusy(false);render();}

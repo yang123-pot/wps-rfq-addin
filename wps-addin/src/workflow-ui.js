@@ -3,8 +3,8 @@
  // R3：主流程七步导航。步骤名与handoff第4.2节阶段一致，侧栏只显示当前阶段的说明、统计与操作。
  // 未实现阶段只给说明/状态/下一步，不提供侧栏逐行确认或品牌编辑入口。
  var STEPS=[
-  {id:'import',label:'导入与合并',title:'01 导入后先选择是否合并',owner:'R3',
-   detail:'导入成功先展示文件与行数，默认“分别保留清单”；选择“合并完全相同项”后才更新精确预览，确认后再进入自动分类。'},
+  {id:'import',label:'导入与合并',title:'01 导入后选择材料处理方式',owner:'R3',
+   detail:'多个工作簿归入同一项目、生成同一份审核成果；默认按来源分别保留，选择“合并完全相同项”后才累加完全相同的材料。'},
   {id:'matching',label:'自动分类',title:'02 自动分类后生成审核成果表',owner:'R4',
    detail:'按已确认的合并选择调用分类库与习惯记忆给出建议，生成独立审核成果工作表；自动建议不等于人工确认。'},
   {id:'review',label:'表内审核',title:'03 在表格中修改，整表一次确认',owner:'R5',
@@ -129,8 +129,8 @@
      example='支持 .xls / .xlsx，一次可选多份；选完再确认怎么合并。';
      primary='选择清单文件';action=function(){clickStageButton('import',['import-files','browse-files']);};
     }else if(stageState.matching!=='ready'){
-     title='选清单';desc='文件已导入。确认合并方式后，进入自动分类和核对。';
-     example='默认分别保留清单；只有完全相同的项目才需要合并。';
+     title='选清单';desc='所有工作簿已进入当前项目。确认材料处理方式后，进入自动分类和核对。';
+     example='默认按工作簿分组保留来源；只有完全相同的材料才需要累加。';
      primary='下一步：核对分类';action=function(){clickStageButton('import','confirm-merge');};
     }else{
      title='核对分类';desc='系统已生成建议。打开成果表，确认每一行属于哪一类。';
@@ -222,7 +222,7 @@
   function noteFor(step){
    if(step.id==='import'){
     if(!stats.files)return '尚未导入清单：请选择本机文件；插件只复制并读取副本，不会改动原件。';
-    return '已成功导入 '+stats.files+' 个文件，共 '+stats.rows+' 行数据。请先选择是否合并完全相同项，确认后再进行自动分类。';
+    return '已成功导入 '+stats.files+' 个文件，共 '+stats.rows+' 行数据；全部归入当前项目。请选择按来源分别保留或合并完全相同的材料，确认后再进行自动分类。';
    }
    return step.detail;
   }
