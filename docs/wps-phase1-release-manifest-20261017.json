@@ -4,15 +4,15 @@
     "name": "wps-rfq-addin-0.1.0-20261017-F8",
     "version": "0.1.0",
     "build": "20261017-F8",
-    "createdAt": "2026-10-17T22:03:54+08:00",
+    "createdAt": "2026-10-17T22:22:38+08:00",
     "branch": "feat/wps-phase1",
-    "commit": "a08db614b017245113157fe76288722579153d31",
+    "commit": "bb4a4316c5e4a11712d1a6a8e31b9c8454cbd1ab",
     "zipName": "wps-rfq-addin-0.1.0-20261017-F8.zip",
-    "zipBytes": 269484,
-    "zipSha256": "3c1dc286d5c74a3a013a466bf9f868ed1e4a2ebeab34f8a095b1149a04bd8a6c",
+    "zipBytes": 917383,
+    "zipSha256": "70faab2201c9d66d9aaaab64ba9a72ab27df61b298aa6b095984649d9aae01cb",
     "codeVersion": "ca92a042a113345a3df74a495b5a4a7d793889cda2e86c46662c522eda0704c2",
     "testedWps": "12.1.0.29161",
-    "fileCount": 73,
+    "fileCount": 82,
     "files": [
       {
         "path": "assets/brands.svg",
@@ -105,14 +105,59 @@
         "sha256": "b96df2abfc3b08e203d29bd636dd7a91acdd1e32f1b75489c813b75236cd2a37"
       },
       {
+        "path": "docs/images/wps-user-guide-f8/step-01-import.png",
+        "bytes": 54666,
+        "sha256": "bfe69fae06f63e4aa1a4de5433e29b30e97283c7df46b53adc3c6cb392b4456d"
+      },
+      {
+        "path": "docs/images/wps-user-guide-f8/step-02-classification.png",
+        "bytes": 54753,
+        "sha256": "90fa93bf676aef1301cf63f1b93fde12996eb9b961629fe1816d90b068570bc7"
+      },
+      {
+        "path": "docs/images/wps-user-guide-f8/step-03-review.png",
+        "bytes": 173187,
+        "sha256": "4bac2b6a97893aade906b18417f5b9b8a8e7a2bff27fb95a275bd259a15becbb"
+      },
+      {
+        "path": "docs/images/wps-user-guide-f8/step-04-categories.png",
+        "bytes": 164449,
+        "sha256": "70cfd1cb1330eebfc733f8f972b463dfd0b866c18e700e59a56d00377bfdd58f"
+      },
+      {
+        "path": "docs/images/wps-user-guide-f8/step-05a-summary-separated.png",
+        "bytes": 173770,
+        "sha256": "f868253a3adba79dc3822ebc1898fcf15bb145f1a472fe43b9d7417d02bb8283"
+      },
+      {
+        "path": "docs/images/wps-user-guide-f8/step-05b-summary-combined.png",
+        "bytes": 96794,
+        "sha256": "93aee5d625d734b9f3b38a8adb4bb23b8e76aa2d1a3d2e9823188d59186d3d7f"
+      },
+      {
+        "path": "docs/images/wps-user-guide-f8/step-06-inquiry.png",
+        "bytes": 95530,
+        "sha256": "f41038fb7ed2b44efb45bb0019caa79d43932ffc5732c0c344a05b5450241877"
+      },
+      {
+        "path": "docs/images/wps-user-guide-f8/step-07-restored.png",
+        "bytes": 65587,
+        "sha256": "764fb8f526bcd211b5b1bc6299901c894491cad8fb5771c692265f65d42def84"
+      },
+      {
+        "path": "docs/images/wps-user-guide-f8/step-07-split.png",
+        "bytes": 68475,
+        "sha256": "a1f3c3ec87ce133e5dd79a4d648468a11640a9270a721b8333949b978cfcb91a"
+      },
+      {
         "path": "docs/wps-install-guide.md",
         "bytes": 7855,
         "sha256": "280ed49c0c578c9aaaff468c16999f5a0c866600bc3b4aec08657d7cbf21aad5"
       },
       {
         "path": "docs/wps-user-guide.md",
-        "bytes": 14739,
-        "sha256": "7b8d16afafb6d08a739c6931c1ecd3a2e8030e7b3e2af8c5c22f3fa5587d2e05"
+        "bytes": 16147,
+        "sha256": "34e99cc6d50872ba340c57040ce1f2090409d0d9a69fe60d2865afcded3bcb50"
       },
       {
         "path": "install/install.ps1",
