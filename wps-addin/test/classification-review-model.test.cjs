@@ -43,6 +43,19 @@ test('唯一可靠建议预填最终分类，冲突行留空并标为异常',()=
   assert.match(byKey[sample.keyOf('水泵','DN50','台')].matchBasis,/完全匹配/);
 });
 
+test('旧习惯记忆的显示名不覆盖当前类别名称',()=>{
+  const library={version:'test-library',categories:[{id:'pump',name:'水泵'}],rules:[]};
+  const item={name:'水泵',feature:'DN50',unit:'台'};
+  const memoryState=memory.learn(memory.create(),
+    {categoryId:'pump',categoryName:'旧水泵',confirmedAt:'2026-10-17T00:00:00.000Z'},
+    {item:item,projectId:'p-test01'});
+  const result=model.build([{id:'row-pump',name:item.name,feature:item.feature,unit:item.unit,
+    quantity:'1',scopeId:'scope-test',sources:[]}],{library:library,memory:memoryState,projectId:'p-test01'});
+  assert.equal(result.rows[0].autoCategoryName,'水泵');
+  assert.equal(result.rows[0].finalCategoryName,'水泵');
+  assert.doesNotMatch(result.rows[0].matchBasis,/旧水泵/);
+});
+
 test('成果表按图03列序输出9列，规格保存完整特征，编码与来源只进内部绑定',()=>{
   const {result}=built();
   const sheet=model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'});

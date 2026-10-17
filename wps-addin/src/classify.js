@@ -62,10 +62,12 @@
      +(rule.basis?'（依据：'+rule.basis+'）':''));
   });
   memoryCandidates(item,memoryState,allowed,projectId).forEach(function(found){
-   candidates.push({categoryId:found.categoryId,categoryName:found.categoryName||library.categoryName(source,found.categoryId),
+   var categoryName=library.categoryName(source,found.categoryId),basis=found.basis||'历史人工确认',arrow=basis.lastIndexOf('\u2192');
+   if(arrow>=0&&found.categoryName)basis=basis.slice(0,arrow+1)+categoryName;
+   candidates.push({categoryId:found.categoryId,categoryName:categoryName,
     source:'memory',matchLevel:found.matchLevel==='exact'?'exact':'partial',memoryId:found.memoryId,
-    basis:found.basis||'历史人工确认',matched:[]});
-   reasons.push('命中历史确认：'+(found.basis||found.categoryName||found.categoryId));
+    basis:basis,matched:[]});
+   reasons.push('命中历史确认：'+(basis||categoryName||found.categoryId));
   });
   var distinct=[],byCategory={};
   candidates.forEach(function(candidate){
