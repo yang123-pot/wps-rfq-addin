@@ -3,6 +3,13 @@
   "productName": "材料整理助手",
   "currentDesign": "seven-step",
   "scope": "七步纵向列表默认界面、当前步骤单一主操作、次要动作收进更多操作；三步稿保留为设计过程记录",
+  "amendments": [
+    {
+      "date": "2026-10-18",
+      "file": "amendments-20261018.md",
+      "summary": "用户要求简版隐藏普通用户无需理解的技术信息，并形成连贯单步流程：操作后原位显示下一步按钮；七步列表只作进度展示，技术面板只在详细步骤出现。"
+    }
+  ],
   "files": [
     {
       "file": "01-current-step.png",

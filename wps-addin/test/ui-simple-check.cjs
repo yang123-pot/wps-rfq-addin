@@ -17,6 +17,7 @@ const { createServer } = require('../dev/server.cjs');
         ActiveWorkbook: null,
         AutomationSecurity: 1,
         Workbooks: { Count: 0, Item() { return null; } },
+        GetOpenFilename() { return false; },
         PluginStorage: {
           getItem(key) { return backing.getItem('plugin:' + key); },
           setItem(key, value) { backing.setItem('plugin:' + key, String(value)); },
@@ -55,11 +56,13 @@ const { createServer } = require('../dev/server.cjs');
     await page.locator('#simple-mode-toggle').click();
     assert.equal(await page.locator('#simple-home').isVisible(), true);
     await page.locator('#simple-primary').click();
-    assert.equal(await page.locator('body').evaluate(el => el.classList.contains('simple-task-mode')), true, '主按钮进入简版任务视图');
+    assert.equal(await page.locator('#simple-home').isVisible(), true, '操作时始终停留在当前步骤卡片');
+    assert.equal(await page.locator('body').evaluate(el => el.classList.contains('simple-task-mode')), false, '简版不展开技术面板');
     assert.equal(await page.locator('#workflow-section').isHidden(), true, '简版任务视图不显示七步导航');
-    assert.equal(await page.locator('#stage-panel-import').isVisible(), true, '简版任务视图显示当前任务面板');
-    await page.locator('#simple-mode-toggle').click();
-    assert.equal(await page.locator('#simple-home').isVisible(), true, '顶部“简版”返回七步首页');
+    assert.equal(await page.locator('#stage-panel-import').isHidden(), true, '简版不显示识别预览技术面板');
+    assert.equal(await page.locator('.import-more').isHidden(), true, '简版隐藏备用导入入口');
+    assert.equal(await page.locator('#stage-panel-import > section.card[aria-label="当前工作簿"]').isHidden(), true, '简版隐藏单簿读取入口');
+    assert.equal(await page.locator('#simple-seven-list .simple-seven-row[role="button"]').count(), 0, '简版步骤列表只显示进度，不跳入技术页');
 
     await page.evaluate(() => {
       document.getElementById('project-status').textContent =
@@ -68,12 +71,35 @@ const { createServer } = require('../dev/server.cjs');
       document.dispatchEvent(new Event('rfq:project-status'));
     });
     assert.match(await page.locator('#simple-title').innerText(), /填写品牌和供应商/);
+    assert.equal(await page.locator('#simple-primary').innerText(), '打开品牌表', '品牌步骤应直接显示对应操作');
+    assert.equal(await page.locator('#stage-panel-brands').isHidden(), true, '品牌步骤不展开技术面板');
     await page.evaluate(() => {
       document.getElementById('project-status').textContent =
         '导入与合并：已确认 · 自动分类：已确认 · 表内审核：已确认 · 分类工作簿：已确认 · 品牌汇总：已确认 · 询价表：未完成 · 拆分文件：未完成';
       document.dispatchEvent(new Event('rfq:project-status'));
     });
     assert.match(await page.locator('#simple-title').innerText(), /生成询价表/);
+    assert.equal(await page.locator('#simple-primary').innerText(), '生成询价表', '询价步骤先显示生成操作');
+    await page.evaluate(() => {
+      document.getElementById('project-status').textContent =
+        '导入与合并：已确认 · 自动分类：已确认 · 表内审核：已确认 · 分类工作簿：已确认 · 品牌汇总：已确认 · 询价表：已确认 · 拆分文件：未完成';
+      document.getElementById('inquiry-next').disabled = false;
+      document.dispatchEvent(new Event('rfq:project-status'));
+    });
+    await page.waitForFunction(() => /下一步：拆分供应商文件/.test(document.querySelector('#simple-primary').textContent));
+    assert.equal(await page.locator('#simple-primary').innerText(), '下一步：拆分供应商文件', '询价完成后再显示下一步');
+    assert.equal(await page.locator('#stage-panel-inquiry').isHidden(), true, '询价步骤不展开技术面板');
+    await page.locator('#simple-primary').click();
+    await page.waitForFunction(() => /拆分供应商文件/.test(document.querySelector('#simple-title').textContent));
+    assert.equal(await page.locator('#simple-title').innerText(), '拆分供应商文件');
+    assert.equal(await page.locator('#simple-primary').innerText(), '选择输出文件夹', '拆分前应先显示目录选择');
+    await page.evaluate(() => {
+      document.getElementById('project-status').textContent =
+        '导入与合并：已确认 · 自动分类：已确认 · 表内审核：已确认 · 分类工作簿：已确认 · 品牌汇总：已确认 · 询价表：已确认 · 拆分文件：未完成';
+      document.dispatchEvent(new Event('rfq:project-status'));
+    });
+    assert.match(await page.locator('#simple-title').innerText(), /拆分供应商文件/);
+    assert.equal(await page.locator('#simple-primary').innerText(), '选择输出文件夹', '拆分前应先显示目录选择');
     await page.evaluate(() => {
       document.getElementById('project-status').textContent =
         '导入与合并：已确认 · 自动分类：已确认 · 表内审核：已确认 · 分类工作簿：已确认 · 品牌汇总：已确认 · 询价表：已确认 · 拆分文件：已确认';

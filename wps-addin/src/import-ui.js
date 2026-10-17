@@ -1,7 +1,7 @@
 (function(){
   'use strict';
   function node(tag,text,className){var e=document.createElement(tag);if(text!=null)e.textContent=text;if(className)e.className=className;return e;}
-  function button(text,action){var e=node('button',text,'locate');e.type='button';e.addEventListener('click',action);return e;}
+  function button(text,action,className){var e=node('button',text,'locate'+(className?' '+className:''));e.type='button';e.addEventListener('click',action);return e;}
   function create(options){
     var collection=RfqCollection.create(),selected=null,page=0,busy=false;
     var mergeConfirmedKey=null;
@@ -233,8 +233,8 @@
       collection.entries.forEach(function(e){
         var li=node('li',null,e.id===selected?'selected-file':'');
         li.appendChild(node('strong',e.metadata.originalName));li.appendChild(node('p',e.metadata.originalPath,'source'));
-        li.appendChild(node('p',e.snapshot.sheets.length+' 张表 · '+e.parsed.materials.length+' 项 · '+e.parsed.issues.length+' 个问题'+(e.dirty?' · 核对未保存':''),'note'));
-        li.appendChild(button('核对此文件',function(){activate(e.id);}));
+        li.appendChild(node('p',e.snapshot.sheets.length+' 张表 · '+e.parsed.materials.length+' 项 · '+e.parsed.issues.length+' 个问题'+(e.dirty?' · 核对未保存':''),'note file-detail'));
+        li.appendChild(button('核对此文件',function(){activate(e.id);},'technical-file-action'));
         li.appendChild(button('移除此文件',function(){
           if(e.dirty&&!window.confirm('此文件有未保存核对，移除会丢失这些修改，是否继续？'))return;
           collection=RfqCollection.remove(collection,e.id);

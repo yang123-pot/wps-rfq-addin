@@ -36,8 +36,10 @@
     simpleSevenList=document.getElementById('simple-seven-list'),simpleTitle=document.getElementById('simple-title'),
     simpleDesc=document.getElementById('simple-desc'),simpleExample=document.getElementById('simple-example'),
     simplePrimary=document.getElementById('simple-primary'),simpleExampleLink=document.getElementById('simple-example-link'),
-    simpleBack=document.getElementById('simple-back'),
+    simpleMergeChoice=document.getElementById('simple-merge-choice'),simpleMergeSummary=document.getElementById('simple-merge-summary'),
+    simpleResult=document.getElementById('simple-result'),
     simpleGuide=document.getElementById('simple-guide'),simpleHelp=document.getElementById('simple-help');
+  var simpleMergeRadios=simpleMergeChoice?simpleMergeChoice.querySelectorAll('input[name="simple-merge-mode"]'):[];
   var current='import',stats={files:0,rows:0,mergedRows:0},stageState={},panels={},buttons={},navigationWatch=null;
   var viewMode='home';
   if(!nav||!host||!importPanel)return null;
@@ -78,24 +80,32 @@
   }
   function splitDirectoryChosen(){
    var label=document.getElementById('split-directory-label');
-   return !!(label&&String(label.textContent||'').trim());
+   var text=label?String(label.textContent||'').trim():'';
+   return !!text&&!/^尚未选择/.test(text);
   }
   function simpleStageIndex(){
-   if(stageState.split==='ready'||splitComplete())return 8;
-   if(stageState.inquiry==='ready')return simpleFlags.inquiryNext?7:6;
-   if(stageState.brands==='ready')return 6;
-   if(stageState.categories==='ready')return summaryGenerated()?5:4;
-   if(stageState.review==='ready')return 4;
-   if(stageState.matching==='ready')return simpleFlags.reviewOpened?3:2;
-   return 1;
+   var step=1,currentSteps={import:1,matching:2,review:3,categories:4,brands:5,inquiry:6,split:7};
+   if(stageState.split==='ready'||splitComplete())step=8;
+   else if(stageState.inquiry==='ready')step=simpleFlags.inquiryNext?7:6;
+   else if(stageState.brands==='ready')step=6;
+   else if(stageState.categories==='ready')step=summaryGenerated()?5:4;
+   else if(stageState.review==='ready')step=4;
+   else if(stageState.matching==='ready'||simpleFlags.reviewOpened)step=simpleFlags.reviewOpened?3:2;
+   return Math.max(step,currentSteps[current]||1);
   }
   function clickStageButton(stage,ids,after){
-   openTask(stage);
+   if(stage)goTo(stage);
    setTimeout(function(){
     var list=Array.isArray(ids)?ids:[ids];
     for(var i=0;i<list.length;i++){
      var button=document.getElementById(list[i]);
-     if(button&&!button.hidden&&!button.disabled){button.click();if(after)after();return;}
+     if(button&&!button.hidden&&!button.disabled){
+      if(simpleResult){simpleResult.textContent='正在处理，请稍候…';simpleResult.hidden=false;}
+      button.click();
+      if(after)after();
+      setTimeout(renderSimple,0);
+      return;
+     }
     }
     showSimpleHelp('这一步还不能操作，请先完成上一步，或点“详细步骤”查看原因。');
    },30);
@@ -118,11 +128,11 @@
   }
   function openTask(stage){
    if(stage)goTo(stage);
-   setViewMode('task');
+   setViewMode('home');
   }
   function renderSimple(){
    if(!simpleHome)return;
-   var step=simpleStageIndex(),title,desc,example,primary,action,linkText;
+   var step=simpleStageIndex(),title,desc,example,primary,action,linkText,resultText;
    if(step===1){
     if(stageState.import!=='ready'&&!stats.files){
      title='选清单';desc='把要询价的表格选进来。插件只读取副本，不会修改原件。';
@@ -131,18 +141,18 @@
     }else if(stageState.matching!=='ready'){
      title='选清单';desc='所有工作簿已进入当前项目。确认材料处理方式后，进入自动分类和核对。';
      example='默认按工作簿分组保留来源；只有完全相同的材料才需要累加。';
-     primary='下一步：核对分类';action=function(){clickStageButton('import','confirm-merge');};
+     primary='确认材料处理方式，继续';action=function(){clickStageButton('import','confirm-merge');};
     }else{
      title='核对分类';desc='系统已生成建议。打开成果表，确认每一行属于哪一类。';
      example='有冲突或空分类的行会被标出来。';
      primary=reviewGenerated()?'打开成果表核对':'生成审核成果表';
-     action=reviewGenerated()?function(){clickStageButton('matching','classification-review-open',function(){simpleFlags.reviewOpened=true;openTask('review');});}:function(){clickStageButton('matching','classification-review-generate');};
+     action=reviewGenerated()?function(){clickStageButton('matching','classification-review-open',function(){simpleFlags.reviewOpened=true;});}:function(){clickStageButton('matching','classification-review-generate');};
     }
    }else if(step===2){
     title='核对分类';desc='系统已生成建议。打开成果表，确认每一行属于哪一类。';
     example='有冲突或空分类的行会被标出来。';
     primary=reviewGenerated()?'打开成果表核对':'生成审核成果表';
-    action=reviewGenerated()?function(){clickStageButton('matching','classification-review-open',function(){simpleFlags.reviewOpened=true;openTask('review');});}:function(){clickStageButton('matching','classification-review-generate');};
+    action=reviewGenerated()?function(){clickStageButton('matching','classification-review-open',function(){simpleFlags.reviewOpened=true;});}:function(){clickStageButton('matching','classification-review-generate');};
    }else if(step===3){
     title='审核确认';desc='检查最终分类和备注。整张表没有问题后，一次确认并生成分类工作簿。';
     example='确认前仍可修改；空分类或冲突会定位到具体单元格。';
@@ -155,7 +165,7 @@
     }else if(!summaryGenerated()){
      primary='生成分类汇总表';action=function(){clickStageButton('categories','categories-summary',function(){simpleFlags.summaryGenerated=true;});};
     }else{
-     primary='下一步：填写品牌';action=function(){openTask('brands');};
+     primary='下一步：填写品牌';action=function(){simpleFlags.summaryGenerated=true;goTo('brands');renderSimple();};
     }
    }else if(step===5){
     title='填写品牌和供应商';desc='在表格的黄色区域填写。每一类至少填一个品牌和一个供应商，填完保存。';
@@ -171,7 +181,7 @@
     if(stageState.inquiry!=='ready'){
      primary='生成询价表';action=function(){clickStageButton('inquiry','inquiry-generate');};
     }else{
-     primary='下一步：拆分供应商文件';action=function(){simpleFlags.inquiryNext=true;clickStageButton('inquiry','inquiry-next');};
+     primary='下一步：拆分供应商文件';action=function(){simpleFlags.inquiryNext=true;clickStageButton('inquiry','inquiry-next',function(){simpleFlags.inquiryNext=true;});};
     }
    }else if(step===7){
     title='拆分供应商文件';desc='每张询价页拆成一个独立文件，已有同名文件不会覆盖。';
@@ -186,30 +196,47 @@
     example='文件已保存到输出文件夹。';
     primary='打开文件夹';action=function(){clickStageButton('split','split-open');};linkText='再做一单';
    }
+   if(step===1)resultText=stats.files?('已导入 '+stats.files+' 份清单，共 '+stats.rows+' 项。请选择处理方式。'):'';
+   else if(step===2)resultText=reviewGenerated()?'成果表已生成。下一步打开表格，核对分类。':'清单已确认。点下方按钮生成审核成果表。';
+   else if(step===3)resultText='请在审核成果表中检查分类和备注，完成后点下方按钮。';
+   else if(step===4)resultText=stageState.categories!=='ready'?'审核已确认。点下方按钮生成分类工作簿。':
+    (!summaryGenerated()?'分类工作簿已生成。点下方按钮生成分类汇总表。':'分类汇总表已生成。下一步填写品牌和供应商。');
+   else if(step===5)resultText=simpleFlags.brandsOpened?'填完品牌和供应商并保存后，点下方按钮继续。':'点下方按钮打开表格，在黄色区域填写。';
+   else if(step===6)resultText=stageState.inquiry!=='ready'?'品牌已读回。点下方按钮生成询价表。':'询价表已生成。下一步拆分供应商文件。';
+   else if(step===7)resultText=splitDirectoryChosen()?'文件夹已选好。点下方按钮开始拆分。':'先选择保存供应商文件的文件夹。';
+   else resultText='供应商文件已生成。';
    if(simpleProgress)simpleProgress.textContent=step===8?'已完成':'第'+step+'步 / 共7步';
    if(simpleBar)simpleBar.style.width=(Math.min(step,7)/7*100)+'%';
    if(simpleTitle)simpleTitle.textContent=title;
    if(simpleDesc)simpleDesc.textContent=desc;
-   if(simpleExample)simpleExample.textContent=example;
+   var chooseMerge=step===1&&stats.files>0&&stageState.matching!=='ready';
+   if(simpleExample){simpleExample.textContent=example;simpleExample.hidden=chooseMerge;}
+   if(simpleMergeChoice){
+    simpleMergeChoice.hidden=!chooseMerge;
+    var mergeChecked=!!(document.getElementById('merge-identical')&&document.getElementById('merge-identical').checked);
+    Array.prototype.forEach.call(simpleMergeRadios,function(radio){
+     radio.checked=radio.value===(mergeChecked?'merge':'separate');
+    });
+    var detailedSummary=document.getElementById('merge-summary');
+    if(simpleMergeSummary)simpleMergeSummary.textContent=detailedSummary?detailedSummary.textContent:'';
+   }
+   if(simpleResult){simpleResult.textContent=resultText||'';simpleResult.hidden=!resultText;}
    if(simplePrimary){simplePrimary.textContent=primary;simplePrimary.onclick=action;}
    if(simpleExampleLink){
     simpleExampleLink.hidden=false;
     simpleExampleLink.textContent=linkText||'不知道怎么填？看示例';
     simpleExampleLink.onclick=linkText?function(){if(confirm('开始一单新的材料整理？当前项目已保存。'))location.reload();}:function(){showSimpleHelp('先做当前这一步。需要保存、恢复、重试或查看技术信息时，点“设置”或“详细步骤”。');};
    }
-   if(simpleBack)simpleBack.hidden=step===1;
-   if(simpleBack)simpleBack.onclick=function(){if(step>1)openTask(STEPS[step-2].id);};
    if(simpleSevenList){
     simpleSevenList.innerHTML='';
     STEPS.forEach(function(item,index){
      var n=index+1,row=document.createElement('div');
      row.className='simple-seven-row'+(step===8||n<step?' done':'')+(n===step?' current':'');
-     row.setAttribute('data-stage',item.id);row.setAttribute('role','button');row.tabIndex=0;
+     row.setAttribute('data-stage',item.id);
      var num=document.createElement('span');num.className='n';num.textContent=(step===8||n<step)?'✓':String(n);
      var label=document.createElement('span');label.className='label';label.textContent=SIMPLE_LABELS[index]||item.label;
      var state=document.createElement('span');state.className='state';state.textContent=(step===8||n<step)?'已完成':(n===step?'当前':'未开始');
      row.appendChild(num);row.appendChild(label);row.appendChild(state);
-     row.addEventListener('click',function(){openTask(item.id);});
      simpleSevenList.appendChild(row);
     });
    }
@@ -332,10 +359,22 @@
   if(simpleGuide)simpleGuide.addEventListener('click',function(){
    showSimpleHelp('七步：选清单、核对分类、审核确认、分类工作簿、填品牌、生成询价表、拆分文件。第一次只做当前这一步即可，遇到问题再打开右上角“设置”。');
   });
+  Array.prototype.forEach.call(simpleMergeRadios,function(radio){
+   radio.addEventListener('change',function(){
+    if(!radio.checked)return;
+    var target=document.getElementById(radio.value==='merge'?'merge-identical':'merge-separate');
+    if(target&&!target.checked)target.click();
+    renderSimple();
+   });
+  });
   var splitStatus=document.getElementById('split-status');
   if(splitStatus&&window.MutationObserver)new MutationObserver(renderSimple).observe(splitStatus,{childList:true,subtree:true,characterData:true});
   var splitDirectoryLabel=document.getElementById('split-directory-label');
   if(splitDirectoryLabel&&window.MutationObserver)new MutationObserver(renderSimple).observe(splitDirectoryLabel,{childList:true,subtree:true,characterData:true});
+  ['classification-review-stats','classification-review-open','brands-open','categories-banner','sheet-review-banner','inquiry-banner'].forEach(function(id){
+   var target=document.getElementById(id);
+   if(target&&window.MutationObserver)new MutationObserver(renderSimple).observe(target,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['disabled']});
+  });
   var projectStatus=document.getElementById('project-status');
   if(projectStatus&&window.MutationObserver)new MutationObserver(syncFromProjectStatus).observe(projectStatus,{childList:true,subtree:true,characterData:true});
   if(document.addEventListener)document.addEventListener('rfq:project-status',syncFromProjectStatus);
