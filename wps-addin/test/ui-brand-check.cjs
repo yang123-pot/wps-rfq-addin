@@ -209,6 +209,8 @@ async function summaryFlow(){
   // 图01→图04：导入、合并确认、整表确认（含改选汽车充电桩）、生成4份独立分类工作簿。
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
+ await page.locator('#preview-confirm').click();
+ await page.waitForFunction(()=>document.querySelector('#merge-section').hidden===false);
   await page.locator('#merge-identical').check();
   await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='8');
   await page.locator('#confirm-merge').click();

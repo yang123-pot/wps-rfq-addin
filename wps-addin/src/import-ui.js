@@ -8,8 +8,11 @@
     var importPreviewHandle=null,importPreviewKey=null;
     var picker=document.getElementById('import-files'),message=document.getElementById('import-message');
     var merge=document.getElementById('merge-identical');merge.checked=false;
+    var mergeAll=document.getElementById('merge-all-workbooks');mergeAll.checked=false;
     var mergeSeparate=document.getElementById('merge-separate');
     var mergeDetail=document.getElementById('merge-detail');
+    var previewGate=document.getElementById('preview-gate'),previewConfirm=document.getElementById('preview-confirm');
+    var previewReviewed=false;
     var multiWorkbookHint=document.getElementById('multi-workbook-hint');
     var mergeSeparateTitle=document.getElementById('merge-separate-title');
     var mergeSeparateNote=document.getElementById('merge-separate-note');
@@ -24,14 +27,19 @@
       var multi=isMultiSource();
       return {multi:multi,merge:'合并完全相同项',separate:'分别保留（按工作簿分组）'};
     }
+    function currentPreview(){
+      return RfqCollection.preview(collection,merge.checked===true,mergeAll.checked===true);
+    }
     // 切到“表内审核”时自动按稳定rowId读回成果表，侧栏直接显示当前填写进度（读不到就明确提示，不猜）。
     var workflow=window.RfqWorkflowUI?window.RfqWorkflowUI.create({onStageChange:function(stage){
       if(stage==='review')refreshReviewRead();
     }}):null;
     var confirmMerge=document.getElementById('confirm-merge');
     var exporter=RfqExportUI.create({application:options.application,getCollection:function(){return collection;},
-      mergeIdentical:function(){return merge.checked;},onBusy:function(value){busy=value;options.onBusy(value);}});
+      mergeIdentical:function(){return merge.checked;},mergeAllWorkbooks:function(){return mergeAll.checked;},
+      onBusy:function(value){busy=value;options.onBusy(value);}});
     var projects=RfqProjectUI.create({getCollection:function(){return collection;},mergeIdentical:function(){return merge.checked;},
+      mergeAllWorkbooks:function(){return mergeAll.checked;},
       restore:function(project){return restoreProject(project);},getClassification:function(){return classifier.snapshot();},
       getReviewBinding:function(){return reviewBinding;},
       restoreReviewBinding:function(value){reviewBinding=value||null;return reviewBinding;},
@@ -81,7 +89,7 @@
       getClassificationRows:function(){return classifier.rows();},
       afterRestore:function(){render();},
       restoreClassification:function(value){classifier.restore(value);},
-      getPreview:function(){return collection.entries.length?RfqCollection.preview(collection,merge.checked):null;},
+      getPreview:function(){return collection.entries.length?currentPreview():null;},
       getStageVerdicts:function(){return stageVerdicts();},
       getMergeConfirmation:function(){return mergeConfirmedKey;},
       restoreMergeConfirmation:function(key){mergeConfirmedKey=typeof key==='string'&&key?key:null;},
@@ -105,7 +113,7 @@
       onBusy:function(value){
         busy=value;options.onBusy(value);
         // 项目恢复在忙状态下重绘；结束时单独恢复主按钮，不重绘或再次读写成果。
-        confirmMerge.disabled=busy||!collection.entries.length||!RfqCollection.preview(collection,merge.checked).canFinalize;
+        confirmMerge.disabled=busy||!previewReviewed||!collection.entries.length||!currentPreview().canFinalize;
       }});
     var libraryPanel=null,brandPanel=null,headerPanel=null,inquiryPanel=null,splitPanel=null;
     // 品牌与供应商面板的输入：当前清单、合并方式、来源校验结果、逐行分类确认与合并预览确认键。
@@ -125,8 +133,8 @@
         brands:summaryVerdict()};
     }
     function brandContext(){
-      var preview=collection.entries.length?RfqCollection.preview(collection,merge.checked):null,verdicts=stageVerdicts();
-      return {collection:collection,mergeIdentical:merge.checked===true,preview:preview,
+      var preview=collection.entries.length?currentPreview():null,verdicts=stageVerdicts();
+      return {collection:collection,mergeIdentical:merge.checked===true,mergeAllWorkbooks:mergeAll.checked===true,preview:preview,
         classification:classifier.snapshot(),rows:classifier.rows(),mergeConfirmedKey:mergeConfirmedKey,
         matching:verdicts.matching,review:legacyReviewVerdict(),categories:verdicts.categories};
     }
@@ -191,6 +199,8 @@
       if(!inputs.length)throw Error('项目记录里没有来源清单，无法恢复。');
       collection=RfqCollection.add(RfqCollection.create(),inputs);
       selected=null;page=0;merge.checked=project.mergeIdentical===true;
+      mergeAll.checked=merge.checked||((project.sources||[]).some(function(source){return source.scopeId==='combined';}));
+      previewReviewed=collection.entries.length>0;
       render();
       if(collection.entries.length)activate(collection.entries[0].id);
       return true;
@@ -237,18 +247,19 @@
         li.appendChild(button('核对此文件',function(){activate(e.id);},'technical-file-action'));
         li.appendChild(button('移除此文件',function(){
           if(e.dirty&&!window.confirm('此文件有未保存核对，移除会丢失这些修改，是否继续？'))return;
-          collection=RfqCollection.remove(collection,e.id);
+          collection=RfqCollection.remove(collection,e.id);previewReviewed=false;
           if(selected===e.id){selected=null;options.onRemove(e.id);if(collection.entries.length)activate(collection.entries[0].id);}
           render();tell('已从本次列表移除，原件和已保存核对记录保留。');
         }));list.appendChild(li);
       });
-      document.getElementById('merge-section').hidden=!collection.entries.length;
+      document.getElementById('merge-section').hidden=!collection.entries.length||!previewReviewed;
+      if(previewGate)previewGate.hidden=!collection.entries.length||previewReviewed;
       var labels=modeLabels();
       if(multiWorkbookHint){
         multiWorkbookHint.hidden=!labels.multi;
         multiWorkbookHint.textContent=labels.multi?('检测到 '+collection.entries.length+' 份清单、共 '+
           collection.entries.reduce(function(count,entry){return count+((entry.snapshot&&entry.snapshot.sheets&&entry.snapshot.sheets.length)||0);},0)+
-          ' 个工作表。所有工作簿默认归入当前项目，汇总为同一份审核成果；请选择是否合并完全相同的材料。'):'';
+          ' 个工作表。请选择是否合并全部工作簿，再决定是否累加完全相同的材料。'):'';
       }
       if(mergeSeparateTitle)mergeSeparateTitle.textContent=labels.separate;
       if(mergeSeparateNote)mergeSeparateNote.textContent=labels.multi?
@@ -260,12 +271,14 @@
         '仅当 项目名称＋项目特征描述＋单位 完全相同时合并，不进行模糊匹配；数量精确累加。';
       projects.refresh();
       if(!collection.entries.length){
+        if(previewGate)previewGate.hidden=true;
         exporter.refresh({canFinalize:false});classifier.refresh({groups:[]});
         if(workflow)workflow.setStats({files:0,rows:0,mergedRows:0});
         if(brandPanel)brandPanel.refresh();renderCategories();renderBrands();return;
       }
-      var result=RfqCollection.preview(collection,merge.checked),pages=Math.max(1,Math.ceil(result.groups.length/20));page=Math.min(page,pages-1);
-      var mergeConfirmed=mergeConfirmedKey===RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,groups:result.groups});
+      var result=currentPreview(),pages=Math.max(1,Math.ceil(result.groups.length/20));page=Math.min(page,pages-1);
+      var mergeConfirmed=mergeConfirmedKey===RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,
+        mergeAllWorkbooks:mergeAll.checked===true,groups:result.groups});
       exporter.refresh(result);
       // R3：确认选择前不进入匹配——未确认时不给任何分类建议，避免越过“先选是否合并”。
       classifier.refresh(mergeConfirmed?result:{groups:[],inputCount:result.inputCount,outputCount:0,issues:[],canFinalize:false});
@@ -285,11 +298,13 @@
       if(headerPanel)headerPanel.refresh();
       if(inquiryPanel)inquiryPanel.refresh();
       if(splitPanel)splitPanel.refresh();
-      document.getElementById('merge-summary').textContent=collection.entries.length+' 份清单归入当前项目 · 原始 '+result.inputCount+
-        ' 项 → 预览 '+result.outputCount+' 项 · '+(merge.checked?'已选择合并完全相同项':'已选择按来源分别保留');
-      confirmMerge.disabled=busy||!result.canFinalize;
+      document.getElementById('merge-summary').textContent=collection.entries.length+' 份清单 · '+
+        (mergeAll.checked?'合并全部工作簿':'保留工作簿来源')+' · 原始 '+result.inputCount+
+        ' 项 → 预览 '+result.outputCount+' 项 · '+(merge.checked?'已选择合并完全相同项':'不累加重复项');
+      confirmMerge.disabled=busy||!previewReviewed||!result.canFinalize;
       confirmMerge.textContent=mergeConfirmed?'已确认本次选择（可重新确认并继续）':'确认选择，开始自动分类';
-      document.getElementById('merge-status').textContent=(result.canFinalize?'本次校验通过，预览尚未另存。':
+      document.getElementById('merge-status').textContent=(!previewReviewed?'请先查看导入预览，再选择是否合并全部工作簿。':
+        result.canFinalize?'本次校验通过，预览尚未另存。':
         result.issues.length+' 个待核对问题仍阻断后续处理；请在上方选择文件逐项核对。')+
         (mergeConfirmed?' 本次选择已确认，可继续自动分类。':' 确认选择后才能进入自动分类。');
       syncMergeChoices();
@@ -305,15 +320,17 @@
       document.getElementById('merge-pages').textContent=(page+1)+' / '+pages+' 页';
       document.getElementById('merge-prev').disabled=page===0;document.getElementById('merge-next').disabled=page+1>=pages;
     }
-    // 图01的两个选项互斥：工作簿统一归入当前项目；默认按来源分别保留，勾选“合并完全相同项”才累加重复材料。
+    // 图01：先预览，再决定是否合并全部工作簿；完全相同材料是否累加仍由独立选项控制。
     function syncMergeChoices(){
       if(mergeSeparate)mergeSeparate.checked=!merge.checked;
       var separateRow=mergeSeparate&&mergeSeparate.parentNode,combinedRow=merge&&merge.parentNode;
       if(separateRow)separateRow.classList.toggle('is-selected',!merge.checked);
       if(combinedRow)combinedRow.classList.toggle('is-selected',merge.checked===true);
+      if(mergeAll&&mergeAll.parentNode)mergeAll.parentNode.classList.toggle('is-selected',mergeAll.checked===true);
     }
     function chooseMode(combined){
       merge.checked=combined===true;
+      if(merge.checked)mergeAll.checked=true;
       page=0;render();
     }
     function modeTell(combined){
@@ -323,6 +340,16 @@
     }
     merge.addEventListener('change',function(){chooseMode(merge.checked);modeTell(merge.checked);});
     if(mergeSeparate)mergeSeparate.addEventListener('change',function(){chooseMode(false);modeTell(false);});
+    mergeAll.addEventListener('change',function(){
+      if(!mergeAll.checked&&merge.checked){merge.checked=false;page=0;}
+      render();
+      tell(mergeAll.checked?'已选择合并全部工作簿，继续选择是否累加完全相同的材料。':'已选择保留每个工作簿和来源，不跨工作簿合并材料。');
+    });
+    if(previewConfirm)previewConfirm.addEventListener('click',function(){
+      if(!collection.entries.length)return;
+      previewReviewed=true;page=0;render();
+      tell('导入预览已确认。请选择是否合并全部工作簿，以及是否累加完全相同的材料。');
+    });
     if(mergeDetail)mergeDetail.addEventListener('click',function(){
       syncImportPreview(true);
       tell('合并预览明细：请查看主工作簿中的“导入预览”和“合并明细”；原件不变，确认选择后才开始分类。');
@@ -330,13 +357,16 @@
     function syncImportPreview(force){
       var box=document.getElementById('import-preview-status');
       if(!collection.entries.length||!options.application||!window.RfqImportPreviewModel)return;
-      var key=mergeSelectionKey();
+      var key=(previewReviewed?'reviewed:':'preview:')+mergeSelectionKey();
       if(!force&&importPreviewKey===key)return;
       try{
-        var model=RfqImportPreviewModel.build(collection,merge.checked,{projectName:projectDisplayName()});
+        var model=RfqImportPreviewModel.build(collection,merge.checked,{projectName:projectDisplayName(),
+          previewOnly:!previewReviewed,mergeAllWorkbooks:mergeAll.checked===true});
         importPreviewHandle=RfqExportHost.showPreview(options.application,model,importPreviewHandle);
         importPreviewKey=key;
-        if(box){box.textContent='主表已显示导入预览与合并明细（'+model.inputCount+' → '+model.outputCount+' 行）。预览随选择刷新。';box.className='note';}
+        if(box){box.textContent=previewReviewed?
+          ('主表已显示材料处理预览（'+model.inputCount+' → '+model.outputCount+' 行）。预览随选择刷新。'):
+          ('主表已显示工作簿和工作表预览（共 '+model.inputCount+' 项），尚未合并。');box.className='note';}
       }catch(error){
         // 只拦主表预览，不回滚已经核实的导入；用户可明确重试，不自动反复创建失败簿。
         importPreviewKey=key;
@@ -345,7 +375,8 @@
     }
     confirmMerge.addEventListener('click',function(){
       if(busy)return;
-      var result=collection.entries.length?RfqCollection.preview(collection,merge.checked):null;
+      if(!previewReviewed){tell('请先查看导入预览，并点“我已看完预览，选择工作簿处理方式”。',true);return;}
+      var result=collection.entries.length?currentPreview():null;
       if(!result||!result.canFinalize){tell('还有必须处理的问题，请先处理来源问题再确认预览。',true);return;}
       // 2026-10-11 用户确认（A2a）：来源/区段“待核对”类问题确认后放行——必须由用户显式确认，并记入本次确认。
       if(result.needsReviewAck){
@@ -359,10 +390,12 @@
         if(!agree){tell('已取消：'+(result.reviewIssueCount)+' 条来源/区段待核对未确认，未进入自动分类。',true);return;}
         tell('已确认 '+reviewLines.length+' 条来源/区段待核对，按现状继续。');
       }
-      mergeConfirmedKey=RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,groups:result.groups});
+      mergeConfirmedKey=RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,
+        mergeAllWorkbooks:mergeAll.checked===true,groups:result.groups});
       render();
       if(workflow)workflow.goTo('matching');
-      tell('已确认本次'+(merge.checked?'精确合并':'分别保留')+'选择，开始自动分类；来源或合并方式变化后需要重新确认。');
+      tell('已确认本次“'+(mergeAll.checked?'合并全部工作簿':'保留工作簿来源')+'、'+
+        (merge.checked?'合并完全相同项':'不累加重复项')+'”，开始自动分类；选择变化后需要重新确认。');
     });
     document.getElementById('merge-prev').addEventListener('click',function(){page--;render();});
     document.getElementById('merge-next').addEventListener('click',function(){page++;render();});
@@ -372,12 +405,14 @@
     function reviewTell(text,error){var box=reviewEl('classification-review-message');if(box){box.textContent=text;box.className=error?'error':'';}}
     function currentLibrary(){return classifier.library?classifier.library():null;}
     function mergeSelectionKey(){
-      var result=collection.entries.length?RfqCollection.preview(collection,merge.checked):null;
-      return RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,groups:result?result.groups:[]});
+      var result=collection.entries.length?currentPreview():null;
+      return RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,
+        mergeAllWorkbooks:mergeAll.checked===true,groups:result?result.groups:[]});
     }
     function matchingKey(){
-      var result=collection.entries.length?RfqCollection.preview(collection,merge.checked):null;
+      var result=collection.entries.length?currentPreview():null;
       return RfqProject.contentKey({stage:'matching',collection:collection,mergeIdentical:merge.checked===true,
+        mergeAllWorkbooks:mergeAll.checked===true,
         groups:result?result.groups:[]});
     }
     function selectionConfirmed(){return !!mergeConfirmedKey&&mergeConfirmedKey===mergeSelectionKey();}
@@ -1449,9 +1484,10 @@
           prepared.files[i].importedAt=new Date().toISOString();
           entries.push({metadata:prepared.files[i],snapshot:RfqImportHost.readCopy(options.application,prepared.files[i])});
         }
+        previewReviewed=false;
         var next=RfqCollection.add(collection,entries);collection=next;added=true;render();
         if(!selected)activate(collection.entries[0].id);
-        tell('已导入 '+entries.length+' 份清单，全部归入当前项目。原件未打开；下方只选择相同材料是否累加。');
+        tell('已导入 '+entries.length+' 份清单并生成导入预览。原件未打开；请先查看预览，再选择是否合并全部工作簿。');
       }catch(error){tell((added?'文件已加入，但界面更新失败，请重新选择文件核对。':'本批未加入，已有列表保留。')+error.message,true);}
       // 导入结束后必须再渲染一次：导入过程中的渲染发生在busy=true时，控件会保持禁用。
       finally{busy=false;options.onBusy(false);render();}

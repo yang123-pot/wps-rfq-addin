@@ -76,15 +76,30 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
   assert.match(await page.locator('#workflow-note').innerText(),/已成功导入 2 个文件，共 10 行数据/);
-  assert.match(await page.locator('#workflow-note').innerText(),/全部归入当前项目/);
-  assert.match(await page.locator('#workflow-note').innerText(),/合并完全相同的材料/);
-  if(process.env.RFQ_WORKFLOW_MULTI_SCREENSHOT)await page.locator('#merge-section').screenshot({path:process.env.RFQ_WORKFLOW_MULTI_SCREENSHOT});
+  assert.match(await page.locator('#workflow-note').innerText(),/先查看导入预览/);
+  assert.equal(await page.locator('#preview-gate').isVisible(),true,'导入后先显示预览确认入口');
+  assert.equal(await page.locator('#merge-section').isHidden(),true,'预览完成前不得出现合并选择');
   assert.equal(await page.locator('#workflow-rows').innerText(),'10','导入总行数');
   assert.equal(await page.locator('#workflow-merged').innerText(),'10','未合并时预览行数保持10');
-  assert.deepEqual(await page.evaluate(()=>window.__previews[0].sheets.map(s=>s.name)),['导入预览','合并明细'],
-   '导入后必须向主工作表输出图01预览');
+  assert.deepEqual(await page.evaluate(()=>window.__previews[0].sheets.map(s=>s.name)),['导入预览'],
+   '预览完成前只显示工作簿和工作表结构');
+  assert.equal(await page.evaluate(()=>window.__previews[0].previewOnly),true);
+  await page.locator('#simple-mode-toggle').click();
+  assert.equal(await page.locator('#simple-home').isVisible(),true);
+  assert.equal(await page.locator('#stage-panel-import').isHidden(),true,'预览阶段不展开技术面板');
+  assert.equal(await page.locator('#simple-merge-choice').isHidden(),true,'预览完成前不显示合并选项');
+  assert.match(await page.locator('#simple-title').innerText(),/预览导入内容/);
+  assert.equal(await page.locator('#simple-primary').innerText(),'我已看完预览，选择处理方式');
+  if(process.env.RFQ_PREVIEW_GATE_SCREENSHOT)await page.screenshot({path:process.env.RFQ_PREVIEW_GATE_SCREENSHOT,fullPage:true});
+  await page.locator('#simple-primary').click();
+  await page.waitForFunction(()=>document.querySelector('#merge-section').hidden===false);
+  assert.equal(await page.locator('#preview-gate').isHidden(),true,'预览确认后收起预览确认入口');
+  assert.deepEqual(await page.evaluate(()=>window.__previews.at(-1).sheets.map(s=>s.name)),['导入预览','合并明细'],
+   '预览确认后才显示材料处理预览');
+  await page.locator('#simple-mode-toggle').click();
   assert.equal(await page.locator('#stage-panel-import').isHidden(),false);
   assert.equal(await page.locator('#stage-panel-matching').isHidden(),true);
+  if(process.env.RFQ_WORKFLOW_MULTI_SCREENSHOT)await page.locator('#merge-section').screenshot({path:process.env.RFQ_WORKFLOW_MULTI_SCREENSHOT});
 
   // 简版始终停留在当前步骤卡片，只显示材料处理选择、结果摘要和下一步按钮。
   await page.locator('#simple-mode-toggle').click();
@@ -93,7 +108,13 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.equal(await page.locator('#simple-merge-choice').isVisible(),true,'导入后显示材料处理选择');
   assert.match(await page.locator('#simple-result').innerText(),/已导入 2 份清单，共 10 项/);
   assert.equal(await page.locator('#simple-primary').innerText(),'确认材料处理方式，继续','完成后在同一位置显示下一步按钮');
+  if(process.env.RFQ_PREVIEW_READY_SCREENSHOT)await page.screenshot({path:process.env.RFQ_PREVIEW_READY_SCREENSHOT,fullPage:true});
+  assert.equal(await page.locator('#simple-merge-all').isChecked(),false,'默认不合并全部工作簿');
   assert.equal(await page.locator('#simple-merge-choice input[value="separate"]').isChecked(),true,'默认分别保留');
+  await page.locator('#simple-merge-all').check();
+  assert.equal(await page.locator('#merge-all-workbooks').isChecked(),true,'简版工作簿选择必须同步');
+  await page.locator('#simple-merge-all').uncheck();
+  assert.equal(await page.locator('#merge-all-workbooks').isChecked(),false);
   await page.locator('#simple-merge-choice input[value="merge"]').check();
   await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='8');
   assert.equal(await page.locator('#merge-identical').isChecked(),true,'简版选择必须同步到实际处理方式');

@@ -39,10 +39,10 @@ function fixture(){
     index:String(index+1),name:v[0],feature:v[1],unit:v[2],quantity:v[3],
     autoCategoryName:v[4],categoryId:v[5],categoryName:v[6],skip:v[5]==='no-inquiry',
     note:index===6?'草稿备注':''}));
-  const value=project.create(col,true,{projectId:'p-ui-draft-sha-0001'});
-  const inputKey=project.contentKey({stage:'matching',collection:col,mergeIdentical:true,groups:preview.groups});
+  const value=project.create(col,true,{projectId:'p-ui-draft-sha-0001',mergeAllWorkbooks:true});
+  const inputKey=project.contentKey({stage:'matching',collection:col,mergeIdentical:true,mergeAllWorkbooks:true,groups:preview.groups});
   value.revision=5;
-  value.mergeKey=project.contentKey({collection:col,mergeIdentical:true,groups:preview.groups});
+  value.mergeKey=project.contentKey({collection:col,mergeIdentical:true,mergeAllWorkbooks:true,groups:preview.groups});
   value.matching={schemaVersion:1,path:REVIEW_PATH,sha256:SHA_A,sheet:'分类审核成果',
     headerRow:3,firstRow:4,lastRow:11,rowIdColumn:11,inputKey,
     libraryVersion:sample.library.version,categories:sample.library.categories.map(c=>({id:c.id,name:c.name})),

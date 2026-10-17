@@ -53,6 +53,8 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   });
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
+  await page.locator('#preview-confirm').click();
+  await page.waitForFunction(()=>document.querySelector('#merge-section').hidden===false);
   assert.equal(await page.locator('#export-workbook').isDisabled(),false,'导入有效后应可另存');
   assert.match(await page.locator('#merge-summary').innerText(),/3.*3/);
   const exportCalls=()=>page.evaluate(()=>window.__exportCalls.length);

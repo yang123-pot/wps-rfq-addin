@@ -37,6 +37,7 @@
     simpleDesc=document.getElementById('simple-desc'),simpleExample=document.getElementById('simple-example'),
     simplePrimary=document.getElementById('simple-primary'),simpleExampleLink=document.getElementById('simple-example-link'),
     simpleMergeChoice=document.getElementById('simple-merge-choice'),simpleMergeSummary=document.getElementById('simple-merge-summary'),
+    simpleMergeAll=document.getElementById('simple-merge-all'),
     simpleResult=document.getElementById('simple-result'),
     simpleGuide=document.getElementById('simple-guide'),simpleHelp=document.getElementById('simple-help');
   var simpleMergeRadios=simpleMergeChoice?simpleMergeChoice.querySelectorAll('input[name="simple-merge-mode"]'):[];
@@ -69,6 +70,10 @@
    renderSimple();
   }
   var simpleFlags={reviewOpened:false,summaryGenerated:false,brandsOpened:false,inquiryNext:false};
+  function previewReady(){
+   var section=document.getElementById('merge-section');
+   return !!section&&!section.hidden;
+  }
   function reviewGenerated(){
    var status=document.getElementById('classification-review-stats');
    var open=document.getElementById('classification-review-open');
@@ -138,6 +143,10 @@
      title='选清单';desc='把要询价的表格选进来。插件只读取副本，不会修改原件。';
      example='支持 .xls / .xlsx，一次可选多份；选完再确认怎么合并。';
      primary='选择清单文件';action=function(){clickStageButton('import',['import-files','browse-files']);};
+    }else if(!previewReady()){
+     title='预览导入内容';desc='先查看导入预览中的工作簿和工作表，确认没有漏选或重复。';
+     example='当前只展示导入结构，尚未合并全部工作簿。';
+     primary='我已看完预览，选择处理方式';action=function(){clickStageButton('import','preview-confirm');};
     }else if(stageState.matching!=='ready'){
      title='选清单';desc='所有工作簿已进入当前项目。确认材料处理方式后，进入自动分类和核对。';
      example='默认按工作簿分组保留来源；只有完全相同的材料才需要累加。';
@@ -196,7 +205,8 @@
     example='文件已保存到输出文件夹。';
     primary='打开文件夹';action=function(){clickStageButton('split','split-open');};linkText='再做一单';
    }
-   if(step===1)resultText=stats.files?('已导入 '+stats.files+' 份清单，共 '+stats.rows+' 项。请选择处理方式。'):'';
+   if(step===1)resultText=stats.files?(previewReady()?('已导入 '+stats.files+' 份清单，共 '+stats.rows+
+     ' 项。请选择是否合并全部工作簿。'):('已导入 '+stats.files+' 份清单，共 '+stats.rows+' 项，预览已生成。')):'';
    else if(step===2)resultText=reviewGenerated()?'成果表已生成。下一步打开表格，核对分类。':'清单已确认。点下方按钮生成审核成果表。';
    else if(step===3)resultText='请在审核成果表中检查分类和备注，完成后点下方按钮。';
    else if(step===4)resultText=stageState.categories!=='ready'?'审核已确认。点下方按钮生成分类工作簿。':
@@ -209,7 +219,7 @@
    if(simpleBar)simpleBar.style.width=(Math.min(step,7)/7*100)+'%';
    if(simpleTitle)simpleTitle.textContent=title;
    if(simpleDesc)simpleDesc.textContent=desc;
-   var chooseMerge=step===1&&stats.files>0&&stageState.matching!=='ready';
+   var chooseMerge=step===1&&stats.files>0&&previewReady()&&stageState.matching!=='ready';
    if(simpleExample){simpleExample.textContent=example;simpleExample.hidden=chooseMerge;}
    if(simpleMergeChoice){
     simpleMergeChoice.hidden=!chooseMerge;
@@ -219,6 +229,7 @@
     });
     var detailedSummary=document.getElementById('merge-summary');
     if(simpleMergeSummary)simpleMergeSummary.textContent=detailedSummary?detailedSummary.textContent:'';
+    if(simpleMergeAll)simpleMergeAll.checked=!!(document.getElementById('merge-all-workbooks')&&document.getElementById('merge-all-workbooks').checked);
    }
    if(simpleResult){simpleResult.textContent=resultText||'';simpleResult.hidden=!resultText;}
    if(simplePrimary){simplePrimary.textContent=primary;simplePrimary.onclick=action;}
@@ -249,7 +260,7 @@
   function noteFor(step){
    if(step.id==='import'){
     if(!stats.files)return '尚未导入清单：请选择本机文件；插件只复制并读取副本，不会改动原件。';
-    return '已成功导入 '+stats.files+' 个文件，共 '+stats.rows+' 行数据；全部归入当前项目。请选择按来源分别保留或合并完全相同的材料，确认后再进行自动分类。';
+    return '已成功导入 '+stats.files+' 个文件，共 '+stats.rows+' 行数据。请先查看导入预览，再选择是否合并全部工作簿。';
    }
    return step.detail;
   }
@@ -366,6 +377,11 @@
     if(target&&!target.checked)target.click();
     renderSimple();
    });
+  });
+  if(simpleMergeAll)simpleMergeAll.addEventListener('change',function(){
+   var target=document.getElementById('merge-all-workbooks');
+   if(target&&target.checked!==simpleMergeAll.checked)target.click();
+   else renderSimple();
   });
   var splitStatus=document.getElementById('split-status');
   if(splitStatus&&window.MutationObserver)new MutationObserver(renderSimple).observe(splitStatus,{childList:true,subtree:true,characterData:true});

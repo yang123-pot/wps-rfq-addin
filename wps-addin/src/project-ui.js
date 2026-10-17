@@ -52,7 +52,8 @@
   }
   function renderStatus(){
     if(!current){status.textContent='尚未保存项目记录。导入清单后可保存，重启WPS后再打开恢复。';return;}
-    status.textContent='项目 '+current.projectId+' · 版本 '+current.revision+' · '+(current.mergeIdentical?'精确合并':'分别保留')+'\n'+stageText(current);
+    status.textContent='项目 '+current.projectId+' · 版本 '+current.revision+' · '+
+      (current.mergeIdentical?'合并全部工作簿并累加相同材料':current.mergeAllWorkbooks?'合并全部工作簿':'保留每个工作簿')+'\n'+stageText(current);
     if(restoreAudit&&restoreAudit.issues.length)
       status.textContent+='\n恢复核对：'+restoreAudit.issues.slice(0,3).map(function(issue){return issue.message;}).join('；')+
         (restoreAudit.issues.length>3?'；其余'+(restoreAudit.issues.length-3)+'项请重新定位或重做对应阶段':'');
@@ -89,6 +90,7 @@
     var matching=(verdicts&&verdicts.matching)||(progress.rows.length?{ready:true,detail:'自动分类建议已生成，尚未人工确认'}
       :{ready:false,detail:'尚未生成自动分类建议'});
     return {collection:options.getCollection(),mergeIdentical:options.mergeIdentical()===true,
+      mergeAllWorkbooks:options.mergeAllWorkbooks?options.mergeAllWorkbooks()===true:false,
       preview:options.getPreview?options.getPreview():null,
       mergeConfirmedKey:options.getMergeConfirmation?options.getMergeConfirmation():null,
       classification:options.getClassification?options.getClassification():null,
@@ -199,8 +201,9 @@
     busy=true;if(options.onBusy)options.onBusy(true);
     try{
       tell('正在保存项目记录…');
-      var next=current?RfqProject.refresh(current,collection,options.mergeIdentical())
-        :RfqProject.create(collection,options.mergeIdentical(),{projectId:identity()});
+      var mergeAllWorkbooks=options.mergeAllWorkbooks?options.mergeAllWorkbooks()===true:false;
+      var next=current?RfqProject.refresh(current,collection,options.mergeIdentical(),{mergeAllWorkbooks:mergeAllWorkbooks})
+        :RfqProject.create(collection,options.mergeIdentical(),{projectId:identity(),mergeAllWorkbooks:mergeAllWorkbooks});
       next=collectFutureFields(next);
       next=syncStages(next);
       RfqProject.assertValid(next);

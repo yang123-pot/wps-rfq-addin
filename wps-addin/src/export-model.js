@@ -4,8 +4,8 @@
   else root.RfqExportModel=factory(root.RfqCollection);
 }(typeof window==='object'?window:globalThis,function(collection){
   'use strict';
-  function build(input,mergeIdentical){
-    var result=collection.preview(input,mergeIdentical);
+  function build(input,mergeIdentical,mergeAllWorkbooks){
+    var result=collection.preview(input,mergeIdentical,mergeAllWorkbooks);
     if(!result.canFinalize)throw Error('清单为空或仍有待核对问题，不能另存。');
     var main=[['序号','项目编码','项目名称','项目特征描述','单位','工程量','清单来源','来源条数']];
     var sources=[['清单序号','原文件','原路径','文件SHA256','工作表','原行号','来源行号','原编码','核对编码','原工程量','核对工程量','单位','工程名称','专业','专业依据','归集范围','来源标识','原名称','原单位','原工程名称','原专业','核对追溯JSON']];

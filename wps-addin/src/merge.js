@@ -14,7 +14,9 @@
     if (!Array.isArray(books) || !books.length) throw new Error('请先添加解析后的工作簿。');
     options = options || {};
     if (options.mergeIdentical != null && typeof options.mergeIdentical !== 'boolean') throw new Error('合并选项必须明确开启或关闭。');
+    if (options.mergeAllWorkbooks != null && typeof options.mergeAllWorkbooks !== 'boolean') throw new Error('工作簿合并选项必须明确开启或关闭。');
     var merge = options.mergeIdentical === true;
+    var mergeAllWorkbooks = options.mergeAllWorkbooks == null ? merge : options.mergeAllWorkbooks === true;
     var result = { mode: merge ? 'merge-identical' : 'separate', inputCount: 0, outputCount: 0, groups: [], issues: [], canFinalize: false };
     var bookKeys = new Set(), fingerprints = new Set(), sourceKeys = new Set(), issues = new Set(), groups = new Map();
     books.forEach(function (book) {
@@ -68,7 +70,7 @@
         if (!item.unit.trim()) issue('unit-missing', 'error', source, '单位为空，不能完成合并。');
         if (quantity === null) issue('quantity-invalid', 'error', source, '工程量异常，已单独保留原值，不计入其他材料合计。');
         if (!source.engineering.trim() || !source.profession.trim()) issue('source-unresolved', 'review', source, '工程名称或专业来源待核对。');
-        var scopeId = merge ? 'combined' : bookKey;
+        var scopeId = mergeAllWorkbooks ? 'combined' : bookKey;
         var eligible = merge && quantity !== null && item.name.trim() && item.unit.trim();
         var groupKey = eligible ? JSON.stringify([item.name, item.feature, item.unit]) : sourceId;
         var group = eligible ? groups.get(groupKey) : null;

@@ -124,6 +124,7 @@ body:not(.detail-mode) footer{display:none!important}
 .simple-merge-choice input{margin:3px 0 0;accent-color:#237555;flex:none}
 .simple-merge-choice b{display:block;font-size:12px}
 .simple-merge-choice small{display:block;font-size:10px;line-height:1.6;color:#75867b;margin-top:2px}
+.simple-merge-all{background:#f7faf8}
 .simple-result{background:#eef6f0;border-left:3px solid #237555;border-radius:5px;padding:8px 9px;margin:10px 0;color:#416350!important;font-size:11px!important;line-height:1.65!important}
 .simple-primary{width:100%;border:0;border-radius:8px;background:#237555;color:#fff;font:inherit;font-size:14px;font-weight:700;padding:12px;cursor:pointer}
 .simple-primary:disabled{background:#e4eae6;color:#89998e;cursor:default}
@@ -150,3 +151,5 @@ header .header-mode:hover:enabled,header .header-gear:hover:enabled{background:#
 .import-more{margin:10px 0 0;border-top:1px dashed #dfe8e1;padding-top:8px}
 .import-more>summary{cursor:pointer;font-size:11px;color:#5d7466}
 .import-more button{margin-top:8px}
+.preview-gate{border:1px solid #dfe8e1;background:#fbfdfb;border-radius:8px;padding:12px;margin:12px 0}
+.preview-gate p{font-size:12px;margin:0 0 10px}

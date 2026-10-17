@@ -14,7 +14,7 @@
       if(busy)return;var target=null,prepared=null;
       try{
         var sourceCollection=options.getCollection();
-        var model=RfqExportModel.build(sourceCollection,options.mergeIdentical());
+        var model=RfqExportModel.build(sourceCollection,options.mergeIdentical(),options.mergeAllWorkbooks&&options.mergeAllWorkbooks());
         if(!window.confirm('确认按当前预览另存？\n'+(model.mode==='merge-identical'?'精确合并':'逐条保留来源')+'：'+model.inputCount+' 条 → '+model.outputCount+' 条。\n包含内部来源明细；编码和工程量按文本保留精度。')){tell('已取消确认，核对记录保留。');return;}
         target=RfqExportHost.selectTarget(options.application,model.mode==='merge-identical'?'项目_合并清单.xlsx':'项目_分离清单.xlsx');
         if(!target){tell('已取消选择保存位置，核对记录保留。');return;}

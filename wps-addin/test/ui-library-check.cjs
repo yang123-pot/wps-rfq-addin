@@ -97,6 +97,8 @@ async function setInput(locator,value){
 
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===1);
+  await page.locator('#preview-confirm').click();
+  await page.waitForFunction(()=>document.querySelector('#merge-section').hidden===false);
   await page.locator('#confirm-merge').click();
   await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次选择已确认'));
   const initial=await reviewSnapshot();

@@ -26,6 +26,16 @@ test('explicit merge combines only exact name feature unit while ignoring differ
   assert.deepEqual(result.groups[0].sourceLabels,['一号楼—给排水','二号楼—给排水']);
   assert.equal(result.groups[0].sources.length,3);assert.equal(result.canFinalize,true);
 });
+test('workbook merge choice is independent from identical material accumulation',()=>{
+  const books=[book([material(3),material(4)]),otherBook([material(3)])];
+  const combined=preview(books,{mergeIdentical:false,mergeAllWorkbooks:true});
+  assert.equal(combined.inputCount,3);assert.equal(combined.outputCount,3);
+  assert.deepEqual(combined.groups.map(x=>x.scopeId),['combined','combined','combined'],
+    '合并全部工作簿时不自动累加重复材料');
+  const separate=preview(books,{mergeIdentical:false,mergeAllWorkbooks:false});
+  assert.equal(separate.inputCount,3);assert.equal(separate.outputCount,3);
+  assert.equal(new Set(separate.groups.map(x=>x.scopeId)).size,2,'不合并时保留工作簿来源边界');
+});
 test('same code and near text cannot force a merge or unit conversion',()=>{
   const items=[material(3),material(4,{name:' 管道'}),material(5,{feature:'DN50 含接头'}),material(6,{unit:'M'}),material(7,{unit:'m '})];
   items.forEach(x=>x.code='SAME');const result=preview([book(items)],{mergeIdentical:true});

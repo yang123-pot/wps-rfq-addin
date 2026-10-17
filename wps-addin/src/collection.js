@@ -32,9 +32,12 @@
     })};
   }
   function remove(collection,id){return {entries:collection.entries.filter(function(e){return e.id!==id;})};}
-  function preview(collection,mergeIdentical){
+  function preview(collection,mergeIdentical,mergeAllWorkbooks){
     if(!collection.entries.length)return {mode:'separate',inputCount:0,outputCount:0,groups:[],issues:[],canFinalize:false};
-    return merge.preview(collection.entries.map(function(e){return e.parsed;}),{mergeIdentical:mergeIdentical===true});
+    return merge.preview(collection.entries.map(function(e){return e.parsed;}),{
+      mergeIdentical:mergeIdentical===true,
+      mergeAllWorkbooks:mergeAllWorkbooks==null?undefined:mergeAllWorkbooks===true
+    });
   }
   return {create:create,add:add,update:update,remove:remove,preview:preview};
 }));

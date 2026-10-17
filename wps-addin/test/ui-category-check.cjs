@@ -171,6 +171,8 @@ function initScript(context){
   // 图01→图02→图03：导入、合并确认、生成成果表、整表确认（含用户改选汽车充电桩）。
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
+ await page.locator('#preview-confirm').click();
+ await page.waitForFunction(()=>document.querySelector('#merge-section').hidden===false);
   await page.locator('#merge-identical').check();
   await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='8');
   await page.locator('#confirm-merge').click();

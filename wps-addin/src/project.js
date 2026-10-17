@@ -65,7 +65,7 @@
   return {schemaVersion:SCHEMA_VERSION,projectId:requested?String(requested):newId(),
    name:name||'未命名项目',createdAt:now(),updatedAt:now(),revision:0,
    fromProjectId:input.fromProjectId?String(input.fromProjectId):null,
-   mergeIdentical:!!mergeIdentical,stages:emptyStages(),sources:[],mergeKey:null,
+   mergeIdentical:!!mergeIdentical,mergeAllWorkbooks:input.mergeAllWorkbooks===true,stages:emptyStages(),sources:[],mergeKey:null,
    matching:null,review:null,categories:null,summary:null,brands:null,inquiry:null,split:null,header:null,carried:null,history:[]};
  }
  function create(input,mergeIdentical,options){
@@ -126,6 +126,7 @@
   if(!Number.isSafeInteger(project.revision)||project.revision<0)errors.push('项目版本号无效。');
   if(typeof project.name!=='string'||!project.name)errors.push('项目名称缺失。');
   if(typeof project.mergeIdentical!=='boolean')errors.push('合并选择缺失。');
+  if(project.mergeAllWorkbooks!=null&&typeof project.mergeAllWorkbooks!=='boolean')errors.push('工作簿合并选择无效。');
   if(project.fromProjectId!=null&&(typeof project.fromProjectId!=='string'||!ID_PATTERN.test(project.fromProjectId)))
    errors.push('上游项目编号无效。');
   validateStages(project,STAGES,errors);
@@ -205,9 +206,10 @@
   Object.keys(current).forEach(function(key){if(!seen[key])added.push(key);});
   return {added:added,changed:changed,removed:removed};
  }
- function refresh(project,collection,mergeIdentical){
+ function refresh(project,collection,mergeIdentical,options){
   assertEditable(project);
-  var next=copy(project),comparison=compareSources(project,collection);
+  var next=copy(project),comparison=compareSources(project,collection),input=options||{},
+    mergeAllWorkbooks=input.mergeAllWorkbooks===true;
   next.sources=sourcesOf(collection).map(function(source){
    source.scopeId=scopeIdOf(source,!!mergeIdentical);
    return source;
@@ -217,6 +219,10 @@
   if(!!mergeIdentical!==!!project.mergeIdentical){
    next.mergeIdentical=!!mergeIdentical;
    next=invalidate(next,{kind:'merge',detail:mergeIdentical?'改为精确合并':'改为分别保留'});
+  }
+  if(mergeAllWorkbooks!==!!project.mergeAllWorkbooks){
+   next.mergeAllWorkbooks=mergeAllWorkbooks;
+   next=invalidate(next,{kind:'merge',detail:mergeAllWorkbooks?'改为合并全部工作簿':'改为保留每个工作簿'});
   }
   next.updatedAt=now();
   return next;
@@ -321,6 +327,7 @@
   var input=options||{},stage=KEY_CONTENT[input.stage]?input.stage:'import',
     includes=KEY_CONTENT[stage],rows=normalizeMaterials(input.groups||input.rows);
   var snapshot={version:2,stage:stage,mergeIdentical:input.mergeIdentical===true,
+   mergeAllWorkbooks:input.mergeAllWorkbooks===true,
    sources:((input.collection&&input.collection.entries)||[]).map(function(entry){
     return {id:text(entry.id),origin:text(entry.metadata&&entry.metadata.originalPath).toLowerCase(),
      fingerprint:text(entry.metadata&&entry.metadata.fingerprint).toLowerCase()};
@@ -349,8 +356,9 @@
   var sourcesReady=entries.length>0&&invalidSources===0;
   var previewClean=sourcesReady&&!!preview&&preview.canFinalize===true&&issues===0;
   var mergeIdentical=input.mergeIdentical===true;
+  var mergeAllWorkbooks=input.mergeAllWorkbooks===true;
   var rows=(input.groups&&input.groups.length)?input.groups:rowsFromPreview(preview);
-  var mergeKey=contentKey({stage:'import',collection:source,mergeIdentical:mergeIdentical,groups:rows});
+  var mergeKey=contentKey({stage:'import',collection:source,mergeIdentical:mergeIdentical,mergeAllWorkbooks:mergeAllWorkbooks,groups:rows});
   var mergeConfirmed=typeof input.mergeConfirmedKey==='string'&&input.mergeConfirmedKey===mergeKey;
   var importReady=previewClean&&mergeConfirmed;
   var matchingReady=importReady&&!!input.matching&&input.matching.ready===true;
@@ -362,7 +370,7 @@
   var reviewSource=input.review&&input.review.rows?input.review:(input.review||input.classification);
   // 分类/汇总阶段的生产物就是那一本分类工作簿：1 文件＋逐页行数（含第 1 页汇总页）。
   var output=normalizeOutput(input.categories||input.summary);
-  var key={collection:source,mergeIdentical:mergeIdentical,groups:rows,review:reviewSource,
+  var key={collection:source,mergeIdentical:mergeIdentical,mergeAllWorkbooks:mergeAllWorkbooks,groups:rows,review:reviewSource,
    brands:input.brands&&input.brands.rows?input.brands:input.brands||input.assignments,header:input.header||null,
    output:output};
   var matchingKey=contentKey(Object.assign({},key,{stage:'matching'}));
@@ -385,7 +393,7 @@
    mergeKey:mergeKey,matchingKey:matchingKey,reviewKey:reviewKey,categoriesKey:categoriesKey,
    summaryKey:summaryKey,brandsKey:brandsKey,inquiryKey:inquiryKey,splitKey:splitKey,
    brandKey:reviewKey,generationKey:inquiryKey,
-   mergeIdentical:mergeIdentical,rowCount:rows.length,rows:rows};
+   mergeIdentical:mergeIdentical,mergeAllWorkbooks:mergeAllWorkbooks,rowCount:rows.length,rows:rows};
  }
  // 只把能证明完成的阶段置为ready；一旦上游断裂，从该阶段起取消ready并让下游过期。
  function sync(project,report){

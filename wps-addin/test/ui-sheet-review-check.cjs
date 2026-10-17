@@ -132,6 +132,8 @@ async function run(options={}){
   // 导入两份清单→选合并→确认选择（图01），进入自动分类（图02）。
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
+ await page.locator('#preview-confirm').click();
+ await page.waitForFunction(()=>document.querySelector('#merge-section').hidden===false);
   await page.locator('#merge-identical').check();
   await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='8');
   await page.locator('#confirm-merge').click();

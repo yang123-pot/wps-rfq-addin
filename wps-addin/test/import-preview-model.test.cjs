@@ -19,8 +19,17 @@ test('图01主工作表：两个文件10行、精确合并8行且明细保留逐
 test('默认分别保留10行，预览不声称已经合并或已经分类',()=>{
  const result=model.build(sample.buildCollection(),false,{projectName:'示例园区'});
  assert.equal(result.outputCount,10);
- assert.equal(result.sheets[0].values.some(row=>row.join('').includes('按来源分别保留，同一项目')),true);
- assert.equal(result.sheets[0].values.some(row=>row.join('').includes('所有工作簿默认进入当前项目')),true);
+ assert.equal(result.sheets[0].values.some(row=>row.join('').includes('保留每个工作簿来源，不累加重复项')),true);
+ assert.equal(result.sheets[0].values.some(row=>row.join('').includes('各工作簿保留来源分组')),true);
  assert.equal(result.sheets[0].values.some(row=>row[5]==='1 + 1 = 2'),false);
  assert.equal(result.sheets[0].values.every(row=>row.length===6),true);
+});
+test('预览完成前只显示文件和逐工作表结构，不生成材料合并结果',()=>{
+ const result=model.build(sample.buildCollection(),false,{projectName:'示例园区',previewOnly:true});
+ assert.equal(result.previewOnly,true);
+ assert.equal(result.inputCount,10);assert.equal(result.outputCount,0);
+ assert.deepEqual(result.sheets.map(sheet=>sheet.name),['导入预览']);
+ assert.equal(result.sheets[0].values.some(row=>row.join('').includes('尚未合并工作簿')),true);
+ assert.equal(result.sheets[0].values.some(row=>row.join('').includes('请先核对上方工作簿和工作表')),true);
+ assert.equal(result.sheets[0].values.some(row=>row[5]==='1 + 1 = 2'),false);
 });
