@@ -127,7 +127,7 @@
     if(stageState.import!=='ready'&&!stats.files){
      title='选清单';desc='把要询价的表格选进来。插件只读取副本，不会修改原件。';
      example='支持 .xls / .xlsx，一次可选多份；选完再确认怎么合并。';
-     primary='选择清单文件';action=function(){clickStageButton('import',['browse-files','import-files']);};
+     primary='选择清单文件';action=function(){clickStageButton('import',['import-files','browse-files']);};
     }else if(stageState.matching!=='ready'){
      title='选清单';desc='文件已导入。确认合并方式后，进入自动分类和核对。';
      example='默认分别保留清单；只有完全相同的项目才需要合并。';

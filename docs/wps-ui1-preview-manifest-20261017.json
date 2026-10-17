@@ -4,13 +4,13 @@
     "name": "wps-material-organizer-0.1.0-20261017-UI1",
     "version": "0.1.0",
     "build": "20261017-UI1",
-    "createdAt": "2026-10-17T23:42:16+08:00",
+    "createdAt": "2026-10-17T23:52:49+08:00",
     "branch": "feat/wps-phase1",
-    "commit": "4751bc75dca9ff77c1b68032b2bd1a38521dee31",
+    "commit": "008e2acf950bb4e91d9602b57bda4eb9a8e2baf7",
     "zipName": "wps-material-organizer-0.1.0-20261017-UI1.zip",
-    "zipBytes": 1612916,
-    "zipSha256": "f8408ca1d21d1d62302ccab0ad671ea4516a08e7998e079594f4e51c5966f719",
-    "codeVersion": "6ae5fbe818adca9c720aea5001c75a48b006535ae0ebe9f890295e9dad502b3c",
+    "zipBytes": 1613122,
+    "zipSha256": "a54770ab0b9d2656166dd5d7e179ccefa08a383b3ecfd80af759c2c0ed045616",
+    "codeVersion": "b14ead2103ff096b15da255745c0a9d851554d4722dbd026fd8a5947e1e9e5ad",
     "testedWps": "12.1.0.29161",
     "fileCount": 93,
     "files": [
@@ -51,8 +51,8 @@
       },
       {
         "path": "candidate-manifest.json",
-        "bytes": 14790,
-        "sha256": "4977ba3bb72ff9f48b1ac926fbc6f837693d53706ba06904bac907174844bb4f"
+        "bytes": 17180,
+        "sha256": "6e3d65fa2507dfe768767c738145e1e4d7722a2cc6ec0655ea6e6ddfbc602236"
       },
       {
         "path": "dev/atomic-file.cjs",
@@ -467,17 +467,17 @@
       {
         "path": "src/workflow-ui.js",
         "bytes": 21650,
-        "sha256": "2c7b61e446d4f7438b419e0aba13fd1db2bae64b53986790998cc16753c190e0"
+        "sha256": "e44f1b65aaee5d3c9d95fedb189b8454fe8aa20a38e494557dd9c4ef48df198e"
       },
       {
         "path": "styles.css",
-        "bytes": 16690,
-        "sha256": "768cabbd973effa066358e4c4cd541b1f3aff46f88f041a16937ce64e79397f4"
+        "bytes": 16870,
+        "sha256": "03b5a009d02c3ad84417580b322c750afb87d7773bac9504aabb2c6d49bef99a"
       },
       {
         "path": "taskpane.html",
-        "bytes": 24947,
-        "sha256": "0ca621e3a85b9e950cc45916223d3ccb8b6bfba7681d0b085e54f10cc603c995"
+        "bytes": 25062,
+        "sha256": "bfe34cab5abbf72f3b26288f6047db3c56035f8bdfd23a87704ed27ced57c22f"
       }
     ]
   }

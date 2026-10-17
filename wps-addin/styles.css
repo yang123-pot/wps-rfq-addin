@@ -128,3 +128,7 @@ header .header-mode{flex:none;margin-left:auto;font-size:10px;padding:6px 7px;wh
 header .header-gear{flex:none}
 header .header-mode:hover:enabled,header .header-gear:hover:enabled{background:#f4f8f5;color:#345142}
 #connection{margin-bottom:8px;line-height:1.5}
+
+.import-more{margin:10px 0 0;border-top:1px dashed #dfe8e1;padding-top:8px}
+.import-more>summary{cursor:pointer;font-size:11px;color:#5d7466}
+.import-more button{margin-top:8px}
