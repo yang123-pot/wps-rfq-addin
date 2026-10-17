@@ -167,7 +167,7 @@ function initScript(context){
    await page.evaluate(()=>{const aux=document.getElementById('aux-section');if(aux)aux.open=false;});
    await page.screenshot({path:file,fullPage:true});
   };
-  await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html');
+  await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html?mode=detail');
   // 图01→图02→图03：导入、合并确认、生成成果表、整表确认（含用户改选汽车充电桩）。
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);

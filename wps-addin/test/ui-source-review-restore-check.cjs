@@ -38,7 +38,7 @@ async function run(){
    const spy="const originalCreate=RfqImportUI.create; RfqImportUI.create=function(o){const select=o.onSelect;return originalCreate(Object.assign({},o,{onSelect:function(e){window.__sourceSelection=e;return select(e);}}));};\n";
    await route.fulfill({response,body:spy+body});
   });
-  await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html');
+  await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html?mode=detail');
   await page.locator('#aux-section > summary').click();
   await page.locator('#refresh-projects').click();
   await page.locator('#project-list li').filter({hasText:'来源恢复测试'}).getByRole('button',{name:'打开',exact:true}).click();

@@ -11,7 +11,7 @@ function OnOpenRfqPane() {
     if (!window.RfqRibbonNavigation) throw Error('窗口管理脚本未加载，请检查插件服务后重新加载本插件。');
     return !!window.RfqRibbonNavigation.ensureWindow(window.Application);
   } catch (error) {
-    alert('无法打开项目询价窗口：' + error.message);
+    alert('无法打开材料整理助手窗口：' + error.message);
     return false;
   }
 }
@@ -26,7 +26,7 @@ function OnGotoStage(control) {
     if (!stage) return false;
     return window.RfqRibbonNavigation.openStage(window.Application, stage);
   } catch (error) {
-    alert('无法打开项目询价窗口：' + error.message);
+    alert('无法打开材料整理助手窗口：' + error.message);
     return false;
   }
 }
@@ -40,7 +40,7 @@ function OnReloadRfqPane() {
       }
     });
   } catch (error) {
-    alert('无法重建项目询价窗口：' + error.message);
+    alert('无法重建材料整理助手窗口：' + error.message);
     return false;
   }
 }
@@ -49,6 +49,9 @@ function OnReloadRfqPane() {
 function GetRfqImage(control) {
   var id = control && (control.Id || control.id || control.ID);
   switch (id) {
+    case 'rfqStepImport': return 'assets/import.svg';
+    case 'rfqStepBrands': return 'assets/brands.svg';
+    case 'rfqStepInquiry': return 'assets/inquiry.svg';
     case 'rfqStageImport': return 'assets/import.svg';
     case 'rfqStageMatching': return 'assets/matching.svg';
     case 'rfqStageReview': return 'assets/review.svg';

@@ -102,6 +102,13 @@ test('按钮控件能按tag或id解析阶段，未知控件拒绝',()=>{
  assert.equal(nav.stageFromControl({}),null);
 });
 
+test('简版三步按钮id映射到既有阶段',()=>{
+ const nav=freshModule();
+ assert.equal(nav.stageFromControl({Id:'rfqStepImport'}),'import');
+ assert.equal(nav.stageFromControl({Id:'rfqStepBrands'}),'brands');
+ assert.equal(nav.stageFromControl({Id:'rfqStepInquiry'}),'inquiry');
+});
+
 test('每个快捷入口只导航：确认/学习/写表/拆分调用计数均为0',()=>{
  STAGES.forEach(stage=>{
   const nav=freshModule(),store=storage(),spy=workflowSpy();

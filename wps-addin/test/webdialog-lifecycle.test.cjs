@@ -275,7 +275,7 @@ test('宿主只认最小创建签名时退回不定位调用，窗口仍打开',
   assert.equal(args.length, 2, '先试完整参数，失败后退回最小签名');
   assert.deepEqual(args[0].slice(11, 13), [1464, 180], '第一次带位置参数');
   assert.equal(args[0].length, 14, '第一次按宿主文档的完整签名调用');
-  assert.deepEqual(args[1], [args[0][0], '项目询价', 440, 720, false, undefined, undefined, undefined,
+  assert.deepEqual(args[1], [args[0][0], '材料整理助手', 440, 720, false, undefined, undefined, undefined,
     undefined, undefined, undefined, undefined, undefined, undefined], '退回时只用最小签名');
   const placement = h.context.window.RfqRibbonNavigation.placementReport();
   assert.equal(placement.createdWith, 'minimal');

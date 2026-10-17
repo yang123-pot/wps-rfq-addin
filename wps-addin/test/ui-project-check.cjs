@@ -40,7 +40,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   };
   await install();
   const origin='http://127.0.0.1:'+server.address().port;
-  await page.goto(origin+'/taskpane.html');
+  await page.goto(origin+'/taskpane.html?mode=detail');
   await page.locator('#aux-section > summary').click();
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);

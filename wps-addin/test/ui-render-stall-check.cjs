@@ -61,7 +61,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
    window.Application=app;
   },{files});
   const origin='http://127.0.0.1:'+server.address().port;
-  await page.goto(origin+'/taskpane.html');
+  await page.goto(origin+'/taskpane.html?mode=detail');
   assert.equal(await page.locator('#browse-files').isVisible(),true,'服务注入只读目录接口后必须出现侧栏内浏览按钮');
 
   await page.locator('#browse-files').click();

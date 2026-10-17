@@ -190,7 +190,7 @@ async function summaryFlow(){
    await fs.mkdir(SUMMARY_EVIDENCE,{recursive:true});
    await fs.writeFile(path.join(SUMMARY_EVIDENCE,name),JSON.stringify(value,null,2));
   };
-  await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html');
+  await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html?mode=detail');
   await page.locator('#aux-section > summary').click();
   await page.evaluate(()=>{
    const values={'header-company':'测试安装工程有限公司','header-address':'测试市测试路1号',

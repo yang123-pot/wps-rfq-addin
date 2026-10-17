@@ -2,7 +2,8 @@
   "name": "wps-rfq-addin",
   "version": "0.1.0",
   "private": true,
-  "description": "WPS招标清单询价插件",
+  "displayName": "材料整理助手",
+  "description": "材料整理助手：WPS招标清单整理与询价插件",
   "addonType": "et",
   "scripts": {
     "test": "node --test test/*.test.cjs",

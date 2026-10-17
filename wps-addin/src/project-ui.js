@@ -56,6 +56,9 @@
     if(restoreAudit&&restoreAudit.issues.length)
       status.textContent+='\n恢复核对：'+restoreAudit.issues.slice(0,3).map(function(issue){return issue.message;}).join('；')+
         (restoreAudit.issues.length>3?'；其余'+(restoreAudit.issues.length-3)+'项请重新定位或重做对应阶段':'');
+    if(document&&document.dispatchEvent){
+      try{document.dispatchEvent(new CustomEvent('rfq:project-status'));}catch(_){}
+    }
   }
   // 阶段只按当前真实内容判定：导入集合、来源问题、本次预览确认、逐行分类确认，以及后续阶段的明确结论。
   // R1过渡期：侧栏仍是旧的逐行分类/品牌/生成面板，这里把已有结论映射到v2的matching/review/brands/inquiry/split；

@@ -1,4 +1,4 @@
-# WPS询价插件安装、升级与卸载说明（2026-10-17，F7）
+# 材料整理助手安装、升级与卸载说明（2026-10-17）
 
 安装脚本位于 `wps-addin/install/`：`install.ps1`、`start.ps1`、`uninstall.ps1`，共享身份核对 `service-identity.ps1`。全部为用户级操作，不需要管理员权限，也不修改WPS或Windows安全设置。
 
@@ -18,7 +18,7 @@ pwsh -File wps-addin\install\install.ps1
 6. 创建并明确传入 `DataRoot` 下的五个目录：`imports`、`library`、`projects`、`headers`、`splits`。
 7. 以隐藏窗口启动本机服务，只监听 `127.0.0.1:38891`；服务只提供插件资源和本机项目/库/回执接口。
 
-安装后请重启WPS表格，再从“项目询价”功能区打开侧栏。
+安装后请重启WPS表格，再从“材料整理”功能区打开材料整理助手。用户看到的名称是“材料整理助手”，内部注册身份仍是 `WpsRfqAddin`，升级不会产生两个插件。
 
 可覆盖参数：`-SourceDir`、`-AppDir`、`-PublishPath`、`-DataRoot`、`-Port`、`-SkipService`、`-SkipHealthCheck`。`SkipService` 仅供隔离复制测试；真实升级/卸载不要依赖它。
 
@@ -122,7 +122,7 @@ pwsh -File .\install\install.ps1
 
 3. 安装脚本只复制发布白名单文件：`main.js`、`ribbon.xml`、`taskpane.html`、`styles.css`、`package.json`、`rules/`、`src/`、运行所需的 `dev/*.cjs`、`assets/`。测试、样本、诊断脚本、开发探针入口和本机证据不进入 AppDir。
 4. 安装后访问 `http://127.0.0.1:38891/health`，应看到 `service=wps-rfq-addin`、`version=0.1.0`、绝对 `scriptPath`、`startedAt` 和 64 位 `codeVersion`。该 `codeVersion` 应与同目录 `candidate-manifest.json` 中记录的运行代码版本一致。
-5. 重启 WPS 表格，从“项目询价”功能区打开询价助手，按[用户说明](wps-user-guide.md)执行七步。
+5. 重启 WPS 表格，从“材料整理”功能区打开材料整理助手，按[用户说明](wps-user-guide.md)执行三步简版或详细步骤。
 
 候选包边界：
 

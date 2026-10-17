@@ -77,7 +77,7 @@ async function run(){
   });
   await page.exposeFunction('__writeSplitFixture',async function(stagePath,payload){
    await fs.writeFile(stagePath,xlsxFixture.workbook(payload));});
-  await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html');
+  await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html?mode=detail');
   await page.evaluate(function(args){
    ['split-message','split-status','split-directory','split-directory-label','split-preview','split-run','split-retry','split-open']
     .forEach(function(id){const old=document.getElementById(id),clone=old.cloneNode(true);old.parentNode.replaceChild(clone,old);});

@@ -29,6 +29,8 @@
   if(typeof tag==='string'&&isStage(tag))return tag;
   var id=control.id||control.Id;
   if(typeof id==='string'){
+    var simple={rfqStepImport:'import',rfqStepBrands:'brands',rfqStepInquiry:'inquiry'};
+    if(simple[id])return simple[id];
     var guess=id.replace(/^rfqStage/i,'').toLowerCase();
     if(isStage(guess))return guess;
   }
@@ -81,9 +83,9 @@
  // 这时退回不定位的最小调用——定位能力缺失绝不能导致询价窗口打不开。
  function createDialog(application,url,target){
   var attempts=[];
-  if(target)attempts.push({name:'extended',args:[url,'项目询价',target.width,target.height,false,
+  if(target)attempts.push({name:'extended',args:[url,'材料整理助手',target.width,target.height,false,
    true,2,'',0,true,false,target.x,target.y]});
-  attempts.push({name:'minimal',args:[url,'项目询价',WINDOW_WIDTH,WINDOW_HEIGHT,false]});
+  attempts.push({name:'minimal',args:[url,'材料整理助手',WINDOW_WIDTH,WINDOW_HEIGHT,false]});
   var lastError=null;
   for(var index=0;index<attempts.length;index++){
    try{

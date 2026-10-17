@@ -1,13 +1,38 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>项目询价</title><link rel="stylesheet" href="styles.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>材料整理助手</title><link rel="stylesheet" href="styles.css"></head>
 <body>
-  <header><img src="assets/inquiry.svg" alt=""><div><h1>项目询价</h1><p>从招标清单，到供应商询价文件</p></div></header>
+  <header><img src="assets/inquiry.svg" alt=""><div><h1>材料整理助手</h1><p>按提示一步一步做</p></div><button id="simple-mode-toggle" class="header-mode" type="button">详细步骤</button><button id="simple-settings-toggle" class="header-gear" type="button" title="设置">⚙</button></header>
   <main>
     <fieldset id="task-controls">
     <div id="connection" class="connection" role="status">正在连接WPS表格…</div>
+    <section id="simple-home" class="simple-home" aria-label="材料整理七步">
+      <div class="simple-progress"><span id="simple-progress-text">第1步 / 共7步</span><div class="simple-bar"><i id="simple-bar-fill"></i></div></div>
+      <div id="simple-seven-list" class="simple-seven-list" aria-label="七步进度"></div>
+      <button id="simple-back" class="simple-back" type="button">← 上一步</button>
+      <div class="simple-card">
+        <h2 id="simple-title">选清单并核对分类</h2>
+        <p id="simple-desc">先选要询价的表格，确认材料属于哪一类。</p>
+        <div id="simple-example" class="simple-example">支持 .xls / .xlsx，一次可选多份；原件不会被修改。</div>
+        <button id="simple-primary" class="simple-primary" type="button">开始选清单</button>
+        <button id="simple-example-link" class="simple-link" type="button">不知道怎么填？看示例</button>
+      </div>
+      <div id="simple-help" class="simple-help" hidden></div>
+      <div class="simple-hint"><div>第一次用？先只做这一步，其他功能不用管。</div><button id="simple-guide" type="button">使用说明</button></div>
+    </section>
+    <section id="simple-settings" class="simple-settings" hidden>
+      <h2>设置</h2>
+      <p class="note">平时不用打开。需要保存项目、填单位信息或遇到问题时再来。</p>
+      <button class="simple-setting" type="button" data-simple-section="project-section"><b>项目</b><span>保存或打开以前的单</span></button>
+      <button class="simple-setting" type="button" data-simple-section="header-section"><b>单位信息</b><span>项目名称、单位、经办人、电话</span></button>
+      <button class="simple-setting" type="button" data-simple-section="library-section"><b>材料分类</b><span>查看或调整材料分类</span></button>
+      <button class="simple-setting" type="button" id="simple-help-setting"><b>遇到问题</b><span>重建窗口、查看使用说明</span></button>
+      <button id="simple-detail-link" class="simple-setting" type="button"><b>详细步骤</b><span>需要排查时查看完整七步</span></button>
+      <div id="simple-setting-help" class="simple-help" hidden></div>
+      <button id="simple-settings-close" class="simple-close" type="button">关闭设置</button>
+    </section>
     <section id="workflow-section" class="card workflow" aria-label="主流程">
-      <h2>项目询价 · 七步流程</h2>
+      <h2>材料整理助手 · 七步详细流程</h2>
       <ol id="workflow-nav" class="workflow-nav"></ol>
       <p id="workflow-note" class="note"></p>
       <div class="metrics workflow-stats"><div><strong id="workflow-rows">0</strong><span>导入总行数</span></div><div><strong id="workflow-merged">0</strong><span>合并后行数</span></div></div>
@@ -38,6 +63,6 @@
     </details><section class="next"><h2>接下来的整理流程</h2><ol><li>自动分类，全部人工核对</li><li>填写品牌、供应商和询价抬头</li><li>生成询价表，一键拆分文件</li></ol></section>
     </fieldset>
   </main>
-  <footer>七步流程验证版 · 真实WPS完整验收进行中</footer>
+  <footer>材料整理助手 · 七步简洁版</footer>
   <script src="src/parser.js"></script><script src="src/host.js"></script><script src="src/path-picker.js"></script><script src="src/decimal.js"></script><script src="src/merge.js"></script><script src="src/review.js"></script><script src="src/review-ui.js"></script><script src="src/import-host.js"></script><script src="src/collection.js"></script><script src="src/workbook-layout.js"></script><script src="src/import-preview-model.js"></script><script src="src/export-model.js"></script><script src="src/export-host.js?v=file-freeze-1"></script><script src="src/category-workbooks.js"></script><script src="src/export-ui.js"></script><script src="src/project.js"></script><script src="src/project-restore.js"></script><script src="src/project-ui.js"></script><script src="src/project-host.js"></script><script src="src/category-library.js"></script><script src="src/category-memory.js"></script><script src="src/classify.js"></script><script src="src/classification.js"></script><script src="src/brand-table.js"></script><script src="src/brand-model.js"></script><script src="src/brand-host.js?v=file-freeze-1"></script><script src="src/brand-reference.js"></script><script src="src/inquiry-header.js"></script><script src="src/inquiry-model.js"></script><script src="src/split-plan.js"></script><script src="src/split-state.js"></script><script src="src/classification-review-model.js"></script><script src="src/classification-review-host.js"></script><script src="src/classification-ui.js"></script><script src="src/library-ui.js"></script><script src="src/brand-ui.js"></script><script src="src/header-ui.js"></script><script src="src/inquiry-ui.js?v=file-freeze-1"></script><script src="src/split-ui.js?v=file-freeze-1"></script><script src="src/ribbon-navigation.js"></script><script src="src/workflow-ui.js"></script><script src="src/import-ui.js"></script><script src="src/taskpane.js"></script>
 </body></html>

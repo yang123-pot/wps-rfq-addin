@@ -25,7 +25,7 @@ async function until(reportPath,predicate){
  try{
   const page=await browser.newPage({viewport:{width:420,height:600}});
   const origin='http://127.0.0.1:'+server.address().port;
-  await page.goto(origin+'/taskpane.html');
+  await page.goto(origin+'/taskpane.html?mode=detail');
   await page.locator('header').click();
   await page.mouse.wheel(0,400);
   const reports=await until(reportPath,items=>items.some(item=>item.stage==='pane-ready')&&

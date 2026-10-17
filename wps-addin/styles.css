@@ -60,3 +60,71 @@
 #sheet-review-issues>li{font-size:12px}
 .aux>summary{cursor:pointer;font-size:12px}
 @media (max-width:360px){.workflow-step{flex:1 1 40px}.workflow-step-button .workflow-step-label{font-size:9px}}
+
+/* 三步简版：默认只显示当前要做的一件事；七步详细流程仍在 body.detail-mode 下保留。 */
+.header-mode,.header-gear{margin-left:auto;margin-top:0;width:auto;border:1px solid #dfe8e1;background:#fff;color:#456253;border-radius:7px;padding:7px 9px;font:inherit;font-size:11px;cursor:pointer}
+.header-gear{margin-left:0;width:32px;padding:7px 0;font-size:15px}
+body:not(.detail-mode) #workflow-section,
+body:not(.detail-mode) .stage-panel,
+body:not(.detail-mode) #aux-section,
+body:not(.detail-mode) .next{display:none!important}
+body.simple-task-mode #workflow-section,
+body.simple-task-mode #aux-section,
+body.simple-task-mode .next{display:none!important}
+body.simple-task-mode .stage-panel{display:none!important}
+body.simple-task-mode .stage-panel.simple-task-active{display:block!important}
+body.simple-task-mode #stage-panel-import > section.card[aria-label="当前工作簿"],
+body.simple-task-mode #sheets-section,
+body.simple-task-mode #review-section,
+body.simple-task-mode #import-section .note{display:none!important}
+body.simple-task-mode #stage-panel-import > .intro,
+body.simple-task-mode .stage-panel > p.note:last-child{display:none!important}
+body.detail-mode #simple-home,
+body.detail-mode #simple-settings{display:none!important}
+.simple-home{padding:4px 0 0}
+.simple-progress{display:flex;align-items:center;gap:9px;color:#6f8176;font-size:11px;margin:2px 0 12px}
+.simple-bar{flex:1;height:7px;border-radius:99px;background:#e4ebe6;overflow:hidden}
+.simple-bar i{display:block;height:100%;width:33%;background:#237555;border-radius:99px}
+.simple-step-strip{display:flex;gap:5px;margin-bottom:12px}
+.simple-step{flex:1;min-width:0;text-align:center;color:#93a198;font-size:10px;line-height:1.35}
+.simple-step b{display:grid;place-items:center;width:24px;height:24px;margin:0 auto 4px;border:1px solid #d5dfd9;border-radius:50%;background:#fff;color:#8a9990;font-size:11px}
+.simple-step.current{color:#237555;font-weight:700}
+.simple-step.current b{background:#237555;border-color:#237555;color:#fff}
+.simple-step.done b{background:#edf5ef;border-color:#cfe2d5;color:#237555}
+.simple-seven-list{border:1px solid #dfe8e1;border-radius:8px;background:#fff;overflow:hidden;margin-bottom:12px}
+.simple-seven-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #edf1ee;font-size:11px;color:#6f8176;cursor:pointer}
+.simple-seven-row:last-child{border-bottom:0}
+.simple-seven-row .n{width:22px;height:22px;border-radius:50%;border:1px solid #d5dfd9;display:grid;place-items:center;font-size:10px;color:#8a9990;flex:none}
+.simple-seven-row .label{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.simple-seven-row .state{font-size:10px;color:#96a197;padding-right:4px}
+.simple-seven-row.done .n{background:#edf5ef;border-color:#cfe2d5;color:#237555}
+.simple-seven-row.done .state{color:#5d8469}
+.simple-seven-row.current{background:#eef6f0;border-left:3px solid #237555;padding-left:7px;color:#2e5a40;font-weight:700}
+.simple-seven-row.current .n{background:#237555;border-color:#237555;color:#fff}
+.simple-seven-row.current .state{color:#237555;font-weight:700}
+.simple-back{display:block;border:0;background:transparent;color:#6b7e72;font:inherit;font-size:11px;padding:0;margin:0 0 8px;cursor:pointer}
+.simple-card{background:#fff;border:1px solid #dfe8e1;border-radius:12px;box-shadow:0 4px 14px #284b3910;padding:16px;margin-bottom:10px}
+.simple-card h2{font-size:19px;line-height:1.35;margin:0 0 7px}
+.simple-card p{font-size:12px;line-height:1.75;color:#64766c;margin:0}
+.simple-example{background:#f7faf8;border:1px solid #e4ece6;border-radius:8px;padding:9px 10px;margin:11px 0 12px;font-size:11px;line-height:1.7;color:#5d7365}
+.simple-primary{width:100%;border:0;border-radius:8px;background:#237555;color:#fff;font:inherit;font-size:14px;font-weight:700;padding:12px;cursor:pointer}
+.simple-primary:disabled{background:#e4eae6;color:#89998e;cursor:default}
+.simple-link{display:block;margin:9px auto 0;border:0;background:transparent;color:#4f7460;font:inherit;font-size:11px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.simple-next{display:flex;justify-content:space-between;gap:8px;align-items:center;background:#fbfcfb;border:1px solid #e7ece8;border-radius:8px;padding:10px 12px;color:#7b8c82;font-size:11px}
+.simple-next strong{color:#5b7062;font-size:11px}
+.simple-hint{display:flex;justify-content:space-between;gap:8px;align-items:center;background:#fff8e8;border:1px solid #f1dfb8;border-radius:8px;padding:9px 10px;margin-top:10px;color:#8a6420;font-size:11px;line-height:1.6}
+.simple-hint button{border:0;background:transparent;color:#8a6420;font:inherit;font-weight:700;white-space:nowrap;cursor:pointer}
+.simple-help{background:#f7faf8;border:1px solid #e4ece6;border-radius:8px;padding:10px;margin:8px 0;color:#5d7365;font-size:11px;line-height:1.75}
+.simple-settings{padding:4px 0 0}
+.simple-settings h2{font-size:18px;margin:4px 0 5px}
+.simple-setting{display:block;width:100%;text-align:left;border:1px solid #e3ebe6;background:#fff;border-radius:9px;padding:11px 12px;margin-top:8px;font:inherit;cursor:pointer}
+.simple-setting b{display:block;font-size:13px;color:#345142}
+.simple-setting span{display:block;font-size:10px;color:#8a9990;margin-top:3px}
+.simple-close{width:100%;border:0;border-radius:8px;background:#eef3ef;color:#4d6657;padding:11px;font:inherit;font-size:12px;cursor:pointer;margin-top:10px}
+header>div{flex:1;min-width:0}
+header h1{font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header .header-mode{flex:none;margin-left:auto;font-size:10px;padding:6px 7px;white-space:nowrap}
+header .header-gear{flex:none}
+header .header-mode:hover:enabled,header .header-gear:hover:enabled{background:#f4f8f5;color:#345142}
+#connection{margin-bottom:8px;line-height:1.5}

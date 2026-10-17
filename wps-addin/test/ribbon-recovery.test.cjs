@@ -20,15 +20,11 @@ function buttonTag(id){
  assert.ok(tag,'功能区必须有 '+id+' 按钮');
  return tag[0];
 }
-// R12-K：与获批图01/07一致的功能区阶段入口（按钮id、按钮文字、阶段ID）。
+// 简版：功能区只保留三个大入口，内部仍映射到既有七阶段。
 const STAGE_BUTTONS=[
- ['rfqStageImport','导入清单','import'],
- ['rfqStageMatching','自动分类','matching'],
- ['rfqStageReview','表内审核','review'],
- ['rfqStageCategories','分类工作簿','categories'],
- ['rfqStageBrands','品牌汇总','brands'],
- ['rfqStageInquiry','询价表','inquiry'],
- ['rfqStageSplit','拆分文件','split']
+ ['rfqStepImport','① 选清单并核对分类','import'],
+ ['rfqStepBrands','② 填品牌和供应商','brands'],
+ ['rfqStepInquiry','③ 生成供应商文件','inquiry']
 ];
 function load(options={}){
  const events=[];let paneVisible=true,exists=options.hasPane!==false;
@@ -93,17 +89,17 @@ test('窗口查询异常时明确失败，不能将未知状态当作关闭',()=
 });
 
 // R12-K：功能区补齐与获批图一致的阶段快捷入口，同时保留“打开/重建”入口。
-test('功能区补齐与获批图一致的七步阶段入口，并保留打开与重建入口',()=>{
+test('功能区只保留三个大入口，并保留打开与重建入口',()=>{
  STAGE_BUTTONS.forEach(function(entry){
   const tag=buttonTag(entry[0]);
   assert.match(tag,/onAction="OnGotoStage"/,entry[0]+'必须连接阶段导航回调');
   assert.match(tag,new RegExp('label="'+entry[1]+'"'),entry[0]+'按钮文字应与获批图一致');
-  assert.match(tag,new RegExp('tag="'+entry[2]+'"'),entry[0]+'必须带阶段ID，且只使用既有7个ID');
+  assert.match(tag,new RegExp('tag="'+entry[2]+'"'),entry[0]+'必须带阶段ID，且只使用既有阶段ID');
   assert.match(tag,/size="large"/,'阶段入口应为大按钮，与获批图一致');
  });
  const group=ribbon.match(/<group\b[^>]*\bid="rfqStages"[^>]*>[\s\S]*?<\/group>/);
- assert.ok(group,'功能区必须有阶段导航分组');
- assert.equal((group[0].match(/<button\b/g)||[]).length,7,'阶段分组只放7个既有阶段入口');
+ assert.ok(group,'功能区必须有三步入口分组');
+ assert.equal((group[0].match(/<button\b/g)||[]).length,3,'三步分组只放三个大入口');
  assert.equal(buttonAction('rfqOpenPane'),'OnOpenRfqPane','打开侧栏入口保持可用');
  assert.equal(buttonAction('rfqReloadPane'),'OnReloadRfqPane','手动重建入口保持可用');
 });
@@ -178,17 +174,13 @@ test('未加载窗口管理脚本时打开与重建明确失败，阶段入口�
  assert.deepEqual(staged.events,[],'无导航脚本时阶段入口不得产生任何宿主操作');
 });
 
-// R12-L补验：七阶段各有可发布的本地图标，getImage只取资源，不执行导航或业务动作。
+// 简版三步各有可发布的本地图标，getImage只取资源，不执行导航或业务动作。
 const STAGE_IMAGES=[
- ['rfqStageImport','assets/import.svg'],
- ['rfqStageMatching','assets/matching.svg'],
- ['rfqStageReview','assets/review.svg'],
- ['rfqStageCategories','assets/categories.svg'],
- ['rfqStageBrands','assets/brands.svg'],
- ['rfqStageInquiry','assets/inquiry.svg'],
- ['rfqStageSplit','assets/split.svg']
+ ['rfqStepImport','assets/import.svg'],
+ ['rfqStepBrands','assets/brands.svg'],
+ ['rfqStepInquiry','assets/inquiry.svg']
 ];
-test('七阶段图标回调返回各自资源，不能再共用同一询价图标',()=>{
+test('三步图标回调返回各自资源，不能再共用同一询价图标',()=>{
  const {context,events}=load({skipNav:true});
  const images=STAGE_IMAGES.map(([id,want])=>{
   const callback=/\bgetImage="([^"]+)"/.exec(buttonTag(id));
@@ -198,10 +190,10 @@ test('七阶段图标回调返回各自资源，不能再共用同一询价图�
   assert.equal(context[callback[1]]({id:id}),want,'兼容既有小写控件id');
   return image;
  });
- assert.equal(new Set(images).size,7,'七个阶段必须有七个独立资源');
+ assert.equal(new Set(images).size,3,'三个入口必须有三个独立资源');
  assert.deepEqual(events,[],'取图标不能访问宿主、写存储、导航或弹确认');
 });
-test('七阶段图标资源实际存在且内容互异，无外部资源或脚本依赖',()=>{
+test('三步图标资源实际存在且内容互异，无外部资源或脚本依赖',()=>{
  const contents=STAGE_IMAGES.map(([id,asset])=>{
   const filename=path.join(root,asset);
   assert.equal(fs.existsSync(filename),true,id+'的SVG资源必须存在');
@@ -211,9 +203,9 @@ test('七阶段图标资源实际存在且内容互异，无外部资源或脚�
   assert.doesNotMatch(svg,/<script\b|\bon\w+=|\b(?:href|src)\s*=|<foreignObject\b/i,'图标须是独立静态SVG');
   return svg;
  });
- assert.equal(new Set(contents).size,7,'换资源名不能掩盖图标内容仍相同');
+ assert.equal(new Set(contents).size,3,'换资源名不能掩盖图标内容仍相同');
 });
-test('图标回调保留打开入口及未知控件兜底，取图后七阶段仍只发送导航请求',()=>{
+test('图标回调保留打开入口及未知控件兜底，取图后三步仍只发送导航请求',()=>{
  const {context,events}=load();
  [undefined,null,{Id:'rfqOpenPane'},{Id:'unknown'}].forEach(control=>{
   assert.equal(context.GetRfqImage(control),'assets/inquiry.svg');
@@ -224,6 +216,6 @@ test('图标回调保留打开入口及未知控件兜底，取图后七阶段�
   assert.equal(context[buttonAction(id)]({Id:id}),true);
   assert.equal(JSON.parse(context.window.Application.PluginStorage.getItem('rfq.window.nav.request')).stage,stage);
  });
- assert.equal(events.filter(event=>event[0]==='store').length,7,'每阶段仍只写一次导航请求');
+ assert.equal(events.filter(event=>event[0]==='store').length,3,'每个入口仍只写一次导航请求');
  assert.equal(events.some(event=>['confirm','navigate','create','alert'].includes(event[0])),false);
 });

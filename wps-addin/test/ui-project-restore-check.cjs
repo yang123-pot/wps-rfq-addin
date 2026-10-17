@@ -40,7 +40,7 @@ async function run(){
     return nativeFetch.apply(null,arguments);
    };
   },{project:null,inspect:{}});
-  await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html');
+  await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html?mode=detail');
   await page.evaluate(function(args){
    ['save-project','open-project','refresh-projects','relocate-project','project-message','project-status','project-list']
     .forEach(function(id){const old=document.getElementById(id),clone=old.cloneNode(true);old.parentNode.replaceChild(clone,old);});

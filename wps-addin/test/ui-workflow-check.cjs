@@ -55,7 +55,7 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
    window.Application=app;window.__files=files;
   },{files,drain:DRAIN,mep:MEP});
   const origin='http://127.0.0.1:'+server.address().port;
-  await page.goto(origin+'/taskpane.html');
+  await page.goto(origin+'/taskpane.html?mode=detail');
   await page.evaluate(()=>{
    window.__previews=[];
    window.RfqExportHost.showPreview=(app,model)=>{window.__previews.push(model);return {name:'插件预览'};};

@@ -176,7 +176,7 @@
     }
   });
   if (!application) {
-    connection.textContent = '请从WPS表格的“项目询价”功能区打开';
+    connection.textContent = '请从WPS表格的“材料整理”功能区打开';
     message.textContent = '此页面需要连接WPS中的工作簿。请在WPS内启动插件后读取清单。';
     return;
   }

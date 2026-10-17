@@ -163,7 +163,7 @@ async function run(){
     await window.__writeInquiryFixture(stagePath,model.sheets);
     if(settings&&settings.finalizeFreeze)await settings.finalizeFreeze();};
   });};
-  await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html');
+  await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html?mode=detail');
   const shot=async function(file){
    if(!file)return;
    await page.evaluate(function(){const aux=document.getElementById('aux-section');if(aux)aux.open=false;});

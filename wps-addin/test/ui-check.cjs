@@ -13,7 +13,7 @@ const {createServer} = require('../dev/server.cjs');
     const page=await browser.newPage({viewport:{width:380,height:850}});
     page.on('dialog',dialog=>dialog.accept());
     page.on('pageerror',error=>errors.push(error.message));
-    const url='http://127.0.0.1:'+server.address().port+'/taskpane.html';
+    const url='http://127.0.0.1:'+server.address().port+'/taskpane.html?mode=detail';
     await page.goto(url);
     assert.equal(await page.locator('#read-workbook').isDisabled(),true);
     assert.match(await page.locator('#message').innerText(),/WPS/);
