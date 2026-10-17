@@ -167,4 +167,11 @@ SHA-256：
 
 本包只按明确文件清单暂存并审查 `git diff --cached`；不使用 `git add .`/`git add -A`。入场 `wps-addin/dev/pane-diagnostics.js` 原样保留、不暂存；原始资料、私有证据、运行数据、候选 zip、隔离安装目录均不入 Git。
 
-提交、普通推送、`git ls-remote` 与本地 HEAD 逐位核对结果以本机 `outputs/wps-phase1-F8/20261017/backup-receipt.json` 和最终报告为准。推送失败时保留本地提交并如实记录，不强推。
+实际结果：
+
+- 候选源码提交 `a08db614b017245113157fe76288722579153d31`（`feat(wps): prepare F8 delivery candidate and user guide`）；
+- 清单提交 `33475292f5fde225ccd55478b5e4b843be9464c8`（`docs(wps): record F8 candidate source commit`）；
+- 普通 `git push origin feat/wps-phase1` 退出 0；
+- `git rev-parse HEAD` 与 `git ls-remote origin refs/heads/feat/wps-phase1` 逐位相同，均为 `33475292f5fde225ccd55478b5e4b843be9464c8`。
+
+本机回执 `outputs/wps-phase1-F8/20261017/backup-receipt.json`。未强推，未上传原始资料、私有证据、候选 zip 或隔离安装目录。
