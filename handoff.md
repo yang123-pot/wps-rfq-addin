@@ -1,5 +1,7 @@
 # WPS询价插件：已批准效果图、执行计划与交接文档
 
+> **2026-10-17 F7完成（最新入口）：** 入场HEAD `4936f8c`，F6已勾R12结案。按F7补齐安装/启动/卸载的服务身份（健康响应绝对脚本路径、创建时间、实际运行代码版本；PID文件只作候选），升级改为同级暂存复制+目录切换，复制/启动失败还原本插件注册/代码并恢复旧服务；DataRoot明确创建并传入`imports/library/projects/headers/splits`。Node全量**515/515**（新增5项），隔离生命周期安装→同版重启→开项目→升级→源文件锁复制失败→`process.exit(1)`启动失败→卸载→重装全部通过：v1→v2代码版本变化并实际返回`f7-v2`，两次失败均退出1且回到v2/旧注册，项目revision1与五目录哨兵保持。WPS构建号`12.1.0.29161`经COM隐藏实例核对（`Workbooks=0`，用户已有WPS进程未变）；本包未改用户真实publish.xml或重启用户WPS，真实浮窗沿用F6。旧版无身份服务会拒绝自动停止、需手动停一次。详见[F7证据](docs/wps-phase1-f7-evidence-20261017.md)。**F7出口齐备；F8未开始，须另开会话。** 入场pane原样保留、不暂存。
+
 > **2026-10-17 F6完成、R12结案（最新入口）：** 入场HEAD `c6edf7f`，F6在最后产品提交`1ca0835`上只修复旧记忆显示名。修复后Node全量510/510、恢复/启动子集58/58、Python实际发现/执行10/10通过；默认Node缺playwright，改用本机Codex运行时路径后六主流程及四个恢复/启动浏览器检查10/10 exit0，仍属模拟宿主。四项目按批准测试口径4/4，当前6793确认/198成果SHA及178类别页/178内部链接/57880材料公开格核对通过。独立审查发现的旧标签链路已先红后绿修复，隔离库重算错误候选0、未改库；用户在真实WPS功能区打开浮窗后确认“已经完整打开”，D06默认可见性/可达性由真人反馈补齐，精确最小宽度/缩放仍只按F3浏览器CSS320记录。见[F6证据与脱敏索引](docs/wps-phase1-f6-evidence-20261017.md)。**F6出口齐备、R12结案；F7/F8未开始，须另开工作包。** 入场pane原样保留、不暂存。
 
 > **10-17 21:01 D06接续并补齐：** 38891正常服务按原五目录恢复（normal/PID1224，身份以`outputs/wps-phase1-F5/resume-20261017/approved-session-service.json`为准）；Computer Use返回`apps:[]`、KET.Application COM不暴露`WebDialog`，均不能替代浮窗。随后用户在真实WPS功能区重开浮窗并确认“已经完整打开”，作为默认位置与可达性真人证据；工具未注入页内输入。精确最小宽度/缩放未作原生像素测量，沿用F3浏览器CSS320。R12据此结案，F7/F8不开始。
@@ -805,11 +807,13 @@ node wps-addin/test/ui-project-check.cjs
 | R6–R8 | 按10-11变更为一本多页、首页汇总、内部名称链接；F5两布局4/4 | 不恢复旧多分类文件；精确最小宽度/缩放仍以浏览器层证据为边界 |
 | R9–R11 | 询价/拆分/持久回执与恢复已有；最终文件冻结链1ca0835 | 无新增真人/隔离宿主重跑，F6当前只读6793行/198件通过 |
 | R12 | **F6完成、已结案**；Node510/510、恢复启动58/58、Python发现/执行10/10、浏览器10/10；四项目4/4；用户确认浮窗完整打开 | 无；精确最小宽度/缩放仍无原生像素读数，已明确边界 |
-| R13 | **F7/F8未开始** | 安装身份/回退/升级/DataRoot、生命周期、真实说明/用户实操/候选包/支持范围均保留，不提前实施 |
+| R13 | **F7完成；F8未开始** | 安装身份/回退/升级/DataRoot、隔离生命周期已完成；本包提交/推送以回执核对，用户实操、新版说明、候选包/支持范围留F8 |
 
 下一包按0.2与详细计划执行。R12-I完成不合并/全跳过/边界数据：新增`test/r12i-boundaries.test.cjs`8项（Node 370/370），并在隔离真实WPS上跑完不合并完整链（4分类簿4/2/2/1、9条询价、5份拆分）、全部无需询价（不落空文件）、精度与文本隔离（前导零/长小数/长中文特征/2页重复表头/超单格拒绝）；本包源码只加`workbook-layout.guardValues`超长单格防护。R12-A只做现场保护与接续检查点，没有新增真机通过或源码修复；R12-B已收敛4个入场修改（`export-files.cjs`/`server.cjs`/`import-ui.js`/`export-files.test.cjs`），`export-host.js`及其测试留R12-D；R12-C新增`compareSnapshot`/`fromSnapshot`、恢复审计的业务内容判定与草稿恢复提示，并用真实受保护文件留只读证据（H11 SHA相同、比较报差异、旧审计ok=true/新审计ok=false），Node 340/340；R12-D完成汇总写入次序/下拉来源/链接目标/预览归属与双布局，用独立隐藏COM实例实测链接并截图，Node 344/344；R12-E完成拆分待核对内容证明与UI显式核对，并用独立隔离WPS真机写/读回真实供应商拆分文件、跑真实文件SHA下的待核对状态机，Node 356/356、`ui-split-check` PASS；R12-F重建公开输出审计，Node 361/361、Python 8/8，并用隔离污染件逐格留证、按纯值清单只读核对R12-E真实供应商件。R12-D/E/F/I的真机补充与只读文件核对均未在插件UI内点按完成，不把模拟宿主、原生COM读回或文件只读审计写成插件UI真机通过。R12-J（2026-10-02）在隔离隐藏WPS 12.1.0.29161上按真实插件代码＋真实`dev/server`管线跑完异常/恢复矩阵**21/21项、0失败**（取消/关闭、目标已存在/竞争/只读目录、分类与拆分各注入第二份失败并只重试未完成、发布前中断/响应丢失/回执失败与服务重启、删除与外改、键过期、暂存清理、五恢复检查点、409冲突与用户打开的簿/宏安全值、关闭重开点链接、整树搬移后重定位、侧栏出帧与重建），Node **371/371**、Python 8/8、`ui-*`17/17；**产品源码改动很小**——只读目录补强`wps-addin/dev/export-files.cjs`（`prepare`先探测目标目录可写：只读目录预检即拒绝、写入0份；先写失败用例再最小实现，端到端J3c记录`EPERM`、用户文件SHA不变）＋新增浏览器检查`wps-addin/test/ui-cancel-check.cjs`；另有3个浏览器夹具（`ui-sheet-review`/`ui-memory`/`ui-category`）按R12-C内容语义修好，属夹具过期非产品缺陷、断言未删。同样未在插件UI内点按完成。
 
 ### 7.2 每包Git备份
+
+F7（2026-10-17）明确清单为：`wps-addin/dev/server.cjs`（健康身份与`--code-version`）、`wps-addin/install/service-identity.ps1`（共享身份核对）、`wps-addin/install/install.ps1`（暂存/切换/回退/五目录）、`wps-addin/install/start.ps1`、`wps-addin/install/uninstall.ps1`、`wps-addin/test/install.test.cjs`（生命周期/身份/路径/隐藏启动）、`wps-addin/test/server.test.cjs`、`docs/wps-install-guide.md`、`docs/wps-phase1-f7-evidence-20261017.md`、`docs/wps-workflow-v3-acceptance.md`、`docs/wps-phase1-release-checklist.md`、`docs/superpowers/plans/2026-10-11-wps-phase1-completion.md`、`handoff.md`。全量Node**515/515**；隔离生命周期回执/日志在`outputs/wps-phase1-F7/`，不入Git。入场未提交修改`wps-addin/dev/pane-diagnostics.js`原样保留、不暂存。提交/普通推送/远程SHA以本机`outputs/wps-phase1-F7/backup-receipt.json`和最终报告为准。
 
 F3（2026-10-11）明确清单为2源码＋3测试＋4文档共9文件：`wps-addin/src/import-ui.js`（`autoOpenSummary`：发布校验＋项目绑定保存成功后自动打开一次；绑定保存未成功不打开并如实提示；打开失败提示“已生成、未打开”并保留手动入口）、`wps-addin/src/ribbon-navigation.js`（`screenArea/placementFor/dialogBounds/attemptPlacement/createDialog`与只读`placementReport()`：位置参数→最小签名回退→`Move/Resize`兜底→读回核对，定位能力缺失不影响打开）、`wps-addin/test/ui-brand-check.cjs`（自动打开/手动入口/打开失败/写入失败/绑定保存失败）、`wps-addin/test/webdialog-lifecycle.test.cjs`（新增6项定位能力分支）、`wps-addin/test/ui-workflow-check.cjs`（missing/stale三态与精确CSS320；重建段请求改为重建页初始化前播种以消除偶发）、`docs/wps-phase1-f3-evidence-20261011.md`、`docs/wps-workflow-v3-acceptance.md`、`docs/wps-phase1-release-checklist.md`、`handoff.md`（以实际提交与远程SHA为准）。本机真机脚本/JSON/截图/xlsx在`outputs/wps-phase1-F3/`，不入Git；入场未提交修改`wps-addin/dev/pane-diagnostics.js`原样保留、不暂存。
 
@@ -869,6 +873,7 @@ git ls-remote origin refs/heads/feat/wps-phase1
 ### 7.3 历史及本机证据
 
 - [2026-10-11整体进度核对](docs/wps-project-progress-audit-20261011.md)：当前里程碑、原包状态、D01–D12差额、本轮368项子集与证据边界。
+- [2026-10-17 F7安装与隔离生命周期证据](docs/wps-phase1-f7-evidence-20261017.md)：服务身份/暂存升级/失败回退/PID复用/DataRoot五目录、515项Node及实际PIDs/版本/SHA；明确真实WPS浮窗沿用F6与旧版服务边界。
 - [2026-10-11 F1证据](docs/wps-phase1-f1-evidence-20261011.md)：末行外材料行拒绝与定位、内部页隐藏写盘/读回、行高实测（354字→396pt与AutoFit一致）、真机追加-拒绝-恢复与截图索引。
 - [2026-10-11 F5证据](docs/wps-phase1-f5-evidence-20261011.md)：四项目前置复核（8原件/副本SHA逐位一致、现存填写簿、3626待核行构成与分项目分布、重复容量与跨类别、项目1编码前导零结论、品牌/供应商/抬头无来源记录）、隔离验收库与六类业务待决登记、逐项目来源基线与0/4阻塞点。
 - [2026-10-12 一本多页（图04/05 变更B）证据](docs/wps-phase1-f5-b-evidence-20261012.md)：变更实施（单本/第1页汇总/页内跳转/逐页回执/业务键）、Node 482/482 与 17 项 ui-*、项目1 第4步及下游真机重跑与 Python 读盘审计 26/26，以及示例数据等边界。

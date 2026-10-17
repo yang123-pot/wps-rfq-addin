@@ -4,6 +4,7 @@ const http = require('node:http');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const { createServer, prepareProbeSources } = require('../dev/server.cjs');
 
 function client(server) {
@@ -24,7 +25,7 @@ async function setup(t, probe = false, extra = {}) {
     probeConfig: probe ? { token: 'unit-test-token', outputPath: 'C:\\test\\probe.xlsx' } : null, ...extra });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await new Promise(resolve => server.close(resolve)); await fs.rm(root, {recursive:true,force:true}); });
-  return {request:client(server),reportPath};
+  return {request:client(server),reportPath,root};
 }
 test('serves plugin assets but not arbitrary workspace files', async t => {
   const {request} = await setup(t);
@@ -37,7 +38,32 @@ test('serves plugin assets but not arbitrary workspace files', async t => {
   assert.equal(index.status, 200);
   assert.match(index.body, /main.js/);
   assert.doesNotMatch(index.body, /host-probe/);
-  assert.deepEqual(JSON.parse((await request('/health')).body), {service:'wps-rfq-addin',version:'0.1.0',mode:'development'});
+  const health=JSON.parse((await request('/health')).body);
+  assert.equal(health.service,'wps-rfq-addin');
+  assert.equal(health.version,'0.1.0');
+  assert.equal(health.mode,'development');
+  assert.equal(health.pid,process.pid);
+  assert.equal(health.scriptPath,path.resolve(__dirname,'..','dev','server.cjs'),'必须报告实际加载的脚本绝对路径');
+  assert.match(health.codeVersion,/^[a-f0-9]{64}$/);
+  assert.equal(Number.isNaN(Date.parse(health.startedAt)),false,'健康响应必须带可比较的启动时间');
+});
+test('health identity reports the running code version and the CLI prints the same version', async t => {
+  const root=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-identity-'));
+  t.after(()=>fs.rm(root,{recursive:true,force:true}));
+  await fs.writeFile(path.join(root,'main.js'),'window.version="one";');
+  const first=createServer({root});
+  await new Promise(resolve=>first.listen(0,'127.0.0.1',resolve));
+  const firstHealth=JSON.parse((await (await fetch('http://127.0.0.1:'+first.address().port+'/health')).text()));
+  await new Promise(resolve=>first.close(resolve));
+  await fs.writeFile(path.join(root,'main.js'),'window.version="two";');
+  const second=createServer({root});
+  await new Promise(resolve=>second.listen(0,'127.0.0.1',resolve));
+  const secondHealth=JSON.parse((await (await fetch('http://127.0.0.1:'+second.address().port+'/health')).text()));
+  await new Promise(resolve=>second.close(resolve));
+  assert.notEqual(firstHealth.codeVersion,secondHealth.codeVersion,'代码变化必须改变运行版本');
+  const cli=spawnSync(process.execPath,[path.resolve(__dirname,'..','dev','server.cjs'),'--code-version',root],{encoding:'utf8'});
+  assert.equal(cli.status,0,cli.stderr);
+  assert.equal(cli.stdout.trim(),secondHealth.codeVersion,'安装侧必须能用同一算法计算期望版本');
 });
 test('serves all seven local Ribbon SVG icons through the strict asset whitelist', async t => {
   const root=path.resolve(__dirname,'..');

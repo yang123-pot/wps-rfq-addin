@@ -1,5 +1,6 @@
 const http = require('node:http');
 const fs = require('node:fs/promises');
+const fsSync = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const os = require('node:os');
@@ -27,8 +28,47 @@ const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.cs
 const TYPES = {'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
   '.html':'text/html; charset=utf-8','.xml':'application/xml; charset=utf-8','.svg':'image/svg+xml',
   '.json':'application/json; charset=utf-8'};
+const VERSION_SKIP_DIRECTORIES = new Set(['node_modules','.git','outputs','test','install','__pycache__']);
+const VERSION_SKIP_FILES = new Set(['server.pid']);
+
+// 运行代码版本：按相对路径排序后逐个哈希文件，服务启动时计算一次。
+// 安装脚本用同一算法核对“正在运行的代码”和“AppDir 中已安装的代码”是否一致。
+function codeVersionForRoot(root) {
+  const absolute = path.resolve(root);
+  const lines = [];
+  function walk(directory, relative) {
+    let entries;
+    try { entries = fsSync.readdirSync(directory, {withFileTypes:true}); } catch (_) { return; }
+    entries.sort((a, b) => a.name.localeCompare(b.name, 'en'));
+    for (const entry of entries) {
+      const nextRelative = relative ? relative + '/' + entry.name : entry.name;
+      if (entry.isDirectory()) {
+        if (VERSION_SKIP_DIRECTORIES.has(entry.name)) continue;
+        walk(path.join(directory, entry.name), nextRelative);
+        continue;
+      }
+      if (!entry.isFile() || VERSION_SKIP_FILES.has(entry.name) || /\.(?:log|pid)$/i.test(entry.name)) continue;
+      const bytes = fsSync.readFileSync(path.join(directory, entry.name));
+      lines.push(nextRelative + '\n' + crypto.createHash('sha256').update(bytes).digest('hex'));
+    }
+  }
+  walk(absolute, '');
+  return crypto.createHash('sha256').update(lines.join('\n')).digest('hex');
+}
 
 function createServer({root, probeConfig = null, reportPath = null, importDirectory = null, projectDirectory = null, libraryDirectory = null, headerDirectory = null, splitDirectory = null}) {
+  const appDir = path.resolve(root);
+  const startedAt = new Date(Date.now() - Math.round(process.uptime() * 1000)).toISOString();
+  const identity = {
+    service:'wps-rfq-addin',
+    version:'0.1.0',
+    mode:probeConfig ? 'probe' : 'development',
+    pid:process.pid,
+    scriptPath:path.join(__dirname, 'server.cjs'),
+    appDir,
+    startedAt,
+    codeVersion:codeVersionForRoot(appDir)
+  };
   const reports = [];
   let writes = Promise.resolve();
   const importToken = crypto.randomBytes(32).toString('hex');
@@ -196,8 +236,7 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
       } catch (_) { return reply(500, 'Could not save probe report'); }
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return reply(405, 'GET required');
-    if (url.pathname === '/health') return reply(200, JSON.stringify({service:'wps-rfq-addin',version:'0.1.0',
-      mode:probeConfig ? 'probe' : 'development'}), 'application/json');
+    if (url.pathname === '/health') return reply(200, JSON.stringify(identity), 'application/json');
     if (url.pathname === '/' || url.pathname === '/index.html') {
       // WPS owns index.html. Supply its bootstrap in memory, not as a product file.
       const probe = probeConfig ? '<script>window.__RFQ_PROBE__=' +
@@ -245,6 +284,12 @@ async function prepareProbeSources(sourcePaths, outputDirectory) {
 async function main() {
   const args = process.argv.slice(2);
   function arg(name, fallback) { const i = args.indexOf(name); return i < 0 ? fallback : args[i + 1]; }
+  if (args.includes('--code-version')) {
+    const rootArg = arg('--code-version', null);
+    if (!rootArg) throw new Error('--code-version requires a directory');
+    process.stdout.write(codeVersionForRoot(path.resolve(rootArg)) + '\n');
+    return;
+  }
   const port = Number(arg('--port', '38891'));
   const reportPath = arg('--report', null);
   const outputPath = arg('--probe-output', null);
@@ -264,4 +309,4 @@ async function main() {
   server.listen(port, '127.0.0.1', () => console.log('WPS add-in ready: http://127.0.0.1:' + port + (probeConfig ? ' (probe enabled)' : '')));
 }
 if (require.main === module) main().catch(error => {console.error(error.message);process.exitCode=1;});
-module.exports = {createServer,prepareProbeSources};
+module.exports = {createServer,prepareProbeSources,codeVersionForRoot};

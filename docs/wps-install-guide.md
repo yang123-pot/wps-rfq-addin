@@ -1,6 +1,6 @@
-# WPS询价插件安装、升级与卸载说明（2026-09-27）
+# WPS询价插件安装、升级与卸载说明（2026-10-17，F7）
 
-安装脚本位于 `wps-addin/install/`：`install.ps1`、`start.ps1`、`uninstall.ps1`。全部为用户级操作，不需要管理员权限，也不修改WPS或Windows安全设置。
+安装脚本位于 `wps-addin/install/`：`install.ps1`、`start.ps1`、`uninstall.ps1`，共享身份核对 `service-identity.ps1`。全部为用户级操作，不需要管理员权限，也不修改WPS或Windows安全设置。
 
 ## 一、安装
 
@@ -10,44 +10,74 @@ pwsh -File wps-addin\install\install.ps1
 
 脚本会：
 
-1. 备份WPS的 `publish.xml` 为 `publish.xml.bak-时间戳`。
-2. 只按 `name/guid=WpsRfqAddin` 匹配本插件；同端口的其他加载项不会被删除或改写。
-3. 重复执行只保留一个本插件节点。
-4. 覆盖程序目录前，把旧目录备份为 `app.bak-时间戳`；复制失败时尝试回退旧代码。
-5. 复制 `main.js`、`ribbon.xml`、`taskpane.html`、`styles.css`、`package.json`、`rules`、`src`、`dev`、`assets` 到 `%LOCALAPPDATA%\WpsRfqAddin\app`。
-6. 从发布目录剔除探针和诊断脚本：`host-probe.js`、`pane-diagnostics.js`、`acceptance-probe.js`。
+1. 核对 `SourceDir` 是有效插件目录，并校验 AppDir、DataRoot、publish.xml 都是绝对路径且没有互相包含的危险关系。
+2. 备份WPS的 `publish.xml` 为 `publish.xml.bak-时间戳`。
+3. 只按 `name/guid=WpsRfqAddin` 匹配本插件；同端口的其他加载项不会被删除或改写。
+4. 把发布文件复制到同级暂存目录，再切换到 AppDir；不会边复制边破坏正在使用的程序目录。
+5. 从发布目录剔除探针和诊断脚本：`host-probe.js`、`pane-diagnostics.js`、`acceptance-probe.js`。
+6. 创建并明确传入 `DataRoot` 下的五个目录：`imports`、`library`、`projects`、`headers`、`splits`。
 7. 以隐藏窗口启动本机服务，只监听 `127.0.0.1:38891`；服务只提供插件资源和本机项目/库/回执接口。
 
 安装后请重启WPS表格，再从“项目询价”功能区打开侧栏。
 
-可覆盖参数：`-SourceDir`、`-AppDir`、`-PublishPath`、`-DataRoot`、`-Port`、`-SkipService`、`-SkipHealthCheck`。
+可覆盖参数：`-SourceDir`、`-AppDir`、`-PublishPath`、`-DataRoot`、`-Port`、`-SkipService`、`-SkipHealthCheck`。`SkipService` 仅供隔离复制测试；真实升级/卸载不要依赖它。
 
-## 二、启动与健康检查
+## 二、服务身份与健康检查
 
 ```powershell
 pwsh -File wps-addin\install\start.ps1
 Invoke-RestMethod http://127.0.0.1:38891/health
 ```
 
-期望返回：`service=wps-rfq-addin`。服务未启动时，WPS侧栏只显示连接失败，不会调用云端接口。
+健康响应至少包含：
+
+```text
+service=wps-rfq-addin
+pid=<进程号>
+scriptPath=<AppDir\dev\server.cjs 绝对路径>
+appDir=<AppDir 绝对路径>
+startedAt=<启动时间>
+codeVersion=<服务启动时对实际代码计算的 SHA-256 版本>
+```
+
+安装、启动和卸载只有在以下条件同时满足时才停止/重启服务：
+
+- 健康响应的 `scriptPath`、`appDir` 与本插件目录一致；
+- 进程命令行中的 `server.cjs` 是同一绝对路径；
+- 进程创建时间与 `startedAt` 在容差内；
+- 健康响应的 `codeVersion` 与 AppDir 当前代码计算值一致。
+
+`server.pid` 只是候选线索，不单独授权停止进程。PID 复用、命令行不可读或命令行指向其他目录的 `server.cjs` 时，脚本拒绝停止并说明原因。
 
 ## 三、升级
 
-1. 先确认项目/库/模板数据在 `%LOCALAPPDATA%\WpsRfqAddin`，本项目的数据目录不随程序目录覆盖而删除。
+1. 先确认项目/库/模板数据在 `%LOCALAPPDATA%\WpsRfqAddin`，程序目录覆盖不会删除这些数据。
 2. 更新代码后重新运行 `install.ps1`。
-3. 脚本先备份 `publish.xml` 和旧程序目录，再覆盖发布文件；失败时保留错误并尝试回退旧程序目录。
-4. 重启WPS，打开项目。R11会先核对审核表、分类簿、汇总表、总询价簿和拆分回执的真实路径/SHA；不通过时不会显示为已完成。
+3. 脚本先核对旧服务身份，再在同级暂存目录完成新代码复制；暂存成功后停止旧服务、备份旧程序目录并切换到新代码。
+4. 新服务启动后核对 `codeVersion`、绝对脚本路径和进程号；通过后才写入 PID 并报告成功。
+5. 复制失败：旧程序目录和运行中的旧服务保持不变，仅还原本次写入的注册。
+6. 启动失败：停止本次新进程，还原旧代码和注册，并尝试恢复旧服务；控制台会列出回退结果。
+7. 重启WPS，打开项目。R11会先核对审核表、分类簿、汇总表、总询价簿和拆分回执的真实路径/SHA；不通过时不会显示为已完成。
 
-## 四、卸载
+升级请沿用旧服务端口。若确实要改端口，先用旧端口运行 `uninstall.ps1`（或手动停止旧服务）再安装，避免两个本机服务并存。
+
+**旧版本服务边界：** F7 之前启动的服务没有健康身份字段（`scriptPath/startedAt/codeVersion`）。安装/启动/卸载会拒绝自动停止这类服务，并提示先手动停止旧服务一次。这是为了避免误停未知进程；手动停止后再次安装即可进入可自动核对的 F7 生命周期。
+
+## 四、启动
+
+`start.ps1` 会先核对端口上是否已有身份一致的本插件服务；已有则复用，不重复启动。端口被其他程序占用时直接报错，不停止对方。新服务始终以隐藏窗口启动，并把五个 DataRoot 子目录显式传给服务。
+
+## 五、卸载
 
 ```powershell
 pwsh -File wps-addin\install\uninstall.ps1
 ```
 
-1. 只停止本插件服务进程：先读 `%LOCALAPPDATA%\WpsRfqAddin\server.pid`，再核对命令行包含 `server.cjs`；命令行不符时不终止。
-2. 备份并更新 `publish.xml`，只移除本插件身份节点，其他插件原样保留。
-3. 默认保留程序目录和全部用户数据，便于重新安装/回退。
-4. 只有显式加 `-RemoveAppDir` 才删除预期的 `%LOCALAPPDATA%\WpsRfqAddin\app`。
+1. 优先通过 `/health` 核对并停止本插件服务；身份不符时拒绝停止，且不移除注册、不删除程序或数据。
+2. 没有健康响应时，`server.pid` 只用于提示；命令行不可读、不是本插件绝对脚本或无法核对运行代码版本时，不停止进程。
+3. 备份并更新 `publish.xml`，只移除本插件身份节点，其他插件原样保留。
+4. 默认保留程序目录和全部用户数据，便于重新安装/回退。
+5. 只有显式加 `-RemoveAppDir` 才删除程序目录；删除前要求目录含本插件 `main.js`、`package.json` 名称为 `wps-rfq-addin`，且不包含 DataRoot。
 
 用户数据位置：
 
@@ -57,15 +87,16 @@ pwsh -File wps-addin\install\uninstall.ps1
 - 导入副本：`imports`
 - 拆分回执：`splits`
 
-## 五、回退
+## 六、回退
 
 - 注册回退点：`publish.xml.bak-*`。
-- 代码回退点：`%LOCALAPPDATA%\WpsRfqAddin\app.bak-*`。
-- 数据保留：`%LOCALAPPDATA%\WpsRfqAddin` 下的项目、库、模板、导入副本和拆分回执不被默认卸载删除。
+- 代码回退点：`app.bak-*`。
+- 安装失败会自动使用这些回退点；成功升级后它们仍保留，便于人工回退。
+- 数据保留：`%LOCALAPPDATA%\WpsRfqAddin` 下的五个目录不被默认卸载删除。
 - 回退代码后重新执行安装脚本即可；旧版本遇到未知数据版本会拒绝读写并保留文件。
 
-## 六、当前实测边界
+## 七、实测范围与边界
 
-- 安装/卸载身份隔离、同端口其他插件保留、重复安装、程序目录备份和用户数据保留已在本机临时 `publish.xml` 上真实执行验证。
-- 真实WPS中的“安装→重启→打开项目→升级→回退→卸载→重装恢复”尚未完成。当前阻塞是Computer Use认证错误：`unsupported Codex auth method: apikey`，导致无法合规操作WPS窗口。
-- 支持版本只登记已实际验证的范围：WPS表格 `12.1.0.29161`。其他版本需要隔离验证后再加入支持清单。
+- 2026-10-17 在隔离 AppDir/DataRoot/publish.xml/端口上执行安装→同版重启→开项目→升级→复制失败→启动失败回退→卸载→重装，Node全量515/515通过；详见[F7证据](wps-phase1-f7-evidence-20261017.md)。
+- 真实 WPS 表格构建号实测 `12.1.0.29161`；F7 安装生命周期未修改用户真实 publish.xml，也未重启用户正在使用的 WPS。真实 WPS 浮窗打开证据沿用 F6。
+- 其他 WPS 版本未在本机隔离环境实测，不列入支持范围。
