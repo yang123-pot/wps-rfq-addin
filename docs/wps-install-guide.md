@@ -14,7 +14,7 @@ pwsh -File wps-addin\install\install.ps1
 2. 备份WPS的 `publish.xml` 为 `publish.xml.bak-时间戳`。
 3. 只按 `name/guid=WpsRfqAddin` 匹配本插件；同端口的其他加载项不会被删除或改写。
 4. 把发布文件复制到同级暂存目录，再切换到 AppDir；不会边复制边破坏正在使用的程序目录。
-5. 从发布目录剔除探针和诊断脚本：`host-probe.js`、`pane-diagnostics.js`、`acceptance-probe.js`。
+5. 从发布目录剔除探针、诊断和故障注入文件；候选包本身不包含这些文件。
 6. 创建并明确传入 `DataRoot` 下的五个目录：`imports`、`library`、`projects`、`headers`、`splits`。
 7. 以隐藏窗口启动本机服务，只监听 `127.0.0.1:38891`；服务只提供插件资源和本机项目/库/回执接口。
 
@@ -97,6 +97,35 @@ pwsh -File wps-addin\install\uninstall.ps1
 
 ## 七、实测范围与边界
 
-- 2026-10-17 在隔离 AppDir/DataRoot/publish.xml/端口上执行安装→同版重启→开项目→升级→复制失败→启动失败回退→卸载→重装，Node全量515/515通过；详见[F7证据](wps-phase1-f7-evidence-20261017.md)。
+- 2026-10-17 在隔离 AppDir/DataRoot/publish.xml/端口上执行安装→同版重启→开项目→升级→复制失败→启动失败回退→卸载→重装，F7生命周期通过；F8把开发探针移出生产入口后全量Node **517/517**、Python **10/10**通过。详见[F7证据](wps-phase1-f7-evidence-20261017.md)和[F8证据](wps-phase1-f8-evidence-20261017.md)。
 - 真实 WPS 表格构建号实测 `12.1.0.29161`；F7 安装生命周期未修改用户真实 publish.xml，也未重启用户正在使用的 WPS。真实 WPS 浮窗打开证据沿用 F6。
 - 其他 WPS 版本未在本机隔离环境实测，不列入支持范围。
+
+## 八、交付候选包（F8，2026-10-17）
+
+候选包文件名：
+
+```text
+wps-rfq-addin-0.1.0-20261017-F8.zip
+```
+
+候选包版本 `0.1.0`，构建标签 `20261017-F8`。压缩包与逐文件 SHA-256 清单位于本机 `outputs/wps-phase1-F8/20261017/`；提交到仓库的清单为 `docs/wps-phase1-release-manifest-20261017.json`。安装前请先用清单核对压缩包 SHA。
+
+从压缩包安装：
+
+1. 将压缩包解压到任意用户目录，解压后应看到 `main.js`、`ribbon.xml`、`src/`、`dev/`、`install/` 和 `docs/`。
+2. 在该解压目录打开 PowerShell，执行：
+
+```powershell
+pwsh -File .\install\install.ps1
+```
+
+3. 安装脚本只复制发布白名单文件：`main.js`、`ribbon.xml`、`taskpane.html`、`styles.css`、`package.json`、`rules/`、`src/`、运行所需的 `dev/*.cjs`、`assets/`。测试、样本、诊断脚本、开发探针入口和本机证据不进入 AppDir。
+4. 安装后访问 `http://127.0.0.1:38891/health`，应看到 `service=wps-rfq-addin`、`version=0.1.0`、绝对 `scriptPath`、`startedAt` 和 64 位 `codeVersion`。该 `codeVersion` 应与同目录 `candidate-manifest.json` 中记录的运行代码版本一致。
+5. 重启 WPS 表格，从“项目询价”功能区打开询价助手，按[用户说明](wps-user-guide.md)执行七步。
+
+候选包边界：
+
+- 开发探针模式已从生产入口 `dev/server.cjs` 移除，放在不进入候选包的 `dev/probe-server.cjs`；候选服务没有 `/__probe/report` 入口，也不加载任何诊断脚本。
+- 候选包只包含合成/虚拟测试所需的产品资源，不包含原始招标清单、报价、联系人、凭据、本机项目/库/模板或运行日志。
+- 历史 32 类迁入和其他 WPS 版本不在本候选包的支持声明内；详见发布清单和 F8 证据。

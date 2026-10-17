@@ -5,7 +5,8 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { createServer, prepareProbeSources } = require('../dev/server.cjs');
+const { createServer } = require('../dev/server.cjs');
+const { createProbeServer, prepareProbeSources } = require('../dev/probe-server.cjs');
 
 function client(server) {
   const port = server.address().port;
@@ -21,8 +22,9 @@ async function setup(t, probe = false, extra = {}) {
   await fs.writeFile(path.join(root, 'main.js'), 'window.example = true;');
   await fs.writeFile(path.join(root, 'secret.txt'), 'private-data');
   const reportPath = path.join(root, 'report.json');
-  const server = createServer({ root, reportPath,
-    probeConfig: probe ? { token: 'unit-test-token', outputPath: 'C:\\test\\probe.xlsx' } : null, ...extra });
+  const server = probe
+    ? createProbeServer({ root, reportPath, probeConfig: { token: 'unit-test-token', outputPath: 'C:\\test\\probe.xlsx' }, ...extra })
+    : createServer({ root, ...extra });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await new Promise(resolve => server.close(resolve)); await fs.rm(root, {recursive:true,force:true}); });
   return {request:client(server),reportPath,root};

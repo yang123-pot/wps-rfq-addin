@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
-const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs');
+const {chromium}=require('playwright'),{createProbeServer}=require('../dev/probe-server.cjs');
 
 async function until(reportPath,predicate){
  const deadline=Date.now()+10000;
@@ -16,7 +16,7 @@ async function until(reportPath,predicate){
 (async()=>{
  const folder=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-pane-diag-'));
  const reportPath=path.join(folder,'reports.json');
- const server=createServer({root:path.resolve(__dirname,'..'),reportPath,
+ const server=createProbeServer({root:path.resolve(__dirname,'..'),reportPath,
   probeConfig:{token:'pane-test-token',outputPath:path.join(folder,'probe.xlsx')}});
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  // 系统可能随机分配到Chromium默认拦截的端口（例如6667），这里显式放行本次实际端口。

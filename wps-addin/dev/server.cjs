@@ -28,8 +28,8 @@ const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.cs
 const TYPES = {'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
   '.html':'text/html; charset=utf-8','.xml':'application/xml; charset=utf-8','.svg':'image/svg+xml',
   '.json':'application/json; charset=utf-8'};
-const VERSION_SKIP_DIRECTORIES = new Set(['node_modules','.git','outputs','test','install','__pycache__']);
-const VERSION_SKIP_FILES = new Set(['server.pid']);
+const VERSION_SKIP_DIRECTORIES = new Set(['node_modules','.git','outputs','test','install','docs','__pycache__']);
+const VERSION_SKIP_FILES = new Set(['server.pid','candidate-manifest.json']);
 
 // 运行代码版本：按相对路径排序后逐个哈希文件，服务启动时计算一次。
 // 安装脚本用同一算法核对“正在运行的代码”和“AppDir 中已安装的代码”是否一致。
@@ -56,21 +56,19 @@ function codeVersionForRoot(root) {
   return crypto.createHash('sha256').update(lines.join('\n')).digest('hex');
 }
 
-function createServer({root, probeConfig = null, reportPath = null, importDirectory = null, projectDirectory = null, libraryDirectory = null, headerDirectory = null, splitDirectory = null}) {
+function createServer({root, importDirectory = null, projectDirectory = null, libraryDirectory = null, headerDirectory = null, splitDirectory = null, extensions = null, mode = 'development'}) {
   const appDir = path.resolve(root);
   const startedAt = new Date(Date.now() - Math.round(process.uptime() * 1000)).toISOString();
   const identity = {
     service:'wps-rfq-addin',
     version:'0.1.0',
-    mode:probeConfig ? 'probe' : 'development',
+    mode,
     pid:process.pid,
     scriptPath:path.join(__dirname, 'server.cjs'),
     appDir,
     startedAt,
     codeVersion:codeVersionForRoot(appDir)
   };
-  const reports = [];
-  let writes = Promise.resolve();
   const importToken = crypto.randomBytes(32).toString('hex');
   const exports = importDirectory ? createExportStore({directory:path.join(importDirectory,'exports')}) : null;
   const projects = createProjectStore({directory: projectDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'projects')});
@@ -88,6 +86,8 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         (req.headers.origin && req.headers.origin !== origin)) return reply(403, 'Local origin required');
     let url;
     try { url = new URL(req.url, origin); } catch (_) { return reply(400, 'Invalid URL'); }
+    if (extensions && typeof extensions.handle === 'function' &&
+        await extensions.handle({req, res, url, reply})) return;
     if (['/api/import/prepare','/api/export/prepare','/api/export/freeze','/api/export/commit','/api/export/verify','/api/export/inspect','/api/export/discard'].includes(url.pathname)) {
       const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');
       if (!importDirectory) return json(404,{error:'当前服务未启用文件导入，请启动最新开发服务。'});
@@ -209,76 +209,31 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         return json(200,await listDirectory(data));
       } catch(error) {return json(400,{error:error.message});}
     }
-    if (url.pathname === '/__probe/report') {
-      if (!probeConfig || !reportPath) return reply(404, 'Not found');
-      if (req.method !== 'POST') return reply(405, 'POST required');
-      if (req.headers['x-rfq-probe-token'] !== probeConfig.token) return reply(403, 'Invalid probe token');
-      let size = 0;
-      const chunks = [];
-      try {
-        for await (const chunk of req) {
-          size += chunk.length;
-          if (size <= 65536) chunks.push(chunk);
-        }
-        if (size > 65536) return reply(413, 'Report too large');
-        let report;
-        try { report = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch (_) { return reply(400, 'Invalid JSON'); }
-        if (!report || typeof report.stage !== 'string' || report.stage.length > 80 || Array.isArray(report)) return reply(400, 'Invalid report');
-        reports.push({...report, receivedAt: new Date().toISOString()});
-        if (reports.length > 100) {
-          const heartbeat = reports.findIndex(item => item.stage === 'pane-heartbeat');
-          reports.splice(heartbeat < 0 ? 0 : heartbeat, 1);
-        }
-        const data = JSON.stringify({reports}, null, 2);
-        writes = writes.catch(() => {}).then(() => fs.writeFile(reportPath, data, 'utf8'));
-        await writes;
-        return reply(200, '{"ok":true}', 'application/json');
-      } catch (_) { return reply(500, 'Could not save probe report'); }
-    }
+    const isExtensionScript = extensions && typeof extensions.allowStatic === 'function' &&
+      extensions.allowStatic(url.pathname);
+    if (!ASSETS.has(url.pathname) && !isExtensionScript &&
+        !['/health', '/', '/index.html'].includes(url.pathname)) return reply(404, 'Not found');
     if (req.method !== 'GET' && req.method !== 'HEAD') return reply(405, 'GET required');
     if (url.pathname === '/health') return reply(200, JSON.stringify(identity), 'application/json');
     if (url.pathname === '/' || url.pathname === '/index.html') {
       // WPS owns index.html. Supply its bootstrap in memory, not as a product file.
-      const probe = probeConfig ? '<script>window.__RFQ_PROBE__=' +
-        JSON.stringify(probeConfig).replace(/</g, '\\u003c') + ';</script><script src="/dev/host-probe.js"></script>' : '';
+      const extra = extensions && typeof extensions.indexHtml === 'function' ? extensions.indexHtml() : '';
       return reply(200, '<!doctype html><html><head><meta charset="utf-8"></head><body>' +
-        '<script src="/main.js"></script>' + probe + '</body></html>', TYPES['.html']);
+        '<script src="/main.js"></script>' + extra + '</body></html>', TYPES['.html']);
     }
-    const isProbeScript = probeConfig &&
-      ['/dev/host-probe.js','/dev/pane-diagnostics.js','/dev/acceptance-probe.js'].includes(url.pathname);
-    if (!ASSETS.has(url.pathname) && !isProbeScript) return reply(404, 'Not found');
     try {
       let content = await fs.readFile(path.join(root, url.pathname.slice(1)));
       if (importDirectory && url.pathname === '/taskpane.html') {
         content = content.toString('utf8').replace('<head>', '<head><script>window.__RFQ_IMPORT__=' +
           JSON.stringify({token:importToken,browse:true}) + ';</script>');
       }
-      if (probeConfig && url.pathname === '/taskpane.html') {
-        const token = JSON.stringify(probeConfig.token);
-        content = content.toString('utf8').replace('</body>', '<script>window.__RFQ_PANE_PROBE__={token:' + token + '};</script>' +
-          '<script src="/dev/pane-diagnostics.js"></script><script src="/dev/acceptance-probe.js"></script></body>');
+      if (extensions && url.pathname === '/taskpane.html' && typeof extensions.transformTaskpane === 'function') {
+        content = extensions.transformTaskpane(content.toString('utf8'));
       }
       return reply(200, content, TYPES[path.extname(url.pathname)] || 'application/octet-stream');
     } catch (_) { return reply(404, 'Not found'); }
   });
   return server;
-}
-
-async function prepareProbeSources(sourcePaths, outputDirectory) {
-  if (!sourcePaths.length) return [];
-  const directory = await fs.mkdtemp(path.join(outputDirectory, 'probe-inputs-'));
-  const manifest = [];
-  for (let index = 0; index < sourcePaths.length; index++) {
-    const original = path.resolve(sourcePaths[index]);
-    const extension = path.extname(original).toLowerCase();
-    if (!['.xls','.xlsx'].includes(extension)) throw new Error('Probe source must be xls or xlsx');
-    const copied = path.join(directory, 'source-' + (index + 1) + extension);
-    const bytes = await fs.readFile(original);
-    await fs.writeFile(copied, bytes, {flag:'wx'});
-    manifest.push({original,copied,sha256:crypto.createHash('sha256').update(bytes).digest('hex')});
-  }
-  await fs.writeFile(path.join(directory, 'manifest.json'), JSON.stringify(manifest,null,2), {flag:'wx'});
-  return manifest.map(item => item.copied);
 }
 
 async function main() {
@@ -291,22 +246,15 @@ async function main() {
     return;
   }
   const port = Number(arg('--port', '38891'));
-  const reportPath = arg('--report', null);
-  const outputPath = arg('--probe-output', null);
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid port');
-  if ((reportPath && !outputPath) || (!reportPath && outputPath)) throw new Error('Probe requires --report and --probe-output');
-  const inputPaths = args.reduce((out, value, i) => value === '--source' ? out.concat(path.resolve(args[i + 1])) : out, []);
-  if (inputPaths.length && !outputPath) throw new Error('--source requires probe mode');
-  const sourcePaths = outputPath ? await prepareProbeSources(inputPaths, path.dirname(path.resolve(outputPath))) : [];
-  const probeConfig = outputPath ? {token:crypto.randomBytes(24).toString('hex'), outputPath:path.resolve(outputPath),sourcePaths} : null;
   const importDirectory=path.resolve(arg('--import-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','imports')));
   const libraryDirectory=path.resolve(arg('--library-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','library')));
   const projectDirectory=path.resolve(arg('--project-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','projects')));
   const headerDirectory=path.resolve(arg('--header-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','headers')));
   const splitDirectory=path.resolve(arg('--split-directory',path.join(process.env.LOCALAPPDATA || os.homedir(),'WpsRfqAddin','splits')));
-  const server = createServer({root:path.resolve(__dirname,'..'),probeConfig,reportPath:reportPath && path.resolve(reportPath),importDirectory,libraryDirectory,projectDirectory,headerDirectory,splitDirectory});
+  const server = createServer({root:path.resolve(__dirname,'..'),importDirectory,libraryDirectory,projectDirectory,headerDirectory,splitDirectory});
   server.on('error', error => { console.error(error.message); process.exitCode = 1; });
-  server.listen(port, '127.0.0.1', () => console.log('WPS add-in ready: http://127.0.0.1:' + port + (probeConfig ? ' (probe enabled)' : '')));
+  server.listen(port, '127.0.0.1', () => console.log('WPS add-in ready: http://127.0.0.1:' + port));
 }
 if (require.main === module) main().catch(error => {console.error(error.message);process.exitCode=1;});
-module.exports = {createServer,prepareProbeSources,codeVersionForRoot};
+module.exports = {createServer,codeVersionForRoot};
