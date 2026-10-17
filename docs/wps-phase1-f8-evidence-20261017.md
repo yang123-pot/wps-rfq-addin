@@ -204,7 +204,8 @@ SHA-256 `9ff7b89f12b95792d8886d3e4f1ba03c0ff3777d86e863ea5e43bdd4cc4c82e6`；5 �
 
 - 候选源码提交 `a08db614b017245113157fe76288722579153d31`（`feat(wps): prepare F8 delivery candidate and user guide`）；
 - 清单提交 `33475292f5fde225ccd55478b5e4b843be9464c8`（`docs(wps): record F8 candidate source commit`）；
-- 普通 `git push origin feat/wps-phase1` 退出 0；
-- `git rev-parse HEAD` 与 `git ls-remote origin refs/heads/feat/wps-phase1` 逐位相同，均为 `33475292f5fde225ccd55478b5e4b843be9464c8`。
+- 真人试跑与最终说明提交 `fdcff3b9dc6c804dc1a5689cac31a89dbccfd14f`（`docs(wps): complete F8 user walkthrough and candidate manifest`）；
+- 清单指向最终源码提交 `66c00c176edfed3d598e86d025fd1f5b4ec55dc5`（`docs(wps): point F8 manifest at final source commit`）；
+- 普通 `git push origin feat/wps-phase1` 退出 0；推送后 `git rev-parse HEAD` 与 `git ls-remote origin refs/heads/feat/wps-phase1` 逐位相同，均为 `66c00c176edfed3d598e86d025fd1f5b4ec55dc5`。
 
-本机回执 `outputs/wps-phase1-F8/20261017/backup-receipt.json`。未强推，未上传原始资料、私有证据、候选 zip 或隔离安装目录。
+随后仅追加本证据/交接的状态文字，最终文档提交与远程HEAD以本机 `outputs/wps-phase1-F8/20261017/backup-receipt.json` 和最终报告为准；候选 zip 与源码内容不因该文字提交变化。未强推，未上传原始资料、私有证据、候选 zip 或隔离安装目录。
