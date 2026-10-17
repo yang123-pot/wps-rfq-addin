@@ -4,13 +4,13 @@
     "name": "wps-material-organizer-0.1.0-20261017-UI1",
     "version": "0.1.0",
     "build": "20261017-UI1",
-    "createdAt": "2026-10-17T23:52:49+08:00",
+    "createdAt": "2026-10-17T23:59:53+08:00",
     "branch": "feat/wps-phase1",
-    "commit": "70397c7ab5fb819d5ac0788f7d8667f71d95cf63",
+    "commit": "9cd9313759b89619fe33cb53594c66e7728ace6b",
     "zipName": "wps-material-organizer-0.1.0-20261017-UI1.zip",
-    "zipBytes": 1613122,
-    "zipSha256": "a54770ab0b9d2656166dd5d7e179ccefa08a383b3ecfd80af759c2c0ed045616",
-    "codeVersion": "b14ead2103ff096b15da255745c0a9d851554d4722dbd026fd8a5947e1e9e5ad",
+    "zipBytes": 1613754,
+    "zipSha256": "afa23897503d209d228ebae4b6359e6bc6b9ba4d5fd8f9fbfbbf3d5af968cfb1",
+    "codeVersion": "392b724c93f323e5f38123bd854af09d2a367a492cbf5301cf0068b9b45db36e",
     "testedWps": "12.1.0.29161",
     "fileCount": 93,
     "files": [
@@ -52,7 +52,7 @@
       {
         "path": "candidate-manifest.json",
         "bytes": 17180,
-        "sha256": "6e3d65fa2507dfe768767c738145e1e4d7722a2cc6ec0655ea6e6ddfbc602236"
+        "sha256": "d61fd3253eb9e2affb6eca6bb8ef2e86d27798794ed8ec50e8ed7f5dc6c1a313"
       },
       {
         "path": "dev/atomic-file.cjs",
@@ -366,8 +366,8 @@
       },
       {
         "path": "src/import-ui.js",
-        "bytes": 105241,
-        "sha256": "f4499e7ac26a437ba5a25a42eca0ea2efbda35e7d5c9008683488e91d9edc3e0"
+        "bytes": 105580,
+        "sha256": "13decc876edb0bf909ab9d1c2a8473628d66e275905998e22f7356134404d24f"
       },
       {
         "path": "src/inquiry-header.js",
@@ -401,8 +401,8 @@
       },
       {
         "path": "src/path-picker.js",
-        "bytes": 11813,
-        "sha256": "97807bb060992ee74bb8433ee3582cb4bbacc4b9b7845bb7e71758362ebae10e"
+        "bytes": 13026,
+        "sha256": "1a01a835f5d72feab5f9fbff61631dd27ba21426a372a1b1ef4785733da92e94"
       },
       {
         "path": "src/project-host.js",
@@ -416,8 +416,8 @@
       },
       {
         "path": "src/project-ui.js",
-        "bytes": 22106,
-        "sha256": "ab79944ce7c5a3b9c90f52f22dff519b5f6700335ea8f1f01e9b31d03ae40540"
+        "bytes": 22363,
+        "sha256": "3e30569b270b72fff7ee298e9557919f68994be7d857e1d560a98232dcc00ce0"
       },
       {
         "path": "src/project.js",
@@ -451,8 +451,8 @@
       },
       {
         "path": "src/split-ui.js",
-        "bytes": 23411,
-        "sha256": "67ad4a58ac6c3b6150d5cc6a4d495fb23001c1dace4927ff3e110e54b18b257b"
+        "bytes": 23706,
+        "sha256": "b17e864bf731f9555783cdca21558fab28ef3546d02f4c942c6042a519a88bf9"
       },
       {
         "path": "src/taskpane.js",

@@ -376,6 +376,13 @@
   }
   if(chooseDirectory)chooseDirectory.addEventListener('click',function(){
    if(!window.RfqPathPicker){tell('当前侧栏不支持目录选择，请重新打开侧栏。',true);return;}
+   if(typeof RfqPathPicker.selectFolder==='function'){
+    var native=RfqPathPicker.selectFolder(options.application,directory,'选择拆分输出文件夹');
+    if(native&&native.supported){
+     if(native.path){directory=native.path;batchId=ensureBatch();syncPlan();}
+     return;
+    }
+   }
    RfqPathPicker.open({mode:'directory',token:window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token,
     startPath:directory,title:'选择拆分输出文件夹',confirmLabel:'使用此文件夹',
     onConfirm:function(paths){directory=paths&&paths[0]||'';batchId=ensureBatch();syncPlan();},

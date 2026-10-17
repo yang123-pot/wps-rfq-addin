@@ -22,6 +22,7 @@ SHA 见同目录 `manifest.json`。
 
 - `taskpane.html`：标题改为“材料整理助手”；新增七步纵向列表、当前任务卡、设置菜单、详细模式按钮和齿轮；页脚改为“材料整理助手 · 七步简洁版”。
 - 第1步导入：主按钮改为 WPS 原生 `GetOpenFilename` 文件对话框，可浏览文件夹并多选 `.xls/.xlsx`；原侧栏选择器收进“更多导入方式（备用）”。
+- 其他选择：审核成果表保存改用原生 `GetSaveAsFilename`；拆分输出目录和项目重新定位优先调用原生 `FileDialog(4)`/`GetFolder`，宿主不支持时才回退侧栏目录选择器；询价表/内部清单/品牌参考继续使用原生文件对话框。
 - `styles.css`：新增七步列表、单主按钮卡、设置菜单、窄侧栏头部布局；默认隐藏七步详细区和辅助区，`body.detail-mode` 下恢复。
 - `src/workflow-ui.js`：新增七步状态机（选清单/核对分类/审核确认/分类工作簿/填品牌/生成询价表/拆分文件）、单主按钮路由、设置菜单、详细模式切换、项目状态和拆分状态监听；保留原有七步导航和所有阶段面板。
 - `src/project-ui.js`：项目状态更新时广播 `rfq:project-status`，让简版步骤及时前进。
@@ -55,6 +56,7 @@ node wps-addin/test/ui-simple-check.cjs
 
 - `ui-workflow-check`、`ui-brand-check`、`ui-inquiry-check`、`ui-split-check`、`ui-project-check`、`ui-sheet-review-check`：PASS；
 - `ui-import-check`：PASS（原生导入/复制/取消/重复/失败原子性）；
+- `ui-split-check`、`ui-project-restore-check`：PASS（原生目录能力缺失时回退侧栏选择器）。
 - `ui-cancel-check`、`ui-category-check`、`ui-classification-check`、`ui-project-restore-check`、`ui-source-review-restore-check`、`ui-startup-navigation-check`、`ui-import-check`、`ui-library-check`、`ui-export-check`、`ui-review-check`、`ui-check`：PASS。
 
 日志本机 `outputs/wps-phase1-ui-simplify-20261017/`。
@@ -66,8 +68,8 @@ node wps-addin/test/ui-simple-check.cjs
 ### 4.5 UI1 预览候选
 
 - 包名：`wps-material-organizer-0.1.0-20261017-UI1.zip`；版本 `0.1.0`，构建标签 `20261017-UI1`；
-- 93 个文件（产品/安装/说明＋用户说明截图）；运行代码版本 `b14ead2103ff096b15da255745c0a9d851554d4722dbd026fd8a5947e1e9e5ad`；
-- zip SHA-256 `a54770ab0b9d2656166dd5d7e179ccefa08a383b3ecfd80af759c2c0ed045616`，1,613,122 字节；
+- 93 个文件（产品/安装/说明＋用户说明截图）；运行代码版本 `392b724c93f323e5f38123bd854af09d2a367a492cbf5301cf0068b9b45db36e`；
+- zip SHA-256 `afa23897503d209d228ebae4b6359e6bc6b9ba4d5fd8f9fbfbbf3d5af968cfb1`，1,613,754 字节；
 - 解压后隔离安装/健康/43 个脚本与 7 个图标读取/生产入口探针 404/卸载均通过；
 - 候选清单 `candidate-ui1-manifest.json` 与 `docs/wps-ui1-preview-manifest-20261017.json`。
 
@@ -80,4 +82,5 @@ node wps-addin/test/ui-simple-check.cjs
 ## 6. 未完成
 
 - 真实 WPS 中点击第1步“选择清单文件…”验证原生对话框是否仍导致询价窗口停绘；若停绘，改回 WPS 风格内嵌选择器。
+- 真实 WPS 中核对审核成果表保存、拆分输出目录、项目重新定位的原生/回退路径，并确认是否停绘。
 - UI1 源码/清单已提交并普通推送：源码 `9fb09ca74ac409f26273238747e1bed9838276a2`，清单 `4c311907aa91d9982b364a433e23ea8a19167801`；最终文档提交与远程 SHA 以本机 `outputs/wps-phase1-ui-simplify-20261017/backup-receipt-ui1.json` 及最终报告为准。

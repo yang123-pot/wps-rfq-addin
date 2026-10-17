@@ -219,5 +219,31 @@
   pathInput.focus();
   return {close:cancelPicker,reload:function(){load(state.path);}};
  }
- window.RfqPathPicker={open:open};
+ // 原生目录选择优先：WPS/Office 暴露 FileDialog(4) 时使用系统文件夹选择器；
+ // 宿主没有该能力时返回 supported:false，由调用方回退到内嵌目录选择器。
+ function selectFolder(app,startPath,title){
+  if(!app)return {supported:false};
+  try{
+   var factory=app.FileDialog,dialog=null;
+   if(typeof factory==='function')dialog=factory(4);
+   else if(factory&&typeof factory.Show==='function')dialog=factory;
+   if(dialog&&typeof dialog.Show==='function'){
+    if(title&&'Title' in dialog)dialog.Title=title;
+    if(startPath&&'InitialFileName' in dialog)dialog.InitialFileName=startPath;
+    var shown=dialog.Show();
+    if(shown===-1||shown===true){
+     var items=dialog.SelectedItems;
+     var picked=items&&typeof items.Item==='function'?items.Item(1):null;
+     return {supported:true,path:picked?String(picked):null};
+    }
+    return {supported:true,path:null};
+   }
+   if(typeof app.GetFolder==='function'){
+    var folder=app.GetFolder(startPath||'');
+    return {supported:true,path:folder?String(folder):null};
+   }
+  }catch(error){return {supported:false,error:String(error&&error.message||error)};}
+  return {supported:false};
+ }
+ window.RfqPathPicker={open:open,selectFolder:selectFolder};
 }());

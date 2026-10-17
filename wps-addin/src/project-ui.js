@@ -309,36 +309,43 @@
     }catch(error){tell('项目未打开。'+error.message,true);return false;}
     finally{busy=false;if(options.onBusy)options.onBusy(false);}
   }
+  async function relocateTo(target,fromRoot){
+    if(!target)return;
+    busy=true;if(options.onBusy)options.onBusy(true);
+    try{
+      var relocated=RfqProjectRestore.relocate(restoreRecord,{fromRoot:fromRoot,toRoot:target});
+      var audit=await auditRestore(relocated);
+      if(!audit.ok)throw Error('重新定位后仍有文件未核对通过：'+audit.issues.map(function(issue){return issue.message;}).join('；'));
+      var receipt=await request('save',{project:relocated,expectedRevision:restoreRecord.revision});
+      relocated.revision=Number(receipt.revision);
+      if(!options.restore||options.restore(relocated)===false)throw Error('项目内容无法恢复到侧栏。');
+      if(options.restoreClassification)options.restoreClassification(
+        relocated.classification||(relocated.carried&&relocated.carried.classification)||null);
+      restoreFutureFields(relocated);
+      restoreRecord=relocated;restoreAudit=audit;restoreBlocks={};
+      if(relocateButton)relocateButton.hidden=true;
+      if(options.afterRestore)options.afterRestore(relocated);
+      current=syncStages(relocated);
+      if(options.afterRestore)options.afterRestore(relocated);
+      pendingId=null;renderStatus();
+      tell('项目文件已重新定位并逐项核对通过：'+target+'。');
+    }catch(error){tell('重新定位未完成：'+error.message,true);}
+    finally{busy=false;if(options.onBusy)options.onBusy(false);}
+  }
   async function relocateProject(){
     if(busy||!restoreRecord||!restoreAudit||!restoreAudit.relocatable)return;
     if(!window.RfqPathPicker){tell('当前侧栏不支持目录选择，请重新打开侧栏。',true);return;}
     var fromRoot=restoreAudit.commonRoot;
+    if(typeof RfqPathPicker.selectFolder==='function'){
+      var native=RfqPathPicker.selectFolder(options.application,fromRoot,'选择搬移后的项目根目录');
+      if(native&&native.supported){
+        if(native.path)await relocateTo(native.path,fromRoot);
+        return;
+      }
+    }
     RfqPathPicker.open({mode:'directory',startPath:fromRoot,title:'选择搬移后的项目根目录',
       confirmLabel:'核验并重新定位',
-      onConfirm:async function(paths){
-        var target=paths&&paths[0];
-        if(!target)return;
-        busy=true;if(options.onBusy)options.onBusy(true);
-        try{
-          var relocated=RfqProjectRestore.relocate(restoreRecord,{fromRoot:fromRoot,toRoot:target});
-          var audit=await auditRestore(relocated);
-          if(!audit.ok)throw Error('重新定位后仍有文件未核对通过：'+audit.issues.map(function(issue){return issue.message;}).join('；'));
-          var receipt=await request('save',{project:relocated,expectedRevision:restoreRecord.revision});
-          relocated.revision=Number(receipt.revision);
-          if(!options.restore||options.restore(relocated)===false)throw Error('项目内容无法恢复到侧栏。');
-          if(options.restoreClassification)options.restoreClassification(
-            relocated.classification||(relocated.carried&&relocated.carried.classification)||null);
-          restoreFutureFields(relocated);
-          restoreRecord=relocated;restoreAudit=audit;restoreBlocks={};
-          if(relocateButton)relocateButton.hidden=true;
-          if(options.afterRestore)options.afterRestore(relocated);
-          current=syncStages(relocated);
-          if(options.afterRestore)options.afterRestore(relocated);
-          pendingId=null;renderStatus();
-          tell('项目文件已重新定位并逐项核对通过：'+target+'。');
-        }catch(error){tell('重新定位未完成：'+error.message,true);}
-        finally{busy=false;if(options.onBusy)options.onBusy(false);}
-      },
+      onConfirm:function(paths){return relocateTo(paths&&paths[0],fromRoot);},
       onError:function(text){tell(text,true);}});
   }
   saveButton.addEventListener('click',saveProject);

@@ -404,12 +404,18 @@
       return collection.entries.length?String(collection.entries[0].metadata.originalName).replace(/\.[^.]+$/,''):'未命名项目';
     }
     function pickReviewTarget(suggested){
-      return new Promise(function(resolve){
-        if(!window.__RFQ_IMPORT__||!RfqPathPicker)return resolve(null);
-        RfqPathPicker.open({mode:'save',token:window.__RFQ_IMPORT__.token,title:'选择成果表保存位置',
-          fileName:suggested,startPath:'',confirmLabel:'生成到此位置',
-          onConfirm:function(value){resolve(value&&value.target?value:null);},onCancel:function(){resolve(null);}});
-      });
+      try{
+        if(options.application&&typeof options.application.GetSaveAsFilename==='function'){
+          var target=RfqClassificationReviewHost.selectTarget(options.application,suggested);
+          return Promise.resolve(target?{target:target}:null);
+        }
+        if(!window.__RFQ_IMPORT__||!RfqPathPicker)return Promise.resolve(null);
+        return new Promise(function(resolve){
+          RfqPathPicker.open({mode:'save',token:window.__RFQ_IMPORT__.token,title:'选择成果表保存位置',
+            fileName:suggested,startPath:'',confirmLabel:'生成到此位置',
+            onConfirm:function(value){resolve(value&&value.target?value:null);},onCancel:function(){resolve(null);}});
+        });
+      }catch(error){return Promise.reject(error);}
     }
     async function generateReview(){
       if(reviewBusy)return;
