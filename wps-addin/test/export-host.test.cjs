@@ -273,6 +273,7 @@ function layoutFixture(overrides){
  // Range()缓存必须按地址记忆住合并/填充/下拉状态，才能被读回校验。
  return {app,book,ranges,get sheets(){return sheets;},get saved(){return saved;},merges,fills,validations,links,columnWidths,rowHeights,
   isFrozen(name){return frozenSheets.get(sheets.find(sheet=>sheet.Name===name))===true;},
+  loadFileFreeze(plan){for(const item of plan){if(!item.freeze)continue;const sheet=sheets.find(s=>s.Name===item.name);frozenSheets.set(sheet,true);freezePositions.set(sheet,{row:item.freeze.row-1,column:item.freeze.column-1});}},
   get selected(){return selected;},get closed(){return closed;}};
 }
 
@@ -498,6 +499,29 @@ function freezeBook(){
   {rowCount:4,columnCount:2})},{name:'明细',values,layout:layout.build({columns:[{index:1},{index:2}],freeze:{row:2,column:2}},
   {rowCount:4,columnCount:2})}]};
 }
+
+test('file freeze never calls native pane setters and strictly reopens the finalized stage',async()=>{
+ assert.equal(typeof host.writeWithFileFreeze,'function');
+ const h=layoutFixture({requireActiveSheet:true}),book=freezeBook(),before=JSON.stringify(book),window=h.app.ActiveWindow;
+ for(const key of ['FreezePanes','SplitRow','SplitColumn','ScrollRow']){
+  const descriptor=Object.getOwnPropertyDescriptor(window,key);Object.defineProperty(window,key,{get:descriptor.get,set(){throw Error('native pane setter must not be called');}});
+ }
+ let calls=0;await host.writeWithFileFreeze(h.app,book,'C:\\temp\\rfq-layout.xlsx',async plan=>{
+  calls++;assert.equal(h.saved,true);assert.ok(h.closed>=2,'stage must be saved and closed before file processing');
+  assert.deepEqual(plan,[{name:'汇总',freeze:{row:4,column:1}},{name:'明细',freeze:{row:2,column:2}}]);h.loadFileFreeze(plan);
+ });
+ assert.equal(calls,1);assert.equal(JSON.stringify(book),before);assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx');assert.equal(h.app.AutomationSecurity,1);
+});
+test('file freeze rejects processing failure, missing panes and changed values before publication',async()=>{
+ assert.equal(typeof host.writeWithFileFreeze,'function');
+ for(const arm of ['processing','missing','values']){
+  const h=layoutFixture({requireActiveSheet:true});await assert.rejects(host.writeWithFileFreeze(h.app,freezeBook(),'C:\\temp\\rfq-layout.xlsx',async plan=>{
+   if(arm==='processing')throw Error('file processing failed');if(arm==='missing')return;
+   h.loadFileFreeze(plan);h.sheets[0].Range('A1:B4').value[3][0]='changed';
+  }),/processing failed|冻结|不一致/);
+  assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx');assert.equal(h.app.AutomationSecurity,1);
+ }
+});
 test('文本被宿主改写时指出首个差异单元格及期望/读回值',()=>{
  const h=layoutFixture({corruptQuotedText:true});
  const book={sheets:[{name:'分类汇总表',values:[['名称','跳转'],['风口、风阀',"'风口、风阀'!A1"]]}]};

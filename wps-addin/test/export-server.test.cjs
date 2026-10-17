@@ -1,5 +1,23 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
 const {createServer}=require('../dev/server.cjs');
+const xlsxFixture=require('./fixtures/xlsx-container.cjs');
+
+test('file freeze endpoint uses local auth and the registered ticket plan, never a supplied path',async t=>{
+ const folder=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-freeze-api-')),server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(folder,'stages')});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{await new Promise(r=>server.close(r));await fs.rm(folder,{recursive:true,force:true});});
+ const origin='http://127.0.0.1:'+server.address().port,html=await(await fetch(origin+'/taskpane.html')).text(),token=JSON.parse(html.match(/window\.__RFQ_IMPORT__=(\{[^;]+\});/)[1]).token;
+ const headers={'content-type':'application/json','x-rfq-import-token':token},request=(route,data,h=headers)=>fetch(origin+'/api/export/'+route,{method:'POST',headers:h,body:JSON.stringify(data)});
+ assert.equal((await fetch(origin+'/api/export/freeze')).status,405);assert.equal((await request('freeze',{},{})).status,403);
+ assert.equal((await request('freeze',{}, {...headers,origin:'https://other.example'})).status,403);
+ assert.equal((await request('freeze',{ticket:'unknown'})).status,400);
+ const plan=[{name:'阀门',freeze:{row:7,column:1}}],p=await(await request('prepare',{target:path.join(folder,'result.xlsx'),freezePlan:plan})).json();
+ await fs.writeFile(p.stagePath,xlsxFixture.workbook(plan));assert.equal((await request('commit',{ticket:p.ticket})).status,400);
+ const outside=path.join(folder,'existing.xlsx');await fs.writeFile(outside,'untouched');
+ const response=await request('freeze',{ticket:p.ticket,stagePath:outside,freezePlan:[{name:'wrong',freeze:{row:2,column:1}}]});assert.equal(response.status,200);
+ const frozen=await response.json();assert.equal(frozen.sheets,1);assert.equal(await fs.readFile(outside,'utf8'),'untouched');
+ const xml=xlsxFixture.entries(await fs.readFile(p.stagePath))['xl/worksheets/sheet1.xml'].toString();assert.match(xml,/ySplit="6"/);
+ const committed=await request('commit',{ticket:p.ticket});assert.equal(committed.status,200);assert.equal((await committed.json()).sha256,frozen.sha256);
+});
 test('export endpoints require the local session and publish only server-issued stages without overwrite',async t=>{
  const folder=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-export-api-')),server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(folder,'private')});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{await new Promise(r=>server.close(r));await fs.rm(folder,{recursive:true,force:true});});

@@ -48,7 +48,7 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         (req.headers.origin && req.headers.origin !== origin)) return reply(403, 'Local origin required');
     let url;
     try { url = new URL(req.url, origin); } catch (_) { return reply(400, 'Invalid URL'); }
-    if (['/api/import/prepare','/api/export/prepare','/api/export/commit','/api/export/verify','/api/export/inspect','/api/export/discard'].includes(url.pathname)) {
+    if (['/api/import/prepare','/api/export/prepare','/api/export/freeze','/api/export/commit','/api/export/verify','/api/export/inspect','/api/export/discard'].includes(url.pathname)) {
       const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');
       if (!importDirectory) return json(404,{error:'当前服务未启用文件导入，请启动最新开发服务。'});
       if (req.method !== 'POST') return json(405,{error:'POST required'});
@@ -63,7 +63,8 @@ function createServer({root, probeConfig = null, reportPath = null, importDirect
         let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'导入请求无效。'});}
         if(!data||Array.isArray(data))return json(400,{error:'导入请求无效。'});
         if(url.pathname==='/api/export/prepare')return json(200,await exports.prepare(data.target,
-          {adjacent:data.adjacent===true,createParent:data.createParent===true}));
+          {adjacent:data.adjacent===true,createParent:data.createParent===true,freezePlan:data.freezePlan}));
+        if(url.pathname==='/api/export/freeze')return json(200,await exports.freeze(data.ticket));
         if(url.pathname==='/api/export/commit')return json(200,await exports.commit(data.ticket));
         if(url.pathname==='/api/export/verify')return json(200,await exports.verify(data.ticket,data.target,data.sha256));
         if(url.pathname==='/api/export/inspect')return json(200,await exports.inspect(data.target,data.sha256));

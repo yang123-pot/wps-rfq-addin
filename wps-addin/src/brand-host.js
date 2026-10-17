@@ -47,7 +47,10 @@
   }
  }
 // 生成沿用内部清单已验证的独占发布路径：不覆盖已有文件、写入后重开逐值校验。
-function write(app,workbook,stagePath){return host.write(app,workbook,stagePath);}
+function write(app,workbook,stagePath,options){
+ if(options&&options.finalizeFreeze)return host.writeWithFileFreeze(app,workbook,stagePath,options.finalizeFreeze);
+ return host.write(app,workbook,stagePath);
+}
  // R8：读取用户填写后的分类汇总表。优先复用WPS里已打开的同路径工作簿（含未保存的最新填写），
  // 未打开时以只读方式打开、读完后关闭；解析与校验全部交给模型，错误定位到具体单元格。
  function readSummary(app,binding){
@@ -91,6 +94,6 @@ function summaryWrite(app,workbook,stagePath){return host.write(app,workbook,sta
   if(error)throw error;
   return {path:filePath,opened:true,reused:false};
  }
- return {read:read,write:write,selectTarget:host.selectTarget,valuesOf:valuesOf,
+ return {read:read,write:write,freezePlan:host.freezePlan,selectTarget:host.selectTarget,valuesOf:valuesOf,
   readSummary:readSummary,summaryWrite:summaryWrite,openSummary:openSummary};
 }));

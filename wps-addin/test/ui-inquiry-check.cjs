@@ -9,6 +9,7 @@ const collection=require('../src/collection.js');
 const reviewModel=require('../src/classification-review-model.js');
 const brandModel=require('../src/brand-model.js');
 const inquiryModel=require('../src/inquiry-model.js');
+const xlsxFixture=require('./fixtures/xlsx-container.cjs');
 const SHOT=process.env.RFQ_UI_INQUIRY_SCREENSHOT,EVIDENCE=process.env.RFQ_UI_INQUIRY_EVIDENCE;
 
 const DRAIN=[['工程名称：示例园区','','','',''],['项目编码','项目名称','项目特征描述','单位','工程量'],
@@ -134,7 +135,7 @@ async function run(){
   await page.exposeFunction('__writeSummaryFixture',async function(file,payload){
    await fs.writeFile(file,Buffer.concat([Buffer.from([0x50,0x4b,3,4]),Buffer.from(String(payload))]));});
   await page.exposeFunction('__writeInquiryFixture',async function(file,payload){
-   await fs.writeFile(file,Buffer.concat([Buffer.from([0x50,0x4b,3,4]),Buffer.from(String(payload))]));});
+   await fs.writeFile(file,xlsxFixture.workbook(payload));});
   const installStubs=function(){return page.evaluate(function(){
    // 一本多页（2026-10-11变更）：第4步一次写入“第 1 页汇总＋逐类页”，第5步汇总表＝同一本工作簿第 1 页。
    window.RfqCategoryWorkbooks.writeAll=async function(app,plan,stagePath,options){
@@ -157,9 +158,10 @@ async function run(){
    window.RfqBrandHost.openSummary=function(app,filePath){window.__summaryOpened.push(filePath);return {path:filePath,opened:true};};
    window.RfqBrandHost.selectTarget=function(app,suggested){
     window.__suggested=suggested;return window.__inquiryTarget;};
-   window.RfqBrandHost.write=async function(app,model,stagePath){
+   window.RfqBrandHost.write=async function(app,model,stagePath,settings){
     window.__inquiryBooks.push({stagePath:stagePath,model:model});
-    await window.__writeInquiryFixture(stagePath,'inquiry');};
+    await window.__writeInquiryFixture(stagePath,model.sheets);
+    if(settings&&settings.finalizeFreeze)await settings.finalizeFreeze();};
   });};
   await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html');
   const shot=async function(file){

@@ -401,6 +401,42 @@
     }
     if(error)throw error;
   }
+  // File-freeze output has a deliberately unpublished phase. No native pane setters
+  // run here; the final read-only reopen still checks the ORIGINAL complete model.
+  function freezePlan(model){
+    return model.sheets.map(function(s){
+      var spec=s.layout;
+      if(spec)layout.assertValid(spec,{rowCount:s.values.length,columnCount:spec.columns.length});
+      return {name:s.name,freeze:spec&&spec.freeze?{row:spec.freeze.row||1,column:spec.freeze.column||1}:null};
+    });
+  }
+  function verifySavedStage(app,model,stagePath){
+    var previous=app.ActiveWorkbook,security=app.AutomationSecurity,opened=null,error=null;
+    if(typeof security!=='number')throw Error('不能读取宏安全设置，未核对暂存文件。');
+    for(var n=1;n<=app.Workbooks.Count;n++)if(key(app.Workbooks.Item(n).FullName)===key(stagePath))
+      throw Error('暂存文件已打开，未完成只读重开核验。');
+    try{
+      app.AutomationSecurity=3;if(app.AutomationSecurity!==3)throw Error('无法禁用自动宏，未核对暂存文件。');
+      var candidate=app.Workbooks.Open(stagePath,0,true);
+      if(!candidate||key(candidate.FullName)!==key(stagePath))throw Error('WPS未返回指定暂存文件。');
+      opened=candidate;verify(opened,model);verifyLayout(app,opened,model,stagePath);
+    }catch(e){error=e;}
+    finally{
+      try{if(opened)opened.Close(false);}catch(e){error=Error('暂存文件只读关闭失败：'+e.message);}
+      try{app.AutomationSecurity=security;}catch(e){error=Error('宏安全设置恢复失败：'+e.message);}
+      try{if(previous)previous.Activate();}catch(e){error=Error('原工作簿恢复失败：'+e.message);}
+    }
+    if(error)throw error;
+  }
+  async function writeWithFileFreeze(app,model,stagePath,finalizeStage){
+    if(typeof finalizeStage!=='function')throw Error('缺少文件层冻结步骤，未写入。');
+    var plan=freezePlan(model),pending=Object.assign({},model,{sheets:model.sheets.map(function(s){
+      return Object.assign({},s,{layout:s.layout?Object.assign({},s.layout,{freeze:null}):s.layout});
+    })});
+    write(app,pending,stagePath);
+    await finalizeStage(plan);
+    verifySavedStage(app,model,stagePath);
+  }
   // 图01预览只占用插件自己新建且尚未另存的工作簿；绝不把当前活动簿当预览目标。
   // 草稿簿身份：未另存时宿主给的FullName就是名字本身，不含路径分隔符；一旦另存就不再属于插件预览。
   function previewIdentity(book){
@@ -626,6 +662,6 @@
       });
     });
   }
-  return {selectTarget:selectTarget,write:write,showPreview:showPreview,address:address,
+  return {selectTarget:selectTarget,write:write,writeWithFileFreeze:writeWithFileFreeze,freezePlan:freezePlan,showPreview:showPreview,address:address,
    verifyExistingOutput:verifyExistingOutput};
 }));

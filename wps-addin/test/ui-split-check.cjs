@@ -4,6 +4,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
 const sample=require('./fixtures/workflow-v3-sample.cjs');
 const collection=require('../src/collection.js');
 const inquiryModel=require('../src/inquiry-model.js');
+const xlsxFixture=require('./fixtures/xlsx-container.cjs');
 const SPLIT_NAMES=sample.expectations.splitFiles.slice();
 const SHOT=process.env.RFQ_UI_SPLIT_SCREENSHOT,EVIDENCE=process.env.RFQ_UI_SPLIT_EVIDENCE;
 function digest(bytes){return crypto.createHash('sha256').update(bytes).digest('hex');}
@@ -75,20 +76,21 @@ async function run(){
    window.__splitWrites=[];window.__receipts=[];window.__openedFolder='';
   });
   await page.exposeFunction('__writeSplitFixture',async function(stagePath,payload){
-   await fs.writeFile(stagePath,Buffer.concat([Buffer.from([0x50,0x4b,3,4]),Buffer.from(String(payload))]));});
+   await fs.writeFile(stagePath,xlsxFixture.workbook(payload));});
   await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html');
   await page.evaluate(function(args){
    ['split-message','split-status','split-directory','split-directory-label','split-preview','split-run','split-retry','split-open']
     .forEach(function(id){const old=document.getElementById(id),clone=old.cloneNode(true);old.parentNode.replaceChild(clone,old);});
    window.__splitGeneration=args.generation;window.__splitOutput=args.outputDirectory;
    window.RfqPathPicker.open=function(options){window.__picker=options;options.onConfirm([window.__splitOutput]);return {close(){}};};
-   window.RfqBrandHost.write=async function(app,book,stagePath){
+   window.RfqBrandHost.write=async function(app,book,stagePath,settings){
     const sheet=book.sheets[0];
     window.__splitWrites.push({stagePath:stagePath,name:sheet.name,hasLayout:!!sheet.layout,
      columns:sheet.values[sheet.values.length-sheet.layout.metadata.headerRow],
      values:sheet.values.slice(sheet.layout.metadata.headerRow).map(function(row){return row.slice(0,10);})});
     if(window.__failSynthetic&&sheet.name==='阀门_合成询价'){window.__failSynthetic=false;throw Error('模拟第二份失败');}
-    await window.__writeSplitFixture(stagePath,sheet.name);
+    await window.__writeSplitFixture(stagePath,book.sheets);
+    if(settings&&settings.finalizeFreeze)await settings.finalizeFreeze();
    };
    window.Application.Shell=function(command){window.__openedFolder=command;};
    window.__splitPanel=window.RfqSplitUI.create({application:window.Application,

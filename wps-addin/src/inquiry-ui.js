@@ -111,12 +111,14 @@
    try{
     busy=true;if(options.onBusy)options.onBusy(true);render();
     tell('正在准备新文件…');
-    prepared=await requests('prepare',{target:target});
+    prepared=await requests('prepare',{target:target,freezePlan:RfqBrandHost.freezePlan(book)});
     if(!prepared||typeof prepared.ticket!=='string'||typeof prepared.stagePath!=='string')
      throw Error('生成会话信息不完整，未写入。');
     tell('正在写入并重新打开校验…');
     await new Promise(function(resolve){setTimeout(resolve,0);});
-    await RfqBrandHost.write(options.application,book,prepared.stagePath);
+    await RfqBrandHost.write(options.application,book,prepared.stagePath,{finalizeFreeze:function(){
+     return requests('freeze',{ticket:prepared.ticket});
+    }});
     tell('正在保存到所选位置…');
     var result;
     try{result=await requests('commit',{ticket:prepared.ticket});}

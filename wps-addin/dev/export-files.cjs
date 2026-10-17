@@ -1,5 +1,6 @@
 const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto');
 const {constants}=require('node:fs');
+const {validatePlan,freezeFile}=require('./file-freeze.cjs');
 function digest(bytes){return crypto.createHash('sha256').update(bytes).digest('hex');}
 async function absent(file){try{await fs.lstat(file);}catch(e){if(e.code==='ENOENT')return;throw e;}throw Error('目标文件已存在，请使用新文件名，禁止覆盖。');}
 // 相邻暂存清理：提交成功立即删；提交前失败、宿主仍占用或提交失败时，由下一次同目标prepare兜底清理足够陈旧的残留。
@@ -67,6 +68,7 @@ function createExportStore({directory}){
  async function prepare(target,options){
   if(typeof target!=='string'||target.length>4096||!path.isAbsolute(target)||path.extname(target).toLowerCase()!=='.xlsx'||/[<>:"|?*]|[. ]$/.test(path.basename(target)))throw Error('请选择有效的新xlsx绝对路径。');
   const settings=options&&typeof options==='object'?options:{};
+  const freezePlan=settings.freezePlan==null?null:validatePlan(settings.freezePlan);
   // R6：分类工作簿目录（成果批次/分类工作簿）由插件创建，只在显式要求且目标不存在时才建目录。
   if(settings.createParent===true)await fs.mkdir(path.dirname(target),{recursive:true});
   const parent=await fs.realpath(path.dirname(target)),destination=path.join(parent,path.basename(target));
@@ -90,7 +92,7 @@ function createExportStore({directory}){
    stagePath=path.join(folder,'rfq-'+crypto.randomUUID()+'.xlsx');
   }
   const ticket=crypto.randomBytes(24).toString('hex');
-  tickets.set(ticket,{created:Date.now(),target:destination,stagePath,busy:false,result:null,adjacent});
+  tickets.set(ticket,{created:Date.now(),target:destination,stagePath,busy:false,result:null,adjacent,freezePlan,freezeResult:null});
   const prepared={ticket,target:destination,stagePath};
   if(staleCleanup)prepared.staleCleanup=staleCleanup;
   return prepared;
@@ -110,6 +112,10 @@ function createExportStore({directory}){
    }catch(e){throw Error('无法读取WPS暂存文件：'+e.message);}
    if(!bytes.subarray(0,4).equals(Buffer.from([0x50,0x4b,3,4])))throw Error('暂存文件不是xlsx容器，未另存。');
    const sha256=digest(bytes);
+   if(entry.freezePlan){
+    if(!entry.freezeResult)throw Error('暂存文件尚未完成文件层冻结，未发布。');
+    if(sha256!==entry.freezeResult.sha256)throw Error('冻结后的暂存文件发生变化，未发布。');
+   }
    try{await fs.copyFile(entry.stagePath,entry.target,constants.COPYFILE_EXCL);}
    catch(e){if(e.code==='EEXIST')throw Error('目标文件已存在，未覆盖，请使用新文件名。');throw Error('目标文件写入失败：'+e.message);}
    if(digest(await fs.readFile(entry.target))!==sha256)throw Error('另存文件校验失败，请检查目标文件；未确认保存成功。');
@@ -117,6 +123,18 @@ function createExportStore({directory}){
    // 已成功发布并校验，就不能因为清理暂存失败（Windows上宿主可能仍占用）把成功报成失败；残留交给下次prepare清理。
    if(entry.adjacent)await removeStage(entry.stagePath);
    return entry.result;
+  }finally{entry.busy=false;}
+ }
+ // Only a live unpublished server-issued stage may be processed; no caller-supplied file path.
+ async function freeze(ticket){
+  const entry=tickets.get(ticket);if(!entry||Date.now()-entry.created>3600000)throw Error('另存会话已失效。');
+  if(entry.result)throw Error('文件已发布，禁止改写冻结。');
+  if(entry.busy)throw Error('暂存文件正在处理。');
+  if(!entry.freezePlan)throw Error('该会话未登记文件冻结计划。');
+  entry.busy=true;
+  try{
+   if(entry.freezeResult){if(digest(await fs.readFile(entry.stagePath))!==entry.freezeResult.sha256)throw Error('冻结后的暂存文件发生变化。');return entry.freezeResult;}
+   entry.freezeResult=await freezeFile(entry.stagePath,entry.freezePlan);return entry.freezeResult;
   }finally{entry.busy=false;}
  }
  // 失败/取消后由调用方显式清理本次相邻暂存。结构化结果先判 published/busy：
@@ -150,6 +168,6 @@ function createExportStore({directory}){
   return {target,exists:true,sha256,bytes:bytes.length,
    matches:typeof expected==='string'&&expected?sha256===expected.toLowerCase():null};
  }
- return {prepare,commit,verify,inspect,discard};
+ return {prepare,freeze,commit,verify,inspect,discard};
 }
 module.exports={createExportStore};

@@ -215,10 +215,13 @@
    return receipt;
   }
   async function publish(file,sheet){
-   var preparedFile=await exportRequest('prepare',{target:file.target});
+   var workbook=sheetWorkbook(sheet);
+   var preparedFile=await exportRequest('prepare',{target:file.target,freezePlan:RfqBrandHost.freezePlan(workbook)});
    if(!preparedFile||typeof preparedFile.ticket!=='string'||typeof preparedFile.stagePath!=='string')
     throw Error('拆分暂存信息不完整，未写入。');
-   await RfqBrandHost.write(options.application,sheetWorkbook(sheet),preparedFile.stagePath);
+   await RfqBrandHost.write(options.application,workbook,preparedFile.stagePath,{finalizeFreeze:function(){
+    return exportRequest('freeze',{ticket:preparedFile.ticket});
+   }});
    var result;
    try{result=await exportRequest('commit',{ticket:preparedFile.ticket});}
    catch(error){if(error.status&&error.status<500)throw error;result=await exportRequest('commit',{ticket:preparedFile.ticket});}
