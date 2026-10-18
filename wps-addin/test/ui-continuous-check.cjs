@@ -75,15 +75,25 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   await action('下一步：拆分询价文件');await action('选择输出文件夹');await shot('07-split-ready');
   // 拆分写入复用业务模型与真实发布/冻结/回执链；只替代宿主落盘。
   await page.evaluate(()=>{RfqExportHost.writeWorkbook=async(app,model,file,opts)=>{await window.__writeFixture(file,model.sheets);if(opts&&opts.finalizeFreeze)await opts.finalizeFreeze();};});
-  await action('开始拆分');await page.waitForFunction(()=>RfqAssistant.view().step===8,null,{timeout:30000});
-  const done=await record();assert.equal(done.split.files.filter(f=>f.state==='succeeded').length,5);assert.equal((await fs.readdir(out)).length,5);assert.equal(await page.locator('#assistant-output-files li').count(),5);await shot('08-complete');
+  await page.evaluate(()=>{window.__supplierWriteCount=0;const write=RfqBrandHost.write;RfqBrandHost.write=async function(){window.__supplierWriteCount++;return write.apply(this,arguments);};});
+  await page.route('**/api/split/copy-complete',route=>route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'模拟完整总表导出失败'})}));
+  await action('开始拆分');await page.waitForFunction(()=>!RfqAssistant.snapshot().busy);
+  assert.equal(await page.evaluate(()=>RfqAssistant.view().step),7,'完整文件失败时不得显示全部完成');
+  assert.equal(await page.evaluate(()=>window.__supplierWriteCount),5);assert.equal((await fs.readdir(out)).length,5);
+  if(await page.getByRole('alertdialog').count())await page.keyboard.press('Escape');
+  await page.unroute('**/api/split/copy-complete');await action('重试未完成文件');
+  await page.waitForFunction(()=>RfqAssistant.view().step===8,null,{timeout:30000});
+  assert.equal(await page.evaluate(()=>window.__supplierWriteCount),5,'仅补完整文件，不重写成功的五个供应商文件');
+  const done=await record();assert.equal(done.split.files.filter(f=>f.state==='succeeded').length,6);assert.equal((await fs.readdir(out)).length,6);assert.equal(await page.locator('#assistant-output-files li').count(),6);
+  const complete=done.split.files.find(f=>f.kind==='complete-workbook');assert.ok(complete);assert.deepEqual(await fs.readFile(complete.target),await fs.readFile(inquiryTarget),'导出的完整工作簿必须原样保留');
+  assert.match(await page.locator('#simple-desc').innerText(),/5.*供应商.*1.*完整.*6/);await shot('08-complete');
   const stores=await page.evaluate(()=>window.__stores);await page.addInitScript(stored=>{window.__stores=stored;},stores);
   await page.reload();await page.evaluate(()=>{RfqExportHost.showPreview=(app,model)=>({name:'预览'});});await page.locator('#simple-settings-toggle').click();await page.locator('[data-simple-section="project-section"]').click();
   await page.locator('#open-project').click();await page.locator('#project-list > li button').first().click();
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已恢复项目'));
   assert.equal(await page.getByRole('alertdialog').count(),0,'恢复不能出现异常：'+await page.locator('#assistant-problem').textContent());
   await page.locator('#simple-mode-toggle').click();await page.waitForFunction(()=>RfqAssistant.view().step===8);
-  assert.equal(await primary.innerText(),'打开文件夹');assert.equal((await record()).split.files.length,5);await shot('09-restored');
+  assert.equal(await primary.innerText(),'打开文件夹');assert.equal((await record()).split.files.length,6);await shot('09-restored');
   await fs.unlink(inquiryTarget);await page.reload();await page.evaluate(()=>{RfqExportHost.showPreview=()=>({name:'预览'});});
   await page.locator('#simple-settings-toggle').click();await page.locator('[data-simple-section="project-section"]').click();
   await page.locator('#open-project').click();await page.locator('#project-list > li button').first().click();

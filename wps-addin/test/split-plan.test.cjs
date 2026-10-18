@@ -12,8 +12,9 @@ const generation={inputKey:'ck1-split',sheetIds:['sheet-a','sheet-b'],target:'C:
  sha256:'a'.repeat(64)};
 test('one inquiry sheet becomes one file and internal sheets are never split out',()=>{
  const built=plan.build({model:model(),generation:generation,targetDirectory:'C:\\out\\项目询价'});
- assert.equal(built.files.length,2,'只按kind=inquiry取页，不按页名猜');
- assert.deepEqual(built.files.map(file=>file.name),['水阀门_供应商A.xlsx','水阀门_供应商B.xlsx']);
+ assert.equal(built.files.length,3,'两份供应商文件加一份完整总表');
+ assert.deepEqual(built.files.filter(file=>file.kind==='inquiry').map(file=>file.name),['水阀门_供应商A.xlsx','水阀门_供应商B.xlsx']);
+ assert.equal(built.files[2].kind,'complete-workbook');
  assert.equal(built.files[0].target,'C:\\out\\项目询价\\水阀门_供应商A.xlsx');
  assert.equal(built.files[0].sheetId,'sheet-a');
  assert.equal(built.files[0].hasLayout,true,'拆分计划保留询价页版式标记');

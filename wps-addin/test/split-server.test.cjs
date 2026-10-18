@@ -48,6 +48,16 @@ function generation(context){
  return {inputKey:'ck1-split-server',target:context.generationTarget,sha256:digest(context.bytes),
   sheetIds:['sheet-a','sheet-b'],modelSnapshot:model()};
 }
+test('完整总表复制接口保持本机会话鉴权，并校验已准备的原总表字节',async t=>{
+ const context=await setup(t),payload={projectId:'p-total-api-01',batchId:'b-total-api-01',generation:generation(context),currentKey:'ck1-split-server',targetDirectory:context.outputDirectory};
+ assert.equal((await context.request('copy-complete',payload,{'content-type':'application/json'})).status,403);
+ assert.equal((await fetch(context.origin+'/api/split/copy-complete')).status,405);
+ assert.equal((await context.request('copy-complete',payload)).status,400,'没有准备回执不得复制');
+ await context.request('prepare',payload);const response=await context.request('copy-complete',payload);assert.equal(response.status,200);
+ const result=await response.json();assert.deepEqual(await fs.readFile(result.target),context.bytes);
+ assert.equal((await context.request('copy-complete',payload)).status,400,'重复发布绝不覆盖');
+ assert.equal((await context.request('copy-complete',{...payload,verifyOnly:true})).status,200);
+});
 test('split prepare isolates by project and batch, verifies generation and all targets',async t=>{
  const context=await setup(t);
  const result=await context.request('prepare',{projectId:'p-split-0001',batchId:'b-split-0001',
@@ -55,9 +65,9 @@ test('split prepare isolates by project and batch, verifies generation and all t
  assert.equal(result.status,200);
  const prepared=await result.json();
  assert.equal(prepared.canPublish,true);
- assert.deepEqual(prepared.plan.files.map(file=>file.name),['水泵_华川设备.xlsx','阀门_多供应商.xlsx']);
- assert.equal(prepared.plan.files.length,2,'只拆分kind=inquiry，不含内部追溯页');
- assert.deepEqual(prepared.receipt.files.map(file=>file.state),['pending','pending']);
+ assert.deepEqual(prepared.plan.files.filter(file=>file.kind==='inquiry').map(file=>file.name),['水泵_华川设备.xlsx','阀门_多供应商.xlsx']);
+ assert.equal(prepared.plan.files.length,3,'两份询价拆分页加一份完整总表，不单独拆分内部追溯页');
+ assert.deepEqual(prepared.receipt.files.map(file=>file.state),['pending','pending','pending']);
  assert.equal(prepared.receipt.revision,1);
  assert.equal((await context.request('prepare',{projectId:'p-split-0002',batchId:'b-split-0002',
   generation:generation(context),currentKey:'ck1-split-server',targetDirectory:context.outputDirectory})).status,200);
@@ -90,7 +100,7 @@ test('restart reconciliation skips verified files, retries only unfinished, and 
  const afterRestart=await(await context.request('prepare',{projectId,batchId,generation:generation(context),
   currentKey:'ck1-split-server',targetDirectory:context.outputDirectory})).json();
  assert.equal(afterRestart.summary.succeeded.length,1,'重启后成功文件按SHA跳过');
- assert.deepEqual(afterRestart.receipt.files.filter(file=>file.state!=='succeeded').map(file=>file.fileId),[fileB.fileId],
+ assert.deepEqual(afterRestart.receipt.files.filter(file=>file.state!=='succeeded').map(file=>file.fileId),[fileB.fileId,'complete-workbook'],
   '只续作未完成文件');
  await fs.writeFile(fileA.target,Buffer.from('外部改写'));
  const rewritten=await(await context.request('prepare',{projectId,batchId,generation:generation(context),

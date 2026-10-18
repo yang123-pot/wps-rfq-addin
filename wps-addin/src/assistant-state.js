@@ -8,14 +8,14 @@
   var split=s.split||{};
   if(s.reviewConfirmed&&s.noInquiry)at(8,'核对已完成，无需生成询价文件','本次材料均为“无需询价”，核对记录已保留。','saveProject','保存项目');
   else if(s.splitVerified&&split.planned>0&&split.complete===split.planned&&!split.failed&&!split.pending&&!split.needsVerification)
-   at(8,'已生成 '+split.complete+' 个询价文件','检查文件后即可发送给供应商。','openFolder','打开文件夹');
+   at(8,split.completeWorkbookCount?'文件已全部导出':'已生成 '+split.complete+' 个询价文件',split.completeWorkbookCount?split.supplierCount+' 个供应商文件＋1 份完整总表，共 '+split.complete+' 个文件已保存并核对。':'共 '+split.complete+' 个文件已保存并核对。','openFolder','打开文件夹');
   else if(s.brandsReady){
    at(6,'填写询价抬头','填写的信息会带到全部询价文件。报价单价和金额留空。','inquiryGenerate',s.inquiryStale?'重新生成询价总表':'生成询价总表');
    if(s.inquiryReady){
     at(6,'询价总表已生成','共 '+s.expectedSheets+' 张询价页，下一步生成可发送的独立文件。','goSplit','下一步：拆分询价文件');
     if(s.splitStarted){
-     at(7,'生成供应商文件','每张询价表生成一个独立文件，已有文件不会覆盖。','chooseDirectory','选择输出文件夹');
-     if(s.outputDirectory)at(7,'生成供应商文件','将生成 '+s.expectedSheets+' 个独立询价文件。','splitRun','开始拆分');
+     at(7,'导出询价文件','导出供应商文件，同时保存一份完整询价总表，已有文件不会覆盖。','chooseDirectory','选择输出文件夹');
+     if(s.outputDirectory)at(7,'导出询价文件','将导出 '+s.expectedSheets+' 个供应商文件和 1 份完整总表，共 '+(s.expectedSheets+1)+' 个文件。','splitRun','开始拆分');
      if(split.failed||split.pending&&split.complete)Object.assign(v,{action:'splitRetry',label:'重试未完成文件'});
      if(split.needsVerification)Object.assign(v,{action:'splitVerify',label:'核对已有文件'});
     }

@@ -52,7 +52,7 @@
    inputKey:text(plan.inputKey),generationSha256:text(generationSha256),
    outputDirectory:text(input.outputDirectory||plan.directory||''),
    updatedAt:new Date().toISOString(),
-   files:plan.files.map(function(file){return {fileId:file.fileId,sheetId:file.sheetId||null,name:file.name||'',
+   files:plan.files.map(function(file){return {kind:file.kind||'inquiry',fileId:file.fileId,sheetId:file.sheetId||null,name:file.name||'',
     target:file.target,state:'pending',sha256:null,observedSha256:null,verifiedBy:null,verifiedAt:null,error:null};})};
  }
  // mark是唯一的“记账成功”入口：succeeded必须带核对证明（真实发布写回或显式内容核对）；

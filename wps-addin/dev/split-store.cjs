@@ -116,9 +116,17 @@ function createSplitStore({directory}={}){
    else if(book.sha256!==String(generation.sha256||'').toLowerCase())
     conflicts.push({code:'generation-sha-mismatch',message:'总询价工作簿已被外部修改，请重新生成后再拆分。'});
   }catch(error){conflicts.push({code:'generation-unreadable',message:error.message});}
-  const previous=await load(projectId,batchId);
-  if(previous&&!alignReceipt(previous,built))
-   throw Error('该批次回执与当前拆分清单不一致，请更换批次或输出目录后重试。');
+  let previous=await load(projectId,batchId),upgraded=false;
+  if(previous&&!alignReceipt(previous,built)){
+   // 旧版批次只缺新增完整总表时补一条pending，保留原供应商文件及证明，不能借迁移接受其他差异。
+   const complete=built.files.find(file=>file.kind==='complete-workbook');
+   if(complete&&!previous.files.some(file=>file.fileId===complete.fileId)){
+    const extra=create({inputKey:built.inputKey,directory:built.directory,files:[complete]},generation.sha256,{projectId,batchId}).files[0];
+    const candidate={...previous,files:previous.files.concat(extra)};
+    if(alignReceipt(candidate,built)){previous=candidate;upgraded=true;}
+   }
+   if(!upgraded)throw Error('该批次回执与当前拆分清单不一致，请更换批次或输出目录后重试。');
+  }
   const checks=[];
   for(const file of built.files){
    try{checks.push(Object.assign({fileId:file.fileId},await inspectTarget(file.target)));}
@@ -134,7 +142,7 @@ function createSplitStore({directory}={}){
   if(!previous&&conflicts.length)return {plan:checkedPlan,receipt:null,revision:0,canPublish:false};
   let receipt=previous||create(built,generation.sha256,{projectId:projectId,batchId:batchId});
   if(previous)receipt=reconcile(receipt,checks);
-  if(!sameReceipt(previous,receipt)){
+  if(upgraded||!sameReceipt(previous,receipt)){
    const expectedRevision=previous?previous.revision:0;
    const saved=await save(receipt,{expectedRevision:expectedRevision});
    receipt=saved.receipt;
@@ -146,8 +154,47 @@ function createSplitStore({directory}={}){
   return {plan:checkedPlan,receipt:receipt,revision:receipt.revision,canPublish:canPublish,
    canVerify:canVerify,summary:summary};
  }
+ // 只复制已准备批次绑定的完整总表。使用核过SHA的同一份字节写入，避免源路径在核验与复制间变化；目标独占创建。
+ async function copyComplete(input){
+  const source=input||{},generation=source.generation;
+  if(!generation||!generation.modelSnapshot)throw Error('请先生成并校验完整询价总表。');
+  const built=planModel.build({model:generation.modelSnapshot,generation,targetDirectory:source.targetDirectory,currentKey:source.currentKey});
+  const record=await load(source.projectId,source.batchId);
+  if(!record||!alignReceipt(record,built))throw Error('完整总表与已准备的批次回执不一致，请重新准备拆分。');
+  if(!built.canPublish)throw Error(built.conflicts.map(item=>item.message).join('；'));
+  const file=built.files.find(item=>item.kind==='complete-workbook');
+  if(!file||!path.isAbsolute(file.target)||!path.isAbsolute(generation.target))throw Error('完整总表路径无效。');
+  const actual=await inspectTarget(generation.target);
+  if(!actual.exists||actual.sha256!==String(generation.sha256).toLowerCase())throw Error('完整总表不存在或已被修改，请重新生成后再导出。');
+  const bytes=await fs.readFile(generation.target);
+  if(bytes.length<4||bytes.length>256*1024*1024||!bytes.subarray(0,4).equals(Buffer.from([0x50,0x4b,3,4]))||digest(bytes)!==generation.sha256.toLowerCase())
+   throw Error('完整总表内容已变化或不是有效xlsx，未导出。');
+  if(source.verifyOnly===true){
+   const existing=await inspectTarget(file.target);
+   if(!existing.exists)throw Error('完整总表副本不存在，请重试未完成文件。');
+   if(existing.sha256!==actual.sha256)throw Error('完整总表副本与拆分前完整文件不一致，原文件保留，未覆盖。');
+   return {target:file.target,sha256:existing.sha256,bytes:existing.bytes};
+  }
+  const stage=path.join(path.dirname(file.target),'.rfq-complete-'+crypto.randomUUID()+'.tmp');
+  let handle=null,owned=false;
+  try{
+   handle=await fs.open(stage,'wx');owned=true;await handle.writeFile(bytes);await handle.sync();await handle.close();handle=null;
+   if(digest(await fs.readFile(stage))!==actual.sha256)throw Error('完整总表暂存校验失败，未发布。');
+   // 同目录硬链接原子且独占：并发同名文件不会被替换，磁盘写满也不会留下半个最终文件。
+   await fs.link(stage,file.target);
+  }catch(error){
+   if(error.code==='EEXIST')throw Error('完整总表同名文件已存在，未覆盖，请更换文件夹或核对已有文件。');
+   throw Error('完整总表导出失败，请检查可用空间或更换本机文件夹后重试：'+error.message);
+  }finally{
+   if(handle)await handle.close().catch(function(){});
+   if(owned)await fs.rm(stage,{force:true}).catch(function(){});
+  }
+  const result=await inspectTarget(file.target);
+  if(result.sha256!==actual.sha256)throw Error('完整总表副本校验失败，未确认成功。');
+  return {target:file.target,sha256:result.sha256,bytes:result.bytes};
+ }
  return {directory:root,fileNameFor:receiptKey,load:load,save:save,prepare:prepare,
-  inspectTarget:inspectTarget};
+  inspectTarget:inspectTarget,copyComplete:copyComplete};
 }
 module.exports={SCHEMA_VERSION:SCHEMA_VERSION,STATES:STATES,ID_PATTERN:ID_PATTERN,
  fileNameFor:receiptKey,validate:validate,summarize:summarize,create:create,mark:mark,

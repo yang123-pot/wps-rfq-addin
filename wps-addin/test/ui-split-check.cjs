@@ -5,7 +5,7 @@ const sample=require('./fixtures/workflow-v3-sample.cjs');
 const collection=require('../src/collection.js');
 const inquiryModel=require('../src/inquiry-model.js');
 const xlsxFixture=require('./fixtures/xlsx-container.cjs');
-const SPLIT_NAMES=sample.expectations.splitFiles.slice();
+const SPLIT_NAMES=sample.expectations.splitFiles.slice(),TOTAL_NAME='示例园区_询价总表_完整文件.xlsx';
 const SHOT=process.env.RFQ_UI_SPLIT_SCREENSHOT,EVIDENCE=process.env.RFQ_UI_SPLIT_EVIDENCE;
 function digest(bytes){return crypto.createHash('sha256').update(bytes).digest('hex');}
 function columnName(index){let name='';for(;index>0;index=Math.floor((index-1)/26))name=String.fromCharCode(65+(index-1)%26)+name;return name;}
@@ -108,18 +108,18 @@ async function run(){
   assert.doesNotMatch(await page.locator('#stage-panel-split').innerText(),/将在 R10 开发包实现/,
    '已实现拆分不可继续展示未实现占位说明');
   await page.evaluate(function(){document.getElementById('split-directory').click();});
-  await page.waitForFunction(function(){return /计划 5 个文件/.test(document.getElementById('split-status').textContent)&&
+  await page.waitForFunction(function(){return /计划 6 个文件/.test(document.getElementById('split-status').textContent)&&
    !document.getElementById('split-run').disabled;});
   await page.evaluate(function(){window.__failSynthetic=true;document.getElementById('split-run').click();});
-  await page.waitForFunction(function(){return /拆分完成4份，失败1份/.test(document.getElementById('split-message').textContent)&&
+  await page.waitForFunction(function(){return /拆分完成5份，失败1份/.test(document.getElementById('split-message').textContent)&&
    window.__splitWrites.length===5;});
-  assert.deepEqual((await fs.readdir(outputDirectory)).sort(),SPLIT_NAMES.slice(0,2).concat(SPLIT_NAMES.slice(3)).sort(),
+  assert.deepEqual((await fs.readdir(outputDirectory)).sort(),SPLIT_NAMES.slice(0,2).concat(SPLIT_NAMES.slice(3),[TOTAL_NAME]).sort(),
    '失败该份未发布，其余四份真实落盘');
   const beforeRetry=await page.evaluate(function(){return window.__splitWrites.map(function(item){return item.name;});});
   assert.deepEqual(beforeRetry,['水泵_青源','水泵_恒流','阀门_合成询价','风机_瑞风','汽车充电桩_驰电']);
   await page.locator('.rfq-split-result button').click();
   await page.evaluate(function(){document.getElementById('split-retry').click();});
-  await page.waitForFunction(function(){return /完成5份，失败0份/.test(document.getElementById('split-message').textContent)&&
+  await page.waitForFunction(function(){return /完成6份，失败0份/.test(document.getElementById('split-message').textContent)&&
    window.__splitWrites.length===6;});
   if(SHOT){await fs.mkdir(path.dirname(SHOT),{recursive:true});await page.screenshot({path:SHOT,fullPage:true});}
   if(EVIDENCE){
@@ -130,7 +130,8 @@ async function run(){
     receipt:window.__splitPanel.receipt(),openedFolder:window.__openedFolder};});
    await fs.writeFile(path.join(EVIDENCE,'split-result.json'),JSON.stringify(evidence,null,2));
   }
-  assert.deepEqual((await fs.readdir(outputDirectory)).sort(),SPLIT_NAMES.slice().sort(),'重试后5个图07文件名全部存在');
+  assert.deepEqual((await fs.readdir(outputDirectory)).sort(),SPLIT_NAMES.concat(TOTAL_NAME).sort(),'五个供应商文件及完整总表共六件全部存在');
+  assert.deepEqual(await fs.readFile(path.join(outputDirectory,TOTAL_NAME)),generationBytes,'完整总表逐字节不变');
   const writes=await page.evaluate(function(){return window.__splitWrites;});
   assert.deepEqual(writes.map(function(item){return item.name;}),
    ['水泵_青源','水泵_恒流','阀门_合成询价','风机_瑞风','汽车充电桩_驰电','阀门_合成询价'],
@@ -164,7 +165,7 @@ async function run(){
   await page.waitForFunction(function(){return !!document.querySelector('.rfq-split-result');});
   await page.locator('.rfq-split-result button').click();
   await page.evaluate(function(){window.__splitPanel.refresh();});
-  await page.waitForFunction(function(){return /完成 5/.test(document.getElementById('split-status').textContent);});
+  await page.waitForFunction(function(){return /完成 6/.test(document.getElementById('split-status').textContent);});
   const afterReopen=await page.evaluate(function(){return window.__splitPanel.receipt().files.map(function(file){
    return file.fileId+':'+file.state+':'+file.verifiedBy;});});
   assert.deepEqual(afterReopen,doneStates,'关闭/重开结果窗口和refresh都不改变逐文件状态');
@@ -213,7 +214,7 @@ async function run(){
     freeze:{FreezePanes:true,SplitRow:6,SplitColumn:0}};
   },{target:firstTarget,name:expectedSheet.name,values:expectedSheet.values,merges:mergeAddresses(expectedSheet.layout)});
   await page.evaluate(function(){document.getElementById('split-retry').click();});
-  await page.waitForFunction(function(){return /完成5份，失败0份/.test(document.getElementById('split-message').textContent)&&
+  await page.waitForFunction(function(){return /完成6份，失败0份/.test(document.getElementById('split-message').textContent)&&
    !/待核对/.test(document.getElementById('split-status').textContent);});
   const verified=await page.evaluate(function(){return window.__splitPanel.receipt().files[0];});
   assert.equal(verified.state,'succeeded');

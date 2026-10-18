@@ -1552,7 +1552,7 @@
        brandsReady:!!(stages.brands.ready&&summaryVerdict().ready&&brandsSaved),expectedSheets:summaryRead?summaryRead.expectedSheets:0,
        inquiryReady:genReady&&genSaved,inquiryPendingSave:genReady&&!genSaved,inquiryStale:!!generation&&!genReady,
        outputDirectory:splitPanel&&splitPanel.directory?splitPanel.directory():'',splitVerified:!!(stages.split.ready&&genReady&&splitPanel&&splitPanel.verdict().ready&&splitSaved),splitPendingSave:!!(genReady&&ss&&ss.done&&!splitSaved),
-       split:{planned:receipt?receipt.files.length:0,complete:ss?ss.succeeded.length:0,failed:ss?ss.failed.length:0,pending:ss?ss.pending.length:0,needsVerification:ss?ss.needsVerification.length:0,files:receipt?receipt.files:[]}});
+       split:{planned:receipt?receipt.files.length:0,complete:ss?ss.succeeded.length:0,failed:ss?ss.failed.length:0,pending:ss?ss.pending.length:0,needsVerification:ss?ss.needsVerification.length:0,supplierCount:receipt?receipt.files.filter(function(f){return f.kind!=='complete-workbook';}).length:0,completeWorkbookCount:receipt?receipt.files.filter(function(f){return f.kind==='complete-workbook';}).length:0,files:receipt?receipt.files:[]}});
     }
     if(ui){
       function bind(name,action){ui.register(name,async function(){try{return await action();}finally{publishAssistant();}});}

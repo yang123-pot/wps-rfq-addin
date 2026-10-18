@@ -86,8 +86,8 @@
     var state=record&&record.files?record.files.filter(function(item){return item.fileId===file.fileId;})[0]:null;
     var li=node('li');li.setAttribute('data-split-file',file.fileId);
     li.appendChild(node('strong',file.name));
-    li.appendChild(node('p',file.categoryName+' · '+(file.brand||'（无品牌）')+' · '+(file.supplier||'（无供应商）')+
-     ' · 材料 '+file.materialRows+' 行 · 状态：'+stateLabel(state&&state.state)+(state&&state.error?'（'+state.error+'）':''),'source'));
+    li.appendChild(node('p',(file.kind==='complete-workbook'?'完整总表 · 保留全部工作表、内容和格式':file.categoryName+' · '+(file.brand||'（无品牌）')+' · '+(file.supplier||'（无供应商）')+' · 材料 '+file.materialRows+' 行')+
+     ' · 状态：'+stateLabel(state&&state.state)+(state&&state.error?'（'+state.error+'）':''),'source'));
     li.appendChild(node('p',file.target,'source'));
     previewList.appendChild(li);
    });
@@ -230,6 +230,11 @@
    await exportRequest('verify',{ticket:preparedFile.ticket,target:result.target,sha256:result.sha256});
    return result.sha256;
   }
+  async function copyComplete(file,verifyOnly){
+   var current=currentGeneration(),result=await splitRequest('copy-complete',Object.assign(preparePayload(),{verifyOnly:verifyOnly===true}));
+   if(!result||result.target!==file.target||result.sha256!==current.sha256)throw Error('完整总表导出回执不一致，未确认完成。');
+   return result.sha256;
+  }
   function findSheet(file){
    var current=currentGeneration(),sheets=current&&current.modelSnapshot&&current.modelSnapshot.sheets||[];
    return sheets.filter(function(sheet){return sheet.sheetId===file.sheetId&&sheet.kind==='inquiry';})[0]||null;
@@ -288,9 +293,10 @@
     await new Promise(function(resolve){setTimeout(resolve,0);});
     var outcome;
     try{
-     var sheet=findSheet(file);
-     if(!sheet)throw Error('冻结快照里找不到对应询价页，无法核对。');
-     outcome=await RfqExportHost.verifyExistingOutput(options.application,file,sheet,inspectFile);
+     if(file.kind==='complete-workbook')outcome={ok:true,sha256:await copyComplete(file,true)};
+     else{var sheet=findSheet(file);
+      if(!sheet)throw Error('冻结快照里找不到对应询价页，无法核对。');
+      outcome=await RfqExportHost.verifyExistingOutput(options.application,file,sheet,inspectFile);}
     }catch(error){outcome={ok:false,sha256:null,mismatches:[error.message],layoutIssues:[]};}
     if(!receiptMatches()){report.push('核对期间来源或总簿已变化，未记账成功。');break;}
     if(outcome.ok){
@@ -345,9 +351,11 @@
      tell('正在拆分 '+(index+1)+' / '+todo.length+'：'+file.name);
      await new Promise(function(resolve){setTimeout(resolve,0);});
      try{
-      var sheet=findSheet(file);
-      if(!sheet)throw Error('生成快照里找不到对应询价页。');
-      var sha=await publish(file,sheet);
+      var sha;
+      if(file.kind==='complete-workbook')sha=await copyComplete(file,false);
+      else{var sheet=findSheet(file);
+       if(!sheet)throw Error('生成快照里找不到对应询价页。');
+       sha=await publish(file,sheet);}
       record=RfqSplitState.mark(record,file.fileId,'succeeded',sha);
       try{await saveReceipt(record);}
       catch(saveError){
@@ -415,6 +423,7 @@
    verdict:function(){
     if(!receipt||!receipt.files||!receipt.files.length)return {ready:false,detail:'尚未完成拆分'};
     if(!receiptMatches())return {ready:false,detail:'总询价工作簿或输出目录已变化，需要重新拆分'};
+    if(!recordMatchesPlan(receipt,localPlan()))return {ready:false,detail:'尚未导出完整询价总表，请补导未完成文件'};
     var summary=RfqSplitState.summarize(receipt);
     if(summary.needsVerification.length)return {ready:false,detail:'有文件待核对，不能沿用旧成功记录'};
     if(!summary.done)return {ready:false,detail:'还有文件未成功：'+String(summary.failed.length+summary.pending.length)+'份'};

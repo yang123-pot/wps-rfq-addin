@@ -16,6 +16,7 @@
  function baseName(sheet){
   return safeName(text(sheet.categoryName)+'_'+text(sheet.supplier))+'.xlsx';
  }
+ function completeName(generation){return safeName(text(generation&&generation.target).split(/[\\/]/).pop().replace(/\.xlsx$/i,''))+'_完整文件.xlsx';}
  function join(directory,name){
   var separator=text(directory).indexOf('\\')>=0?'\\':'/';
   return text(directory).replace(/[\\\/]+$/,'')+separator+name;
@@ -51,10 +52,16 @@
    seen[key]=true;
    var headerRow=sheet.layout&&sheet.layout.metadata&&Number.isSafeInteger(sheet.layout.metadata.headerRow)?
     sheet.layout.metadata.headerRow:(sheet.headerRow||0);
-   files.push({fileId:fileId,sheetId:sheet.sheetId,assignmentId:sheet.assignmentId,categoryName:sheet.categoryName,
+   files.push({kind:INQUIRY,fileId:fileId,sheetId:sheet.sheetId,assignmentId:sheet.assignmentId,categoryName:sheet.categoryName,
     brand:sheet.brand,brandLabel:sheet.brandLabel,supplier:sheet.supplier,sheetName:sheet.name,name:name,target:target,
     materialRows:sheet.values.length-headerRow,hasLayout:!!sheet.layout,issues:issues});
   });
+  if(generation&&generation.target&&sheets.length){
+   var completeFile=completeName(generation),completeTarget=join(directory,completeFile),completeIssues=[];
+   if(completeTarget.length>MAX_PATH)completeIssues.push({code:'long-path',message:'完整总表输出路径过长，请选择更短的目录：'+completeTarget});
+   if(seen[completeTarget.toLowerCase()])conflicts.push({code:'duplicate-target',message:'完整总表与供应商文件同名，请修改总表文件名或供应商名称：'+completeFile});
+   files.push({kind:'complete-workbook',fileId:'complete-workbook',name:completeFile,target:completeTarget,issues:completeIssues});
+  }
   files.forEach(function(file){file.issues.forEach(function(issue){
    if(issue.code!=='illegal-character')conflicts.push({code:issue.code,fileId:file.fileId,message:issue.message});});});
  return {schemaVersion:SCHEMA_VERSION,inputKey:text(model.inputKey),generationSha256:text(generation&&generation.sha256||''),
@@ -69,5 +76,5 @@
   });
   return {ok:conflicts.length===0,conflicts:conflicts,canPublish:(plan&&plan.canPublish)===true&&conflicts.length===0};
  }
- return {SCHEMA_VERSION:SCHEMA_VERSION,INQUIRY:INQUIRY,MAX_PATH:MAX_PATH,safeName:safeName,baseName:baseName,build:build,checkTargets:checkTargets};
+ return {SCHEMA_VERSION:SCHEMA_VERSION,INQUIRY:INQUIRY,MAX_PATH:MAX_PATH,safeName:safeName,baseName:baseName,completeName:completeName,build:build,checkTargets:checkTargets};
 }));

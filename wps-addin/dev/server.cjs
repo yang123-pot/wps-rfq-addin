@@ -137,7 +137,7 @@ function createServer({root, importDirectory = null, projectDirectory = null, li
         return json(400,{error:error.message});
       }
     }
-    if (['/api/split/prepare','/api/split/load','/api/split/save'].includes(url.pathname)) {
+    if (['/api/split/prepare','/api/split/load','/api/split/save','/api/split/copy-complete'].includes(url.pathname)) {
       const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');
       if (req.method !== 'POST') return json(405,{error:'POST required'});
       if (req.headers['x-rfq-import-token'] !== importToken ||
@@ -149,6 +149,7 @@ function createServer({root, importDirectory = null, projectDirectory = null, li
         let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'拆分请求无效。'});}
         if(!data||Array.isArray(data))return json(400,{error:'拆分请求无效。'});
         if(url.pathname==='/api/split/prepare')return json(200,await splits.prepare(data));
+        if(url.pathname==='/api/split/copy-complete')return json(200,await splits.copyComplete(data));
         if(url.pathname==='/api/split/load')return json(200,{receipt:await splits.load(data.projectId,data.batchId)});
         return json(200,await splits.save(data.receipt,{expectedRevision:data.expectedRevision}));
       } catch(error) {

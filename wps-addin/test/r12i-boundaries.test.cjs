@@ -138,7 +138,8 @@ test('R12-I不合并：10行来源边界保留，4类4/2/2/1，9条询价材料�
     generation: { inputKey: INPUT_KEY, sha256: 'a'.repeat(64), target: ROOT + '\\示例园区_询价总表.xlsx' },
     currentKey: INPUT_KEY });
   assert.equal(split.canPublish, true, split.conflicts.map(function (item) { return item.message; }).join('；'));
-  assert.deepEqual(split.files.map(function (file) { return file.name; }).sort(),
+  assert.equal(split.files.filter(file=>file.kind==='complete-workbook').length,1);
+  assert.deepEqual(split.files.filter(file=>file.kind==='inquiry').map(function (file) { return file.name; }).sort(),
     ['水泵_华川设备.xlsx', '水泵_启明机电.xlsx', '阀门_多供应商.xlsx', '风机_瑞风设备.xlsx', '汽车充电桩_远程电气.xlsx'].sort());
 });
 
