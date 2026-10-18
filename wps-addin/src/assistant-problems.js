@@ -1,13 +1,25 @@
 (function(root,factory){'use strict';var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.RfqAssistantProblems=api;}(typeof window==='object'?window:globalThis,function(){
  'use strict';
  function column(n){var s='';while(n>0){n--;s=String.fromCharCode(65+n%26)+s;n=Math.floor(n/26);}return s;}
- function unique(items){var seen=Object.create(null);return (items||[]).filter(function(p){var k=[p.code,p.message,p.sheet,p.row,p.column,p.cell].join('|');if(seen[k])return false;seen[k]=true;return true;});}
+ function unique(items){var seen=Object.create(null);return (items||[]).filter(function(p){var k=JSON.stringify([p.path,p.file,p.code,p.message,p.sheet,p.row,p.column,p.cell]);if(seen[k])return false;seen[k]=true;return true;});}
  function describe(input){
   var p=input||{},issues=unique(p.issues||[]),first=issues[0]||{},message=String(p.message||first.message||'本次操作未完成。');
   var cell=first.cell||((first.row&&first.column)?column(first.column)+first.row:'');
-  var location=[first.sheet||p.sheet||'',cell].filter(Boolean).join(' · ');
+  var location=[first.path||first.file||'',first.sheet||p.sheet||'',cell||(first.row?'第 '+first.row+' 行':'')].filter(Boolean).join(' · ');
   var r={title:p.title||'这一步还不能完成',message:message,location:location,issues:issues,actionLabel:p.actionLabel||'去处理',solution:'请展开详情查看具体提示，保留当前填写内容后重试；仍失败时把详情提供给维护人员。',details:p.details||message};
-  if(p.stage==='review'){
+  if(p.stage==='source'){
+   r.title='还有 '+(issues.length||1)+' 处来源问题';r.actionLabel='去核对来源';
+   var solutions={
+    'quantity-invalid':'请对照原清单，在已展开的修正区填写正确的工程量，再点击“确认本行核对”。',
+    'name-missing':'请对照原清单，在已展开的修正区补齐项目名称，再点击“确认本行核对”。',
+    'unit-missing':'请对照原清单，在已展开的修正区补齐单位，再点击“确认本行核对”。',
+    'code-missing':'请按原表填写项目编码；确实没有编码时勾选“已核对原清单，确认无项目编码”，再确认本行核对。',
+    'code-display-unverified':'请按原表显示填写编码，保留前导零，并勾选已核对显示格式，再确认本行核对。',
+    'feature-continuation':'请核对项目特征续行所属的材料行号，在修正区填写“归属材料行号”并确认归属。',
+    'row-unrecognized':'请在已展开的修正区选择此行类型。材料行需补齐字段；非材料说明行需填写核对理由。'
+   };
+   r.solution=solutions[first.code]||'请查看对应行的修正说明；若问题不能在修正区处理，请对照清单修复原文件后重新导入，不能直接标为已解决。';
+  }else if(p.stage==='review'){
    r.title='核对表有 '+(issues.length||1)+' 处需要修改';r.actionLabel='去填写';
    r.solution='请到提示的工作表和单元格修改最终分类；无需询价的材料选择“无需询价”。如果材料名称、数量或行结构被修改，请先恢复原值，再整表确认。';
   }else if(p.stage==='brands'){

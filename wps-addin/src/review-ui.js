@@ -32,6 +32,7 @@
       ['quantity','工程量',entry.quantity == null ? entry.quantityRaw : entry.quantity],
       ['engineering','工程名称',entry.source.engineering],['profession','专业',entry.source.profession]].forEach(function (f) {
       inputs[f[0]] = field(form, f[1], f[2]);
+      inputs[f[0]].setAttribute('data-review-field', f[0]);
     });
     var missing = field(form, '已核对原清单，确认无项目编码', '', 'checkbox');
     missing.checked = !!(entry.review && entry.review.decision && entry.review.decision.allowMissingCode);
@@ -62,6 +63,7 @@
       details.appendChild(materialForm(entry, onDecision));
       (entry.review ? entry.review.continuations : []).forEach(function (part) {
         var form = node('form', null, 'review-form continuation-form');
+        form.setAttribute('data-review-pending', part.confirmed ? 'false' : 'true');
         var text = entry.featureParts.find(function (p) { return p.row === part.row; });
         form.appendChild(node('strong', '第 ' + part.row + ' 行特征续行' + (part.confirmed ? ' · 已确认' : ' · 待确认')));
         form.appendChild(node('p', text ? text.text : '', 'feature'));

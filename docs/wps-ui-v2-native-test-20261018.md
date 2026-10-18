@@ -40,6 +40,8 @@ outputs/wps-ui-v2-20261018/native-file-check-2026-10-18T07-20-21-209Z/
 
 ## 隔离测试入口及当前阻断
 
+**个人电脑与拦截范围澄清：** 用户已确认这是个人电脑，不再要求寻找单位管理员。只读检查显示启动器实际调用的Windows PowerShell五范围均Undefined；工具当前使用的PowerShell 7既有策略为LocalMachine RemoteSigned，两者分别记录，未修改或借换解释器启动PS1。已审核手动启动文件仅启动回环地址隔离服务，未含WPS注册修改；先前自动审批对“启动＋注册”组合只返回 `blocked by policy`，没有细分理由，不能断言是哪一部分触发。个人电脑归属不代表原工具动作已获放行；本轮38918仍未启动、D1–D6不变。先前“找管理员”的表述保留为历史，当前启动方式尚待明确。
+
 上一轮自动审批拒绝“启动隔离服务＋临时注册测试插件”组合动作，返回 `blocked by policy`，未执行，未换工具重试注册。
 
 本轮准备了仅由用户手动运行的 `outputs/wps-ui-v2-20261018/start-isolated-test.cmd` 及配套PS1/CJS：只在127.0.0.1:38918启动服务，独立 `native-test/data/{imports,library,projects,headers,splits}`，只在隔离库首次为空时放入合成样例分类库。**不改WPS注册、不改变正常服务、不自动安装插件或打开窗格。** JavaScript与PowerShell语法检查通过；PS1保存为UTF-8 BOM以供本机Windows PowerShell读取中文路径。启动文件未由助手执行，运行与宿主接入仍待验证。

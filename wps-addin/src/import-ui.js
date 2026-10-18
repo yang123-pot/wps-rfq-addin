@@ -3,7 +3,7 @@
   function node(tag,text,className){var e=document.createElement(tag);if(text!=null)e.textContent=text;if(className)e.className=className;return e;}
   function button(text,action,className){var e=node('button',text,'locate'+(className?' '+className:''));e.type='button';e.addEventListener('click',action);return e;}
   function create(options){
-    var collection=RfqCollection.create(),selected=null,page=0,busy=false;
+    var collection=RfqCollection.create(),selected=null,page=0,busy=false,sourceProblemsShown=false;
     var ui=window.RfqAssistant,reviewOpenedPath="",brandsOpenedPath="",receiptSave=Promise.resolve();
     var mergeConfirmedKey=null;
     var importPreviewHandle=null,importPreviewKey=null;
@@ -208,7 +208,14 @@
     }
     function activate(id){
       var entry=collection.entries.find(function(e){return e.id===id;});
-      if(entry&&options.onSelect(entry)!==false){selected=id;render();}
+      if(entry&&options.onSelect(entry)!==false){selected=id;render();return true;}
+      return false;
+    }
+    function sourceProblems(result){
+      return result.issues.filter(function(issue){return ['source-unresolved','source-inferred','section-ambiguous'].indexOf(issue.code)<0;});
+    }
+    function sourceProblemReport(issues){
+      return {stage:'source',message:'请处理以下 '+issues.length+' 处问题，再确认整理方式。',issues:issues};
     }
     function sources(group){
       var details=node('details'),built=false;
@@ -272,12 +279,18 @@
         '仅当 项目名称＋项目特征描述＋单位 完全相同时合并，不进行模糊匹配；数量精确累加。';
       projects.refresh();
       if(!collection.entries.length){
+        if(sourceProblemsShown){sourceProblemsShown=false;if(window.RfqFeedback)RfqFeedback.clear('source');}
         if(previewGate)previewGate.hidden=true;
         exporter.refresh({canFinalize:false});classifier.refresh({groups:[]});
         if(workflow)workflow.setStats({files:0,rows:0,mergedRows:0});publishAssistant();
         if(brandPanel)brandPanel.refresh();renderCategories();renderBrands();return;
       }
       var result=currentPreview(),pages=Math.max(1,Math.ceil(result.groups.length/20));page=Math.min(page,pages-1);
+      if(sourceProblemsShown&&window.RfqFeedback){
+        var remaining=sourceProblems(result);
+        if(remaining.length)RfqFeedback.updateSummary(sourceProblemReport(remaining));
+        else{sourceProblemsShown=false;RfqFeedback.clear('source');}
+      }
       var mergeConfirmed=mergeConfirmedKey===RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,
         mergeAllWorkbooks:mergeAll.checked===true,groups:result.groups});
       exporter.refresh(result);
@@ -381,7 +394,21 @@
       if(busy)return;
       if(!previewReviewed){tell('请先查看导入预览，并点“我已看完预览，选择工作簿处理方式”。',true);return;}
       var result=collection.entries.length?currentPreview():null;
-      if(!result||!result.canFinalize){tell('还有必须处理的问题，请先处理来源问题再确认预览。',true);return;}
+      if(!result||!result.canFinalize){
+        var issues=result?sourceProblems(result):[];
+        if(window.RfqFeedback&&issues.length){
+          var report=sourceProblemReport(issues),first=issues[0];sourceProblemsShown=true;
+          report.resolve=async function(){
+            var source=collection.entries.find(function(entry){return entry.metadata.originalPath.replace(/[\\/]+/g,'/').toLowerCase()===String(first.path||'').replace(/[\\/]+/g,'/').toLowerCase();});
+            if(!source)throw Error('来源清单已移除，请重新选择清单后核对。');
+            if(!activate(source.id))return;
+            if(workflow)workflow.openDetail('import');
+            if(options.onIssue)await options.onIssue(source,first);
+          };
+          RfqFeedback.notify(report);
+        }else tell('尚未识别出可用材料，请检查清单内容后重新选择文件。',true);
+        return;
+      }
       // 2026-10-11 用户确认（A2a）：来源/区段“待核对”类问题确认后放行——必须由用户显式确认，并记入本次确认。
       if(result.needsReviewAck){
         var reviewLines=result.issues.filter(function(issue){
@@ -1582,6 +1609,7 @@
     if(workflow)workflow.startRibbonNavigation();
     return {
       update:function(id,record,dirty){collection=RfqCollection.update(collection,id,record,dirty);render();},
+      finishSourceIssue:function(){if(workflow)workflow.openTask('import');},
       hasUnsaved:function(){return collection.entries.some(function(e){return e.dirty;});},
       clearSelection:function(){selected=null;render();}
     };

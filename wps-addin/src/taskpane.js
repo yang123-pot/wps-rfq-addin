@@ -5,7 +5,7 @@
   var message = document.getElementById('message');
   var application = window.Application;
   var parsed = null, snapshot = null, record = null, dirty = false, page = 0, pageSize = 20;
-  var imported = null, imports = null;
+  var imported = null, imports = null, sourceCorrectionActive = false;
   var mode = document.getElementById('preview-mode');
   var labels = { 'code-missing': '缺少编码', 'code-display-unverified': '核对编码格式', 'name-missing': '缺少名称',
     'unit-missing': '缺少单位', 'quantity-invalid': '工程量异常', 'source-unresolved': '来源待核对',
@@ -68,6 +68,7 @@
     if (imported) { nextParsed.fingerprint = snapshot.fingerprint; imports.update(imported.id, next, true); }
     record = next; parsed = nextParsed; dirty = true; refresh();
     message.className = ''; message.textContent = '核对已应用，请保存到本机。原始工作簿未修改。';
+    if (sourceCorrectionActive) { sourceCorrectionActive = false; imports.finishSourceIssue(); }
   }
   function decide(decision) {
     try { assertCurrent(false); changeRecord(RfqReview.setDecision(snapshot, record, decision)); }
@@ -151,13 +152,38 @@
   document.getElementById('previous-page').addEventListener('click', function () { page--; renderPreview(); });
   document.getElementById('next-page').addEventListener('click', function () { page++; renderPreview(); });
   var businessBusy=false;
+  async function focusSourceIssue(entry, issue) {
+    if (!imported || imported.id !== entry.id) return;
+    var index = parsed.issues.findIndex(function (item) {
+      return item.code === issue.code && item.sheet === issue.sheet && item.row === issue.row && item.column === issue.column;
+    });
+    if (index < 0) throw new Error('来源问题已更新，请重新确认整理方式后查看剩余问题。');
+    mode.value = 'issues'; page = Math.floor(index / pageSize); renderPreview();
+    var target = document.getElementById('preview-list').children[index % pageSize];
+    target.classList.add('source-problem-target'); target.setAttribute('tabindex', '-1');
+    var editor = target.querySelector('.review-editor');
+    if (editor && !editor.open) await new Promise(function (resolve) {
+      editor.addEventListener('toggle', resolve, {once:true}); editor.open = true;
+    });
+    var fields = {'quantity-invalid':'quantity','name-missing':'name','unit-missing':'unit',
+      'code-missing':'code','code-display-unverified':'code','source-unresolved':'engineering'};
+    var control = fields[issue.code] ? target.querySelector('[data-review-field="' + fields[issue.code] + '"]') : null;
+    if (issue.code === 'feature-continuation') control = target.querySelector('.continuation-form[data-review-pending="true"] input');
+    control = control || target.querySelector('select') || target.querySelector('input') || target;
+    if (control.tagName === 'INPUT') control.setAttribute('aria-invalid', 'true');
+    control.addEventListener('input', function () { control.removeAttribute('aria-invalid'); }, {once:true});
+    control.focus(); control.scrollIntoView({block:'center'});
+    sourceCorrectionActive = true;
+  }
   function syncBusyControls(){document.getElementById('task-controls').disabled=businessBusy||!!(window.RfqAssistant&&RfqAssistant.snapshot().busy);}
   if(window.RfqAssistant)RfqAssistant.subscribe(syncBusyControls);
   imports = RfqImportUI.create({
     application: application,
     onBusy: function (busy) { businessBusy=busy;syncBusyControls(); },
+    onIssue: focusSourceIssue,
     onSelect: function (entry) {
       if (!imported && dirty && !window.confirm('切换到导入文件会清除当前单独读取的未保存核对，是否继续？')) return false;
+      sourceCorrectionActive = false;
       imported = entry; snapshot = entry.snapshot; record = entry.record; parsed = entry.parsed; dirty = entry.dirty;
       page = 0; mode.value = 'all'; showBook(parsed);
       document.getElementById('workbook-context').textContent = '正在核对导入文件（复制时的清单）';
@@ -170,6 +196,7 @@
     },
     onRemove: function (id) {
       if (!imported || imported.id !== id) return;
+      sourceCorrectionActive = false;
       imported = null; parsed = null; snapshot = null; record = null; dirty = false;
       document.getElementById('workbook-context').textContent = '当前工作簿（单独读取）';
       document.getElementById('workbook-name').textContent = '尚未读取';

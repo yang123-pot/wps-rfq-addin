@@ -210,7 +210,7 @@
   if(typeof location!=='undefined'&&/[?&]mode=detail(?:&|$)/.test(location.search||''))setViewMode('detail');
   if(simpleExampleLink)simpleExampleLink.onclick=function(){showSimpleHelp('选择清单→先看预览→确认整理方式→表内核对分类→汇总表填写品牌→填写抬头→拆分文件。每步完成后，下方主按钮会出现下一项操作。');};
   renderSimple();
-  var handle={goTo:goTo,current:function(){return current;},
+  var handle={goTo:goTo,openDetail:openDetail,openTask:openTask,current:function(){return current;},
    panel:function(stage){
     var found=STEPS.filter(function(item){return item.id===stage;})[0];
     return found?stepPanel(found):null;
