@@ -12,6 +12,8 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
  const browser=await chromium.launch({channel:'msedge',headless:true});
  try{
   const page=await browser.newPage({viewport:{width:400,height:768}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+  async function showSimple(){await page.evaluate(()=>document.getElementById('simple-mode-toggle').click());}
+  async function showDetail(){await page.evaluate(()=>{document.getElementById('simple-settings-toggle').click();document.getElementById('simple-detail-link').click();});}
   await page.addInitScript(fixture.initScript,{files,drain:fixture.DRAIN,mep:fixture.MEP,reviewTarget,reviewValues:fixture.REVIEW_VALUES,root});
   await page.exposeFunction('__writeFixture',(file,sheets)=>fs.writeFile(file,xlsx.workbook(sheets)));
   await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html');
@@ -47,10 +49,10 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   await page.route('**/api/project/save',route=>{const p=route.request().postDataJSON().project;
    return p.review&&p.review.revision===2&&p.categories&&p.categories.reviewRevision===2
     ?route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'模拟新版分类簿绑定保存失败'})}):route.continue();});
-  await page.locator('#simple-mode-toggle').click();await page.locator('[data-stage="review"].workflow-step-button').click();
+  await showDetail();await page.locator('[data-stage="review"].workflow-step-button').click();
   await page.evaluate(row=>window.__setCell(row,9,'新版审核备注'),fixture.CONFLICT_ROW);await page.locator('#sheet-review-confirm').click();
   await page.waitForFunction(()=>document.getElementById('project-message').textContent.includes('模拟新版分类簿绑定保存失败'));
-  if(await page.getByRole('alertdialog').count())await page.keyboard.press('Escape');await page.locator('#simple-mode-toggle').click();
+  if(await page.getByRole('alertdialog').count())await page.keyboard.press('Escape');await showSimple();
   assert.equal(await page.evaluate(()=>RfqAssistant.view().action),'saveProject','不能用上版已保存分类簿代替本版保存');
   await page.unroute('**/api/project/save');await action('重试保存项目');
   await page.route('**/api/project/save',route=>route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'模拟磁盘保存失败'})}));
@@ -92,13 +94,13 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   await page.locator('#open-project').click();await page.locator('#project-list > li button').first().click();
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已恢复项目'));
   assert.equal(await page.getByRole('alertdialog').count(),0,'恢复不能出现异常：'+await page.locator('#assistant-problem').textContent());
-  await page.locator('#simple-mode-toggle').click();await page.waitForFunction(()=>RfqAssistant.view().step===8);
+  await showDetail();await page.waitForFunction(()=>RfqAssistant.view().step===8);
   assert.equal(await primary.innerText(),'打开文件夹');assert.equal((await record()).split.files.length,6);await shot('09-restored');
   await fs.unlink(inquiryTarget);await page.reload();await page.evaluate(()=>{RfqExportHost.showPreview=()=>({name:'预览'});});
   await page.locator('#simple-settings-toggle').click();await page.locator('[data-simple-section="project-section"]').click();
   await page.locator('#open-project').click();await page.locator('#project-list > li button').first().click();
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已恢复项目'));
-  if(await page.getByRole('alertdialog').count())await page.keyboard.press('Escape');await page.locator('#simple-mode-toggle').click();
+  if(await page.getByRole('alertdialog').count())await page.keyboard.press('Escape');await showSimple();
   assert.equal(await page.evaluate(()=>RfqAssistant.view().step),6,'恢复检查发现总询价文件缺失时不得继续显示完成或允许拆分');
   assert.deepEqual(errors,[]);console.log('PASS: 新版单主按钮真实服务链10→8→整表确认→4类→5询价→5供应商，错误集中提醒及抬头聚焦。');
  }finally{await browser.close();await new Promise(r=>server.close(r));await fs.rm(root,{recursive:true,force:true});}

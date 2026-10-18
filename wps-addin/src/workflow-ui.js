@@ -194,6 +194,14 @@
   if(simpleGuide)simpleGuide.addEventListener('click',function(){
    showSimpleHelp('七步：选清单、核对分类、审核确认、分类工作簿、填品牌、生成询价表、拆分文件。第一次只做当前这一步即可，遇到问题再打开右上角“设置”。');
   });
+  if(document&&typeof document.addEventListener==='function'){
+   document.addEventListener('rfq:simple-back',function(event){
+    var step=Number(event&&event.detail&&event.detail.step)||0,index=step-1;
+    if(index>=STEPS.length)return;
+    setViewMode('detail');
+    goTo(STEPS[Math.max(0,index-1)].id);
+   });
+  }
   Array.prototype.forEach.call(simpleMergeRadios,function(radio){
    radio.addEventListener('change',function(){
     if(!radio.checked)return;

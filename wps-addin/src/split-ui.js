@@ -411,6 +411,10 @@
    return new Promise(function(resolve){RfqPathPicker.open({mode:'directory',token:window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token,startPath:directory,title:'选择拆分输出文件夹',confirmLabel:'使用此文件夹',onConfirm:async function(paths){directory=paths&&paths[0]||'';batchId=ensureBatch();await syncPlan();resolve();},onCancel:resolve,onError:function(text){tell(text,true);resolve();}});});
   }
   return {execute:execute,chooseDirectory:chooseOutputDirectory,openDirectory:openDirectory,directory:function(){return directory;},refresh:function(){return syncPlan();},receipt:function(){return receipt;},
+   previewFiles:function(){
+    try{return localPlan().files.map(function(file){return {name:file.name,kind:file.kind,fileId:file.fileId};});}
+    catch(_){return [];}
+   },
    restore:function(value){
     if(value&&value.projectId&&value.batchId&&Array.isArray(value.files)){
      receipt=RfqSplitState.demoteUnproven(value);revision=Number(receipt.revision)||0;batchId=receipt.batchId;

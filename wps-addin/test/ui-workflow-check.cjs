@@ -22,6 +22,8 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
  const browser=await chromium.launch({channel:'msedge',headless:true});
  try{
   const page=await browser.newPage({viewport:{width:380,height:900}}),errors=[];
+  async function showSimple(){await page.evaluate(()=>document.getElementById('simple-mode-toggle').click());}
+  async function showDetail(){await page.evaluate(()=>{document.getElementById('simple-settings-toggle').click();document.getElementById('simple-detail-link').click();});}
   page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(({files,drain,mep})=>{
    window.__copyNames={};
@@ -85,7 +87,7 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.deepEqual(await page.evaluate(()=>window.__previews[0].sheets.map(s=>s.name)),['导入预览'],
    '预览完成前只显示工作簿和工作表结构');
   assert.equal(await page.evaluate(()=>window.__previews[0].previewOnly),true);
-  await page.locator('#simple-mode-toggle').click();
+  await showSimple();
   assert.equal(await page.locator('#simple-home').isVisible(),true);
   assert.equal(await page.locator('#stage-panel-import').isHidden(),true,'预览阶段不展开技术面板');
   assert.equal(await page.locator('#simple-merge-choice').isHidden(),true,'预览完成前不显示合并选项');
@@ -97,17 +99,18 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.equal(await page.locator('#preview-gate').isHidden(),true,'预览确认后收起预览确认入口');
   assert.deepEqual(await page.evaluate(()=>window.__previews.at(-1).sheets.map(s=>s.name)),['导入预览','合并明细'],
    '预览确认后才显示材料处理预览');
-  await page.locator('#simple-mode-toggle').click();
+  await showDetail();
   assert.equal(await page.locator('#stage-panel-import').isHidden(),false);
   assert.equal(await page.locator('#stage-panel-matching').isHidden(),true);
   if(process.env.RFQ_WORKFLOW_MULTI_SCREENSHOT)await page.locator('#merge-section').screenshot({path:process.env.RFQ_WORKFLOW_MULTI_SCREENSHOT});
 
   // 简版始终停留在当前步骤卡片，只显示材料处理选择、结果摘要和下一步按钮。
-  await page.locator('#simple-mode-toggle').click();
+  await showSimple();
   assert.equal(await page.locator('#simple-home').isVisible(),true);
   assert.equal(await page.locator('#stage-panel-import').isHidden(),true,'简版不展开识别预览技术面板');
   assert.equal(await page.locator('#simple-merge-choice').isVisible(),true,'导入后显示材料处理选择');
-  assert.match(await page.locator('#simple-result').innerText(),/已导入 2 本工作簿，共 10 条材料/);
+  assert.equal(await page.locator('#assistant-files').isHidden(),true,'预览确认后按效果图收起文件树');
+  assert.match(await page.locator('#merge-summary').innerText(),/10[\s\S]*10/,'材料处理摘要仍由工作表预览提供');
   assert.equal(await page.locator('#simple-primary').innerText(),'确认选择，开始自动分类','完成后在同一位置显示下一步按钮');
   if(process.env.RFQ_PREVIEW_READY_SCREENSHOT)await page.screenshot({path:process.env.RFQ_PREVIEW_READY_SCREENSHOT,fullPage:true});
   assert.equal(await page.locator('#simple-merge-all').isChecked(),false,'默认不合并全部工作簿');
@@ -123,7 +126,7 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='10');
   assert.equal(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth),true,'简版不得横向溢出');
   if(process.env.RFQ_SIMPLE_FOCUS_SCREENSHOT)await page.screenshot({path:process.env.RFQ_SIMPLE_FOCUS_SCREENSHOT,fullPage:true});
-  await page.locator('#simple-mode-toggle').click();
+  await showDetail();
   assert.equal(await page.locator('#preview-section').isVisible(),true,'详细模式仍保留识别预览');
 
   await page.locator('#aux-section > summary').click();
@@ -152,16 +155,16 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.match(await page.locator('#classification-review-banner').innerText(),/尚未自动分类/,'未确认前不得匹配');
 
   // 简版确认后留在当前步骤卡片，并在原位置出现下一步“生成审核成果表”。
-  await page.locator('#simple-mode-toggle').click();
+  await showSimple();
   assert.equal(await page.locator('#simple-primary').innerText(),'确认选择，开始自动分类');
   await page.locator('#simple-primary').click();
   await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次选择已确认'));
   await page.waitForFunction(()=>/生成分类核对表/.test(document.querySelector('#simple-primary').textContent));
-  assert.match(await page.locator('#simple-title').innerText(),/自动分类已完成/);
+  assert.match(await page.locator('#simple-title').innerText(),/自动分类完成/);
   assert.equal(await page.locator('#simple-primary').innerText(),'生成分类核对表','完成后必须直接显示下一步操作');
   assert.equal(await page.locator('#stage-panel-matching').isHidden(),true,'简版不展开自动分类技术面板');
   if(process.env.RFQ_SIMPLE_NEXT_SCREENSHOT)await page.screenshot({path:process.env.RFQ_SIMPLE_NEXT_SCREENSHOT,fullPage:true});
-  await page.locator('#simple-mode-toggle').click();
+  await showDetail();
   assert.equal(await page.locator('#stage-panel-import').isHidden(),true,'确认后进入下一阶段');
   assert.equal(await page.locator('#stage-panel-matching').isHidden(),false);
   // R4：自动分类完成后显示“自动匹配完成”，但仍写明尚未人工确认。

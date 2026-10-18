@@ -711,6 +711,7 @@
         lastReviewRead=RfqClassificationReviewModel.validateRead(read,{categories:reviewBinding.categories,
           allowNewCategories:true});
         reviewDivergence=detectReviewDivergence(read);
+        if(ui)ui.set({reviewPending:lastReviewRead&&lastReviewRead.ok?0:lastReviewRead.errors.length});
         if(!silent&&!lastReviewRead.ok)renderReviewIssues(lastReviewRead.errors);
       }catch(error){
         lastReviewRead=null;reviewDivergence=null;
@@ -1579,6 +1580,7 @@
        brandsReady:!!(stages.brands.ready&&summaryVerdict().ready&&brandsSaved),expectedSheets:summaryRead?summaryRead.expectedSheets:0,
        inquiryReady:genReady&&genSaved,inquiryPendingSave:genReady&&!genSaved,inquiryStale:!!generation&&!genReady,
        outputDirectory:splitPanel&&splitPanel.directory?splitPanel.directory():'',splitVerified:!!(stages.split.ready&&genReady&&splitPanel&&splitPanel.verdict().ready&&splitSaved),splitPendingSave:!!(genReady&&ss&&ss.done&&!splitSaved),
+       plannedSplitFiles:splitPanel&&splitPanel.previewFiles?splitPanel.previewFiles():[],
        split:{planned:receipt?receipt.files.length:0,complete:ss?ss.succeeded.length:0,failed:ss?ss.failed.length:0,pending:ss?ss.pending.length:0,needsVerification:ss?ss.needsVerification.length:0,supplierCount:receipt?receipt.files.filter(function(f){return f.kind!=='complete-workbook';}).length:0,completeWorkbookCount:receipt?receipt.files.filter(function(f){return f.kind==='complete-workbook';}).length:0,files:receipt?receipt.files:[]}});
     }
     if(ui){
