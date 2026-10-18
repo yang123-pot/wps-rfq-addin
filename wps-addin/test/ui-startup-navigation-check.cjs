@@ -54,7 +54,8 @@ async function startup(browser, {request = null, consumed = null, expectedStage 
         removeItem(key){storage.removeItem('plugin:' + key);}}};
   }, {request, consumed});
   try {
-    await page.goto(origin + '/taskpane.html?mode=detail');
+    await require('./assistant-test-ui.cjs').acknowledgeProblems(page);
+  await page.goto(origin + '/taskpane.html?mode=detail');
     assert.deepEqual(errors, [], 'queued navigation must not interrupt the complete taskpane initialization');
     await page.waitForFunction(() => document.querySelector('#connection').classList.contains('ready'));
     assert.equal(await page.locator('#read-workbook').isDisabled(), false, 'the taskpane must finish connecting');

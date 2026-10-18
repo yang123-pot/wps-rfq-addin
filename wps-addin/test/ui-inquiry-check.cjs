@@ -163,6 +163,7 @@ async function run(){
     await window.__writeInquiryFixture(stagePath,model.sheets);
     if(settings&&settings.finalizeFreeze)await settings.finalizeFreeze();};
   });};
+  await require('./assistant-test-ui.cjs').acknowledgeProblems(page);
   await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html?mode=detail');
   const shot=async function(file){
    if(!file)return;
@@ -348,4 +349,5 @@ async function run(){
   console.log('PASS(R9): 图06总询价工作簿——5张询价页（水泵2/阀门1/风机1/充电桩1）、阀门20/12与品牌通达/海岳、抬头与打印版式成立；品牌取自汇总表读回，改品牌后旧生成过期并可重新生成；侧栏显示当前工作簿、预计输出、返回汇总表修改与进入拆分。');
  }finally{await browser.close();await new Promise(function(r){server.close(r);});await fs.rm(root,{recursive:true,force:true});}
 }
-run().catch(function(error){console.error(error);process.exitCode=1;});
+module.exports={initScript,DRAIN,MEP,REVIEW_VALUES,CONFLICT_ROW,SUMMARY_FILLS,fillSummaryGrid};
+if(require.main===module)run().catch(function(error){console.error(error);process.exitCode=1;});

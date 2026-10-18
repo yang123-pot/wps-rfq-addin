@@ -87,6 +87,7 @@ async function setInput(locator,value){
    return route.continue();
   });
   const origin='http://127.0.0.1:'+server.address().port;
+  await require('./assistant-test-ui.cjs').acknowledgeProblems(page);
   await page.goto(origin+'/taskpane.html?mode=detail');
   await page.locator('#aux-section > summary').click();
   await page.waitForFunction(()=>document.querySelector('#library-status').textContent.includes('本机分类库版本 0'));

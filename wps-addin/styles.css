@@ -153,3 +153,39 @@ header .header-mode:hover:enabled,header .header-gear:hover:enabled{background:#
 .import-more button{margin-top:8px}
 .preview-gate{border:1px solid #dfe8e1;background:#fbfdfb;border-radius:8px;padding:12px;margin:12px 0}
 .preview-gate p{font-size:12px;margin:0 0 10px}
+
+/* 2026-10-18：WPS风格右侧操作区。仅插件HTML，WPS自身菜单与工作表保持原生。 */
+:root{font-family:"Microsoft YaHei",sans-serif;color:#202a35;background:#fff;font-size:14px}
+body:not(.detail-mode){height:100vh;overflow:hidden;background:#fff;display:flex;flex-direction:column}
+body:not(.detail-mode)>header{padding:14px 16px;background:#f4f5f7;flex:none;min-height:64px;border-bottom:1px solid #dce0e6}
+body:not(.detail-mode)>header img{width:24px;height:24px}header h1{font-size:18px}header p{font-size:12px;color:#586271}
+body:not(.detail-mode)>main{padding:0;flex:1;min-height:0;display:flex;flex-direction:column}
+body:not(.detail-mode) #task-controls{flex:1;min-height:0;display:flex;flex-direction:column}
+body:not(.detail-mode) #connection{display:none}body:not(.detail-mode) #simple-home{display:flex;flex-direction:column;min-height:0;height:100%;padding:12px 16px 0}
+.simple-progress{font-size:12px;margin:0 0 8px}.simple-bar{display:none}
+.simple-seven-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 4px;border:0;border-radius:0;padding:4px 0 12px;border-bottom:1px solid #e1e4e8;flex:none}
+.simple-seven-row,.simple-seven-row.current{flex-direction:column;border:0;background:transparent;padding:0;gap:4px;font-size:11px}
+.simple-seven-row .label{white-space:normal;text-overflow:clip;text-align:center;line-height:1.3;color:#545d6b}
+.simple-seven-row .n{width:26px;height:26px;font-size:12px}.simple-seven-row.current .n{background:#217346;border-color:#217346}.simple-seven-row .state{display:none}
+body:not(.detail-mode) .simple-card{display:flex;flex-direction:column;flex:1;min-height:0;margin:0;border:0;border-radius:0;box-shadow:none;padding:0}
+.assistant-scroll{flex:1;min-height:0;overflow-y:auto;padding:14px 0;scrollbar-gutter:stable}
+.simple-card h2{font-size:21px;color:#17212d;line-height:1.5}.simple-card p{font-size:14px;color:#4f5967;line-height:1.65}
+#simple-example,.simple-hint{display:none}.simple-merge-choice{padding:0;background:#fff;border:0;border-radius:0}
+.simple-merge-choice label{font-size:14px;padding:12px 0;border:0}.simple-merge-choice b{font-size:14px}.simple-merge-choice small{font-size:12px;color:#626b78}.simple-merge-all{background:#fff}
+.assistant-actions{flex:none;display:flex;gap:12px;align-items:center;border-top:1px solid #e1e4e8;padding:12px 0;background:#fff}
+.simple-primary{order:2;flex:1;min-width:0;border-radius:3px;background:#217346;font-size:14px;min-height:42px;margin:0;padding:10px 12px;line-height:1.45}
+.simple-link{order:1;width:auto;margin:0;color:#1768bb;font-size:12px;white-space:nowrap;text-decoration:none;padding:8px 0}
+.assistant-text-button{width:auto;display:inline-block;margin:8px 0;background:transparent;color:#1768bb;border:0;border-radius:2px;padding:5px 0;font-size:13px}
+.assistant-text-button:hover:enabled,.simple-link:hover:enabled{background:#eef4fa;color:#145897}
+.assistant-file-tree{list-style:none;margin:12px 0;padding:0;border:1px solid #dce0e6;border-radius:3px}.assistant-file-tree li{padding:10px 12px;border-bottom:1px solid #e7e9ed;overflow-wrap:anywhere}.assistant-file-tree li:last-child{border:0}.assistant-file-tree p{margin:4px 0 0 16px;font-size:13px}
+.simple-result{background:#edf5ef;border-radius:3px;font-size:13px!important;border:0;color:#23543b!important}.assistant-stats{background:#edf5ef;padding:10px;color:#23543b!important}
+.assistant-problem{background:#fff2ec;border-left:4px solid #b43a24;padding:10px;color:#8d2b1a!important;font-size:13px!important}
+#assistant-header .card{margin:12px 0;border:0;box-shadow:none;padding:0;border-radius:0}#assistant-header h2,#assistant-header>.card>.note,#assistant-header #header-status{display:none}
+#assistant-header .library-list>li{border:0;padding:7px 0}#assistant-header label{display:block;font-size:13px;color:#374454}#assistant-header input{border:1px solid #ccd3dc;border-radius:3px;padding:9px;background:#fff;font-size:14px}
+input[aria-invalid=true]{border:2px solid #b43a24!important;background:#fff4ef!important}
+#simple-settings{overflow:auto;padding:16px}.simple-setting{border-radius:3px;box-shadow:none}
+.assistant-overlay{position:fixed;inset:0;background:#17212d66;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:12px}
+.assistant-dialog{width:100%;max-height:95vh;overflow:auto;background:#fff;border:1px solid #bdc5d0;border-radius:4px;padding:18px;box-shadow:0 12px 36px #0003}
+.assistant-dialog h2{font-size:18px;color:#8d2b1a;margin:0 0 12px}.assistant-dialog p{font-size:14px;color:#263342}.assistant-dialog strong{display:block;overflow-wrap:anywhere;color:#8d2b1a}.assistant-dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}.assistant-dialog-actions{display:flex;gap:10px;margin-top:16px}.assistant-dialog-actions button{border-radius:3px;font-size:14px}
+body.detail-mode #simple-settings{display:none!important}body.detail-mode #assistant-header{display:none}
+@media(max-width:340px){body:not(.detail-mode)>header{padding:12px}body:not(.detail-mode) #simple-home{padding:10px 12px 0}.simple-seven-list{gap:8px 2px}.simple-seven-row .label{font-size:11px}.assistant-actions{gap:8px}}

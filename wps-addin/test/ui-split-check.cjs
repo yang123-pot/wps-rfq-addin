@@ -77,6 +77,7 @@ async function run(){
   });
   await page.exposeFunction('__writeSplitFixture',async function(stagePath,payload){
    await fs.writeFile(stagePath,xlsxFixture.workbook(payload));});
+  await require('./assistant-test-ui.cjs').acknowledgeProblems(page);
   await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html?mode=detail');
   await page.evaluate(function(args){
    ['split-message','split-status','split-directory','split-directory-label','split-preview','split-run','split-retry','split-open']

@@ -12,24 +12,25 @@
  var KEY='rfq.window.nav.request',CONSUMED='rfq.window.nav.consumed';
  var STAGES=['import','matching','review','categories','brands','inquiry','split'];
  function isStage(stage){return STAGES.indexOf(stage)>=0;}
+ function isDestination(stage){return isStage(stage)||stage==='project'||stage==='help';}
  function uniqueId(){return 'nav-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);}
  function parse(raw){
   var parsed=null;
   try{parsed=JSON.parse(raw);}catch(_){return null;}
   if(!parsed||typeof parsed!=='object')return null;
   if(typeof parsed.id!=='string'||!parsed.id)return null;
-  if(!isStage(parsed.stage))return null;
+  if(!isDestination(parsed.stage))return null;
   return {id:parsed.id,stage:parsed.stage};
  }
  // 功能区按钮既可能是字符串阶段，也可能是宿主传入的控件对象；tag 优先，缺 tag 时按按钮 id 推断。
  function stageFromControl(control){
-  if(typeof control==='string')return isStage(control)?control:null;
+  if(typeof control==='string')return isDestination(control)?control:null;
   if(!control||typeof control!=='object')return null;
   var tag=control.tag||control.Tag;
-  if(typeof tag==='string'&&isStage(tag))return tag;
+  if(typeof tag==='string'&&isDestination(tag))return tag;
   var id=control.id||control.Id;
   if(typeof id==='string'){
-    var simple={rfqStepImport:'import',rfqStepBrands:'brands',rfqStepInquiry:'inquiry'};
+    var simple={rfqStepImport:'import',rfqStepBrands:'brands',rfqStepInquiry:'inquiry',rfqOpenProject:'project',rfqHelp:'help'};
     if(simple[id])return simple[id];
     var guess=id.replace(/^rfqStage/i,'').toLowerCase();
     if(isStage(guess))return guess;
@@ -38,7 +39,7 @@
  }
  function request(storage,stage){
   if(!storage||typeof storage.setItem!=='function')return null;
-  if(!isStage(stage))return null;
+  if(!isDestination(stage))return null;
   var req={id:uniqueId(),stage:stage};
   storage.setItem(KEY,JSON.stringify(req));
   return req;
@@ -236,7 +237,7 @@
  }
  // openStage只显示窗口并写一次导航请求，既有业务前置条件仍由产品页处理。
  function openStage(application,stage,options){
-  if(!isStage(stage))return false;
+  if(!isDestination(stage))return false;
   if(!application)return false;
   var dialog=ensureWindow(application,options);
   if(!dialog)return false;

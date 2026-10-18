@@ -22,9 +22,11 @@ function buttonTag(id){
 }
 // 简版：功能区只保留三个大入口，内部仍映射到既有七阶段。
 const STAGE_BUTTONS=[
- ['rfqStepImport','① 选清单并核对分类','import'],
- ['rfqStepBrands','② 填品牌和供应商','brands'],
- ['rfqStepInquiry','③ 生成供应商文件','inquiry']
+ ['rfqStepImport','选择清单','import'],
+ ['rfqStepBrands','填写品牌','brands'],
+ ['rfqStepInquiry','生成文件','inquiry'],
+ ['rfqOpenProject','打开项目','project'],
+ ['rfqHelp','帮助','help']
 ];
 function load(options={}){
  const events=[];let paneVisible=true,exists=options.hasPane!==false;
@@ -89,7 +91,7 @@ test('窗口查询异常时明确失败，不能将未知状态当作关闭',()=
 });
 
 // R12-K：功能区补齐与获批图一致的阶段快捷入口，同时保留“打开/重建”入口。
-test('功能区只保留三个大入口，并保留打开与重建入口',()=>{
+test('功能区提供五个新版入口，并保留打开与重建入口',()=>{
  STAGE_BUTTONS.forEach(function(entry){
   const tag=buttonTag(entry[0]);
   assert.match(tag,/onAction="OnGotoStage"/,entry[0]+'必须连接阶段导航回调');
@@ -99,7 +101,7 @@ test('功能区只保留三个大入口，并保留打开与重建入口',()=>{
  });
  const group=ribbon.match(/<group\b[^>]*\bid="rfqStages"[^>]*>[\s\S]*?<\/group>/);
  assert.ok(group,'功能区必须有三步入口分组');
- assert.equal((group[0].match(/<button\b/g)||[]).length,3,'三步分组只放三个大入口');
+ assert.equal((group[0].match(/<button\b/g)||[]).length,5,'新版分组只放五个大入口');
  assert.equal(buttonAction('rfqOpenPane'),'OnOpenRfqPane','打开侧栏入口保持可用');
  assert.equal(buttonAction('rfqReloadPane'),'OnReloadRfqPane','手动重建入口保持可用');
 });
@@ -216,6 +218,6 @@ test('图标回调保留打开入口及未知控件兜底，取图后三步仍�
   assert.equal(context[buttonAction(id)]({Id:id}),true);
   assert.equal(JSON.parse(context.window.Application.PluginStorage.getItem('rfq.window.nav.request')).stage,stage);
  });
- assert.equal(events.filter(event=>event[0]==='store').length,3,'每个入口仍只写一次导航请求');
+ assert.equal(events.filter(event=>event[0]==='store').length,STAGE_BUTTONS.length,'每个入口仍只写一次导航请求');
  assert.equal(events.some(event=>['confirm','navigate','create','alert'].includes(event[0])),false);
 });

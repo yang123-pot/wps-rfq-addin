@@ -108,6 +108,15 @@ test('简版三步按钮id映射到既有阶段',()=>{
  assert.equal(nav.stageFromControl({Id:'rfqStepBrands'}),'brands');
  assert.equal(nav.stageFromControl({Id:'rfqStepInquiry'}),'inquiry');
 });
+test('新版功能区增加打开项目和帮助入口，保留七个业务阶段ID',()=>{
+ const nav=freshModule();
+ assert.equal(nav.stageFromControl({Id:'rfqOpenProject'}),'project');
+ assert.equal(nav.stageFromControl({Id:'rfqHelp'}),'help');
+ const store=storage(),spy=workflowSpy();
+ assert.equal(nav.request(store,'project').stage,'project');
+ assert.equal(nav.consume(store,spy.spy).applied,true);
+ assert.deepEqual(spy.calls,[['goTo','project']]);
+});
 
 test('每个快捷入口只导航：确认/学习/写表/拆分调用计数均为0',()=>{
  STAGES.forEach(stage=>{

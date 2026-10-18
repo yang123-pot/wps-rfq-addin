@@ -19,6 +19,7 @@ const {initScript}=require('./ui-sheet-review-check.cjs');
    drain:[...header,['000123','水管','DN50','m','0.1']],
    mep:[...header,['','给排水','','',''],['000456','水管','DN50','m','0.2'],['000789','水龙头','DN15','个','1']]});
   await page.exposeFunction('__writeReviewFixture',file=>fs.writeFile(file,Buffer.from([0x50,0x4b,3,4,1,2])));
+  await require('./assistant-test-ui.cjs').acknowledgeProblems(page);
   await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html?mode=detail');
   await page.evaluate(target=>{
    window.__writes=0;

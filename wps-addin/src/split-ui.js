@@ -17,7 +17,7 @@
     retryButton=document.getElementById('split-retry'),openButton=document.getElementById('split-open');
   var directory='',receipt=null,revision=0,batchId='',prepared=null,prepareError=null,preparing=false,busy=false,resultOverlay=null,
     notifiedReceipt='';
-  function tell(text,error){if(!message)return;message.textContent=text;message.className=error?'error':'';}
+  function tell(text,error){if(!message)return;message.textContent=text;message.className=error?'error':'';if(window.RfqFeedback)RfqFeedback.tell(text,error,'split');}
   function newId(){
    if(window.RfqProject&&typeof window.RfqProject.newId==='function')return window.RfqProject.newId();
    return 'b-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
@@ -330,7 +330,8 @@
    if(!record){tell('拆分回执尚未建立，未开始拆分。',true);return;}
    var blocked=RfqSplitState.blocked(record),todo=RfqSplitState.pending(record);
    if(!blocked.length&&!todo.length){
-    tell('所有文件都已成功并核对通过，无需重做。',false);showResult(plan,record);return;}
+    if(options.onComplete)await options.onComplete();
+    tell('所有文件都已成功并核对通过，无需重做。',false);if(document.body.classList.contains('detail-mode'))showResult(plan,record);return;}
    busy=true;if(options.onBusy)options.onBusy(true);render();
    try{
     if(blocked.length){
@@ -371,7 +372,8 @@
       (summary.failed.length||summary.needsVerification.length?
        '；待核对项已列出原文件位置，逐值核对通过才记账成功，原文件不覆盖。':'。'),
       !!(summary.failed.length||summary.needsVerification.length));
-    if(receipt)showResult(plan,receipt);
+    if(options.onComplete)await options.onComplete();
+    if(receipt&&document.body.classList.contains('detail-mode'))showResult(plan,receipt);
    }finally{busy=false;if(options.onBusy)options.onBusy(false);render();}
   }
   if(chooseDirectory)chooseDirectory.addEventListener('click',function(){
@@ -394,7 +396,13 @@
    try{openDirectory();tell('已请求打开输出文件夹：'+directory);}catch(error){tell(error.message,true);}
   });
   render();
-  return {refresh:function(){syncPlan();},receipt:function(){return receipt;},
+  async function chooseOutputDirectory(){
+   if(!window.RfqPathPicker)throw Error('目录选择器未加载，请重新打开助手。');
+   if(typeof RfqPathPicker.selectFolder==='function'){var native=RfqPathPicker.selectFolder(options.application,directory,'选择拆分输出文件夹');
+    if(native&&native.supported){if(native.path){directory=native.path;batchId=ensureBatch();await syncPlan();}return;}}
+   return new Promise(function(resolve){RfqPathPicker.open({mode:'directory',token:window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token,startPath:directory,title:'选择拆分输出文件夹',confirmLabel:'使用此文件夹',onConfirm:async function(paths){directory=paths&&paths[0]||'';batchId=ensureBatch();await syncPlan();resolve();},onCancel:resolve,onError:function(text){tell(text,true);resolve();}});});
+  }
+  return {execute:execute,chooseDirectory:chooseOutputDirectory,openDirectory:openDirectory,directory:function(){return directory;},refresh:function(){return syncPlan();},receipt:function(){return receipt;},
    restore:function(value){
     if(value&&value.projectId&&value.batchId&&Array.isArray(value.files)){
      receipt=RfqSplitState.demoteUnproven(value);revision=Number(receipt.revision)||0;batchId=receipt.batchId;

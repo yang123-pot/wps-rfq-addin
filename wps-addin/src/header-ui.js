@@ -12,12 +12,14 @@
   RfqInquiryHeader.FIELDS.forEach(function(field){
    inputs[field.key]=document.getElementById('header-'+field.key);
    if(!inputs[field.key])return;
-   inputs[field.key].addEventListener('change',function(){
+   function changed(){
     draft[field.key]=inputs[field.key].value;render();
     // 抬头是询价生成的内容键之一：变化后要立即让询价/拆分面板按最新内容重算可用性。
-    if(options.onChange)options.onChange(draft);});
+    if(options.onChange)options.onChange(draft);}
+   inputs[field.key].addEventListener('input',changed);
+   inputs[field.key].addEventListener('change',changed);
   });
-  function tell(text,error){message.textContent=text;message.className=error?'error':'';}
+  function tell(text,error){message.textContent=text;message.className=error?'error':'';if(window.RfqFeedback)RfqFeedback.tell(text,error,'header');}
   function request(action,payload){
    var token=window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token;
    if(!token)return Promise.reject(Error('当前会话未启用本机抬头模板。'));
@@ -31,8 +33,11 @@
   function render(){
    RfqInquiryHeader.FIELDS.forEach(function(field){
     if(inputs[field.key]&&inputs[field.key].value!==String(draft[field.key]||''))inputs[field.key].value=String(draft[field.key]||'');
+    if(inputs[field.key]&&String(draft[field.key]||'').trim())inputs[field.key].removeAttribute('aria-invalid');
    });
    var check=RfqInquiryHeader.validate(draft);
+   var problem=document.getElementById('assistant-problem');
+   if(check.ok&&problem&&problem.dataset.stage==='header'&&window.RfqFeedback)RfqFeedback.clear();
    status.textContent=RfqInquiryHeader.summary(draft)+(check.ok?' · 抬头已齐全（生成询价表后写入文件前几行）':' · 还缺：'+check.errors.join('；'));
    if(templateSelect){
     templateSelect.textContent='';

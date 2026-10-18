@@ -46,6 +46,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   },{files});
   await page.exposeFunction('__writeExportFixture',async file=>{await fs.writeFile(file,Buffer.from([0x50,0x4b,3,4,1,2]));});
   const origin='http://127.0.0.1:'+server.address().port;
+  await require('./assistant-test-ui.cjs').acknowledgeProblems(page);
   await page.goto(origin+'/taskpane.html?mode=detail');
   await page.locator('#aux-section > summary').click();
   await page.evaluate(()=>{

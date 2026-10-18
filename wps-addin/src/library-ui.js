@@ -12,7 +12,7 @@
     categoryList=document.getElementById('library-categories'),ruleList=document.getElementById('library-rules'),
     memoryFilter=document.getElementById('library-memory-filter'),memoryList=document.getElementById('library-memories');
   var revision=0,draft=null,loaded=false,busy=false,dirty=false;
-  function tell(text,error){message.textContent=text;message.className=error?'error':'';}
+  function tell(text,error){message.textContent=text;message.className=error?'error':'';if(window.RfqFeedback)RfqFeedback.tell(text,error,'library');}
   function current(){return {revision:revision,library:draft.library,memory:draft.memory};}
   function changed(){dirty=true;render();}
   function request(action,data){

@@ -12,7 +12,7 @@
     previewList=document.getElementById('inquiry-preview'),generateButton=document.getElementById('inquiry-generate'),
     nextButton=document.getElementById('inquiry-next'),backButton=document.getElementById('inquiry-back');
   var generation=null,busy=false;
-  function tell(text,error){if(!message)return;message.textContent=text;message.className=error?'error':'';}
+  function tell(text,error){if(!message)return;message.textContent=text;message.className=error?'error':'';if(window.RfqFeedback)RfqFeedback.tell(text,error,'inquiry');}
   function context(){return options.context?options.context():null;}
   function draft(){
    var ctx=context();
@@ -128,7 +128,7 @@
     // 发布后再核一次真实文件SHA，与分类工作簿/汇总表同一口径。
     await requests('verify',{ticket:prepared.ticket,target:result.target,sha256:result.sha256});
     generation=RfqInquiryModel.record(model,{target:result.target,sha256:result.sha256,generatedAt:new Date().toISOString()});
-    if(options.onGeneration)options.onGeneration(generation);
+    if(options.onGeneration){var saved=await options.onGeneration(generation);if(saved===null)throw Error('询价总表已生成，但项目记录未保存。请保存结果后继续。');}
     tell('总询价工作簿已生成并校验：'+result.target+'（'+model.sheets.length+' 张询价页，报价单价与金额留空）。品牌取自汇总表，改品牌请回汇总表修改并重新生成。');
    }catch(error){tell('询价表未确认成功。'+error.message+(prepared?' 请检查目标位置：'+prepared.target:''),true);}
    finally{busy=false;if(options.onBusy)options.onBusy(false);render();}
@@ -142,7 +142,7 @@
    if(options.onBack)options.onBack();
   });
   render();
-  return {refresh:render,generation:function(){return generation;},restore:function(value){generation=value||null;render();},
+  return {generate:generate,refresh:render,generation:function(){return generation;},restore:function(value){generation=value||null;render();},
    model:function(){try{return buildModel();}catch(_){return null;}},
    verdict:function(){
     if(!generation)return {ready:false,detail:'尚未生成总询价工作簿'};

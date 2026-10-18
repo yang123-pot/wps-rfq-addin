@@ -40,6 +40,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   };
   await install();
   const origin='http://127.0.0.1:'+server.address().port;
+  await require('./assistant-test-ui.cjs').acknowledgeProblems(page);
   await page.goto(origin+'/taskpane.html?mode=detail');
   await page.locator('#aux-section > summary').click();
   await page.locator('#import-files').click();
@@ -47,6 +48,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   assert.equal(await page.locator('#preview-gate').isVisible(),true);
   await page.locator('#preview-confirm').click();
   await page.waitForFunction(()=>document.querySelector('#merge-section').hidden===false);
+  await page.locator('#merge-all-workbooks').check();
   await page.locator('#merge-identical').check();
   await page.locator('#confirm-merge').click();
   await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次选择已确认'));

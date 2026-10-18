@@ -128,6 +128,7 @@ async function run(options={}){
   await page.addInitScript(initScript,{files,drain:DRAIN,mep:MEP,reviewTarget,reviewValues:REVIEW_VALUES});
   await page.exposeFunction('__writeReviewFixture',async file=>{await fs.writeFile(file,Buffer.from([0x50,0x4b,3,4,1,2]));});
   const origin='http://127.0.0.1:'+server.address().port;
+  await require('./assistant-test-ui.cjs').acknowledgeProblems(page);
   await page.goto(origin+'/taskpane.html?mode=detail');
   // 导入两份清单→选合并→确认选择（图01），进入自动分类（图02）。
   await page.locator('#import-files').click();

@@ -36,6 +36,7 @@ const DRAIN=[['工程名称：示例园区','','','',''],['项目编码','项目
    window.Application=app;window.__files=files;
   },{files,drain:DRAIN});
   const origin='http://127.0.0.1:'+server.address().port;
+  await require('./assistant-test-ui.cjs').acknowledgeProblems(page);
   await page.goto(origin+'/taskpane.html?mode=detail');
 
   async function pickerCase(options,how){

@@ -11,7 +11,7 @@
   var reviewConfirmation=null,reviewDraft=null,lastError=null;
   var restoreBlocks={},restoreAudit=null,restoreRecord=null;
   var STATE={ready:'已确认',stale:'已过期',missing:'未完成'};
-  function tell(text,error){message.textContent=text;message.className=error?'error':'';}
+  function tell(text,error){message.textContent=text;message.className=error?'error':'';if(window.RfqFeedback)RfqFeedback.tell(text,error,'project');}
   function bindingSnapshot(stage){
    try{
     if(stage==='review')return {matching:options.getReviewBinding?options.getReviewBinding():null,
@@ -357,6 +357,7 @@
   if(relocateButton)relocateButton.addEventListener('click',relocateProject);
   renderStatus();
   return {refresh:renderStatus,current:function(){return current;},identity:identity,reload:listProjects,
+   uiStatus:function(){return {stages:RfqProject.assess(assessmentInputs()),reviewBlocked:!!blockDetail('review')};},
    assessment:function(){return lastReport;},commitReview:commitReview,commitReviewDraft:commitReviewDraft,
    reviewConfirmation:function(){return reviewConfirmation;},reviewDraft:function(){return reviewDraft;},
    lastError:function(){return lastError;},save:saveProject,open:openProject,

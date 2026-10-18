@@ -4,6 +4,7 @@
   function button(text,action,className){var e=node('button',text,'locate'+(className?' '+className:''));e.type='button';e.addEventListener('click',action);return e;}
   function create(options){
     var collection=RfqCollection.create(),selected=null,page=0,busy=false;
+    var ui=window.RfqAssistant,reviewOpenedPath="",brandsOpenedPath="",receiptSave=Promise.resolve();
     var mergeConfirmedKey=null;
     var importPreviewHandle=null,importPreviewKey=null;
     var picker=document.getElementById('import-files'),message=document.getElementById('import-message');
@@ -163,7 +164,7 @@
     // 旧品牌编辑/预览确认不再接入页面；品牌参考保持只读独立入口。
     RfqBrandUI.createReference({application:options.application});
     headerPanel=RfqHeaderUI.create({onChange:function(){
-      if(inquiryPanel)inquiryPanel.refresh();if(splitPanel)splitPanel.refresh();}});
+      if(inquiryPanel)inquiryPanel.refresh();if(splitPanel)splitPanel.refresh();publishAssistant();}});
     // 生成面板的输入：汇总表读回的品牌组、询价抬头、当前清单分组与分类确认，以及生成用内容键。
     // 品牌/供应商的唯一来源是分类汇总表读回（R8），侧栏不再二次编辑；抬头变化同样进入生成内容键。
     function deliveryContext(){
@@ -180,18 +181,18 @@
         summary:summaryVerdict(),summaryPath:summaryReceipt?summaryReceipt.path:null};
     }
     // R9：生成成功后把生成记录落盘，让“询价表”阶段按真实内容置为已确认。
-    function afterInquiryGeneration(){render();if(projects&&projects.save)projects.save();}
+    async function afterInquiryGeneration(){var saved=await projects.save();render();publishAssistant();return saved;}
     inquiryPanel=RfqInquiryUI.create({application:options.application,context:deliveryContext,
       onGeneration:afterInquiryGeneration,
       onNext:function(){if(workflow)workflow.goTo('split');},
       onBack:function(){if(workflow)workflow.goTo('brands');},
       onBusy:function(value){busy=value;options.onBusy(value);}});
-    splitPanel=RfqSplitUI.create({application:options.application,context:deliveryContext,
+    splitPanel=RfqSplitUI.create({application:options.application,context:deliveryContext,onComplete:async function(){await receiptSave;var saved=await projects.save();publishAssistant();if(!saved)throw Error('拆分文件已保留，但项目尚未保存，请重试保存项目。');},
       generation:function(){return inquiryPanel?inquiryPanel.generation():null;},
       projectId:function(){return projects.identity();},
-      onReceipt:function(){if(projects&&projects.save)projects.save();},
+      onReceipt:function(){receiptSave=receiptSave.then(function(){return projects.save();}).then(function(value){publishAssistant();return value;});},
       onBusy:function(value){busy=value;options.onBusy(value);}});
-    function tell(text,error){message.textContent=text;message.className=error?'error':'';}
+    function tell(text,error){message.textContent=text;message.className=error?'error':'';if(window.RfqFeedback)RfqFeedback.tell(text,error,"import");}
     function restoreProject(project){
       var inputs=(project.sources||[]).map(function(source){
         return {metadata:{originalPath:source.originalPath,originalName:source.originalName,copyPath:source.copyPath,fingerprint:source.fingerprint},snapshot:source.snapshot,record:source.reviewRecord};
@@ -199,7 +200,7 @@
       if(!inputs.length)throw Error('项目记录里没有来源清单，无法恢复。');
       collection=RfqCollection.add(RfqCollection.create(),inputs);
       selected=null;page=0;merge.checked=project.mergeIdentical===true;
-      mergeAll.checked=merge.checked||((project.sources||[]).some(function(source){return source.scopeId==='combined';}));
+      mergeAll.checked=project.mergeAllWorkbooks===true;
       previewReviewed=collection.entries.length>0;
       render();
       if(collection.entries.length)activate(collection.entries[0].id);
@@ -273,7 +274,7 @@
       if(!collection.entries.length){
         if(previewGate)previewGate.hidden=true;
         exporter.refresh({canFinalize:false});classifier.refresh({groups:[]});
-        if(workflow)workflow.setStats({files:0,rows:0,mergedRows:0});
+        if(workflow)workflow.setStats({files:0,rows:0,mergedRows:0});publishAssistant();
         if(brandPanel)brandPanel.refresh();renderCategories();renderBrands();return;
       }
       var result=currentPreview(),pages=Math.max(1,Math.ceil(result.groups.length/20));page=Math.min(page,pages-1);
@@ -318,7 +319,7 @@
         li.appendChild(sources(g));groups.appendChild(li);
       });
       document.getElementById('merge-pages').textContent=(page+1)+' / '+pages+' 页';
-      document.getElementById('merge-prev').disabled=page===0;document.getElementById('merge-next').disabled=page+1>=pages;
+      document.getElementById('merge-prev').disabled=page===0;document.getElementById('merge-next').disabled=page+1>=pages;publishAssistant();
     }
     // 图01：先预览，再决定是否合并全部工作簿；完全相同材料是否累加仍由独立选项控制。
     function syncMergeChoices(){
@@ -330,7 +331,7 @@
     }
     function chooseMode(combined){
       merge.checked=combined===true;
-      if(merge.checked)mergeAll.checked=true;
+      // 工作簿是否合并与重复材料累加独立，不隐式更改另一个选项。
       page=0;render();
     }
     function modeTell(combined){
@@ -341,15 +342,16 @@
     merge.addEventListener('change',function(){chooseMode(merge.checked);modeTell(merge.checked);});
     if(mergeSeparate)mergeSeparate.addEventListener('change',function(){chooseMode(false);modeTell(false);});
     mergeAll.addEventListener('change',function(){
-      if(!mergeAll.checked&&merge.checked){merge.checked=false;page=0;}
+      page=0;
       render();
       tell(mergeAll.checked?'已选择合并全部工作簿，继续选择是否累加完全相同的材料。':'已选择保留每个工作簿和来源，不跨工作簿合并材料。');
     });
-    if(previewConfirm)previewConfirm.addEventListener('click',function(){
+    function confirmPreview(){
       if(!collection.entries.length)return;
       previewReviewed=true;page=0;render();
       tell('导入预览已确认。请选择是否合并全部工作簿，以及是否累加完全相同的材料。');
-    });
+    }
+    if(previewConfirm)previewConfirm.addEventListener('click',confirmPreview);
     if(mergeDetail)mergeDetail.addEventListener('click',function(){
       syncImportPreview(true);
       tell('合并预览明细：请查看主工作簿中的“导入预览”和“合并明细”；原件不变，确认选择后才开始分类。');
@@ -363,17 +365,19 @@
         var model=RfqImportPreviewModel.build(collection,merge.checked,{projectName:projectDisplayName(),
           previewOnly:!previewReviewed,mergeAllWorkbooks:mergeAll.checked===true});
         importPreviewHandle=RfqExportHost.showPreview(options.application,model,importPreviewHandle);
+        if(ui)ui.set({previewAvailable:true});
         importPreviewKey=key;
         if(box){box.textContent=previewReviewed?
           ('主表已显示材料处理预览（'+model.inputCount+' → '+model.outputCount+' 行）。预览随选择刷新。'):
           ('主表已显示工作簿和工作表预览（共 '+model.inputCount+' 项），尚未合并。');box.className='note';}
       }catch(error){
+        if(ui)ui.set({previewAvailable:false});if(window.RfqFeedback)RfqFeedback.notify({stage:"import",message:"预览未打开："+error.message,resolve:function(){syncImportPreview(true);}});
         // 只拦主表预览，不回滚已经核实的导入；用户可明确重试，不自动反复创建失败簿。
         importPreviewKey=key;
         if(box){box.textContent='主表预览未完成：'+error.message+' 可点“查看合并明细”重试。';box.className='error';}
       }
     }
-    confirmMerge.addEventListener('click',function(){
+    function confirmSelection(){
       if(busy)return;
       if(!previewReviewed){tell('请先查看导入预览，并点“我已看完预览，选择工作簿处理方式”。',true);return;}
       var result=collection.entries.length?currentPreview():null;
@@ -387,7 +391,7 @@
         var more=reviewLines.length>8?('\n…另有 '+(reviewLines.length-8)+' 条'):'';
         var agree=window.confirm('本次导入有 '+reviewLines.length+' 条“来源/区段待核对”（不影响材料名称、单位与工程量）：\n\n'+
           head+more+'\n\n这些行会带“来源待核对”标记进入后续步骤，工程/专业仅作参考、不参与分类。\n确认“已知悉并继续”吗？');
-        if(!agree){tell('已取消：'+(result.reviewIssueCount)+' 条来源/区段待核对未确认，未进入自动分类。',true);return;}
+        if(!agree){tell('已取消：'+(result.reviewIssueCount)+' 条来源/区段待核对未确认，未进入自动分类。',false);return;}
         tell('已确认 '+reviewLines.length+' 条来源/区段待核对，按现状继续。');
       }
       mergeConfirmedKey=RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,
@@ -396,13 +400,14 @@
       if(workflow)workflow.goTo('matching');
       tell('已确认本次“'+(mergeAll.checked?'合并全部工作簿':'保留工作簿来源')+'、'+
         (merge.checked?'合并完全相同项':'不累加重复项')+'”，开始自动分类；选择变化后需要重新确认。');
-    });
+    }
+    confirmMerge.addEventListener('click',confirmSelection);
     document.getElementById('merge-prev').addEventListener('click',function(){page--;render();});
     document.getElementById('merge-next').addEventListener('click',function(){page++;render();});
     // R4：自动分类→审核成果表。只产出建议并把结果写进独立成果簿；不确认、不学习。
     var reviewModel=null,reviewBinding=null,reviewBusy=false;
     function reviewEl(id){return document.getElementById(id);}
-    function reviewTell(text,error){var box=reviewEl('classification-review-message');if(box){box.textContent=text;box.className=error?'error':'';}}
+    function reviewTell(text,error){var box=reviewEl('classification-review-message');if(box){box.textContent=text;box.className=error?'error':'';}if(window.RfqFeedback)RfqFeedback.tell(text,error,'matching');}
     function currentLibrary(){return classifier.library?classifier.library():null;}
     function mergeSelectionKey(){
       var result=collection.entries.length?currentPreview():null;
@@ -518,7 +523,7 @@
         tell('审核成果表已生成：'+receipt.target);
         try{
           // 打开只是方便用户立刻编辑；打不开不代表生成失败，可稍后点“打开成果表审核”重试。
-          if(options.application)RfqClassificationReviewHost.openForEditing(options.application,receipt.target);
+          if(options.application){RfqClassificationReviewHost.openForEditing(options.application,receipt.target);reviewOpenedPath=receipt.target;}
           reviewTell('审核成果表已生成并校验：'+receipt.target+'。请在表内修改“最终分类”“审核备注”，完成后回到侧栏。');
         }catch(openError){
           reviewTell('审核成果表已生成并校验：'+receipt.target+'，但未能自动打开（'+openError.message+'）。可点“打开成果表审核”重试。');
@@ -527,16 +532,16 @@
       finally{
         // 未发布就失败/被取消时清掉本次相邻暂存，避免在用户成果目录留下点号临时文件。
         if(prepared&&!published){try{await exportRequest('discard',{ticket:prepared.ticket});}catch(_){}}
-        reviewBusy=false;renderReview();
+        reviewBusy=false;renderReview();publishAssistant();
       }
     }
     var generateButton=reviewEl('classification-review-generate'),openButton=reviewEl('classification-review-open');
     if(generateButton)generateButton.addEventListener('click',generateReview);
     if(openButton)openButton.addEventListener('click',function(){
       if(!reviewBinding){reviewTell('还没有生成审核成果表。',true);return;}
-      try{RfqClassificationReviewHost.openForEditing(options.application,reviewBinding.path);
+      try{RfqClassificationReviewHost.openForEditing(options.application,reviewBinding.path);reviewOpenedPath=reviewBinding.path;
         reviewTell('已打开审核成果表：'+reviewBinding.path+'。请在表内修改“最终分类”“审核备注”，完成后整表一次确认。');
-        if(workflow)workflow.goTo('review');}
+        if(workflow)workflow.goTo('review');publishAssistant();}
       catch(error){reviewTell('成果表未打开。'+error.message,true);}
     });
     if(options.restoreReviewBinding)reviewBinding=options.restoreReviewBinding()||null;
@@ -544,7 +549,7 @@
     // 空分类/未知分类/损坏行返回工作表＋单元格并定位。确认快照先落盘，落盘成功才学习，失败不回滚确认。
     var sheetReviewBusy=false,lastReviewRead=null,reviewDivergence=null;
     function sheetEl(id){return document.getElementById(id);}
-    function sheetTell(text,error){var box=sheetEl('sheet-review-message');if(box){box.textContent=text;box.className=error?'error':'';}}
+    function sheetTell(text,error){var box=sheetEl('sheet-review-message');if(box){box.textContent=text;box.className=error?'error':'';}if(window.RfqFeedback)RfqFeedback.tell(text,error,'review');}
     function columnName(column){return Number.isSafeInteger(column)&&column>0&&column<=26?String.fromCharCode(64+column):'';}
     function reviewConfirmation(){return projects.reviewConfirmation?projects.reviewConfirmation():null;}
     function reviewFresh(){
@@ -717,7 +722,7 @@
         sheetTell('审核草稿已保存（'+result.draft.counts.filled+' / '+result.draft.counts.rows+
           ' 行已填），尚未确认、未学习、未生成分类工作簿。'+(checked.ok?'':('还有 '+checked.errors.length+' 处待修改。')));
       }catch(error){sheetTell('审核成果表未保存为草稿：'+error.message,true);}
-      finally{sheetReviewBusy=false;renderSheetReview();}
+      finally{sheetReviewBusy=false;renderSheetReview();publishAssistant();}
     }
     async function confirmSheetReview(){
       if(sheetReviewBusy)return;
@@ -738,6 +743,7 @@
         renderSheetReview();
         if(!checked.ok){
           renderReviewIssues(checked.errors);
+          if(window.RfqFeedback)RfqFeedback.notify({stage:"review",sheet:reviewBinding.sheet,message:"还有 "+checked.errors.length+" 处分类或材料信息需要核对。",issues:checked.errors.map(function(i){return Object.assign({sheet:reviewBinding.sheet},i);}),resolve:function(){RfqClassificationReviewHost.locate(options.application,reviewBinding,checked.errors[0]);}});
           sheetTell('整表未通过校验：'+checked.errors.length+' 处待修改。'+checked.errors[0].message,true);
           if(checked.errors[0].row!=null){
             try{RfqClassificationReviewHost.locate(options.application,reviewBinding,checked.errors[0]);}catch(_){}
@@ -786,7 +792,7 @@
           sheetTell('整表已确认并保存快照；分类习惯未保存，可点“习惯保存重试”：'+learned.error.message,'true');
         if(workflow)workflow.goTo('categories');
         // 图03主按钮“审核完成，生成分类工作簿”：确认快照落盘后才按新快照生成独立分类工作簿。
-        generateCategoryWorkbooks({auto:true}).catch(function(error){
+        await generateCategoryWorkbooks({auto:true}).catch(function(error){
           categoryTell('分类工作簿未生成：'+error.message,true);
         });
       }catch(error){sheetTell('整表确认未完成：'+error.message,true);}
@@ -852,7 +858,7 @@
     // 整本写入→重开逐值核→独占发布→按页读回核行数→只打开一次。不再逐类生成独立文件，也没有单类导出入口。
     var categoryReceipt=null,categoryPlan=null,categoryIssues=[],categoryBusy=false,categoryBlocked=null;
     function categoryEl(id){return document.getElementById(id);}
-    function categoryTell(text,error){var box=categoryEl('categories-message');if(box){box.textContent=text;box.className=error?'error':'';}}
+    function categoryTell(text,error){var box=categoryEl('categories-message');if(box){box.textContent=text;box.className=error?'error':'';}if(window.RfqFeedback)RfqFeedback.tell(text,error,'categories');}
     function pad2(value){return (value<10?'0':'')+value;}
     function stampText(){
       var now=new Date();
@@ -1093,7 +1099,7 @@
             RfqCategoryWorkbooks.setSheetsStatus(receipt,'succeeded');
             receipt.updatedAt=new Date().toISOString();
             categoryReceipt=receipt;
-            await persistCategories('分类工作簿已核对通过（1 本 · '+plan.files.length+' 页），本次不重复写入。');
+            if(!await persistCategories('分类工作簿已核对通过（1 本 · '+plan.files.length+' 页），本次不重复写入。')){renderCategories();render();return {ok:false,pendingSave:true,receipt:receipt};}
             if(!openCategoryWorkbook(receipt))
               categoryTell('分类工作簿已核对通过（1 本 · '+plan.files.length+' 页），但本次未打开：'+receipt.path,true);
             renderCategories();render();
@@ -1135,7 +1141,10 @@
           renderCategories();render();
           return {ok:false,blocked:categoryBlocked};
         }
-        await projects.save();
+        if(!await projects.save()){
+          categoryTell('分类工作簿已生成并校验，但项目绑定未保存。请重试保存项目，已生成文件保留，无需重新生成。',true);
+          renderCategories();render();return {ok:false,pendingSave:true,receipt:receipt};
+        }
         // 4) 全部核实后才显示完成，并只打开这一本工作簿一次。
         var report=RfqCategoryWorkbooks.summarize(receipt),opened=openCategoryWorkbook(receipt);
         categoryTell('已生成并校验分类工作簿（1 本 · '+report.categories+' 页，'+report.detail+'）：'+receipt.path+
@@ -1171,7 +1180,7 @@
       if(summaryLayoutSelect)summaryLayoutSelect.value=selectedLayout();
       categoryTell('品牌填写布局已选择为“'+(selectedLayout()==='combined'?'品牌与供应商同格填写':'品牌、供应商分列')+
         '”，将在生成分类汇总表时使用。');
-      renderBrands();
+      renderBrands();publishAssistant();
     });
     if(categorySummaryButton)categorySummaryButton.addEventListener('click',function(){
       // 图04主按钮：切到第5步，按当前布局把同一本工作簿的第 1 页作为分类汇总表（改布局才另存新文件，不覆盖）。
@@ -1182,7 +1191,7 @@
     // 名称是蓝色下划线原生链接、文件内跳转到对应分类页；品牌与供应商初始空白由用户在表内填写。
     var summaryReceipt=null,summaryRead=null,summaryBusy=false,summaryIssues=[];
     function summaryEl(id){return document.getElementById(id);}
-    function summaryTell(text,error){var box=summaryEl('brands-message');if(box){box.textContent=text;box.className=error?'error':'';}}
+    function summaryTell(text,error){var box=summaryEl('brands-message');if(box){box.textContent=text;box.className=error?'error':'';}if(window.RfqFeedback)RfqFeedback.tell(text,error,'brands');}
     function summaryLayoutLabel(value){return String(value)==='combined'?'品牌与供应商同格填写':'品牌、供应商分列';}
     // 汇总表与分类工作簿是同一本文件（1 文件）：第 1 页是汇总页，其后每类一页。
     function summaryFilePath(){return categoryReceipt&&categoryReceipt.path?categoryReceipt.path:null;}
@@ -1319,6 +1328,7 @@
     function autoOpenSummary(path,layoutName,categoryCount){
       try{
         RfqBrandHost.openSummary(options.application,path);
+        brandsOpenedPath=path;
       }catch(error){
         summaryTell('分类汇总表已生成、未打开：'+path+'（'+(error&&error.message||error)+'）。'+
           '成果文件与项目绑定已保留，可点“打开汇总表”手动打开，不需要重新生成。',true);
@@ -1430,6 +1440,7 @@
           // 当前表内内容已经和上次读回不一致，旧读回结果必须作废并落盘，阶段不得继续显示完成。
           if(summaryRead){summaryRead=null;try{await projects.save();}catch(_){}}
           var first=(result.issues||[]).slice(0,3).map(function(item){return item.message;}).join('；');
+          if(window.RfqFeedback)RfqFeedback.notify({stage:'brands',sheet:summaryReceipt.sheet||'分类汇总表',message:'品牌和供应商还有 '+summaryIssues.length+' 处需要修改。',issues:summaryIssues,resolve:function(){var first=summaryIssues[0]||{};RfqBrandHost.openSummary(options.application,summaryReceipt.path);var b=options.application.ActiveWorkbook;var sh=b.Worksheets.Item(summaryReceipt.sheet||'分类汇总表');sh.Activate();if(first.row)sh.Cells.Item(first.row,first.column||4).Select();}});
           summaryTell('汇总表未通过校验，请按下方定位在表内修改后重试：'+first,true);
           return {ok:false,result:result};
         }
@@ -1442,7 +1453,7 @@
         summaryRead=Object.assign(RfqBrandModel.summaryReadRecord(result,{summaryPath:summaryReceipt.path,
           readAt:new Date().toISOString()}),{sourceSha256:summaryReceipt.sha256||null});
         renderBrands();
-        await projects.save();
+        var savedBrands=await projects.save();if(!savedBrands)throw Error('品牌填写已读回，但项目尚未保存，请重试保存后继续。');
         summaryTell('已读回并校验汇总表：'+summaryRead.categories.length+' 类有效，预计 '+summaryRead.expectedSheets+
           ' 份询价表（'+RfqBrandModel.summaryCountsText(summaryRead.categories)+'）。品牌取自汇总表，改品牌请回汇总表修改并重新读回。');
         renderBrands();render();
@@ -1450,7 +1461,7 @@
         if(workflow)workflow.goTo('inquiry');
         return {ok:true,read:summaryRead};
       }catch(error){summaryTell('汇总表未读回：'+error.message,true);return {ok:false};}
-      finally{summaryBusy=false;renderBrands();}
+      finally{summaryBusy=false;renderBrands();publishAssistant();}
     }
     if(summaryConfirmButton)summaryConfirmButton.addEventListener('click',function(){
       readSummaryBrands().catch(function(error){summaryTell('汇总表未读回：'+error.message,true);});
@@ -1460,6 +1471,7 @@
       if(categoryLayoutSelect)categoryLayoutSelect.value=summaryLayoutSelect.value;
       renderBrands();
       summaryTell('品牌填写布局已选择为“'+summaryLayoutLabel(summaryLayoutSelect.value)+'”，生成的分类汇总表将使用该布局。');
+      publishAssistant();
     });
     picker.disabled=!options.application||!window.__RFQ_IMPORT__;
     if(options.application&&!window.__RFQ_IMPORT__)tell('多文件导入需要启动最新开发服务并重新打开侧栏。');
@@ -1518,7 +1530,54 @@
         }).then(done,done);
       });
     }
+    function publishAssistant(){
+      if(!ui||!projects||!classifier)return;
+      var saved=projects.current(),confirmed=reviewConfirmation(),verdicts=stageVerdicts(),generation=inquiryPanel&&inquiryPanel.generation(),
+        receipt=splitPanel&&splitPanel.receipt(),ss=receipt?RfqSplitState.summarize(receipt):null;
+      var assessed=projects.uiStatus(),stages=assessed.stages;
+      var currentMatch=selectionConfirmed(),freshReview=!!reviewBinding&&currentMatch&&reviewBinding.inputKey===matchingKey()&&!assessed.reviewBlocked;
+      var savedReview=!!(stages.review.ready&&verdicts.review.ready&&saved&&saved.review&&confirmed&&saved.review.inputKey===confirmed.inputKey&&saved.review.revision===confirmed.revision);
+      var brandsSaved=!!(summaryRead&&saved&&saved.brands&&JSON.stringify(saved.brands.categories)===JSON.stringify(summaryRead.categories)&&saved.brands.inputKey===summaryRead.inputKey);
+      var categoriesSaved=!!(categoryReceipt&&saved&&saved.categories&&saved.categories.path===categoryReceipt.path&&saved.categories.sha256===categoryReceipt.sha256&&saved.categories.inputKey===categoryReceipt.inputKey&&saved.categories.reviewRevision===categoryReceipt.reviewRevision);
+      var genReady=!!(stages.inquiry.ready&&inquiryPanel&&inquiryPanel.verdict().ready),genSaved=!!(generation&&saved&&saved.generation&&saved.generation.sha256===generation.sha256);
+      var splitSaved=!!(receipt&&saved&&saved.split&&JSON.stringify(saved.split.files)===JSON.stringify(receipt.files));
+      var counts=reviewModel?RfqClassificationReviewModel.summary(reviewModel):null;
+      ui.set({projectName:projectDisplayName(),layout:selectedLayout(),files:collection.entries.map(function(e){return {name:e.metadata.originalName,sheets:(e.snapshot.sheets||[]).map(function(sh){return sh.name;})};}),
+       rows:collection.entries.reduce(function(n,e){return n+e.parsed.materials.length;},0),mergedRows:collection.entries.length?currentPreview().outputCount:0,
+       previewReviewed:previewReviewed,mergeAll:mergeAll.checked,mergeIdentical:merge.checked,mergeConfirmed:currentMatch,
+       reviewGenerated:freshReview,reviewOpened:!!(freshReview&&reviewOpenedPath===reviewBinding.path),reviewPending:counts?counts.conflict:null,
+       reviewConfirmed:savedReview,noInquiry:!!(savedReview&&confirmed.rows.every(function(r){return r.skip;})),
+       categoriesReady:!!(stages.categories.ready&&verdicts.categories.ready&&categoriesSaved),categoriesPendingSave:!!(savedReview&&verdicts.categories.ready&&!categoriesSaved),categoryCount:categoryPages().length,
+       summaryReady:!!(summaryState().ok&&summaryReceipt&&saved&&saved.summary&&saved.summary.path===summaryReceipt.path&&saved.summary.sha256===summaryReceipt.sha256&&saved.summary.layout===summaryReceipt.layout),brandsOpened:!!(summaryReceipt&&brandsOpenedPath===summaryReceipt.path),
+       brandsReady:!!(stages.brands.ready&&summaryVerdict().ready&&brandsSaved),expectedSheets:summaryRead?summaryRead.expectedSheets:0,
+       inquiryReady:genReady&&genSaved,inquiryPendingSave:genReady&&!genSaved,inquiryStale:!!generation&&!genReady,
+       outputDirectory:splitPanel&&splitPanel.directory?splitPanel.directory():'',splitVerified:!!(stages.split.ready&&genReady&&splitPanel&&splitPanel.verdict().ready&&splitSaved),splitPendingSave:!!(genReady&&ss&&ss.done&&!splitSaved),
+       split:{planned:receipt?receipt.files.length:0,complete:ss?ss.succeeded.length:0,failed:ss?ss.failed.length:0,pending:ss?ss.pending.length:0,needsVerification:ss?ss.needsVerification.length:0,files:receipt?receipt.files:[]}});
+    }
+    if(ui){
+      function bind(name,action){ui.register(name,async function(){try{return await action();}finally{publishAssistant();}});}
+      bind('import',function(){return runImport(function(){return RfqImportHost.selectFiles(options.application);});});
+      bind('previewConfirm',function(){if(!ui.snapshot().previewAvailable){syncImportPreview(true);return;}confirmPreview();});
+      bind('previewRetry',function(){return syncImportPreview(true);});
+      bind('mergeConfirm',confirmSelection);
+      bind('reviewGenerate',generateReview);
+      bind('reviewOpen',function(){if(!reviewBinding)throw Error('请先生成分类核对表。');RfqClassificationReviewHost.openForEditing(options.application,reviewBinding.path);reviewOpenedPath=reviewBinding.path;});
+      bind('reviewConfirm',confirmSheetReview);
+      bind('categoriesGenerate',function(){return generateCategoryWorkbooks({auto:true});});
+      bind('continueBrands',async function(){if(!summaryState().ok||!ui.snapshot().summaryReady){var made=await generateSummary(false);if(!made||!made.ok)return;}
+       if(brandsOpenedPath!==summaryReceipt.path)RfqBrandHost.openSummary(options.application,summaryReceipt.path);var b=options.application.ActiveWorkbook;b.Worksheets.Item(summaryReceipt.sheet||'分类汇总表').Activate();brandsOpenedPath=summaryReceipt.path;});
+      bind('brandsConfirm',readSummaryBrands);
+      bind('inquiryGenerate',async function(){var check=RfqInquiryHeader.validate(headerPanel.header());if(!check.ok){var fields=RfqInquiryHeader.FIELDS.filter(function(f){return f.required&&!String(headerPanel.header()[f.key]||'').trim();});
+       RfqInquiryHeader.FIELDS.forEach(function(f){var n=document.getElementById('header-'+f.key);n.setAttribute('aria-invalid',fields.indexOf(f)>=0?'true':'false');});
+       RfqFeedback.notify({stage:'header',message:check.errors.join('；'),resolve:function(){var n=document.getElementById('header-'+(fields[0]?fields[0].key:'projectName'));n.focus();}});return;}return inquiryPanel.generate();});
+      bind('goSplit',async function(){ui.set({splitStarted:true});if(workflow)workflow.goTo('split');await splitPanel.prepare();});
+      bind('chooseDirectory',function(){return splitPanel.chooseDirectory();});
+      bind('splitRun',function(){return splitPanel.execute();});bind('splitRetry',function(){return splitPanel.execute();});bind('splitVerify',function(){return splitPanel.execute();});
+      bind('openFolder',function(){return splitPanel.openDirectory();});bind('saveProject',function(){return projects.save();});
+      bind('newProject',async function(){var saved=await projects.save();if(saved&&window.confirm('当前项目已保存，开始整理新的清单吗？'))location.reload();});
+    }
     render();
+    if(ui)ui.set({previewAvailable:!!importPreviewHandle});publishAssistant();
     // 所有项目/审核/分类/询价依赖与初始状态就绪后，才允许消费功能区遗留导航请求。
     if(workflow)workflow.startRibbonNavigation();
     return {

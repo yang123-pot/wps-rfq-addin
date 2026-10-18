@@ -12,7 +12,7 @@ const {createHeaderStore} = require('./header-store.cjs');
 const {createSplitStore} = require('./split-store.cjs');
 const {listDirectory} = require('./fs-list.cjs');
 
-const ASSETS = new Set(['/main.js', '/ribbon.xml', '/taskpane.html', '/styles.css', '/src/host.js',
+const ASSETS = new Set(['/src/assistant-state.js','/src/assistant-problems.js','/src/assistant-feedback.js','/src/assistant-ui.js','/main.js', '/ribbon.xml', '/taskpane.html', '/styles.css', '/src/host.js',
   '/src/taskpane.js', '/src/parser.js', '/src/merge.js', '/src/review.js', '/src/review-ui.js',
   '/src/import-host.js', '/src/collection.js', '/src/import-ui.js', '/src/export-model.js',
   '/src/workbook-layout.js', '/src/workflow-ui.js', '/src/import-preview-model.js', '/src/export-host.js', '/src/export-ui.js', '/src/project.js', '/src/project-ui.js',

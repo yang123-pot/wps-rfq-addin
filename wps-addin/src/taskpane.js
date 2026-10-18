@@ -150,9 +150,12 @@
   mode.addEventListener('change', function () { page = 0; renderPreview(); });
   document.getElementById('previous-page').addEventListener('click', function () { page--; renderPreview(); });
   document.getElementById('next-page').addEventListener('click', function () { page++; renderPreview(); });
+  var businessBusy=false;
+  function syncBusyControls(){document.getElementById('task-controls').disabled=businessBusy||!!(window.RfqAssistant&&RfqAssistant.snapshot().busy);}
+  if(window.RfqAssistant)RfqAssistant.subscribe(syncBusyControls);
   imports = RfqImportUI.create({
     application: application,
-    onBusy: function (busy) { document.getElementById('task-controls').disabled = busy; },
+    onBusy: function (busy) { businessBusy=busy;syncBusyControls(); },
     onSelect: function (entry) {
       if (!imported && dirty && !window.confirm('切换到导入文件会清除当前单独读取的未保存核对，是否继续？')) return false;
       imported = entry; snapshot = entry.snapshot; record = entry.record; parsed = entry.parsed; dirty = entry.dirty;
