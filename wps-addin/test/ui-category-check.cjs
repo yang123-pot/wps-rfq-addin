@@ -338,14 +338,16 @@ function initScript(context){
   await page.waitForFunction(()=>/分类工作簿需要重新生成/.test(document.querySelector('#categories-banner').textContent));
   assert.match(await page.locator('#categories-stats').innerText(),/缺少可信的实际页结构读回记录/);
   assert.equal(await page.locator('#categories-summary').isDisabled(),true,'缺少实际页读回时不得解锁汇总');
+  const writesBeforeRecovery=await page.evaluate(()=>window.__categoryWrites.length);
   await waitIdle();
-  await page.locator('#categories-generate').click();
+  await page.evaluate(()=>RfqAssistant.run('categoriesGenerate'));
   await page.waitForFunction(()=>/分类工作簿已生成（1 本 · 4 类 · 无需询价1页）/.test(document.querySelector('#categories-banner').textContent),
    null,{timeout:30000});
   const repaired=await projectRecord();
-  assert.notEqual(repaired.categories.directory,beforeMissingBatch,'不可信旧回执重新生成必须另建批次');
+  assert.equal(repaired.categories.directory,beforeMissingBatch,'现有文件页结构正确时应补做读回，不重复生成');
   assert.equal(repaired.categories.readBack.ok,true);
   assert.equal(repaired.categories.readBack.sheets.length,6);
+  assert.equal(await page.evaluate(()=>window.__categoryWrites.length),writesBeforeRecovery,'恢复读回不得重写工作簿');
   await shot(SHOT?SHOT.replace(/\.png$/,'-rebatch.png'):null);
   await dumpEvidence('category-regenerated.json',{before:beforeBatch,after:after.categories.directory,
    files:await listXlsx(after.categories.directory)});

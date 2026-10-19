@@ -306,7 +306,7 @@ test('逐份写入模拟宿主：4个文件各建一个新工作簿，值与版�
 test('openForEditing复用已打开的同路径工作簿，未打开则只读打开并恢复宏安全值',()=>{
   const filePath='C:\\out\\示例园区\\分类工作簿\\水泵.xlsx';
   let opened=0,active=null;
-  const target={FullName:filePath,Activate(){active=this;}};
+  const target={Name:'水泵.xlsx',FullName:filePath,Activate(){active=this;}};
   const app={AutomationSecurity:1,Workbooks:{Count:1,
     Item(){return target;},Open(){opened++;active=target;return target;}}};
   assert.deepEqual(books.openForEditing(app,filePath),{path:filePath,opened:true,reused:true});
@@ -320,6 +320,26 @@ test('openForEditing复用已打开的同路径工作簿，未打开则只读打
   assert.equal(active,target,'分类工作簿打开后置前供查看');
   assert.throws(()=>books.openForEditing({AutomationSecurity:null,Workbooks:{Count:0}},filePath),/宏安全设置/);
   assert.throws(()=>books.openForEditing(app,'relative.xlsx'),/路径无效/);
+});
+
+test('WPS返回编码路径或规范化短路径时，仍以同名目标完成页结构读回',()=>{
+  const file='C:\\out\\批次#1\\示例园区_分类工作簿.xlsx';
+  function appFor(book){
+    return {AutomationSecurity:1,Workbooks:{Count:1,Item(){return null;},
+      Open(){assert.equal(this.Count,1);return book;}}};
+  }
+  function openedBook(full){
+    return {Name:'示例园区_分类工作簿.xlsx',FullName:full,Worksheets:{Count:2,
+      Item(index){return index===1?{Name:'分类汇总表',UsedRange:{Rows:{Count:9}}}:
+        {Name:'无需询价',UsedRange:{Rows:{Count:2}}};}},Close(save){assert.equal(save,false);}};
+  }
+  const encoded=books.readSheets(appFor(openedBook('C:/out/批次%231/示例园区_分类工作簿.xlsx')),file);
+  assert.deepEqual(encoded.map(item=>item.sheetName),['分类汇总表','无需询价']);
+  const shortPath=books.readSheets(appFor(openedBook('C:\\out\\SHORT~1\\示例园区_分类工作簿.xlsx')),file);
+  assert.deepEqual(shortPath.map(item=>item.sheetName),['分类汇总表','无需询价']);
+  const wrong=openedBook('C:\\out\\另一批次\\另一个文件.xlsx');
+  wrong.Name='另一个文件.xlsx';
+  assert.throws(()=>books.readSheets(appFor(wrong),file),/WPS未返回指定分类工作簿/);
 });
 
 // 2026-10-11（图04/05变更）：一本多页写入必须“有页可写”，发布后按页读回核页名与行数。
@@ -348,7 +368,7 @@ function sheetApp(sheets){
     Workbooks:{Count:1,Item(){return null;},
       Open(file,links,readonly){
         assert.equal(links,0);assert.equal(readonly,true);assert.equal(app.AutomationSecurity,3);
-        return {FullName:file,Worksheets:{get Count(){return sheets.length;},
+        return {Name:String(file).split(/[\\/]/).pop(),FullName:file,Worksheets:{get Count(){return sheets.length;},
           Item(index){const sheet=sheets[index-1];return {Name:sheet.name,UsedRange:{Rows:{Count:sheet.rows}}};}},
           Close(save){assert.equal(save,false);app.closed++;}};}}};
   return app;

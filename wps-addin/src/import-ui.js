@@ -1146,10 +1146,8 @@
       var base=RfqCategoryWorkbooks.rootOf(reviewBinding.path);
       // 首次生成用成果表所在目录（图04：项目名/分类工作簿）；同一版整表确认的续作沿用已记录批次；
       // 重新生成或整表确认有变化时另建批次目录，不覆盖已生成的分类工作簿与已填汇总。
-      var priorComplete=!!(categoryReceipt&&categoryReceipt.status==='complete');
-      var priorVerified=!priorComplete||readBackMatches(categoryReceipt,receiptPages(categoryReceipt));
       var continuing=!input.force&&categoryReceipt&&categoryReceipt.inputKey===matchingKey()&&categoryReceipt.root&&
-        Number(categoryReceipt.reviewRevision)===Number(confirmation.revision)&&priorVerified;
+        Number(categoryReceipt.reviewRevision)===Number(confirmation.revision);
       var root=continuing?categoryReceipt.root:base,plan=null;
       if(!continuing){
         // 一本多页只有一个目标文件：目标已存在（同名不覆盖）时另建批次目录。
@@ -1192,20 +1190,39 @@
       receipt.batchId=plan.batchId;receipt.summaryLayout=layoutName;
       categoryReceipt=receipt;
       try{
-        // 1) 同一路径已有“整本成功”记录：先按记录SHA核对，通过则整本跳过；被外部改写时拒绝覆盖，转待核对。
+        // 1) 同一路径已有“整本成功”记录：先按记录SHA核对。页结构已有可信读回则跳过；
+        // 旧回执缺少读回时，用当前文件补做一次只读页核，通过后直接恢复，不必重复生成。
         if(previous&&previous.status==='complete'&&previous.sha256&&previous.file===plan.file&&
-          previous.layoutVersion===RfqCategoryWorkbooks.LAYOUT_VERSION&&readBackMatches(previous,expectedSheets)){
+          previous.layoutVersion===RfqCategoryWorkbooks.LAYOUT_VERSION){
           var actual=await exportRequest('inspect',{target:plan.path,sha256:previous.sha256});
           if(actual.matches){
             receipt.sha256=actual.sha256;receipt.bytes=actual.bytes;
+            var trusted=readBackMatches(previous,expectedSheets),verified=null;
+            if(trusted)receipt.readBack=previous.readBack;
+            else{
+              try{verified=RfqCategoryWorkbooks.verifySheets(options.application,plan.path,expectedSheets);}
+              catch(error){verified={ok:false,issues:[error.message],sheets:[]};}
+              receipt.readBack={at:new Date().toISOString(),ok:verified.ok,sheets:verified.sheets};
+            }
+            if(!trusted&&!verified.ok){
+              var verifyReason=(verified.issues||['实际页结构未通过核对']).join('；');
+              RfqCategoryWorkbooks.setSheetsStatus(receipt,'needs-verification',verifyReason);
+              receipt.updatedAt=new Date().toISOString();categoryReceipt=receipt;
+              categoryBlocked=[{file:{name:plan.file,path:plan.path},error:verifyReason}];
+              await persistCategories('现有分类工作簿未通过实际页结构核对：'+verifyReason+
+                '。旧文件保留且不覆盖，请改用新批次重新生成。',true);
+              renderCategories();render();
+              return {ok:false,blocked:categoryBlocked};
+            }
             RfqCategoryWorkbooks.setSheetsStatus(receipt,'succeeded');
             receipt.updatedAt=new Date().toISOString();
             categoryReceipt=receipt;
-            if(!await persistCategories('分类工作簿已核对通过（1 本 · '+plan.files.length+' 页），本次不重复写入。')){renderCategories();render();return {ok:false,pendingSave:true,receipt:receipt};}
+            if(!await persistCategories('分类工作簿已核对通过（1 本 · '+plan.files.length+' 页），本次不重复写入。')){
+              renderCategories();render();return {ok:false,pendingSave:true,receipt:receipt};}
             if(!openCategoryWorkbook(receipt))
               categoryTell('分类工作簿已核对通过（1 本 · '+plan.files.length+' 页），但本次未打开：'+receipt.path,true);
             renderCategories();render();
-            return {ok:true,receipt:receipt,plan:plan,skipped:true};
+            return {ok:true,receipt:receipt,plan:plan,skipped:true,recovered:!trusted};
           }
           var reason=actual.exists?'文件已被外部修改，未覆盖':'文件已不存在';
           RfqCategoryWorkbooks.setSheetsStatus(receipt,'needs-verification',reason);
@@ -1227,7 +1244,7 @@
           try{await exportRequest('discard',{ticket:prepared.ticket});}catch(_){}
           throw error;
         }
-        RfqCategoryWorkbooks.setSheetsStatus(receipt,'succeeded');
+        RfqCategoryWorkbooks.setSheetsStatus(receipt,'needs-verification','等待实际文件页结构读回');
         receipt.updatedAt=new Date().toISOString();categoryReceipt=receipt;
         await projects.save();
         // 3) 发布后按页读回：第 1 页＝汇总页、其后每类一页，页名与行数逐页核对。
@@ -1241,6 +1258,8 @@
           renderCategories();render();
           return {ok:false,blocked:categoryBlocked};
         }
+        RfqCategoryWorkbooks.setSheetsStatus(receipt,'succeeded');
+        receipt.updatedAt=new Date().toISOString();categoryReceipt=receipt;
         if(!await projects.save()){
           categoryTell('分类工作簿已生成并校验，但项目绑定未保存。请重试保存项目，已生成文件保留，无需重新生成。',true);
           renderCategories();render();return {ok:false,pendingSave:true,receipt:receipt};
@@ -1264,8 +1283,10 @@
       categoryLayoutSelect=categoryEl('categories-layout');
     if(categoryGenerateButton)categoryGenerateButton.addEventListener('click',function(){
       var regenerate=!!(categoryReceipt&&categoryReceipt.path);
-      if(regenerate&&!window.confirm('重新生成会创建新的成果批次目录，不会覆盖已生成的分类工作簿与已填内容，是否继续？'))return;
-      generateCategoryWorkbooks(regenerate?{force:true}:{}).catch(function(error){
+      var recover=regenerate&&categoryReceipt.status==='complete'&&
+        !readBackMatches(categoryReceipt,receiptPages(categoryReceipt));
+      if(regenerate&&!recover&&!window.confirm('重新生成会创建新的成果批次目录，不会覆盖已生成的分类工作簿与已填内容，是否继续？'))return;
+      generateCategoryWorkbooks(regenerate&&!recover?{force:true}:{}).catch(function(error){
         categoryTell('分类工作簿未生成：'+error.message,true);
       });
     });

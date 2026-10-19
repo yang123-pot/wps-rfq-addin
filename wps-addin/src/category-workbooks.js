@@ -266,21 +266,50 @@ function writeAll(app,planValue,stagePath,options){
  exportHost.write(app,model,stagePath);
  return model;
 }
+ function property(object,name){try{return object&&object[name];}catch(_){return null;}}
+ function normalizePath(value){
+  var raw=text(value).trim();
+  if(/^file:\/+/i.test(raw))raw=raw.replace(/^file:\/+/i,'');
+  try{raw=decodeURIComponent(raw);}catch(_){/* 保留普通路径中的非转义百分号 */}
+  return raw.replace(/\//g,'\\').replace(/\\+/g,'\\').replace(/\\+$/,'').toLowerCase();
+ }
+ function tailName(value){
+  var parts=normalizePath(value).split('\\');
+  return parts[parts.length-1]||'';
+ }
+ function bookFullName(book){
+  var full=property(book,'FullName'),directory=property(book,'Path'),name=property(book,'Name');
+  if(full)return String(full);
+  return directory&&name?String(directory)+'\\'+String(name):String(name||'');
+ }
+ function bookName(book){return String(property(book,'Name')||tailName(bookFullName(book))||'');}
+ function findBook(app,filePath,opened){
+  var expected=normalizePath(filePath),expectedName=tailName(filePath),named=[];
+  var count=Number(property(app.Workbooks,'Count'))||0;
+  for(var index=1;index<=count;index++){
+   var candidate=app.Workbooks.Item(index),full=normalizePath(bookFullName(candidate));
+   if(full===expected)return candidate;
+   if(bookName(candidate).toLowerCase()===expectedName)named.push(candidate);
+  }
+  if(opened){
+   if(normalizePath(bookFullName(opened))===expected)return opened;
+   // WPS可能返回用规范化短路径/编码路径表示的新对象；同名时仍交给后续页结构核对确认。
+   if(bookName(opened).toLowerCase()===expectedName)return opened;
+  }
+  return named.length===1?named[0]:null;
+ }
  // 生成后按图04习惯打开各分类工作簿供查看；宏安全值与活动簿的处理与成果表一致。
  function openForEditing(app,filePath){
   if(!isAbsolute(filePath)||!/^.+\.xlsx$/i.test(text(filePath)))throw Error('分类工作簿路径无效，未打开。');
-  function key(value){return String(value||'').replace(/[\\/]+/g,'/').toLowerCase();}
   var security=app.AutomationSecurity,error=null,book=null;
   if(typeof security!=='number')throw Error('不能读取宏安全设置，未打开分类工作簿。');
   try{
-   for(var index=1;index<=app.Workbooks.Count;index++){
-    var open=app.Workbooks.Item(index);
-    if(open&&key(open.FullName)===key(filePath)){open.Activate();return {path:filePath,opened:true,reused:true};}
-   }
+   var existing=findBook(app,filePath,null);
+   if(existing){existing.Activate();return {path:filePath,opened:true,reused:true};}
    app.AutomationSecurity=3;
    if(app.AutomationSecurity!==3)throw Error('无法禁用自动宏，未打开分类工作簿。');
-   book=app.Workbooks.Open(filePath,0,false);
-   if(!book||key(book.FullName)!==key(filePath))throw Error('WPS未返回指定分类工作簿。');
+   book=findBook(app,filePath,app.Workbooks.Open(filePath,0,false));
+   if(!book)throw Error('WPS未返回指定分类工作簿：'+filePath);
    book.Activate();
   }catch(problem){error=problem;}
   finally{
@@ -290,25 +319,20 @@ function writeAll(app,planValue,stagePath,options){
   return {path:filePath,opened:true,reused:false};
  }
 // 2026-10-11（图04/05变更）：一本多页发布后按页读回——逐页核“页名与顺序”和“本页行数是否都在”。
-function keyOf(value){return text(value).replace(/[\\/]+/g,'/').toLowerCase();}
 function readSheets(app,filePath){
  if(!isAbsolute(filePath)||!/^.+\.xlsx$/i.test(text(filePath)))throw Error('分类工作簿路径无效，未读回核对。');
  if(!app||typeof app.Workbooks!=='object')throw Error('读回分类工作簿需要连接WPS。');
  var security=null,opened=null,book=null,error=null,list=[],index;
  try{
-  var count=Number(app.Workbooks.Count)||0;
-  for(index=1;index<=count;index++){
-   var candidate=app.Workbooks.Item(index);
-   if(candidate&&keyOf(candidate.FullName)===keyOf(filePath)){book=candidate;break;}
-  }
+   book=findBook(app,filePath,null);
   if(!book){
    security=app.AutomationSecurity;
    if(typeof security!=='number')throw Error('不能读取宏安全设置，未读回分类工作簿。');
    app.AutomationSecurity=3;
    if(app.AutomationSecurity!==3)throw Error('无法禁用自动宏，未读回分类工作簿。');
-   opened=app.Workbooks.Open(filePath,0,true);
-   if(!opened||keyOf(opened.FullName)!==keyOf(filePath))throw Error('WPS未返回指定分类工作簿。');
-   book=opened;
+    opened=app.Workbooks.Open(filePath,0,true);
+    book=findBook(app,filePath,opened);
+    if(!book)throw Error('WPS未返回指定分类工作簿：'+filePath);
   }
   var total=Number(book.Worksheets.Count)||0;
   for(index=1;index<=total;index++){
