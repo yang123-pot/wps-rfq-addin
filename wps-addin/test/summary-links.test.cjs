@@ -351,8 +351,9 @@ test('一本多页-汇总页：名称列是内部跳转（地址空＋页名!A1�
  assert.deepEqual(model.validateSummaryBinding(binding),{ok:true,errors:[]});
  // 读回仍按稳定类别ID解析：内部跳转不改读回口径，品牌列照常逐格校验。
  const read=model.parseSummary(workbook.sheets[0].values.map(row=>row.slice()),binding);
- assert.equal(read.ok,false,'未填写品牌供应商时读回必须报缺组');
- assert.equal(read.issues[0].code,'group-empty');
+  assert.equal(read.ok,true,(read.issues[0]||{}).message);
+  assert.equal(read.categories.every(item=>item.groups.length===0),true,'未填写品牌供应商时保留空组');
+  assert.equal(read.expectedSheets,4,'四类仍各保留一份空品牌询价页');
 });
 test('一本多页-模拟宿主：内部跳转真落地（地址空、SubAddress＝页名!A1）并重开读回一致',()=>{
  const plan=internalPlan(),workbook=model.buildSummary(plan,{}),fixture=summaryApp(),

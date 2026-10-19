@@ -70,11 +70,12 @@ test('an existing target always blocks publishing instead of being overwritten',
  assert.match(checked.conflicts.map(item=>item.message).join('；'),/绝不覆盖/);
  assert.equal(plan.checkTargets(built,['C:\\other\\别的.xlsx']).canPublish,true);
 });
-test('a sheet without a supplier is refused because the base name needs it',()=>{
+test('a sheet without a supplier uses the category name and stays splittable',()=>{
  const missing=model();
  missing.sheets[0].supplier='';
  const built=plan.build({model:missing,generation:generation,targetDirectory:'C:\\out'});
- assert.match(built.conflicts.map(item=>item.code).join('；'),/empty-name/);
- assert.equal(built.canPublish,false);
+ assert.deepEqual(built.files.filter(file=>file.kind==='inquiry').map(file=>file.name),
+  ['水阀门.xlsx','水阀门_供应商B.xlsx'],'供应商为空时只用类别名，空值不阻断拆分');
+ assert.equal(built.canPublish,true);
  assert.equal(inquiry.INQUIRY,'inquiry');
 });

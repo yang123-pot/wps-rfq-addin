@@ -31,7 +31,7 @@
     at(4,'生成分类工作簿','首页是分类汇总表，后面每类材料一张工作表。','categoriesGenerate','生成分类工作簿');
    if(s.categoriesReady)at(4,'分类工作簿已生成',s.categoryCount+' 类询价材料，已放在同一本工作簿。首页是汇总表，每类材料一张工作表'+
      (s.noInquiryPage?'；“无需询价”明细在最后一张工作表。':'。'),'continueBrands','下一步：填写品牌和供应商');
-   if(s.categoriesReady&&s.summaryReady&&s.brandsOpened)at(5,'填写品牌和供应商','在黄色区域填写，每类至少填一组。','brandsConfirm','填写完成，下一步');
+   if(s.categoriesReady&&s.summaryReady&&s.brandsOpened)at(5,'填写品牌和供应商','可填写1至3组，也可以全部留空；直接下一步后，询价表对应位置保持空白。','brandsConfirm','下一步：生成询价表');
    if(s.categoriesPendingSave)at(4,'分类工作簿已生成，项目尚未保存','已生成文件会保留，请保存本次分类结果后继续。','saveProject','重试保存项目');
   }else if(s.mergeConfirmed){
    at(2,'自动分类完成','','reviewGenerate','生成分类核对表');

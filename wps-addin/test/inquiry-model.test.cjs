@@ -57,6 +57,19 @@ test('图06：分别生成每组一张、合成每类一张，材料只列一次
  assert.equal(valve.supplier,'多供应商','多供应商合成用于后续拆分的文件名');
  assert.equal(sheetNamed(model,'风机_瑞风').supplier,'瑞风设备','单组用本组供应商');
 });
+test('品牌和供应商留空时仍生成询价页，品牌列与供应商信息保持空白',()=>{
+ const blankBrands=brands.map(function(item){
+  return Object.assign({},item,{mode:'synthesize',groups:[]});});
+ const model=build({brands:blankBrands});
+ assert.deepEqual(model.sheets.map(function(sheet){return sheet.name;}),['水泵','阀门','风机','汽车充电桩']);
+ const pump=sheetNamed(model,'水泵');
+ assert.deepEqual(pump.groups,[{brand:'',supplier:''}]);
+ assert.equal(pump.brandLabel,'');
+ assert.equal(pump.supplier,'');
+ assert.deepEqual(pump.supplierLines,['']);
+ assert.equal(dataRows(pump).every(function(row){return row[6]==='';}),true,'询价表品牌列保持空白');
+ assert.equal(dataRows(pump).length,2,'空白品牌仍保留本类全部材料行');
+});
 
 test('图06抬头块、10列公开值、报价与金额留空、长特征换行',()=>{
  const model=build(),valve=sheetNamed(model,'阀门_合成询价');

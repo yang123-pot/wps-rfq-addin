@@ -41,9 +41,9 @@
    var current=isCurrent();
    if(!ready){
     banner.textContent='尚未完成品牌汇总';banner.className='result-banner';
-    progress.textContent='当前进度 6 / 7 · 等待第5步在分类汇总表内填写品牌与供应商并读回';
-    stats.textContent='品牌与供应商取自分类汇总表读回结果，不在侧栏二次编辑。';
-    status.textContent='在“品牌汇总”生成汇总表、填写品牌供应商后点“填写完成，生成询价表”读回。';
+    progress.textContent='当前进度 6 / 7 · 等待第5步读取分类汇总表';
+    stats.textContent='品牌与供应商取自分类汇总表；允许为空，空值会在询价表中保持空白。';
+    status.textContent='在“品牌汇总”生成汇总表后点“读取汇总表，下一步”；品牌和供应商可以留空。';
    }else if(!header.ok){
     banner.textContent='询价抬头未填齐';banner.className='result-banner';
     progress.textContent='当前进度 6 / 7 · 品牌已读回，等待填写询价抬头';

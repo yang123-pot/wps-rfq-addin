@@ -176,20 +176,27 @@ test('R8汇总读回：两种布局解析等价，1至3组与生成方式一致�
  assert.equal(model.summaryCountsText(separatedRead.categories),'水泵 2 份、阀门 1 份、风机 1 份、汽车充电桩 1 份');
  assert.equal(separatedRead.totalGroups,6);
 });
-test('R8汇总读回：单组默认合成、空组忽略、半组/重复组合/多组未选方式都报单元格',()=>{
+test('R8汇总读回：品牌供应商可留空，空组忽略、半组保留、重复组合与多组未选方式仍报单元格',()=>{
  const single=r8Summary('separated',r8Fills({mode:'',groups:[{brand:'甲',supplier:'S1'}]}));
  const singleRead=model.parseSummary(single.values,single.binding);
  assert.equal(singleRead.ok,true,(singleRead.issues[0]||{}).message);
  assert.equal(singleRead.categories[0].mode,'synthesize','单组默认合成一份');
  assert.equal(singleRead.expectedSheets,4,'四类各单组，每类仍只有一份');
  const spec=model.summaryLayoutFor('separated');
- // 半组：只填品牌不填供应商，定位到该组单元格。
+ // 半组：只填品牌不填供应商，允许原样读回，后续询价表供应商留空。
  const half=r8Summary('separated',r8Fills(R8_FILLS[0]));
  half.values[spec.firstRow-1][spec.groups[1][1]-1]='';
  const halfRead=model.parseSummary(half.values,half.binding);
- assert.equal(halfRead.ok,false);
- assert.equal(halfRead.issues[0].code,'group-half');
- assert.equal(halfRead.issues[0].cell,'G4','半组定位到第2组的供应商单元格');
+  assert.equal(halfRead.ok,true,(halfRead.issues[0]||{}).message);
+  assert.deepEqual(halfRead.categories[0].groups,[{brand:'青源',supplier:'华川设备'},{brand:'恒流',supplier:''}]);
+  // 全部留空：该类别仍进入下一步，按一份空品牌/空供应商询价页计算。
+  const empty=r8Summary('separated',r8Fills({mode:'',groups:[]}));
+  const emptyRead=model.parseSummary(empty.values,empty.binding);
+  assert.equal(emptyRead.ok,true,(emptyRead.issues[0]||{}).message);
+  assert.deepEqual(emptyRead.categories[0].groups,[]);
+  assert.equal(emptyRead.categories[0].mode,'synthesize');
+  assert.equal(emptyRead.expectedSheets,4,'空白品牌类别仍保留一份询价页');
+  assert.equal(model.summarySheetCount(emptyRead.categories),4);
  // 重复组合：完全相同的品牌/供应商组合出现两次。
  const dup=r8Summary('separated',r8Fills({mode:'synthesize',groups:[{brand:'通达',supplier:'正通商贸'},{brand:'通达',supplier:'正通商贸'}]}));
  const dupRead=model.parseSummary(dup.values,dup.binding);
@@ -244,7 +251,7 @@ test('R8汇总读回：稳定类别ID读回，排序不串类；删行/复制行
  assert.equal(unknownRead.issues[0].code,'category-unknown');
  assert.equal(unknownRead.issues[0].cell,'K5');
 });
-test('R8同格读回：标签错误/缺标签/额外文本报单元格，两行解析成独立字段',()=>{
+test('R8同格读回：未知文本报单元格，单行品牌/供应商可留空并解析成独立字段',()=>{
  const base=r8Summary('combined');
  assert.equal(model.parseSummary(base.values,base.binding).ok,true);
  const missing=base.values.map(row=>row.slice());missing[4][3]='青源';// 缺少“品牌：”标签
@@ -258,8 +265,8 @@ test('R8同格读回：标签错误/缺标签/额外文本报单元格，两行�
  assert.equal(extraRead.issues[0].cell,'D5');
  const half=base.values.map(row=>row.slice());half[4][3]='品牌：青源';
  const halfRead=model.parseSummary(half,base.binding);
- assert.equal(halfRead.ok,false);
- assert.equal(halfRead.issues[0].code,'combined-supplier-missing');
+  assert.equal(halfRead.ok,true,(halfRead.issues[0]||{}).message);
+  assert.deepEqual(halfRead.categories.filter(item=>item.categoryId==='pump')[0].groups[0],{brand:'青源',supplier:''});
  // 英文冒号与换行兼容。
  const english=base.values.map(row=>row.slice());english[4][3]='品牌: 青源\r\n供应商: 华川设备';
  const englishRead=model.parseSummary(english,base.binding);

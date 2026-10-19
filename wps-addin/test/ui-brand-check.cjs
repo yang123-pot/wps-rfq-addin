@@ -276,8 +276,8 @@ async function summaryFlow(){
   assert.match(String(receipt.summary.sha256),/^[a-f0-9]{64}$/,'汇总表回执必须带SHA');
   assert.match(await page.locator('#brands-banner').innerText(),/分类汇总表已生成（4 类）/);
  assert.match(await page.locator('#project-status').textContent(),
-   /品牌汇总：未完成（分类汇总表已生成（4 类，品牌、供应商分列），请在表内填写品牌与供应商后点“填写完成，生成询价表”读回）/,
-   '生成汇总表但未读回填写内容前，品牌汇总阶段不得误报完成');
+   /品牌汇总：未完成（分类汇总表已生成（4 类，品牌、供应商分列），品牌与供应商可留空；点“读取汇总表，下一步”继续）/,
+   '生成汇总表但未读回前，品牌汇总阶段不得误报完成；文案明确允许留空');
   // F3：发布校验与项目绑定保存完成后自动打开一次最终文件，供用户直接表内填写。
   assert.deepEqual(await page.evaluate(()=>window.__summaryOpened.map(item=>String(item).toLowerCase())),
    [String(receipt.summary.path).toLowerCase()],'分列布局生成成功后必须自动打开一次最终汇总表（无需再点按钮）');
@@ -289,14 +289,30 @@ async function summaryFlow(){
   await shot(SUMMARY_SHOT&&SUMMARY_SHOT.replace(/\.png$/,'-separated.png'));
  await dumpEvidence('summary-binding-separated.json',receipt.summary);
   await dumpEvidence('summary-files.json',await fs.readdir(workbookDirectory));
-  // R8：先放一个半组错误，验证读回定位到具体单元格且不改用户在表内的填写；再改成完整内容读回。
+  // 用户要求：品牌和供应商可全空后直接下一步；询价模型仍保留四类各一份空品牌询价页。
+  await page.evaluate(({file,values})=>window.__seedSummary(file,values),
+   {file:receipt.summary.path,values:separated.values.map(row=>row.slice())});
+  await page.locator('#brands-confirm').click();
+  try{await page.waitForFunction(()=>document.querySelector('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage')==='inquiry');}
+  catch(_){throw Error('空白品牌未进入询价表：'+JSON.stringify(await page.evaluate(()=>({
+   stage:document.querySelector('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage'),
+   message:document.querySelector('#brands-message').textContent,
+   issues:document.querySelector('#brands-issues').textContent,
+   status:document.querySelector('#brands-status').textContent,
+   project:document.querySelector('#project-status').textContent}))));}
+  const blankRead=await projectRecord();
+  assert.equal(blankRead.brands.expectedSheets,4,'全空品牌时四类仍各生成一份询价页');
+  assert.equal(blankRead.brands.categories.every(item=>item.groups.length===0),true,'空品牌空供应商原样保存');
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="brands"]').click();
+  // R8：先放一个重复组合错误，验证读回定位到具体单元格且不改用户在表内的填写；再改成完整内容读回。
   const separatedPath=receipt.summary.path,specSep=brandModel.summaryLayoutFor('separated');
   const halfGrid=fillSummaryGrid(separated,SUMMARY_FILLS);
-  halfGrid[specSep.firstRow-1][specSep.groups[1][1]-1]='';
+  halfGrid[specSep.firstRow-1][specSep.groups[1][0]-1]=halfGrid[specSep.firstRow-1][specSep.groups[0][0]-1];
+  halfGrid[specSep.firstRow-1][specSep.groups[1][1]-1]=halfGrid[specSep.firstRow-1][specSep.groups[0][1]-1];
   await page.evaluate(({file,values})=>window.__seedSummary(file,values),{file:separatedPath,values:halfGrid});
   await page.locator('#brands-confirm').click();
   await page.waitForFunction(()=>/未通过校验/.test(document.querySelector('#brands-message').textContent));
-  assert.match(await page.locator('#brands-issues').innerText(),/G4|成对/,'半组错误必须定位到具体单元格');
+  assert.match(await page.locator('#brands-issues').innerText(),/F4|重复/,'重复组合错误必须定位到具体单元格');
   assert.match(await page.locator('#project-status').textContent(),/品牌汇总：未完成/,'校验未通过时品牌汇总阶段不得完成');
   await page.evaluate(({file,values})=>window.__seedSummary(file,values),
    {file:separatedPath,values:fillSummaryGrid(separated,SUMMARY_FILLS)});
@@ -306,7 +322,7 @@ async function summaryFlow(){
   await page.waitForFunction(()=>document.querySelector('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage')==='inquiry');
   await page.locator('#workflow-nav .workflow-step-button[data-stage="brands"]').click();
   assert.match(await page.locator('#brands-message').innerText(),/预计 5 份询价表/);
-  assert.match(await page.locator('#brands-banner').innerText(),/品牌与供应商已读回（4 类）/);
+  assert.match(await page.locator('#brands-banner').innerText(),/分类汇总表已读回（4 类）/);
   const readSeparated=await projectRecord();
   assert.equal(readSeparated.brands.expectedSheets,5,'水泵2、阀门1、风机1、充电桩1共5份');
   assert.deepEqual(readSeparated.brands.categories.map(item=>[item.categoryId,item.mode,item.groups.length]),
@@ -316,7 +332,8 @@ async function summaryFlow(){
   assert.match(await page.locator('#project-status').textContent(),/品牌汇总：已确认/,'读回通过后品牌汇总阶段才算完成');
   // 已读回后再把表内改坏：旧读回作废、阶段回到未完成，且不改动用户在表内的填写。
   const brokenGrid=fillSummaryGrid(separated,SUMMARY_FILLS);
-  brokenGrid[specSep.firstRow-1][specSep.groups[1][1]-1]='';
+  brokenGrid[specSep.firstRow-1][specSep.groups[1][0]-1]=brokenGrid[specSep.firstRow-1][specSep.groups[0][0]-1];
+  brokenGrid[specSep.firstRow-1][specSep.groups[1][1]-1]=brokenGrid[specSep.firstRow-1][specSep.groups[0][1]-1];
   await page.evaluate(({file,values})=>window.__seedSummary(file,values),{file:separatedPath,values:brokenGrid});
   await page.locator('#brands-confirm').click();
   await page.waitForFunction(()=>/未通过校验/.test(document.querySelector('#brands-message').textContent));
@@ -380,7 +397,7 @@ async function summaryFlow(){
   await installStubs();
   await openProject();
   await page.locator('#workflow-nav .workflow-step-button[data-stage="brands"]').click();
-  await page.waitForFunction(()=>/品牌与供应商已读回（4 类）/.test(document.querySelector('#brands-banner').textContent));
+  await page.waitForFunction(()=>/分类汇总表已读回（4 类）/.test(document.querySelector('#brands-banner').textContent));
   assert.equal(await page.locator('#brands-list > li').count(),4);
   assert.equal(await page.locator('#brands-layout').inputValue(),'combined','恢复后布局必须与项目记录一致');
   assert.match(await page.locator('#project-status').textContent(),/品牌汇总：已确认/,'读回的品牌组随项目保存并恢复');
@@ -447,7 +464,7 @@ async function summaryFlow(){
   assert.equal((await summaryFiles()).length,filesBeforeSaveFail+1,'已发布成果文件保留');
   assert.equal(await page.evaluate(()=>window.__summaryOpened.length),openedBeforeSaveFail,'绑定保存失败不得自动打开');
   assert.deepEqual(errors,[]);
-  console.log('PASS(R7+R8一本多页): 图05A/05B分类汇总表＝分类工作簿第 1 页——一类一行、双布局可用、4条名称链接文件内跳到对应分类页；R8按稳定类别ID读回、半组定位单元格、多品牌按组保留、预计5份、双布局等价并随项目保存恢复。');
+  console.log('PASS(R7+R8一本多页): 图05A/05B分类汇总表＝分类工作簿第 1 页——一类一行、双布局可用、4条名称链接文件内跳到对应分类页；R8允许品牌供应商留空、半组保留、重复组合定位、多品牌按组保留、双布局等价并随项目保存恢复。');
 }finally{await browser.close();await new Promise(r=>server.close(r));await fs.rm(root,{recursive:true,force:true});}
 }
 (async()=>{await summaryFlow();})().catch(e=>{console.error(e);process.exitCode=1;});

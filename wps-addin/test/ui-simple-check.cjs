@@ -78,7 +78,7 @@ const { createServer } = require('../dev/server.cjs');
     await page.evaluate(()=>{document.getElementById('project-status').textContent='分类工作簿：已确认';document.dispatchEvent(new Event('rfq:project-status'));});
     assert.equal(await page.locator('#simple-primary').innerText(),'选择清单文件');
     await page.evaluate(()=>RfqAssistant.set({reviewConfirmed:true,categoriesReady:true,summaryReady:true,brandsOpened:true}));
-    assert.equal(await page.locator('#simple-primary').innerText(),'填写完成，下一步');
+    assert.equal(await page.locator('#simple-primary').innerText(),'下一步：生成询价表');
     await page.evaluate(()=>RfqAssistant.set({brandsReady:true,expectedSheets:5}));
     assert.equal(await page.locator('#simple-primary').innerText(),'生成询价总表');
     await page.evaluate(()=>RfqAssistant.set({inquiryReady:true}));

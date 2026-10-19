@@ -40,12 +40,10 @@
   if(!list||!list.length)throw Error('还没有从分类汇总表读回品牌与供应商，不能生成询价表。');
   return list.map(function(entry){
    var item=entry||{},categoryId=trim(item.categoryId),groups=(item.groups||[]).map(function(group){
-    return {brand:trim(group&&group.brand),supplier:trim(group&&group.supplier)};}).filter(function(group){
-    return !!group.brand;});
+    return {brand:trim(group&&group.brand),supplier:trim(group&&group.supplier)};});
    var label=trim(item.categoryName)||categoryId;
    if(!categoryId)throw Error('分类汇总表里有一类缺少稳定类别标识，不能生成询价表。');
-   if(!groups.length)throw Error('类别“'+label+'”没有完整品牌与供应商，不能生成询价表。');
-   var mode=trim(item.mode);
+   var mode=trim(item.mode)||'synthesize';
    if(MODES.indexOf(mode)<0)throw Error('类别“'+label+'”没有有效的询价生成方式，不能生成询价表。');
    return {categoryId:categoryId,categoryName:trim(item.categoryName)||categoryId,rowCount:Number(item.rowCount)||0,
     mode:mode,groups:groups};
@@ -57,12 +55,14 @@
   return built.rows;
  }
  function sheetGroups(entry){
+  if(!entry.groups.length)return [[{brand:'',supplier:''}]];
   if(entry.mode==='per-brand')return entry.groups.map(function(group){return [group];});
   return [entry.groups];
  }
  // 单组用“类别_品牌”（图06：水泵_青源、风机_瑞风、汽车充电桩_驰电）；多组合成用“类别_合成询价”。
  function sheetNameFor(entry,groupSet){
-  return trim(entry.categoryName)+'_'+(groupSet.length>1?COMBINED_NAME:groupSet[0].brand);
+  var suffix=groupSet.length>1?COMBINED_NAME:trim(groupSet[0]&&groupSet[0].brand);
+  return trim(entry.categoryName)+(suffix?'_'+suffix:'');
  }
  function sheetLayout(block,rowCount,categoryId,mode){
   var columnSpan=COLUMNS.length,totalRows=block.headerRow+rowCount,merges=[],index;
@@ -103,7 +103,7 @@
     throw Error('分类“'+entry.categoryName+'”的材料条数与汇总表不一致（清单'+categoryRows.length+'行，汇总表'+
      entry.rowCount+'行），请重新读回汇总表后再生成。');
    sheetGroups(entry).forEach(function(groupSet){
-    var multi=groupSet.length>1,brandLabel=groupSet.map(function(group){return group.brand;}).join(BRAND_SEPARATOR),
+    var multi=groupSet.length>1,brandLabel=groupSet.map(function(group){return group.brand;}).filter(function(value){return value;}).join(BRAND_SEPARATOR),
      supplierLabel=multi?MULTI_SUPPLIER:groupSet[0].supplier,
      sheetName=sanitize(sheetNameFor(entry,groupSet),used),block=header.block(source.header,groupSet),
      values=block.lines.concat([COLUMNS.slice()]);

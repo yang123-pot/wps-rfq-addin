@@ -308,12 +308,13 @@ test('R12-I汇总边界：1/2/3组、空组/半组/重复组合/同品牌不同�
   assert.equal(gapRead.ok, true, (gapRead.issues[0] || {}).message);
   assert.deepEqual(gapRead.categories.filter(function (entry) { return entry.categoryId === 'pump'; })[0].groups,
     [{ brand: '甲', supplier: 'S1' }, { brand: '丙', supplier: 'S3' }]);
-  // 半组：只填品牌，定位到该组单元格。
-  const half = combinedWith({ groups: [{ brand: '甲', supplier: 'S1' }, { brand: '乙', supplier: '' }] });
+  // 半组：只填品牌，允许原样保留，供应商为空。
+  const half = combinedWith({ groups: [{ brand: '甲', supplier: 'S1' }, { brand: '乙', supplier: '' }],
+    modeLabel: '合成一份' });
   const halfRead = brandModel.parseSummary(half.values, half.binding);
-  assert.equal(halfRead.ok, false);
-  assert.equal(halfRead.issues[0].code, 'group-half');
-  assert.equal(halfRead.issues[0].cell, 'E5');
+  assert.equal(halfRead.ok, true, (halfRead.issues[0] || {}).message);
+  assert.deepEqual(halfRead.categories.filter(function (entry) { return entry.categoryId === 'pump'; })[0].groups,
+    [{ brand: '甲', supplier: 'S1' }, { brand: '乙', supplier: '' }]);
   // 重复组合：同一品牌+供应商两次，报单元格。
   const duplicate = combinedWith({ groups: [{ brand: '甲', supplier: 'S1' }, { brand: '甲', supplier: 'S1' }] });
   const duplicateRead = brandModel.parseSummary(duplicate.values, duplicate.binding);

@@ -14,7 +14,7 @@
  }
  // 基础名保持“分类_供应商名称.xlsx”（Q4未定时不做自动改名，冲突一律阻断绝不覆盖）。
  function baseName(sheet){
-  return safeName(text(sheet.categoryName)+'_'+text(sheet.supplier))+'.xlsx';
+ return safeName(text(sheet.categoryName)+(text(sheet.supplier)?'_'+text(sheet.supplier):''))+'.xlsx';
  }
  function completeName(generation){return safeName(text(generation&&generation.target).split(/[\\/]/).pop().replace(/\.xlsx$/i,''))+'_完整文件.xlsx';}
  function join(directory,name){
@@ -44,8 +44,8 @@
    var stem=name.replace(/\.xlsx$/i,'');
    if(RESERVED.test(stem)||stem.split('_').some(function(part){return RESERVED.test(part);}))
     issues.push({code:'reserved-name',message:'文件名是Windows保留设备名，请改名：'+name});
-   if(!safeName(text(sheet.categoryName))||!safeName(text(sheet.supplier)))
-    issues.push({code:'empty-name',message:'类别或供应商为空，无法组成文件名。'});
+   if(!safeName(text(sheet.categoryName)))
+    issues.push({code:'empty-name',message:'类别为空，无法组成文件名。'});
    if(target.length>MAX_PATH)issues.push({code:'long-path',message:'输出路径过长，请选择更短的目录：'+target});
    var key=target.toLowerCase();
    if(seen[key])conflicts.push({code:'duplicate-target',message:'文件名重复（不区分大小写），请先区分品牌或供应商：'+name});

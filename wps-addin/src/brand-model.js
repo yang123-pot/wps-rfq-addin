@@ -392,10 +392,6 @@
    '同格填写只能有两行“品牌：…”与“供应商：…”，这一格还有“'+unknown+'”，请按格式修改。',row,column,categoryId)};
   if(duplicate)return {issue:summaryIssueAt('combined-duplicate','同格填写标签重复',
    '同格填写的“品牌/供应商”标签出现多次，请合并为两行。',row,column,categoryId)};
-  if(lines.length&&!brandSeen)return {issue:summaryIssueAt('combined-brand-missing','同格填写缺少品牌标签',
-   '同格填写缺少“品牌：…”这一行，请按格式修改。',row,column,categoryId)};
-  if(lines.length&&!supplierSeen)return {issue:summaryIssueAt('combined-supplier-missing','同格填写缺少供应商标签',
-   '同格填写缺少“供应商：…”这一行，请按格式修改。',row,column,categoryId)};
   return {group:{brand:brand==null?'':brand,supplier:supplier==null?'':supplier}};
  }
  // 读回汇总表：表头、稳定类别ID、名称/条数固定列、每组品牌供应商、生成方式都逐项核对，错误定位到具体单元格。
@@ -458,19 +454,12 @@
      index:index,columns:columns,column:columns[0]});
    });
    if(groupIssues.length){issues=issues.concat(groupIssues);continue;}
-   // 空组忽略；只要有一项不完整就报半组并定位到该组单元格，不猜也不补。
+   // 品牌、供应商均可留空；空组忽略，半组保留原值，后续询价表对应位置留空。
    var complete=[];
    parsedGroups.forEach(function(group){
     if(!group.brand&&!group.supplier)return;
-    if(!group.brand||!group.supplier){
-     var badColumn=group.brand?group.columns[group.columns.length-1]:group.columns[0];
-     issues.push(summaryIssueAt('group-half','品牌与供应商没有成对填写',
-      '第'+(group.index+1)+'组只填了'+(group.brand?'品牌':'供应商')+'，请补齐或清空这一组。',row,badColumn,categoryId));
-     return;}
     complete.push(group);
    });
-   if(!complete.length){issues.push(summaryIssueAt('group-empty','还没有填写品牌与供应商',
-    '这一类至少要填写一组完整的品牌与供应商。',row,spec.groups[0][0],categoryId));continue;}
    var combination={};
    complete.forEach(function(group){
     var key=(group.brand+'/'+group.supplier).toLowerCase();
@@ -481,13 +470,13 @@
    var modeLabel=summaryCellAt(values,row,modeColumn),mode=summaryModeValue(modeLabel);
    if(modeLabel&&!mode)issues.push(summaryIssueAt('mode-unknown','询价生成方式无法识别',
     '“'+modeLabel+'”不是可选方式，请从下拉里选择“合成一份”或“按品牌分别生成”。',row,modeColumn,categoryId));
-   else if(complete.length>1&&!mode)issues.push(summaryIssueAt('mode-missing','多组品牌未选择询价生成方式',
+    else if(complete.length>1&&!mode)issues.push(summaryIssueAt('mode-missing','多组品牌未选择询价生成方式',
     '这一类有'+complete.length+'组品牌，请选择“合成一份”或“按品牌分别生成”。',row,modeColumn,categoryId));
    if(!mode)mode='synthesize';
    categories.push({categoryId:categoryId,categoryName:target.categoryName,rowCount:target.rowCount,
     mode:mode,groups:complete.map(function(group){return {brand:group.brand,supplier:group.supplier};}),row:row});
    totalGroups+=complete.length;
-   expectedSheets+=mode==='per-brand'?complete.length:1;
+    expectedSheets+=mode==='per-brand'?Math.max(complete.length,1):1;
   }
   order.forEach(function(item){
    if(seen[item.categoryId])return;
@@ -517,8 +506,7 @@
  function summarySheetCount(categories){
   return (Array.isArray(categories)?categories:[]).reduce(function(total,entry){
    var groups=(entry&&entry.groups)||[];
-   if(!groups.length)return total;
-   return total+(text(entry.mode)==='per-brand'?groups.length:1);},0);
+   return total+(text(entry.mode)==='per-brand'?Math.max(groups.length,1):1);},0);
  }
  function summaryCountsText(categories){
   return (Array.isArray(categories)?categories:[]).map(function(entry){

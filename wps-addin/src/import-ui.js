@@ -1375,12 +1375,12 @@
       var state=summaryState();
       if(!state.ok)return {ready:false,detail:state.reason};
       if(!summaryRead)return {ready:false,generated:true,detail:'分类汇总表已生成（'+summaryReceipt.categories.length+
-        ' 类，'+summaryLayoutLabel(summaryReceipt.layout)+'），请在表内填写品牌与供应商后点“填写完成，生成询价表”读回'};
+        ' 类，'+summaryLayoutLabel(summaryReceipt.layout)+'），品牌与供应商可留空；点“读取汇总表，下一步”继续'};
       if(summaryRead.inputKey!==matchingKey())return {ready:false,detail:'品牌读回绑定的是旧内容：请重新读回汇总表'};
       if(String(summaryRead.summaryPath||'')!==String(summaryReceipt.path||'')||summaryRead.layout!==summaryReceipt.layout)
         return {ready:false,detail:'汇总表已变化，请重新读回汇总表'};
       return {ready:true,generated:true,rows:summaryRead.categories,
-        detail:'品牌与供应商已填写并读回（'+summaryRead.categories.length+' 类 · 预计 '+
+        detail:'分类汇总表已读回（'+summaryRead.categories.length+' 类，品牌和供应商可为空 · 预计 '+
           RfqBrandModel.summaryCountsText(summaryRead.categories)+'，共 '+summaryRead.expectedSheets+' 份询价表）'};
     }
     // 询价/拆分的业务内容：只取当前有效的读回结果，过期或未读回时为空，避免沿用旧品牌。
@@ -1419,14 +1419,14 @@
       }else{
         var verdict=summaryVerdict();
         if(verdict.ready){
-          banner.textContent='品牌与供应商已读回（'+record.categories.length+' 类）';banner.className='result-banner is-done';
-          progress.textContent='当前进度 5 / 7 · 品牌与供应商已读回，可进入第6步生成询价表';
+          banner.textContent='分类汇总表已读回（'+record.categories.length+' 类）';banner.className='result-banner is-done';
+          progress.textContent='当前进度 5 / 7 · 已读回，可进入第6步；空白品牌和供应商会原样保留';
           stats.textContent='预计 '+summaryRead.expectedSheets+' 份询价表（'+RfqBrandModel.summaryCountsText(summaryRead.categories)+
             '）· 布局“'+summaryLayoutLabel(record.layout)+'”';
           status.textContent='实际文件：'+record.path;
         }else{
           banner.textContent='分类汇总表已生成（'+record.categories.length+' 类）';banner.className='result-banner is-done';
-          progress.textContent='当前进度 5 / 7 · 在汇总表黄色区填写品牌与供应商后点“填写完成，生成询价表”';
+          progress.textContent='当前进度 5 / 7 · 可在汇总表黄色区填写品牌与供应商，也可全部留空后直接读取';
           stats.textContent=record.categories.length+' 类 · '+record.categories.reduce(function(total,item){return total+item.rowCount;},0)+
             ' 行纳入询价 · 布局“'+summaryLayoutLabel(record.layout)+'”';
           status.textContent='实际文件：'+record.path+'（第 1 页＝分类汇总表）'+(verdict.detail?' · '+verdict.detail:'');
@@ -1450,7 +1450,7 @@
         generate.textContent=record?'按当前布局重新生成分类汇总表（改布局才另存新文件）':'生成分类汇总表';
       }
       if(open)open.disabled=summaryBusy||!record||!options.application;
-      if(confirm){confirm.disabled=summaryBusy||!state.ok;confirm.textContent='填写完成，生成询价表';}
+      if(confirm){confirm.disabled=summaryBusy||!state.ok;confirm.textContent='读取汇总表，下一步';}
       if(layoutSelect){layoutSelect.disabled=!categories.ready;layoutSelect.value=selectedLayout();}
       if(status&&!state.ok&&state.reason&&record)status.textContent=(status.textContent?status.textContent+' · ':'')+state.reason;
     }
@@ -1466,7 +1466,7 @@
         return {ok:false};
       }
       summaryTell('已生成并校验分类汇总表（'+categoryCount+' 类，'+summaryLayoutLabel(layoutName)+'）：'+path+
-        '，已自动打开，请在黄色区域直接填写品牌与供应商。');
+        '，已自动打开；黄色区域可填写品牌与供应商，也可以留空。');
       return {ok:true};
     }
     async function generateSummary(){
@@ -1586,7 +1586,7 @@
         renderBrands();
         var savedBrands=await projects.save();if(!savedBrands)throw Error('品牌填写已读回，但项目尚未保存，请重试保存后继续。');
         summaryTell('已读回并校验汇总表：'+summaryRead.categories.length+' 类有效，预计 '+summaryRead.expectedSheets+
-          ' 份询价表（'+RfqBrandModel.summaryCountsText(summaryRead.categories)+'）。品牌取自汇总表，改品牌请回汇总表修改并重新读回。');
+          ' 份询价表（'+RfqBrandModel.summaryCountsText(summaryRead.categories)+'）。品牌和供应商可以留空；修改后请重新读取。');
         renderBrands();render();
         // 图05A→06：读回通过后进入第6步生成总询价工作簿（品牌唯一来源即本次读回结果）。
         if(workflow)workflow.goTo('inquiry');

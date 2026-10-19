@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="#f4f7f6"/>
+  <text x="55" y="52" font-family="Microsoft YaHei, sans-serif" font-size="30" font-weight="700" fill="#1f2f2b">品牌与供应商允许留空</text>
+  <text x="55" y="82" font-family="Microsoft YaHei, sans-serif" font-size="16" fill="#5c6b67">第5步不因空白阻断；第6步照常生成询价页，对应品牌与供应商保持空白。</text>
+
+  <rect x="55" y="112" width="720" height="650" rx="8" fill="#fff" stroke="#cbd8d3"/>
+  <text x="78" y="148" font-family="Microsoft YaHei, sans-serif" font-size="21" font-weight="700" fill="#1f6849">1. 第5步：分类汇总表</text>
+  <text x="78" y="176" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#5c6b67">黄色区域可选填；全空、只填品牌、只填供应商都可直接下一步。</text>
+  <g font-family="Microsoft YaHei, sans-serif" font-size="14">
+    <rect x="78" y="202" width="674" height="44" fill="#eaf2ee" stroke="#cbd8d3"/>
+    <text x="91" y="230" font-weight="700">序号</text><text x="145" y="230" font-weight="700">名称</text>
+    <text x="248" y="230" font-weight="700">品牌一</text><text x="342" y="230" font-weight="700">供应商一</text>
+    <text x="454" y="230" font-weight="700">品牌二</text><text x="548" y="230" font-weight="700">供应商二</text>
+    <text x="658" y="230" font-weight="700">生成方式</text>
+
+    <rect x="78" y="246" width="674" height="46" fill="#fff7d7" stroke="#e1d29b"/>
+    <text x="91" y="275">1</text><text x="145" y="275">配电箱</text>
+    <text x="248" y="275" fill="#819087">（空）</text><text x="342" y="275" fill="#819087">（空）</text>
+    <text x="454" y="275" fill="#819087">（空）</text><text x="548" y="275" fill="#819087">（空）</text>
+    <text x="658" y="275">合成一份</text>
+
+    <rect x="78" y="292" width="674" height="46" fill="#fff7d7" stroke="#e1d29b"/>
+    <text x="91" y="321">2</text><text x="145" y="321">桥架</text>
+    <text x="248" y="321">测试品牌</text><text x="342" y="321" fill="#819087">（空）</text>
+    <text x="454" y="321" fill="#819087">（空）</text><text x="548" y="321" fill="#819087">（空）</text>
+    <text x="658" y="321">合成一份</text>
+
+    <rect x="78" y="338" width="674" height="46" fill="#fff7d7" stroke="#e1d29b"/>
+    <text x="91" y="367">3</text><text x="145" y="367">风机</text>
+    <text x="248" y="367" fill="#819087">（空）</text><text x="342" y="367">测试供应商</text>
+    <text x="454" y="367" fill="#819087">（空）</text><text x="548" y="367" fill="#819087">（空）</text>
+    <text x="658" y="367">合成一份</text>
+  </g>
+  <rect x="78" y="410" width="674" height="104" rx="5" fill="#f7faf8" stroke="#d7e0dc"/>
+  <text x="96" y="440" font-family="Microsoft YaHei, sans-serif" font-size="15" font-weight="700" fill="#1f6849">读回口径</text>
+  <text x="96" y="468" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#42544e">· 空白不再作为错误，不再要求“每类至少一组完整品牌与供应商”。</text>
+  <text x="96" y="492" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#42544e">· 多组品牌仍须选择“合成一份”或“按品牌分别生成”。</text>
+  <rect x="78" y="540" width="674" height="58" rx="5" fill="#e8f2ed" stroke="#9ec4b1"/>
+  <text x="96" y="576" font-family="Microsoft YaHei, sans-serif" font-size="15" font-weight="700" fill="#1f6849">主按钮：读取汇总表，下一步</text>
+
+  <rect x="805" y="112" width="740" height="650" rx="8" fill="#fff" stroke="#cbd8d3"/>
+  <text x="828" y="148" font-family="Microsoft YaHei, sans-serif" font-size="21" font-weight="700" fill="#1f6849">2. 第6步：询价总表</text>
+  <text x="828" y="176" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#5c6b67">每类仍生成询价页；缺失的品牌、供应商不补假值。</text>
+  <rect x="828" y="204" width="694" height="118" rx="5" fill="#fbfdfb" stroke="#d7e0dc"/>
+  <text x="846" y="233" font-family="Microsoft YaHei, sans-serif" font-size="15" font-weight="700">供应商信息</text>
+  <line x1="982" y1="204" x2="982" y2="322" stroke="#d7e0dc"/>
+  <text x="1002" y="246" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#819087">（空白）</text>
+  <text x="1002" y="280" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#6b7a74">品牌与供应商未填写时，此区域保留空白。</text>
+
+  <g font-family="Microsoft YaHei, sans-serif" font-size="14">
+    <rect x="828" y="350" width="694" height="44" fill="#eaf2ee" stroke="#cbd8d3"/>
+    <text x="842" y="378" font-weight="700">序号</text><text x="904" y="378" font-weight="700">项目名称</text>
+    <text x="1040" y="378" font-weight="700">单位</text><text x="1120" y="378" font-weight="700">工程量</text>
+    <text x="1238" y="378" font-weight="700">品牌</text>
+    <rect x="828" y="394" width="694" height="48" fill="#fff" stroke="#d7e0dc"/>
+    <text x="842" y="424">1</text><text x="904" y="424">配电箱</text><text x="1040" y="424">台</text>
+    <text x="1120" y="424">16.6</text><text x="1238" y="424" fill="#819087">（空）</text>
+    <rect x="828" y="442" width="694" height="48" fill="#f9fbfa" stroke="#d7e0dc"/>
+    <text x="842" y="472">2</text><text x="904" y="472">桥架</text><text x="1040" y="472">m</text>
+    <text x="1120" y="472">120</text><text x="1238" y="472" fill="#819087">（空）</text>
+  </g>
+  <rect x="828" y="520" width="694" height="128" rx="6" fill="#f7faf8" stroke="#d7e0dc"/>
+  <text x="850" y="552" font-family="Microsoft YaHei, sans-serif" font-size="17" font-weight="700" fill="#1f6849">空白值处理</text>
+  <text x="850" y="582" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#42544e">· 不含品牌时，品牌列留空；不含供应商时，供应商信息区留空。</text>
+  <text x="850" y="608" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#42544e">· 材料行、工程量、类别页和无需询价页不受影响。</text>
+  <text x="850" y="634" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#42544e">· 拆分时供应商为空，文件名退回只用类别名。</text>
+  <text x="828" y="742" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#6b7a74">说明：本补充覆盖旧口径“每类至少填写一组完整品牌与供应商”。</text>
+</svg>

@@ -74,7 +74,8 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   await showDetail();await page.locator('[data-stage="review"].workflow-step-button').click();
   await page.evaluate(row=>window.__setCell(row,10,'新版审核备注'),fixture.CONFLICT_ROW);await page.locator('#sheet-review-confirm').click();
   await page.waitForFunction(()=>document.getElementById('project-message').textContent.includes('模拟新版分类簿绑定保存失败'));
-  await page.waitForFunction(()=>!RfqAssistant.snapshot().busy);
+  await page.waitForFunction(()=>RfqAssistant.snapshot().categoriesPendingSave,
+   null,{timeout:30000});
   if(await page.getByRole('alertdialog').count())await page.keyboard.press('Escape');await showSimple();
   const afterFailure=await page.evaluate(()=>({action:RfqAssistant.view().action,state:RfqAssistant.snapshot(),
    projectMessage:document.querySelector('#project-message').textContent}));
@@ -91,7 +92,7 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   const record=async()=>JSON.parse(await fs.readFile(path.join(projectDirectory,(await fs.readdir(projectDirectory)).find(n=>n.endsWith('.json'))),'utf8'));
   const saved=await record(),summary=await page.evaluate(()=>({values:window.__summary.values,layout:window.__summary.layout.metadata.layout}));
   await page.evaluate(({file,values})=>window.__seedSummary(file,values),{file:saved.summary.path,values:fixture.fillSummaryGrid(summary,fixture.SUMMARY_FILLS)});
-  await shot('05-brands');await action('填写完成，下一步');await page.waitForFunction(()=>RfqAssistant.view().step===6);
+  await shot('05-brands');await action('下一步：生成询价表');await page.waitForFunction(()=>RfqAssistant.view().step===6);
   await action('生成询价总表');await page.getByRole('alertdialog').waitFor();await page.getByRole('alertdialog').getByRole('button',{name:'去填写'}).click();
   assert.equal(await page.locator('#header-projectName').evaluate(n=>n===document.activeElement),true);
   for(const [key,value] of Object.entries({projectName:'示例园区',company:'示例建设公司',contact:'测试员',phone:'示例联系方式'}))await page.locator('#header-'+key).fill(value);
