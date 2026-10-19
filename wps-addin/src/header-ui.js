@@ -12,10 +12,10 @@
   RfqInquiryHeader.FIELDS.forEach(function(field){
    inputs[field.key]=document.getElementById('header-'+field.key);
    if(!inputs[field.key])return;
-   function changed(){
+   function changed(event){
     draft[field.key]=inputs[field.key].value;render();
-    // 抬头是询价生成的内容键之一：变化后要立即让询价/拆分面板按最新内容重算可用性。
-    if(options.onChange)options.onChange(draft);}
+    // 输入时同步草稿并轻量失效；失焦提交后再重算整项目，避免每个字重合并全部材料。
+    if(options.onChange)options.onChange(draft,{editing:!!event&&event.type==='input'});}
    inputs[field.key].addEventListener('input',changed);
    inputs[field.key].addEventListener('change',changed);
   });

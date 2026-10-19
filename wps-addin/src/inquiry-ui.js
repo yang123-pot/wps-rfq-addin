@@ -11,7 +11,7 @@
     message=document.getElementById('inquiry-message'),workbook=document.getElementById('inquiry-workbook'),
     previewList=document.getElementById('inquiry-preview'),generateButton=document.getElementById('inquiry-generate'),
     nextButton=document.getElementById('inquiry-next'),backButton=document.getElementById('inquiry-back');
-  var generation=null,busy=false;
+  var generation=null,busy=false,lastBrandsReady=false;
   function tell(text,error){if(!message)return;message.textContent=text;message.className=error?'error':'';if(window.RfqFeedback)RfqFeedback.tell(text,error,'inquiry');}
   function context(){return options.context?options.context():null;}
   function draft(){
@@ -37,6 +37,7 @@
   // 图06侧栏：当前操作的工作簿、预计输出与每类方式、返回汇总表修改、进入拆分。
   function render(){
    var ctx=context(),model=null,error=null,ready=brandsReady(),header=headerCheck();
+   lastBrandsReady=ready;
    if(ready&&header.ok){try{model=buildModel();}catch(problem){error=problem.message;}}
    var current=isCurrent();
    if(!ready){
@@ -88,6 +89,15 @@
    }
    if(nextButton)nextButton.disabled=busy||!current;
    if(backButton)backButton.disabled=busy;
+  }
+  function headerEdited(value){
+   var check=RfqInquiryHeader.validate(value);
+   if(generateButton)generateButton.disabled=busy||!lastBrandsReady||!check.ok||!options.application;
+   if(nextButton)nextButton.disabled=true;
+   if(generation){
+    banner.textContent='总询价工作簿已过期';banner.className='result-banner';
+    status.textContent='抬头正在修改，填写完成后重新核对；旧询价文件暂不用于拆分。';
+   }
   }
   function requests(action,payload){
    var token=window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token;
@@ -142,7 +152,7 @@
    if(options.onBack)options.onBack();
   });
   render();
-  return {generate:generate,refresh:render,generation:function(){return generation;},restore:function(value){generation=value||null;render();},
+  return {generate:generate,refresh:render,headerEdited:headerEdited,generation:function(){return generation;},restore:function(value){generation=value||null;render();},
    model:function(){try{return buildModel();}catch(_){return null;}},
    verdict:function(){
     if(!generation)return {ready:false,detail:'尚未生成总询价工作簿'};

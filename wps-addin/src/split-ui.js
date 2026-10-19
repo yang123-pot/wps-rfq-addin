@@ -422,7 +422,8 @@
     if(native&&native.supported){if(native.path){directory=native.path;batchId=ensureBatch();await syncPlan();}return;}}
    return new Promise(function(resolve){RfqPathPicker.open({mode:'directory',token:window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token,startPath:directory,title:'选择拆分输出文件夹',confirmLabel:'使用此文件夹',onConfirm:async function(paths){directory=paths&&paths[0]||'';batchId=ensureBatch();await syncPlan();resolve();},onCancel:resolve,onError:function(text){tell(text,true);resolve();}});});
   }
-  return {execute:execute,chooseDirectory:chooseOutputDirectory,openDirectory:openDirectory,directory:function(){return directory;},refresh:function(){return syncPlan();},receipt:function(){return receipt;},
+  return {execute:execute,chooseDirectory:chooseOutputDirectory,openDirectory:openDirectory,directory:function(){return directory;},refresh:function(){return syncPlan();},
+   headerEdited:function(){if(runButton)runButton.disabled=true;if(retryButton)retryButton.disabled=true;},receipt:function(){return receipt;},
    previewFiles:function(){
     try{return localPlan().files.map(function(file){return {name:file.name,kind:file.kind,fileId:file.fileId};});}
     catch(_){return [];}

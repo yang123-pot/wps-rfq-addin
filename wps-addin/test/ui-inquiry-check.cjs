@@ -232,6 +232,24 @@ async function run(){
   assert.match(await page.locator('#inquiry-status').innerText(),/缺少项目名称/,'缺项要如实定位');
   // 填写图06抬头：项目名称、单位名称、材料经办人、联系方式必填；原公司地址可选（这里留空）。
   await page.locator('#aux-section > summary').click();
+  const inputWork=await page.evaluate(function(){
+   const counts={preview:0,assess:0,build:0},originals=[];
+   [[RfqCollection,'preview'],[RfqProject,'assess'],[RfqInquiryModel,'build']].forEach(function(pair){
+    const original=pair[0][pair[1]];originals.push([pair[0],pair[1],original]);
+    pair[0][pair[1]]=function(){counts[pair[1]]++;return original.apply(this,arguments);};
+   });
+   const input=document.getElementById('header-projectName');input.focus();
+   input.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));
+   for(const ch of '示例园区'){
+    input.value+=ch;input.dispatchEvent(new InputEvent('input',{bubbles:true,isComposing:true}));
+   }
+   input.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true,data:'示例园区'}));
+   const result={counts:counts,value:input.value,focused:document.activeElement===input};
+   originals.forEach(function(pair){pair[0][pair[1]]=pair[2];});return result;
+  });
+  assert.deepEqual(inputWork.counts,{preview:0,assess:0,build:0},'抬头逐字输入不能触发清单重合并、整项目评估或询价模型重建');
+  assert.equal(inputWork.value,'示例园区','中文组合输入内容完整保留');
+  assert.equal(inputWork.focused,true,'逐字输入不移走焦点');
   await page.evaluate(function(){
    const values={'header-projectName':'示例园区','header-company':'示例建设公司','header-contact':'测试员',
     'header-phone':'示例联系方式','header-address':''};
@@ -288,6 +306,18 @@ async function run(){
   assert.match(await page.locator('#inquiry-stats').innerText(),/共 5 份询价表/);
   assert.match(await page.locator('#inquiry-status').innerText(),/SHA/);
   assert.equal(await page.locator('#inquiry-next').isEnabled(),true,'生成后可进入拆分');
+  await page.evaluate(function(){
+   const input=document.getElementById('header-projectName');input.value='修改后的项目';
+   input.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+  assert.equal(await page.locator('#inquiry-next').isDisabled(),true,'输入未失焦也必须立即禁止沿用旧询价总表');
+  assert.equal(await page.evaluate(()=>RfqAssistant.snapshot().inquiryReady),false,'简版同步使旧询价失效');
+  await page.evaluate(function(){
+   const input=document.getElementById('header-projectName');input.value='示例园区';
+   input.dispatchEvent(new Event('input',{bubbles:true}));
+   input.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+  assert.equal(await page.locator('#inquiry-next').isEnabled(),true,'提交回原抬头后按当前内容键重新判定，不永久误报过期');
   assert.equal(await page.locator('#inquiry-back').isEnabled(),true,'可返回汇总表修改');
   await shot(SHOT);
   await dump('inquiry-model.json',{sheetNames:sheetNames,

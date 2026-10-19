@@ -165,7 +165,14 @@
     }});
     // 旧品牌编辑/预览确认不再接入页面；品牌参考保持只读独立入口。
     RfqBrandUI.createReference({application:options.application});
-    headerPanel=RfqHeaderUI.create({onChange:function(){
+    headerPanel=RfqHeaderUI.create({onChange:function(draft,meta){
+      if(meta&&meta.editing){
+        if(inquiryPanel)inquiryPanel.headerEdited(draft);
+        if(splitPanel)splitPanel.headerEdited();
+        if(ui)ui.set({inquiryReady:false,inquiryPendingSave:false,inquiryStale:!!(inquiryPanel&&inquiryPanel.generation()),
+          splitVerified:false,splitPendingSave:false});
+        return;
+      }
       if(inquiryPanel)inquiryPanel.refresh();if(splitPanel)splitPanel.refresh();publishAssistant();}});
     // 生成面板的输入：汇总表读回的品牌组、询价抬头、当前清单分组与分类确认，以及生成用内容键。
     // 品牌/供应商的唯一来源是分类汇总表读回（R8），侧栏不再二次编辑；抬头变化同样进入生成内容键。
