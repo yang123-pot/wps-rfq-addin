@@ -250,6 +250,20 @@ async function run(){
   assert.deepEqual(inputWork.counts,{preview:0,assess:0,build:0},'抬头逐字输入不能触发清单重合并、整项目评估或询价模型重建');
   assert.equal(inputWork.value,'示例园区','中文组合输入内容完整保留');
   assert.equal(inputWork.focused,true,'逐字输入不移走焦点');
+  const switchWork=await page.evaluate(function(){
+   let merges=0,matchingKeys=0,assessments=0;const preview=RfqMerge.preview,key=RfqProject.contentKey,assess=RfqProject.assess;
+   RfqMerge.preview=function(){merges++;return preview.apply(this,arguments);};
+   RfqProject.contentKey=function(value){if(value.stage==='matching')matchingKeys++;return key.apply(this,arguments);};
+   RfqProject.assess=function(){assessments++;return assess.apply(this,arguments);};
+   const input=document.getElementById('header-projectName');input.dispatchEvent(new Event('change',{bubbles:true}));
+   document.getElementById('header-company').focus();
+   RfqMerge.preview=preview;RfqProject.contentKey=key;RfqProject.assess=assess;
+   return {merges,matchingKeys,assessments,focused:document.activeElement.id};
+  });
+  assert.equal(switchWork.merges,0,'切换抬头输入框时来源和合并选项未变，不应重新合并材料');
+  assert.equal(switchWork.matchingKeys,0,'抬头不改变自动分类内容键，切框不应重复计算该键');
+  assert.ok(switchWork.assessments<=2,'同一抬头提交刷新最多评估询价内容和阶段状态各一次：'+switchWork.assessments);
+  assert.equal(switchWork.focused,'header-company');
   await page.evaluate(function(){
    const values={'header-projectName':'示例园区','header-company':'示例建设公司','header-contact':'测试员',
     'header-phone':'示例联系方式','header-address':''};

@@ -28,8 +28,15 @@
       var multi=isMultiSource();
       return {multi:multi,merge:'合并清单',separate:'逐条保留'};
     }
+    var previewCache=null;
     function currentPreview(){
-      return RfqCollection.preview(collection,merge.checked===true,mergeAll.checked===true);
+      var identical=merge.checked===true,all=mergeAll.checked===true;
+      // collection的增删/来源修正/项目恢复都会返回新对象；抬头编辑不改变材料及这两个选择。
+      if(!previewCache||previewCache.collection!==collection||previewCache.identical!==identical||previewCache.all!==all){
+        previewCache={collection:collection,identical:identical,all:all,
+          result:RfqCollection.preview(collection,identical,all),selectionKey:null,matchingKey:null};
+      }
+      return previewCache.result;
     }
     // 切到“表内审核”时自动按稳定rowId读回成果表，侧栏直接显示当前填写进度（读不到就明确提示，不猜）。
     var workflow=window.RfqWorkflowUI?window.RfqWorkflowUI.create({onStageChange:function(stage){
@@ -165,6 +172,7 @@
     }});
     // 旧品牌编辑/预览确认不再接入页面；品牌参考保持只读独立入口。
     RfqBrandUI.createReference({application:options.application});
+    var headerRefreshContext=null;
     headerPanel=RfqHeaderUI.create({onChange:function(draft,meta){
       if(meta&&meta.editing){
         if(inquiryPanel)inquiryPanel.headerEdited(draft);
@@ -173,10 +181,14 @@
           splitVerified:false,splitPendingSave:false});
         return;
       }
-      if(inquiryPanel)inquiryPanel.refresh();if(splitPanel)splitPanel.refresh();publishAssistant();}});
+      // 同一次同步刷新共享询价依赖；回调结束就释放，异步操作和下一次编辑重新读取最新内容。
+      var previous=headerRefreshContext;headerRefreshContext={};
+      try{if(inquiryPanel)inquiryPanel.refresh();if(splitPanel)splitPanel.refresh();publishAssistant();}
+      finally{headerRefreshContext=previous;}}});
     // 生成面板的输入：汇总表读回的品牌组、询价抬头、当前清单分组与分类确认，以及生成用内容键。
     // 品牌/供应商的唯一来源是分类汇总表读回（R8），侧栏不再二次编辑；抬头变化同样进入生成内容键。
     function deliveryContext(){
+      if(headerRefreshContext&&headerRefreshContext.value)return headerRefreshContext.value;
       var ctx=brandContext();
       ctx.header=headerPanel?headerPanel.header():null;
       // R8/R9：询价与拆分只取当前有效的汇总读回品牌组；未读回或已过期时为空，不沿用旧品牌。
@@ -184,11 +196,13 @@
       var report=RfqProject.assess(ctx);
       // 询价对象按稳定rowId归类：以R5整表确认快照为准（不是侧栏过渡期的逐行确认），避免改过冲突行后仍按旧建议。
       var confirmation=reviewConfirmation();
-      return {brands:ctx.brands,groups:ctx.preview?ctx.preview.groups:[],
+      var value={brands:ctx.brands,groups:ctx.preview?ctx.preview.groups:[],
         classification:{decisions:(confirmation&&confirmation.rows)||[]},
         header:ctx.header,inputKey:report.generationKey,projectName:projectDisplayName(),
         summary:summaryVerdict(),summaryPath:summaryReceipt?summaryReceipt.path:null,
         noInquiry:categoryReceipt?categoryReceipt.noInquiry||null:null};
+      if(headerRefreshContext)headerRefreshContext.value=value;
+      return value;
     }
     // R9：生成成功后把生成记录落盘，让“询价表”阶段按真实内容置为已确认。
     async function afterInquiryGeneration(){var saved=await projects.save();render();publishAssistant();return saved;}
@@ -460,15 +474,17 @@
     function reviewTell(text,error){var box=reviewEl('classification-review-message');if(box){box.textContent=text;box.className=error?'error':'';}if(window.RfqFeedback)RfqFeedback.tell(text,error,'matching');}
     function currentLibrary(){return classifier.library?classifier.library():null;}
     function mergeSelectionKey(){
-      var result=collection.entries.length?currentPreview():null;
-      return RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,
-        mergeAllWorkbooks:mergeAll.checked===true,groups:result?result.groups:[]});
+      var result=currentPreview();
+      if(previewCache.selectionKey===null)previewCache.selectionKey=RfqProject.contentKey({collection:collection,mergeIdentical:merge.checked===true,
+        mergeAllWorkbooks:mergeAll.checked===true,groups:result.groups});
+      return previewCache.selectionKey;
     }
     function matchingKey(){
-      var result=collection.entries.length?currentPreview():null;
-      return RfqProject.contentKey({stage:'matching',collection:collection,mergeIdentical:merge.checked===true,
+      var result=currentPreview();
+      if(previewCache.matchingKey===null)previewCache.matchingKey=RfqProject.contentKey({stage:'matching',collection:collection,mergeIdentical:merge.checked===true,
         mergeAllWorkbooks:mergeAll.checked===true,
-        groups:result?result.groups:[]});
+        groups:result.groups});
+      return previewCache.matchingKey;
     }
     function selectionConfirmed(){return !!mergeConfirmedKey&&mergeConfirmedKey===mergeSelectionKey();}
     function regenerateReview(){
