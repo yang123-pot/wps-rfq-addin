@@ -396,20 +396,7 @@
     if(receipt&&document.body.classList.contains('detail-mode'))showResult(plan,receipt);
    }finally{busy=false;if(options.onBusy)options.onBusy(false);render();}
   }
-  if(chooseDirectory)chooseDirectory.addEventListener('click',function(){
-   if(!window.RfqPathPicker){tell('当前侧栏不支持目录选择，请重新打开侧栏。',true);return;}
-   if(typeof RfqPathPicker.selectFolder==='function'){
-    var native=RfqPathPicker.selectFolder(options.application,directory,'选择拆分输出文件夹');
-    if(native&&native.supported){
-     if(native.path){directory=native.path;batchId=ensureBatch();syncPlan();}
-     return;
-    }
-   }
-   RfqPathPicker.open({mode:'directory',token:window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token,
-    startPath:directory,title:'选择拆分输出文件夹',confirmLabel:'使用此文件夹',
-    onConfirm:function(paths){directory=paths&&paths[0]||'';batchId=ensureBatch();syncPlan();},
-    onError:function(text){tell(text,true);}});
-  });
+  if(chooseDirectory)chooseDirectory.addEventListener('click',function(){chooseOutputDirectory();});
   if(runButton)runButton.addEventListener('click',function(){execute();});
   if(retryButton)retryButton.addEventListener('click',function(){execute();});
   if(openButton)openButton.addEventListener('click',function(){
@@ -417,10 +404,14 @@
   });
   render();
   async function chooseOutputDirectory(){
-   if(!window.RfqPathPicker)throw Error('目录选择器未加载，请重新打开助手。');
-   if(typeof RfqPathPicker.selectFolder==='function'){var native=RfqPathPicker.selectFolder(options.application,directory,'选择拆分输出文件夹');
-    if(native&&native.supported){if(native.path){directory=native.path;batchId=ensureBatch();await syncPlan();}return;}}
-   return new Promise(function(resolve){RfqPathPicker.open({mode:'directory',token:window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token,startPath:directory,title:'选择拆分输出文件夹',confirmLabel:'使用此文件夹',onConfirm:async function(paths){directory=paths&&paths[0]||'';batchId=ensureBatch();await syncPlan();resolve();},onCancel:resolve,onError:function(text){tell(text,true);resolve();}});});
+   try{
+    if(!window.RfqPathPicker||typeof RfqPathPicker.selectFolder!=='function')throw Error('原生文件夹选择器未加载，请重建助手窗口。');
+    var native=RfqPathPicker.selectFolder(options.application,directory,'选择拆分输出文件夹');
+    if(!native||!native.supported||native.error)throw Error('WPS原生文件夹选择未完成：'+
+     (native&&native.error?native.error:'当前宿主未提供文件夹选择接口。'));
+    if(!native.path)return false;
+    directory=native.path;batchId=ensureBatch();await syncPlan();return true;
+   }catch(error){tell(error.message,true);return false;}
   }
   return {execute:execute,chooseDirectory:chooseOutputDirectory,openDirectory:openDirectory,directory:function(){return directory;},refresh:function(){return syncPlan();},
    headerEdited:function(){if(runButton)runButton.disabled=true;if(retryButton)retryButton.disabled=true;},receipt:function(){return receipt;},

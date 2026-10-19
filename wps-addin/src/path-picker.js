@@ -3,7 +3,8 @@
  *
  * 用途：代替 Application.GetOpenFilename / GetSaveAsFilename。实机证据（2026-09-26）显示，
  * 原生模态文件对话框会让侧栏内嵌网页停止出帧，画面冻结、只能重建侧栏；本组件全部用页面内的
- * HTML 完成选择，不创建任何原生窗口。目录列表由本机服务的只读接口 /api/fs/list 提供。
+ * HTML完成兼容选择，目录列表由本机服务的只读接口/api/fs/list提供。
+ * 最新浮窗流程允许原生对话框；第7步按用户要求只用末尾selectFolder，不回退本HTML目录树。
  *
  * 只做选择：不新建、不改名、不删除、不覆盖任何文件。
  */
@@ -225,16 +226,18 @@
   if(!app)return {supported:false};
   try{
    var factory=app.FileDialog,dialog=null;
-   if(typeof factory==='function')dialog=factory(4);
+   if(typeof factory==='function')dialog=app.FileDialog(4);
    else if(factory&&typeof factory.Show==='function')dialog=factory;
    if(dialog&&typeof dialog.Show==='function'){
-    if(title&&'Title' in dialog)dialog.Title=title;
-    if(startPath&&'InitialFileName' in dialog)dialog.InitialFileName=startPath;
+    if(title)dialog.Title=title;
+    if(startPath)dialog.InitialFileName=startPath;
     var shown=dialog.Show();
     if(shown===-1||shown===true){
      var items=dialog.SelectedItems;
-     var picked=items&&typeof items.Item==='function'?items.Item(1):null;
-     return {supported:true,path:picked?String(picked):null};
+     var picked=typeof items==='function'?dialog.SelectedItems(1):
+       (items&&typeof items.Item==='function'?items.Item(1):null);
+     if(typeof picked!=='string'||!normalizePath(picked))return {supported:true,path:null,error:'WPS原生选择器未返回有效目录，请重新选择。'};
+     return {supported:true,path:normalizePath(picked)};
     }
     return {supported:true,path:null};
    }

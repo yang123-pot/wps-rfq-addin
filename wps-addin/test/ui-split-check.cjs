@@ -89,7 +89,13 @@ async function run(){
    ['split-message','split-status','split-directory','split-directory-label','split-preview','split-run','split-retry','split-open']
     .forEach(function(id){const old=document.getElementById(id),clone=old.cloneNode(true);old.parentNode.replaceChild(clone,old);});
    window.__splitGeneration=args.generation;window.__splitOutput=args.outputDirectory;window.__splitNoInquiry=args.noInquiry;
-   window.RfqPathPicker.open=function(options){window.__picker=options;options.onConfirm([window.__splitOutput]);return {close(){}};};
+   window.__nativeFolderShows=0;window.__nativeCancel=false;window.__webPickerShows=0;
+   window.RfqPathPicker.open=function(){window.__webPickerShows++;throw Error('第7步不能回退网页目录树');};
+   window.Application.FileDialog=function(type){
+    if(this!==window.Application||type!==4)throw Error('原生目录选择调用归属或类型错误');
+    return {Title:'',InitialFileName:'',Show(){window.__nativeFolderShows++;return window.__nativeCancel?0:-1;},
+     SelectedItems:{Item(){return window.__splitOutput;}}};
+   };
    window.RfqBrandHost.write=async function(app,book,stagePath,settings){
     const sheet=book.sheets[0];
     window.__splitWrites.push({stagePath:stagePath,name:sheet.name,hasLayout:!!sheet.layout,
@@ -116,6 +122,15 @@ async function run(){
   await page.evaluate(function(){document.getElementById('split-directory').click();});
   await page.waitForFunction(function(){return /计划 7 个文件/.test(document.getElementById('split-status').textContent)&&
    !document.getElementById('split-run').disabled;});
+  assert.equal(await page.evaluate(()=>window.__nativeFolderShows),1,'详细第7步直接调用原生目录选择器');
+  const selectedBeforeCancel=await page.evaluate(()=>window.__splitPanel.directory());
+  await page.evaluate(async()=>{window.__nativeCancel=true;await window.__splitPanel.chooseDirectory();});
+  assert.equal(await page.evaluate(()=>window.__splitPanel.directory()),selectedBeforeCancel,'简版原生取消保留已选输出目录');
+  assert.equal(await page.evaluate(()=>window.__nativeFolderShows),2);
+  await page.evaluate(async()=>{delete window.Application.FileDialog;await window.__splitPanel.chooseDirectory();});
+  assert.equal(await page.evaluate(()=>window.__webPickerShows),0,'宿主不可用时不静默回退网页目录树');
+  assert.match(await page.locator('#split-message').textContent(),/原生.*文件夹/);
+  assert.equal(await page.evaluate(()=>window.__splitPanel.directory()),selectedBeforeCancel,'原生失败仍保留现有目录');
   await page.evaluate(function(){window.__failSynthetic=true;document.getElementById('split-run').click();});
   await page.waitForFunction(function(){return /拆分完成6份，失败1份/.test(document.getElementById('split-message').textContent)&&
    window.__splitWrites.length===6;});

@@ -1,8 +1,8 @@
 /*
  * R12-J 检查项2：对话框取消/右上角关闭。
  *
- * 本插件主流程不使用原生模态文件对话框（原生对话框会让侧栏停止出帧），
- * 选择文件/另存/选目录统一走侧栏内置 RfqPathPicker。这里对三种模式各取消一次
+ * 本检查覆盖仍保留的内嵌RfqPathPicker兼容组件，第7步已改用原生文件夹选择器，
+ * 原生确认/取消/失败另见native-folder-picker及ui-split检查。这里对三种兼容模式各取消一次
  * （取消按钮、右上角×、Esc），断言：只回调取消、不返回任何目标、不推进阶段、不创建半成品文件。
  */
 const assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs'),fsp=require('node:fs/promises'),os=require('node:os');
