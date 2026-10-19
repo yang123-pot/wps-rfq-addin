@@ -73,7 +73,7 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.equal(await page.locator('#merge-section').isHidden(),true,'未导入前不显示合并选择');
   assert.match(await page.locator('#workflow-note').innerText(),/尚未导入清单/);
   assert.equal(await page.locator('#confirm-merge').innerText(),'确认选择，开始自动分类','主按钮必须与图01一致');
-  assert.equal(await page.locator('#merge-detail').innerText(),'查看合并明细');
+  assert.equal(await page.locator('#merge-detail').innerText(),'查看导入统计');
 
   // 导入两份清单：显示文件与行数，合并前不进入匹配。
   await page.locator('#import-files').click();
@@ -97,8 +97,8 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   await page.locator('#simple-primary').click();
   await page.waitForFunction(()=>document.querySelector('#merge-section').hidden===false);
   assert.equal(await page.locator('#preview-gate').isHidden(),true,'预览确认后收起预览确认入口');
-  assert.deepEqual(await page.evaluate(()=>window.__previews.at(-1).sheets.map(s=>s.name)),['导入预览','合并明细'],
-   '预览确认后才显示材料处理预览');
+  assert.deepEqual(await page.evaluate(()=>window.__previews.at(-1).sheets.map(s=>s.name)),['导入预览'],
+   '选择整理方式后也只显示逐表目录统计');
   await showDetail();
   assert.equal(await page.locator('#stage-panel-import').isHidden(),false);
   assert.equal(await page.locator('#stage-panel-matching').isHidden(),true);
@@ -142,6 +142,10 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='8');
   assert.equal(await page.locator('#workflow-merged').innerText(),'8','合并后行数');
   assert.equal(await page.evaluate(()=>window.__previews.at(-1).outputCount),8,'合并选择应同步更新主工作表');
+  assert.deepEqual(await page.evaluate(()=>window.__previews.at(-1).sheets.map(s=>s.name)),['导入预览']);
+  assert.match(await page.evaluate(()=>window.__previews.at(-1).sheets[0].values.flat().join(' ')),/原始 10 条.*预计整理后 8 条.*减少 2 条/);
+  assert.equal(await page.evaluate(()=>window.__previews.at(-1).sheets[0].values.flat().includes('DN50')),false,
+   '勾选只试算，不把材料行铺成新表');
   assert.equal(await page.locator('#merge-separate').isChecked(),false,'两个选项互斥');
   assert.equal(await page.locator('#merge-list > li').count(),8,'合并预览只显示合并结果');
   await page.locator('#merge-separate').check();
@@ -149,9 +153,9 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   await page.locator('#merge-identical').check();
   await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='8');
 
-  // 查看合并明细与“确认前不匹配”。
+  // 查看导入统计与“确认前不匹配”。
   await page.locator('#merge-detail').click();
-  assert.match(await page.locator('#import-message').innerText(),/合并预览明细/);
+  assert.match(await page.locator('#import-message').innerText(),/导入统计/);
   assert.match(await page.locator('#classification-review-banner').innerText(),/尚未自动分类/,'未确认前不得匹配');
 
   // 简版确认后留在当前步骤卡片，并在原位置出现下一步“生成审核成果表”。

@@ -367,7 +367,7 @@
     if(previewConfirm)previewConfirm.addEventListener('click',confirmPreview);
     if(mergeDetail)mergeDetail.addEventListener('click',function(){
       syncImportPreview(true);
-      tell('合并预览明细：请查看主工作簿中的“导入预览”和“合并明细”；原件不变，确认选择后才开始分类。');
+      tell('导入统计：请查看“导入预览”中的工作表原顺序、材料条数和预计整理结果；原件不变，确认后才开始分类。');
     });
     function syncImportPreview(force){
       var box=document.getElementById('import-preview-status');
@@ -380,14 +380,13 @@
         importPreviewHandle=RfqExportHost.showPreview(options.application,model,importPreviewHandle);
         if(ui)ui.set({previewAvailable:true});
         importPreviewKey=key;
-        if(box){box.textContent=previewReviewed?
-          ('主表已显示材料处理预览（'+model.inputCount+' → '+model.outputCount+' 行）。预览随选择刷新。'):
-          ('主表已显示工作簿和工作表预览（共 '+model.inputCount+' 项），尚未合并。');box.className='note';}
+        if(box){box.textContent='已按原标签顺序列出 '+model.sheetCount+' 张工作表；原始 '+model.inputCount+
+          ' 条 → 预计整理后 '+model.outputCount+' 条。只更新统计，不生成合并明细。';box.className='note';}
       }catch(error){
         if(ui)ui.set({previewAvailable:false});if(window.RfqFeedback)RfqFeedback.notify({stage:"import",message:"预览未打开："+error.message,resolve:function(){syncImportPreview(true);}});
         // 只拦主表预览，不回滚已经核实的导入；用户可明确重试，不自动反复创建失败簿。
         importPreviewKey=key;
-        if(box){box.textContent='主表预览未完成：'+error.message+' 可点“查看合并明细”重试。';box.className='error';}
+        if(box){box.textContent='主表预览未完成：'+error.message+' 可点“查看导入统计”重试。';box.className='error';}
       }
     }
     function confirmSelection(){
