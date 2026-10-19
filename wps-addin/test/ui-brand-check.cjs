@@ -17,7 +17,7 @@ const MEP=[['工程名称：示例园区','','','',''],['项目编码','项目�
  ['','强电','','',''],['CD-101','充电桩配电箱','充电桩配套','台','1']];
 const REVIEW_VALUES=(function(){
  const preview=collection.preview(sample.buildCollection(),true);
- const result=reviewModel.build(preview.groups,{library:sample.library,memory:sample.createMemory(),projectId:'p-sample01'});
+ const result=reviewModel.build(preview.groups,{library:sample.library,memory:sample.createMemory(),projectId:'p-sample01',mergeAllWorkbooks:true});
  return reviewModel.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'}).values;
 }());
 const CONFLICT_ROW=REVIEW_VALUES.findIndex(row=>row[1]==='充电桩配电箱')+1;
@@ -228,7 +228,7 @@ async function summaryFlow(){
   await page.waitForFunction(()=>document.querySelector('#classification-review-message').textContent.includes('已生成并校验'));
   await page.locator('#classification-review-open').click();
   await page.waitForFunction(()=>document.querySelector('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage')==='review');
-  await page.evaluate(({row})=>{window.__setCell(row,8,'汽车充电桩');window.__setCell(row,9,'充电桩配套');},{row:CONFLICT_ROW});
+  await page.evaluate(({row})=>{window.__setCell(row,9,'汽车充电桩');window.__setCell(row,10,'充电桩配套');},{row:CONFLICT_ROW});
   await page.locator('#sheet-review-confirm').click();
   await page.waitForFunction(()=>/整表已确认（8 行）|整表未通过校验|整表确认未完成|整表确认未保存/.test(
    document.querySelector('#sheet-review-message').textContent));

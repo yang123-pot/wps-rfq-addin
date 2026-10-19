@@ -22,6 +22,7 @@
  function validateBinding(binding){
   if(!binding||typeof binding!=='object')throw Error('审核成果绑定无效，请重新生成成果表。');
   if(binding.schemaVersion!==SCHEMA_VERSION)throw Error('审核成果绑定版本不支持：'+String(binding.schemaVersion));
+  if(binding.layoutVersion!==model.LAYOUT_VERSION)throw Error('审核成果表版式已更新，请重新生成成果表。');
   if(typeof binding.path!=='string'||!/^(?:[a-z]:[\\/]|\\\\)/i.test(binding.path))throw Error('审核成果路径无效。');
   if(typeof binding.sheet!=='string'||!binding.sheet)throw Error('审核成果缺少工作表名。');
   [['headerRow','表头行'],['firstRow','首行'],['lastRow','末行'],['rowIdColumn','行标识列']].forEach(function(pair){
@@ -35,14 +36,15 @@
   if(!receipt||typeof receipt.target!=='string'||!/^[a-f\d]{64}$/i.test(String(receipt.sha256||'')))
    throw Error('审核成果保存回执无效，未记录绑定。');
   var lastRow=model.FIRST_ROW+result.rows.length-1;
-  return {schemaVersion:SCHEMA_VERSION,path:receipt.target,sha256:String(receipt.sha256).toLowerCase(),
+  return {schemaVersion:SCHEMA_VERSION,layoutVersion:model.LAYOUT_VERSION,
+   path:receipt.target,sha256:String(receipt.sha256).toLowerCase(),
    sheet:model.SHEET,headerRow:model.HEADER_ROW,firstRow:model.FIRST_ROW,lastRow:lastRow,
    rowIdColumn:model.ROW_ID_COLUMN,libraryVersion:result.libraryVersion,
    categories:result.categories.map(function(category){return {id:category.id,name:category.name};}),
    rowIds:result.rows.map(function(row){return row.rowId;}),
    fields:result.rows.map(function(row){
     return {rowId:row.rowId,index:String(row.index),name:row.name,feature:row.feature,unit:row.unit,
-     quantity:row.quantity,code:row.code,autoCategoryName:model.autoLabel(row),
+     quantity:row.quantity,trace:text(row.trace),code:row.code,autoCategoryName:model.autoLabel(row),
      autoCategoryId:row.autoCategoryId==null?null:String(row.autoCategoryId),
      // R6分类工作簿需要按rowId取来源边界与来源标识；只进内部绑定，不增加公开列。
      scopeId:text(row.scopeId),sourceIds:((row.sourceIds||[]).map(function(id){return text(id);}))};}),
@@ -96,7 +98,7 @@
   validateBinding(binding);
   var fields={},rows=[],issues=[],seen={};
   binding.fields.forEach(function(field){fields[field.rowId]=field;});
-  var labels={name:'项目名称',feature:'规格',unit:'单位',quantity:'工程量',autoCategoryName:'自动建议'};
+  var labels={name:'项目名称',feature:'项目特征描述',unit:'单位',quantity:'工程量',trace:'清单溯源',autoCategoryName:'自动建议'};
   for(var row=binding.firstRow;row<=binding.lastRow;row++){
    var rowId=text(read(row,binding.rowIdColumn));
    if(!rowId){
@@ -118,13 +120,13 @@
    }
    var record={rowId:rowId,row:row,index:text(read(row,1)).trim(),name:text(read(row,2)),
     feature:text(read(row,3)),unit:text(read(row,4)),quantity:text(read(row,5)),
-    autoCategoryName:text(read(row,6)),matchState:text(read(row,7)),
-    finalCategoryName:text(read(row,8)).trim(),reviewNote:text(read(row,9))};
+    trace:text(read(row,6)),autoCategoryName:text(read(row,7)),matchState:text(read(row,8)),
+    finalCategoryName:text(read(row,9)).trim(),reviewNote:text(read(row,10))};
    // 自动建议是生成时的固定数据，R5按它重算“匹配情况”；被改动必须指出单元格而不是静默接受。
    record.autoCategoryId=snapshot.autoCategoryId==null?null:String(snapshot.autoCategoryId);
    record.finalCategoryId=categoryIdOf(binding,record.finalCategoryName);
-   var actualValues={name:record.name,feature:record.feature,unit:record.unit,quantity:record.quantity};
-   ['name','feature','unit','quantity'].forEach(function(field,offset){
+   var actualValues={name:record.name,feature:record.feature,unit:record.unit,quantity:record.quantity,trace:record.trace};
+   ['name','feature','unit','quantity','trace'].forEach(function(field,offset){
     if(actualValues[field]===text(snapshot[field]))return;
     issues.push({row:row,column:2+offset,code:'field-changed',
      message:'第'+row+'行“'+labels[field]+'”已改：原“'+text(snapshot[field])+'”现“'+actualValues[field]+'”'});
@@ -145,7 +147,7 @@
  }
  // R12-C：把读回结果（磁盘/打开簿）与项目保存的审核快照按rowId比较业务内容。
  // SHA只证明物理字节；空分类/类别不同/备注不同/缺行多行都必须报出，绝不用“SHA一致”掩盖业务差异。
- var FIXED_COMPARE=[['name','项目名称'],['feature','规格'],['unit','单位'],['quantity','工程量']];
+ var FIXED_COMPARE=[['name','项目名称'],['feature','项目特征描述'],['unit','单位'],['quantity','工程量'],['trace','清单溯源']];
  function compareCategoryId(row){
   if(!row)return '';
   if(row.categoryId!=null)return text(row.categoryId);

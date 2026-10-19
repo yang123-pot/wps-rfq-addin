@@ -21,7 +21,8 @@ test('offset and reordered headers preserve source coordinates and exact materia
   const before=JSON.stringify(input); const result=parseWorkbook(input); const item=result.materials[0];
   assert.equal(result.materials.length,1);
   assert.deepEqual([item.code,item.name,item.feature,item.unit,item.quantity],['000123',' 管道 ',' A\n B ',' m ','2.5']);
-  assert.deepEqual([item.source.row,item.source.column,item.source.engineering,item.source.profession],[7,5,'一号楼给排水','给排水']);
+  assert.deepEqual([item.source.row,item.source.column,item.source.sequence,item.source.engineering,item.source.profession],
+    [7,5,'','一号楼给排水','给排水'],'未映射序号列时明确留空，不伪造来源序号');
   assert.equal(JSON.stringify(input),before);
   assert.equal('price' in item,false);
   assert.equal('values' in item,false);

@@ -5,14 +5,14 @@
 }(typeof window==='object'?window:globalThis,function(classify,library,layout){
  'use strict';
  // R4：自动分类→审核成果表。只做“建议”，不产生任何人工确认，也不学习。
- var SCHEMA_VERSION=1,SHEET='分类审核成果',OPTIONS_SHEET='内部选项',BINDING_SHEET='内部绑定';
- var COLUMNS=['序号','项目名称','规格','单位','工程量','自动建议','匹配情况','最终分类','审核备注'];
- var ROW_ID_COLUMN=11;                     // K列：随行隐藏辅助列，保存稳定rowId，主表不展示技术字段
+ var SCHEMA_VERSION=1,LAYOUT_VERSION=2,SHEET='分类审核成果',OPTIONS_SHEET='内部选项',BINDING_SHEET='内部绑定';
+ var COLUMNS=['序号','项目名称','项目特征描述','单位','工程量','清单溯源','自动建议','匹配情况','最终分类','审核备注'];
+ var ROW_ID_COLUMN=12;                     // L列：随行隐藏辅助列，保存稳定rowId，主表不展示技术字段
  var TITLE_ROW=1,NOTE_ROW=2,HEADER_ROW=3,FIRST_ROW=4;
  var STATE={suggested:'匹配成功',conflict:'分类冲突',none:'无可靠匹配',skip:'无需询价'};
  // R5：图03的“匹配情况”列在整表读回时按“最终分类 vs 自动建议”重算为一致/存在差异。
  var MATCH={consistent:'一致',different:'存在差异'};
- var MATCH_COLUMN=7,FINAL_COLUMN=8,NOTE_COLUMN=9,AUTO_COLUMN=6;
+ var AUTO_COLUMN=7,MATCH_COLUMN=8,FINAL_COLUMN=9,NOTE_COLUMN=10;
  // 这些读回问题无法可靠定位到材料行或说明绑定已失效，草稿与整表确认都必须先修好。
  // F1：“row-extra”是绑定末行之外的材料行——漏检材料等于丢行，和缺行、重复行一样必须先修好再确认/存草稿。
  var BLOCKING_ISSUES=['row-id-missing','row-id-duplicate','row-id-unknown','row-missing','field-changed','row-extra'];
@@ -23,6 +23,73 @@
  function firstSource(group){
   var sources=(group&&group.sources)||[];
   return sources.length?sources[0]:null;
+ }
+ function sourceTrace(group){
+  var seen={},lines=[];
+  ((group&&group.sources)||[]).forEach(function(source){
+   var engineering=text(source.engineering).trim()||'工程待核对';
+   var profession=text(source.profession).trim()||'专业待核对';
+   var sequence=text(source.sequence).trim();
+   var row=text(source.row).trim();
+   var line=engineering+' / '+profession+' / '+(sequence?'清单序号 '+sequence:'清单序号待核对')+
+     (row?'（原表第'+row+'行）':'');
+   if(!seen[line]){seen[line]=true;lines.push(line);}
+  });
+  return lines.length?lines.join('\n'):'来源待核对';
+ }
+ function normalizedForMatch(value){
+  return text(value).toLowerCase().replace(/[\s\-_./\\()[\]{}:：，,、；;·#*]+/g,'');
+ }
+ function charSet(value){
+  var result={};Array.from(value).forEach(function(char){result[char]=true;});return result;
+ }
+ function bigramSet(value){
+  var result={},chars=Array.from(value);
+  if(chars.length<2)return charSet(value);
+  for(var index=0;index<chars.length-1;index++)result[chars[index]+chars[index+1]]=true;
+  return result;
+ }
+ function dice(left,right){
+  var a=Object.keys(left),b=Object.keys(right),seen={},overlap=0;
+  b.forEach(function(key){seen[key]=true;});
+  a.forEach(function(key){if(seen[key])overlap++;});
+  return a.length+b.length?2*overlap/(a.length+b.length):0;
+ }
+ function commonSuffixRatio(left,right){
+  var a=Array.from(left),b=Array.from(right),limit=Math.min(a.length,b.length),count=0;
+  while(count<limit&&a[a.length-1-count]===b[b.length-1-count])count++;
+  return limit?count/limit:0;
+ }
+ function similarity(left,right){
+  var leftName=normalizedForMatch(left.name),rightName=normalizedForMatch(right.name);
+  if(!leftName||!rightName)return 0;
+  if(leftName===rightName)return 1;
+  var nameScore=dice(charSet(leftName),charSet(rightName))*0.55+
+    dice(bigramSet(leftName),bigramSet(rightName))*0.45;
+  var leftFeature=normalizedForMatch(left.feature),rightFeature=normalizedForMatch(right.feature);
+  var featureScore=leftFeature&&rightFeature?dice(charSet(leftFeature),charSet(rightFeature)):0;
+  var score=nameScore*0.85+featureScore*0.15;
+  if(commonSuffixRatio(leftName,rightName)>=0.5)score=Math.max(score,commonSuffixRatio(leftName,rightName)*0.95);
+  if(Math.min(leftName.length,rightName.length)>=2&&
+    (leftName.indexOf(rightName)>=0||rightName.indexOf(leftName)>=0))score=Math.max(score,0.72);
+  return score;
+ }
+ function clusterSimilar(rows){
+  var clusters=[];
+  rows.forEach(function(row,order){
+   var best=null,bestScore=0;
+   clusters.forEach(function(cluster){
+    var score=similarity(row,cluster.seed);
+    if(score>bestScore){best=cluster;bestScore=score;}
+   });
+   if(best&&bestScore>=0.58)best.rows.push(row);
+   else clusters.push({seed:row,rows:[row],order:order});
+  });
+  var output=[];
+  clusters.sort(function(left,right){return left.order-right.order;}).forEach(function(cluster){
+   cluster.rows.forEach(function(row){output.push(row);});
+  });
+  return output;
  }
  function describe(suggestion){
   if(!suggestion)return '';
@@ -40,7 +107,7 @@
   var check=library.validate(source);
   if(!check.ok)throw Error('分类库不可用：'+check.errors.join('；'));
   var libraryVersion=text(source.version);
-  var rows=groups.map(function(group,index){
+  var rows=groups.map(function(group){
    var item={name:text(group.name),feature:text(group.feature),unit:text(group.unit)};
    var suggestion=classify.suggest(item,source,{memory:input.memory||null,projectId:input.projectId||null});
    var conflicts=(suggestion.conflicts||[]).length>1;
@@ -49,10 +116,11 @@
    var auto=candidates.length&&!conflicts?candidates[0]:null;
    var state=conflicts?STATE.conflict:(candidates.length?(auto&&auto.categoryId===library.DECISION?STATE.skip:STATE.suggested):STATE.none);
    var origin=firstSource(group);
-   return {rowId:rowIdOf(group),index:index+1,name:item.name,feature:item.feature,unit:item.unit,
+   return {rowId:rowIdOf(group),index:0,name:item.name,feature:item.feature,unit:item.unit,
     quantity:quantityText(group.quantity),scopeId:text(group.scopeId),
     code:origin?text(origin.code):'',engineering:origin?text(origin.engineering):'',
     profession:origin?text(origin.profession):'',
+    trace:sourceTrace(group),
     sourceIds:((group.sources||[]).map(function(entry){return text(entry.id);})),
     libraryVersion:libraryVersion,
     autoCategoryId:auto?text(auto.categoryId):null,autoCategoryName:auto?text(auto.categoryName):null,
@@ -60,6 +128,8 @@
     finalCategoryId:auto?text(auto.categoryId):'',finalCategoryName:auto?text(auto.categoryName):'',
     reviewNote:'',abnormal:conflicts};
   });
+  if(input.mergeAllWorkbooks===true)rows=clusterSimilar(rows);
+  rows.forEach(function(row,index){row.index=index+1;});
   return {schemaVersion:SCHEMA_VERSION,sheet:SHEET,columns:COLUMNS.slice(),rows:rows,
    libraryVersion:libraryVersion,categories:library.categories(source).map(function(category){
     return {id:text(category.id),name:text(category.name)};}),
@@ -78,7 +148,7 @@
    detail:(counts.suggested+counts.skip)+' 行有建议 · '+(counts.conflict+counts.none)+' 行需重点核对'};
  }
  function publicRow(row){
-  return [String(row.index),row.name,row.feature,row.unit,row.quantity,
+  return [String(row.index),row.name,row.feature,row.unit,row.quantity,text(row.trace),
    autoLabel(row),row.matchState,row.finalCategoryName||'',row.reviewNote||''];
  }
  // 图03口径：最终分类与自动建议一致才是“一致”，无建议/冲突/被用户改写都是“存在差异”。
@@ -136,7 +206,7 @@
    }else errors.push({row:record.row,column:FINAL_COLUMN,code:'category-unknown',
     title:issueTitle('category-unknown'),message:where+'“最终分类”“'+categoryName+'”不在当前分类库里，请用下拉重新选择。'});
    rows.push({rowId:text(record.rowId),row:record.row,index:text(record.index),name:name,feature:text(record.feature),
-    unit:text(record.unit),quantity:text(record.quantity),
+    unit:text(record.unit),quantity:text(record.quantity),trace:text(record.trace),
     autoCategoryId:text(record.autoCategoryId)||null,autoCategoryName:text(record.autoCategoryName),
     categoryId:categoryId,categoryName:categoryName,skip:categoryId===library.DECISION,
     newCategory:typedNew,
@@ -177,7 +247,7 @@
     lastRow:binding.lastRow,rowIdColumn:binding.rowIdColumn,sha256:binding.sha256!=null?text(binding.sha256):null}:null,
    counts:counts,rows:list.map(function(row){
     return {rowId:text(row.rowId),index:text(row.index),name:text(row.name),feature:text(row.feature),unit:text(row.unit),
-     quantity:text(row.quantity),autoCategoryName:text(row.autoCategoryName),categoryId:text(row.categoryId),
+     quantity:text(row.quantity),trace:text(row.trace),autoCategoryName:text(row.autoCategoryName),categoryId:text(row.categoryId),
      categoryName:text(row.categoryName),skip:row.categoryId===library.DECISION||row.skip===true,
      note:text(row.note),match:row.match===MATCH.consistent?MATCH.consistent:MATCH.different};})};
  }
@@ -187,7 +257,7 @@
   if(broken.length)return {ok:false,errors:broken.map(mapIssue),draft:null};
   var rows=((readResult&&readResult.rows)||[]).map(function(record){
    return {rowId:text(record.rowId),index:text(record.index),name:text(record.name),feature:text(record.feature),
-    unit:text(record.unit),quantity:text(record.quantity),categoryId:text(record.finalCategoryId),
+    unit:text(record.unit),quantity:text(record.quantity),trace:text(record.trace),categoryId:text(record.finalCategoryId),
     categoryName:text(record.finalCategoryName),note:text(record.reviewNote)};
   });
   if(!rows.length)return {ok:false,errors:[{row:null,column:null,code:'row-missing',title:issueTitle('row-missing'),
@@ -220,6 +290,7 @@ function fromSnapshot(snapshot,binding,options){
       name:row.name!=null?text(row.name):text(field.name),feature:row.feature!=null?text(row.feature):text(field.feature),
       unit:row.unit!=null?text(row.unit):text(field.unit),
       quantity:row.quantity!=null?text(row.quantity):text(field.quantity),
+      trace:row.trace!=null?text(row.trace):text(field.trace),
       scopeId:text(field.scopeId),code:text(field.code),engineering:'',profession:'',
       sourceIds:((field.sourceIds||[]).map(function(id){return text(id);})),libraryVersion:libraryVersion,
       autoCategoryId:autoCategoryId,
@@ -240,6 +311,8 @@ function fromSnapshot(snapshot,binding,options){
  function bindingState(binding,inputKey){
   if(!binding||typeof binding!=='object')
    return {ok:false,code:'missing',message:'还没有生成审核成果表：请先在“自动分类”阶段生成并打开成果表。'};
+  if(binding.layoutVersion!==LAYOUT_VERSION)
+   return {ok:false,code:'stale',message:'审核成果表版式已更新（新增清单溯源并调整分类顺序），请重新生成成果表后再审核。'};
   if(binding.inputKey&&inputKey&&text(binding.inputKey)!==text(inputKey))
    return {ok:false,code:'stale',message:'清单、合并选择或分类库已变化（成果表绑定的是旧内容），请重新生成审核成果表后再审核。'};
   return {ok:true,code:'fresh',message:''};
@@ -267,32 +340,32 @@ function fromSnapshot(snapshot,binding,options){
   });
   return changes;
  }
- // 主表9列＋标题两行；K列隐藏保存rowId；异常行整行橙色；最终分类浅黄并挂区域下拉。
+  // 主表10列＋标题两行；L列隐藏保存rowId；异常行整行橙色；最终分类浅黄并挂区域下拉。
  function mainSheet(model,options){
   var input=options||{},title=input.title||'分类审核成果.xlsx',lastRow=FIRST_ROW+model.rows.length-1;
-  var values=[[title,'','','','','','','',''],
-   ['自动匹配仅供参考，请在“最终分类”列审核与修改','','','','','','','',''],
-   COLUMNS.slice()];
+  var values=[[title,'','','','','','','','',''],
+   ['自动匹配仅供参考，请在“最终分类”列审核与修改','','','','','','','','',''],
+   COLUMNS.concat(['',''])];
   model.rows.forEach(function(row){
    var line=publicRow(row);
-   line.push('');                    // J列：公开9列后的空位
-   line.push(row.rowId);             // K列：随行隐藏辅助列
+   line.push('');                    // K列：公开10列后的空位
+   line.push(row.rowId);             // L列：随行隐藏辅助列
    values.push(line);
   });
   values=layout.equalize(values,ROW_ID_COLUMN);   // 等宽矩阵：短标题行不再决定列宽
   layout.guardValues(SHEET,values);               // 超宿主单格上限先在模型拒绝，不交给宿主截断
-  var width=[6,16,22,8,10,14,12,16,20,3,26];
+  var width=[6,16,38,8,10,42,14,12,16,20,3,26];
   var columns=width.map(function(value,index){return {index:index+1,width:value,
    hidden:index+1===ROW_ID_COLUMN,title:index<COLUMNS.length?COLUMNS[index]:'行标识'};});
   var fills=[layout.headerFill(HEADER_ROW,COLUMNS.length)];
-  if(model.rows.length)fills.push(layout.inputFill(FIRST_ROW,8,model.rows.length,1));
+  if(model.rows.length)fills.push(layout.inputFill(FIRST_ROW,FINAL_COLUMN,model.rows.length,1));
   var merges=[{row:TITLE_ROW,column:1,columnSpan:COLUMNS.length},{row:NOTE_ROW,column:1,columnSpan:COLUMNS.length}];
   model.rows.forEach(function(row,index){
    if(!row.abnormal)return;
    fills.push({row:FIRST_ROW+index,column:1,rowSpan:1,columnSpan:COLUMNS.length,color:layout.COLORS.accent});
   });
   // 2026-10-11 用户要求：最终分类保留下拉，但允许直接输入下拉以外的类别名（确认时按新类别接收）。
-  var validations=model.rows.length?[layout.listValidation(FIRST_ROW,8,model.rows.length,1,
+  var validations=model.rows.length?[layout.listValidation(FIRST_ROW,FINAL_COLUMN,model.rows.length,1,
    OPTIONS_SHEET,'$B$2:$B$'+String(model.categories.length+1),{allowOtherInput:true})]:[];
   var spec=layout.build({columns:columns,headerRows:[HEADER_ROW],
    rows:[{index:TITLE_ROW,height:24}],merges:merges,fills:fills,validations:validations,
@@ -314,13 +387,13 @@ function fromSnapshot(snapshot,binding,options){
  }
  // 内部绑定：rowId、固定字段快照与库版本，供整表读回校验；不进入公开列。
  function bindingSheet(model){
-  var values=[['行标识','序号','项目编码','项目名称','项目特征描述','单位','工程量','来源边界','来源标识','库版本']];
+  var values=[['行标识','序号','项目编码','项目名称','项目特征描述','单位','工程量','清单溯源','来源边界','来源标识','库版本']];
   model.rows.forEach(function(row){
-   values.push([row.rowId,String(row.index),row.code,row.name,row.feature,row.unit,row.quantity,
+   values.push([row.rowId,String(row.index),row.code,row.name,row.feature,row.unit,row.quantity,row.trace,
     row.scopeId,row.sourceIds.join(' '),row.libraryVersion]);
   });
-  var spec=layout.build({columns:Array.from({length:10},function(_,index){return {index:index+1};}),headerRows:[1],
-   hidden:true,metadata:{profile:'internal-binding'}},{rowCount:values.length,columnCount:10});
+  var spec=layout.build({columns:Array.from({length:11},function(_,index){return {index:index+1};}),headerRows:[1],
+   hidden:true,metadata:{profile:'internal-binding'}},{rowCount:values.length,columnCount:11});
   return {name:BINDING_SHEET,values:values,layout:spec};
  }
  function workbook(model,options){
@@ -329,11 +402,11 @@ function fromSnapshot(snapshot,binding,options){
  // 读回期望值：R5用它按rowId校验固定字段，未保存编辑与筛选隐藏行都不漏。
  function expectedRows(model){
   return model.rows.map(function(row){
-   return {rowId:row.rowId,index:String(row.index),name:row.name,feature:row.feature,unit:row.unit,
-    quantity:row.quantity,code:row.code};
+    return {rowId:row.rowId,index:String(row.index),name:row.name,feature:row.feature,unit:row.unit,
+     quantity:row.quantity,trace:text(row.trace),code:row.code};
   });
  }
- return {SCHEMA_VERSION:SCHEMA_VERSION,SHEET:SHEET,OPTIONS_SHEET:OPTIONS_SHEET,BINDING_SHEET:BINDING_SHEET,
+ return {SCHEMA_VERSION:SCHEMA_VERSION,LAYOUT_VERSION:LAYOUT_VERSION,SHEET:SHEET,OPTIONS_SHEET:OPTIONS_SHEET,BINDING_SHEET:BINDING_SHEET,
   COLUMNS:COLUMNS.slice(),ROW_ID_COLUMN:ROW_ID_COLUMN,TITLE_ROW:TITLE_ROW,NOTE_ROW:NOTE_ROW,
   HEADER_ROW:HEADER_ROW,FIRST_ROW:FIRST_ROW,STATE:STATE,
   build:build,summary:summary,mainSheet:mainSheet,optionsSheet:optionsSheet,bindingSheet:bindingSheet,

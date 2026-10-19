@@ -898,11 +898,14 @@ test('审核成果的跨表分类下拉在选项页实际存在后写入，并�
  host.write(h.app,workbook,'C:\\temp\\rfq-layout.xlsx');
  const main=h.book.Worksheets.Item('分类审核成果'),options=h.book.Worksheets.Item('内部选项');
  assert.equal(h.saved,true);
- assert.equal(main.Range('H4:H11').Validation.Formula1,'内部选项!$B$2:$B$7');
- assert.equal(main.Range('H4:H11').Validation.InCellDropdown,true);
+ assert.equal(main.Range('I4:I11').Validation.Formula1,'内部选项!$B$2:$B$7');
+ assert.equal(main.Range('I4:I11').Validation.InCellDropdown,true);
  assert.deepEqual(options.Range('A1:B7').Value2,[['类别编号','类别名称'],
   ['no-inquiry','无需询价'],['pump','水泵'],['valve','阀门'],['fan','风机'],['ev-charger','汽车充电桩'],['strong-electric','强电']]);
- assert.deepEqual(main.Range('A1:K11').Value2[3].slice(0,9),['1','水泵','DN50','台','2','水泵','匹配成功','水泵','']);
+ const first=main.Range('A1:L11').Value2[3];
+ assert.deepEqual(first.slice(0,10),['1','水泵','DN50','台','2',first[5],'水泵','匹配成功','水泵','']);
+ assert.match(first[5],/示例园区 \/ 给排水 \/ 清单序号待核对/);
+ assert.equal(first[2],'DN50','第三列公开项目特征描述');
  assert.equal(h.app.AutomationSecurity,1);
  assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx');
 });
@@ -920,7 +923,7 @@ test('分类下拉缺少实际选项页时拒绝保存，清理自建簿并恢�
 test('保存重开后分类来源变成带双引号字面量时拒绝假成功',()=>{
  const workbook=reviewWorkbookWithOptions(),h=layoutFixture({validationEchoBare:true,validationLiteralOnReopen:true});
  assert.throws(()=>host.write(h.app,workbook,'C:\\temp\\rfq-layout.xlsx'),/分类下拉读回不一致/);
- assert.equal(h.book.Worksheets.Item('分类审核成果').Range('H4:H11').Validation.Type,3,'下拉类型仍存在也不能放行');
+ assert.equal(h.book.Worksheets.Item('分类审核成果').Range('I4:I11').Validation.Type,3,'下拉类型仍存在也不能放行');
  assert.equal(h.saved,true,'保存前回读看似相同，必须在保存重开后继续核验');
  assert.equal(h.closed,2);
  assert.equal(h.app.AutomationSecurity,1);
@@ -953,7 +956,7 @@ test('F1生成审核成果时隐藏内部页，重开读回仍隐藏且下拉仍
  assert.notEqual(h.book.Worksheets.Item('分类审核成果').Visible,0,'公开审核页必须可见');
  assert.equal(h.book.Worksheets.Item('内部选项').Visible,0,'内部选项页必须隐藏');
  assert.equal(h.book.Worksheets.Item('内部绑定').Visible,0,'内部绑定页必须隐藏');
- assert.equal(h.book.Worksheets.Item('分类审核成果').Range('H4:H11').Validation.Formula1,'内部选项!$B$2:$B$7',
+ assert.equal(h.book.Worksheets.Item('分类审核成果').Range('I4:I11').Validation.Formula1,'内部选项!$B$2:$B$7',
   '隐藏选项页仍是分类下拉来源');
  assert.equal(h.app.ActiveWorkbook.FullName,'C:\\user.xlsx','隐藏内部页不得打乱用户活动工作簿');
 });

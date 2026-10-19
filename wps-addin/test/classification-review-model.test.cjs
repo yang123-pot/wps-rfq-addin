@@ -28,6 +28,35 @@ test('自动分类只给建议：8行中7行有建议、1行冲突，全部尚�
   assert.equal(summary.confirmed,0,'尚未人工确认');
 });
 
+test('合并全部工作簿时按名称和特征模糊聚类，相似材料连续排列且rowId不丢',()=>{
+  function group(id,name,feature,sequence){
+   return {id,name,feature,unit:'台',quantity:'1',scopeId:'combined',sources:[{
+    id:'source-'+id,sequence,row:sequence,code:'',engineering:'示例工程',profession:'暖通'}]};
+  }
+  const groups=[group('a','排风机','风量 1000','1'),group('b','水表','DN50','2'),
+    group('c','送风机','风量 800','3'),group('d','离心风机','风量 1200','4'),group('e','阀门','DN50','5')];
+  const result=model.build(groups,{library:sample.library,memory:sample.createMemory(),
+    projectId:'p-cluster',mergeAllWorkbooks:true});
+  const names=result.rows.map(row=>row.name),fanPositions=names.map((name,index)=>/风机/.test(name)?index:-1).filter(index=>index>=0);
+  assert.equal(fanPositions.length,3);
+  assert.equal(fanPositions[2]-fanPositions[0],2,'三个相似风机必须连续排列');
+  assert.equal(new Set(result.rows.map(row=>row.rowId)).size,groups.length);
+  assert.deepEqual(result.rows.map(row=>row.index),[1,2,3,4,5]);
+  const unchanged=model.build(groups,{library:sample.library,memory:sample.createMemory(),projectId:'p-cluster',mergeAllWorkbooks:false});
+  assert.deepEqual(unchanged.rows.map(row=>row.name),groups.map(group=>group.name),'未选择统一工作簿时保持原顺序');
+});
+
+test('清单溯源公开来源工程、专业、原清单序号和原表行号，合并组保留全部来源',()=>{
+  const group={id:'g-trace',name:'蝶阀',feature:'DN100',unit:'个',quantity:'2',scopeId:'combined',sources:[
+    {id:'s1',sequence:'18',row:105,code:'A',engineering:'1-1#特殊实验车间',profession:'暖通'},
+    {id:'s2',sequence:'27',row:211,code:'B',engineering:'1-2#特殊实验车间',profession:'给排水'}]};
+  const result=model.build([group],{library:sample.library,memory:sample.createMemory(),projectId:'p-trace'});
+  const trace=result.rows[0].trace;
+  assert.match(trace,/1-1#特殊实验车间 \/ 暖通 \/ 清单序号 18（原表第105行）/);
+  assert.match(trace,/1-2#特殊实验车间 \/ 给排水 \/ 清单序号 27（原表第211行）/);
+  assert.equal(model.publicRow(result.rows[0])[5],trace);
+});
+
 test('唯一可靠建议预填最终分类，冲突行留空并标为异常',()=>{
   const {result}=built();
   const byKey={};
@@ -56,24 +85,28 @@ test('旧习惯记忆的显示名不覆盖当前类别名称',()=>{
   assert.doesNotMatch(result.rows[0].matchBasis,/旧水泵/);
 });
 
-test('成果表按图03列序输出9列，规格保存完整特征，编码与来源只进内部绑定',()=>{
+test('成果表按图03列序输出10列，项目特征描述与清单溯源公开，编码及内部标识保持隐藏',()=>{
   const {result}=built();
   const sheet=model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'});
-  assert.deepEqual(model.COLUMNS,['序号','项目名称','规格','单位','工程量','自动建议','匹配情况','最终分类','审核备注']);
-  assert.deepEqual(sheet.values[2].slice(0,9),model.COLUMNS,'第3行前9列是公开表头');
-  assert.deepEqual(sheet.values[2].slice(9),['',''],'表头右侧只留辅助列位');
+  assert.deepEqual(model.COLUMNS,['序号','项目名称','项目特征描述','单位','工程量','清单溯源','自动建议','匹配情况','最终分类','审核备注']);
+  assert.deepEqual(sheet.values[2].slice(0,10),model.COLUMNS,'第3行前10列是公开表头');
+  assert.deepEqual(sheet.values[2].slice(10),['',''],'表头右侧只留辅助列位');
   assert.equal(sheet.values[0][0],'示例园区_分类审核成果.xlsx','标题行与图02一致');
   assert.match(sheet.values[1][0],/自动匹配仅供参考/);
   assert.equal(sheet.values.length,model.HEADER_ROW+result.rows.length,'标题2行＋表头1行＋全部有效行');
-  assert.deepEqual(model.publicRow(result.rows[0]),['1','水泵','DN50','台','2','水泵','匹配成功','水泵','']);
-  assert.equal(sheet.values[3][2],'DN50','规格列保存完整项目特征描述');
+  const first=result.rows[0];
+  assert.deepEqual(model.publicRow(first),['1','水泵','DN50','台','2',first.trace,'水泵','匹配成功','水泵','']);
+  assert.match(first.trace,/示例园区 \/ 给排水 \/ 清单序号/,'清单溯源包含工程、专业和序号说明');
+  assert.equal(sheet.values[3][2],'DN50','项目特征描述列保存完整特征');
   assert.equal(sheet.values[3][4],'2','工程量按文本写入，保留精度');
-  assert.equal(sheet.values[3].length,11,'公开9列＋序号/行标识辅助列');
-  assert.equal(sheet.values[3][10],result.rows[0].rowId,'K列保存稳定rowId');
+  assert.equal(sheet.values[3][5],first.trace,'清单溯源在第6列');
+  assert.equal(sheet.values[3].length,12,'公开10列＋空位/行标识辅助列');
+  assert.equal(sheet.values[3][11],result.rows[0].rowId,'L列保存稳定rowId');
   assert.equal(model.COLUMNS.includes(result.rows[0].code),false,'主表不得出现技术字段');
   const binding=model.bindingSheet(result);
-  assert.deepEqual(binding.values[0],['行标识','序号','项目编码','项目名称','项目特征描述','单位','工程量','来源边界','来源标识','库版本']);
+  assert.deepEqual(binding.values[0],['行标识','序号','项目编码','项目名称','项目特征描述','单位','工程量','清单溯源','来源边界','来源标识','库版本']);
   assert.equal(binding.values[1][2],result.rows[0].code,'编码只在内部绑定表');
+  assert.equal(binding.values[1][7],result.rows[0].trace,'清单溯源同时纳入内部固定字段核对');
   assert.equal(binding.values.length,result.rows.length+1);
 });
 
@@ -104,8 +137,8 @@ test('其他项目已确认的记忆与规则同类时仍预填成果表，真�
     }else{
       assert.equal(row.autoCategoryId,categoryId,'同类别的两种依据应产生可靠建议');
       assert.equal(row.finalCategoryName,categoryName,'最终分类预填唯一类别');
-      assert.equal(model.publicRow(row)[5],categoryName,'公开自动建议不能丢为待核对');
-      assert.equal(model.publicRow(row)[7],categoryName,'公开最终分类必须与建议相符');
+      assert.equal(model.publicRow(row)[6],categoryName,'公开自动建议不能丢为待核对');
+      assert.equal(model.publicRow(row)[8],categoryName,'公开最终分类必须与建议相符');
     }
   });
   assert.equal(result.counts.suggested,6);
@@ -133,22 +166,22 @@ test('版式落地：表头浅色、最终分类浅黄带区域下拉、异常�
   const {result}=built();
   const sheet=model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'});
   const spec=sheet.layout;
-  assert.equal(layout.validate(spec,{rowCount:sheet.values.length,columnCount:11}).ok,true);
-  assert.equal(spec.columns[10].hidden,true,'行标识列必须隐藏');
-  assert.equal(spec.columns[9].hidden,false);
+  assert.equal(layout.validate(spec,{rowCount:sheet.values.length,columnCount:12}).ok,true);
+  assert.equal(spec.columns[11].hidden,true,'行标识列必须隐藏');
+  assert.equal(spec.columns[10].hidden,false);
   assert.equal(spec.freeze.row,model.FIRST_ROW,'冻结表头');
   assert.equal(spec.print.repeatRow,model.HEADER_ROW,'打印重复表头');
-  assert.deepEqual(spec.merges.map(item=>item.columnSpan),[9,9]);
+  assert.deepEqual(spec.merges.map(item=>item.columnSpan),[10,10]);
   const header=spec.fills.filter(item=>item.row===model.HEADER_ROW&&item.color===layout.COLORS.header);
   assert.equal(header.length,1,'表头浅色填充');
-  const input=spec.fills.filter(item=>item.column===8&&item.color===layout.COLORS.input);
+  const input=spec.fills.filter(item=>item.column===9&&item.color===layout.COLORS.input);
   assert.equal(input.length,1,'最终分类列浅黄可编辑');
   assert.equal(input[0].rowSpan,result.rows.length);
   const abnormal=spec.fills.filter(item=>item.color===layout.COLORS.accent);
   assert.equal(abnormal.length,result.counts.conflict,'异常行橙色');
-  assert.equal(abnormal[0].columnSpan,9);
+  assert.equal(abnormal[0].columnSpan,10);
   assert.equal(spec.validations.length,1,'最终分类列挂区域下拉');
-  assert.equal(spec.validations[0].column,8);
+  assert.equal(spec.validations[0].column,9);
   assert.equal(spec.validations[0].listSheet,model.OPTIONS_SHEET);
   assert.equal(spec.validations[0].listRange,'$B$2:$B$'+String(result.categories.length+1));
   const options=model.optionsSheet(result);
@@ -177,7 +210,7 @@ function readResult(result,change){
   const read={rows:result.rows.map((row,index)=>{
     const finalCategoryName=row.finalCategoryName||'';
     return {rowId:row.rowId,row:model.FIRST_ROW+index,index:String(row.index),name:row.name,feature:row.feature,
-      unit:row.unit,quantity:row.quantity,autoCategoryName:model.autoLabel(row),autoCategoryId:row.autoCategoryId,
+      unit:row.unit,quantity:row.quantity,trace:row.trace,autoCategoryName:model.autoLabel(row),autoCategoryId:row.autoCategoryId,
       finalCategoryName:finalCategoryName,reviewNote:'',finalCategoryId:byName[finalCategoryName]||''};
   }),issues:[]};
   // 行序按来源排列（图02/03的样例行序只是示意），断言一律按材料定位，不按物理行号。
@@ -226,8 +259,8 @@ test('整表校验：空分类、未知分类、读回问题都定位到单元�
   const empty=model.validateRead(emptyRead,{categories:result.categories});
   assert.equal(empty.ok,false);
   assert.equal(empty.errors.length,1);
-  assert.deepEqual([empty.errors[0].code,empty.errors[0].row,empty.errors[0].column],
-    ['category-empty',emptyTarget.row,8]);
+   assert.deepEqual([empty.errors[0].code,empty.errors[0].row,empty.errors[0].column],
+     ['category-empty',emptyTarget.row,9]);
   assert.match(empty.errors[0].message,/“最终分类”为空/);
   assert.equal(empty.counts.empty,1);
   const unknownRead=readResult(result,state=>{
@@ -241,7 +274,7 @@ test('整表校验：空分类、未知分类、读回问题都定位到单元�
   assert.equal(unknown.errors[0].code,'category-unknown');
   assert.equal(unknown.errors[0].title,'最终分类无效');
   assert.equal(unknown.errors[0].row,unknownRead.row('阀门','DN50').row);
-  assert.equal(unknown.errors[0].column,8);
+  assert.equal(unknown.errors[0].column,9);
   assert.equal(unknown.counts.unknown,1);
   const broken=model.validateRead(readResult(result,state=>{
     const conflict=state.row('充电桩配电箱');
@@ -277,7 +310,7 @@ test('保存草稿：未填完也能存，但行标识或固定字段被破坏�
   assert.equal(saved.draft.inputKey,'ck2-0123456789abcdef');
   assert.equal(saved.draft.savedAt,'2026-09-26T11:00:00.000Z');
   assert.deepEqual(Object.keys(saved.draft.rows[0]),
-    ['rowId','index','name','feature','unit','quantity','categoryId','categoryName','note'],'草稿只存行标识与用户可编辑的两列');
+    ['rowId','index','name','feature','unit','quantity','trace','categoryId','categoryName','note'],'草稿保留固定字段核对信息与用户可编辑的两列');
   const refused=model.draft(readResult(result,state=>{state.issues.push({row:null,column:null,code:'row-missing',
     message:'成果表缺少材料行：水泵 / DN50'});}),{});
   assert.equal(refused.ok,false);
@@ -293,15 +326,15 @@ test('整表确认快照按rowId保存整表类别与备注并可判重；改确
   });
   const checked=model.validateRead(read,{categories:result.categories});
   const conflict=pick(checked.rows,'充电桩配电箱'),steel=pick(checked.rows,'钢索');
-  const binding={path:'C:\\out\\示例园区_分类审核成果.xlsx',sheet:model.SHEET,headerRow:3,firstRow:4,lastRow:11,
-    rowIdColumn:11,sha256:'b'.repeat(64)};
+  const binding={layoutVersion:model.LAYOUT_VERSION,path:'C:\\out\\示例园区_分类审核成果.xlsx',sheet:model.SHEET,headerRow:3,firstRow:4,lastRow:11,
+    rowIdColumn:12,sha256:'b'.repeat(64)};
   const first=model.confirmation(checked.rows,{projectId:'p-sample01',inputKey:'ck2-0123456789abcdef',
     libraryVersion:result.libraryVersion,binding:binding,confirmedAt:'2026-09-26T10:00:00.000Z',revision:1});
   assert.equal(first.revision,1);
   assert.equal(first.confirmedAt,'2026-09-26T10:00:00.000Z');
   assert.equal(first.inputKey,'ck2-0123456789abcdef');
   assert.equal(first.sheet.path,binding.path);
-  assert.equal(first.sheet.rowIdColumn,11);
+  assert.equal(first.sheet.rowIdColumn,12);
   assert.equal(first.rows.length,8);
   const firstConflict=pick(first.rows,'充电桩配电箱'),firstSteel=pick(first.rows,'钢索');
   assert.equal(firstConflict.categoryId,'ev-charger');
@@ -326,12 +359,13 @@ test('整表确认快照按rowId保存整表类别与备注并可判重；改确
 test('成果表绑定有效性：缺表要先生成，旧inputKey必须重新生成',()=>{
   assert.equal(model.bindingState(null,'ck2-0123456789abcdef').code,'missing');
   assert.match(model.bindingState(null,'ck2-0123456789abcdef').message,/请先在“自动分类”阶段生成/);
-  assert.equal(model.bindingState({inputKey:'ck2-0123456789abcdef'},'ck2-0123456789abcdef').ok,true);
-  const stale=model.bindingState({inputKey:'ck2-0000000000000000'},'ck2-0123456789abcdef');
+  assert.equal(model.bindingState({layoutVersion:model.LAYOUT_VERSION,inputKey:'ck2-0123456789abcdef'},'ck2-0123456789abcdef').ok,true);
+  const stale=model.bindingState({layoutVersion:model.LAYOUT_VERSION,inputKey:'ck2-0000000000000000'},'ck2-0123456789abcdef');
   assert.equal(stale.ok,false);
   assert.equal(stale.code,'stale');
   assert.match(stale.message,/重新生成/);
-  assert.equal(model.bindingState({},'ck2-0123456789abcdef').ok,true,'无键的旧绑定仍按现行内容校验');
+  assert.equal(model.bindingState({layoutVersion:model.LAYOUT_VERSION},'ck2-0123456789abcdef').ok,true,'同版式且无键的绑定仍按现行内容校验');
+  assert.equal(model.bindingState({inputKey:'ck2-0123456789abcdef'},'ck2-0123456789abcdef').code,'stale','旧版无清单溯源表必须重新生成');
 });
 
 // R12-C：把项目里已保存的审核快照（确认或草稿）写成新的成果副本，用户的人工决定不因文件未保存而丢失。
@@ -360,9 +394,9 @@ test('R12-C：按已保存快照重建成果副本，类别/备注取快照、�
   const sheet=model.mainSheet(restored,{title:'示例园区_分类审核成果_恢复副本.xlsx'});
   assert.deepEqual(sheet.values[model.HEADER_ROW-1],model.COLUMNS.concat(['','']),'第3行是公开表头');
   const rowIndex=restored.rows.indexOf(conflict),line=sheet.values[model.FIRST_ROW+rowIndex-1];
-  assert.equal(line[7],'汽车充电桩');
-  assert.equal(line[8],'充电桩配套');
-  assert.equal(line[10],conflict.rowId,'K列仍写随行rowId');
+  assert.equal(line[8],'汽车充电桩');
+  assert.equal(line[9],'充电桩配套');
+  assert.equal(line[11],conflict.rowId,'L列仍写随行rowId');
   const rebuilt=host.bindingFor({target:'C:\\out\\恢复副本.xlsx',sha256:'b'.repeat(64)},restored,{inputKey:'ck2-0123456789abcdef'});
   const reader=(row,column)=>(sheet.values[row-1]||[])[column-1];
   const back=host.readSheet(reader,rebuilt);
@@ -382,7 +416,7 @@ test('F1内部选项与内部绑定页按版式隐藏，公开审核页与下拉
   assert.equal(workbook.sheets[2].layout.hidden,true,'内部绑定页必须隐藏');
   assert.equal(workbook.sheets[0].layout.validations[0].listSheet,model.OPTIONS_SHEET,'隐藏选项页仍是下拉来源');
   const binding=workbook.sheets[2];
-  assert.equal(layout.validate(binding.layout,{rowCount:binding.values.length,columnCount:10}).ok,true,
+  assert.equal(layout.validate(binding.layout,{rowCount:binding.values.length,columnCount:11}).ok,true,
     '隐藏标记不得让内部绑定页版式失效');
 });
 

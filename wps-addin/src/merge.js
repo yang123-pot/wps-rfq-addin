@@ -76,7 +76,8 @@
         var group = eligible ? groups.get(groupKey) : null;
         var record = { id: sourceId, itemId: item.id, file: source.file || book.name, path: source.path || book.path || '',
           sheet: source.sheet, row: source.row, rows: source.rows.slice(), column: source.column, code: item.code,
-          quantity: quantity, quantityRaw: item.quantityRaw, unit: item.unit,
+          sequence: source.sequence || '',
+          quantity: quantity, quantityRaw: item.quantityRaw, quantityDefaulted:item.quantityDefaulted===true, unit: item.unit,
           engineering: source.engineering || '', profession: source.profession || '', professionBasis: source.professionBasis || 'unresolved',
           section: source.section || '', issueCodes: item.issueCodes.slice(),
           featureParts: (item.featureParts || [{row:source.row,text:item.feature}]).map(function (part) { return {row:part.row,text:part.text}; }) };

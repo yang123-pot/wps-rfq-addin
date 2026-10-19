@@ -213,14 +213,15 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   const written=await page.evaluate(()=>window.__reviewWritten);
   assert.equal(written.title,'示例园区_分类审核成果.xlsx','文件名按“项目名_分类审核成果.xlsx”');
   assert.deepEqual(written.result.counts,{rows:8,suggested:6,skip:1,conflict:1,none:0,pending:8});
-  assert.deepEqual(written.sheet.values[2].slice(0,9),['序号','项目名称','规格','单位','工程量','自动建议','匹配情况','最终分类','审核备注'],'图03列序');
-  assert.equal(written.sheet.layout.columns[10].hidden,true,'随行行标识列必须隐藏');
+  assert.deepEqual(written.sheet.values[2].slice(0,10),['序号','项目名称','项目特征描述','单位','工程量','清单溯源','自动建议','匹配情况','最终分类','审核备注'],'图03列序');
+  assert.equal(written.sheet.layout.columns[11].hidden,true,'随行行标识列必须隐藏');
   assert.equal(written.sheet.layout.validations.length,1,'最终分类列挂区域下拉');
   await page.evaluate(()=>{window.RfqClassificationReviewHost.write=async()=>{};});
   await page.locator('#save-project').click();
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已保存到本机'));
   const storedReview=JSON.parse(await fs.readFile(path.join(root,'projects',(await fs.readdir(path.join(root,'projects')))[0]),'utf8'));
   assert.equal(storedReview.matching.path,reviewTarget,'项目记录必须保存成果簿路径');
+  assert.equal(storedReview.matching.layoutVersion,2,'项目记录必须保存新审核表版式');
   assert.equal(storedReview.matching.rowIds.length,8);
   assert.equal(storedReview.matching.fields.length,8);
   assert.match(storedReview.matching.inputKey,/^ck2-[0-9a-f]{16}$/);

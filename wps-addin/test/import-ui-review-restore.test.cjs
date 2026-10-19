@@ -37,17 +37,19 @@ function fixture(){
   ];
   const rows=values.map((v,index)=>({rowId:sample.rowIdOf(preview,v[0],v[1],v[2]),
     index:String(index+1),name:v[0],feature:v[1],unit:v[2],quantity:v[3],
+    trace:'示例园区 / 给排水 / 清单序号 '+(index+1)+'（原表第'+(index+3)+'行）',
     autoCategoryName:v[4],categoryId:v[5],categoryName:v[6],skip:v[5]==='no-inquiry',
     note:index===6?'草稿备注':''}));
   const value=project.create(col,true,{projectId:'p-ui-draft-sha-0001',mergeAllWorkbooks:true});
   const inputKey=project.contentKey({stage:'matching',collection:col,mergeIdentical:true,mergeAllWorkbooks:true,groups:preview.groups});
   value.revision=5;
   value.mergeKey=project.contentKey({collection:col,mergeIdentical:true,mergeAllWorkbooks:true,groups:preview.groups});
-  value.matching={schemaVersion:1,path:REVIEW_PATH,sha256:SHA_A,sheet:'分类审核成果',
-    headerRow:3,firstRow:4,lastRow:11,rowIdColumn:11,inputKey,
+  value.matching={schemaVersion:1,layoutVersion:2,path:REVIEW_PATH,sha256:SHA_A,sheet:'分类审核成果',
+    headerRow:3,firstRow:4,lastRow:11,rowIdColumn:12,inputKey,
     libraryVersion:sample.library.version,categories:sample.library.categories.map(c=>({id:c.id,name:c.name})),
     rowIds:rows.map(r=>r.rowId),fields:rows.map(r=>({rowId:r.rowId,index:r.index,
-      name:r.name,feature:r.feature,unit:r.unit,quantity:r.quantity,autoCategoryName:r.autoCategoryName}))};
+      name:r.name,feature:r.feature,unit:r.unit,quantity:r.quantity,trace:r.trace,
+      autoCategoryName:r.autoCategoryName}))};
   value.review=null;
   value.generation=null;
   value.reviewDraft={schemaVersion:1,state:'draft',inputKey,savedAt:'2026-10-03T10:00:00.000Z',
@@ -61,7 +63,7 @@ async function boot(config={}){
   const sheetRows=copy(rows);
   if(config.sheet)config.sheet(sheetRows);
   const order=config.ascending?sheetRows:sheetRows.reverse();
-  const matrix=order.map(r=>[r.index,r.name,r.feature,r.unit,r.quantity,r.autoCategoryName,
+  const matrix=order.map(r=>[r.index,r.name,r.feature,r.unit,r.quantity,r.trace,r.autoCategoryName,
     '一致',r.categoryName,r.note,'',r.rowId]);
   if(config.cells)config.cells(matrix);
   const sheet={Cells:{Item(row,column){
@@ -163,13 +165,13 @@ test('production restore: '+changed+' changed in saved draft is rejected even wi
 });
 
 test('production restore: changed automatic suggestion cannot refresh physical SHA',async()=>{
-  const result=await boot({cells(matrix){matrix[0][5]='外部改写建议';}});
+  const result=await boot({cells(matrix){matrix[0][6]='外部改写建议';}});
   assert.equal(result.panel.restoreAudit().ok,false);
   assert.equal(result.panel.restoreAudit().physicalRefresh.length,0);
   assert.equal(result.saves.length,0);
 });
 for(const issue of ['missing','duplicate','unknown'])test('production restore: '+issue+' row ID refuses SHA refresh',async()=>{
-  const result=await boot({cells(matrix){matrix[0][10]=issue==='missing'?'':issue==='duplicate'?matrix[1][10]:'foreign-row';}});
+  const result=await boot({cells(matrix){matrix[0][11]=issue==='missing'?'':issue==='duplicate'?matrix[1][11]:'foreign-row';}});
   assert.equal(result.panel.restoreAudit().ok,false);
   assert.equal(result.panel.restoreAudit().physicalRefresh.length,0);
   assert.equal(result.saves.length,0);

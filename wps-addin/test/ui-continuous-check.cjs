@@ -41,7 +41,7 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   // 错误先集中提醒，去修改定位到成果表；关闭后保留摘要。
   await primary.click();await page.getByRole('alertdialog').waitFor();assert.match(await page.getByRole('alertdialog').innerText(),/分类/);
   await page.keyboard.press('Escape');assert.equal(await page.locator('#assistant-problem').isVisible(),true);
-  await page.evaluate(row=>window.__setCell(row,8,'汽车充电桩'),fixture.CONFLICT_ROW);
+  await page.evaluate(row=>window.__setCell(row,9,'汽车充电桩'),fixture.CONFLICT_ROW);
   await action('核对完成，生成分类工作簿');
   await page.waitForFunction(()=>RfqAssistant.view().action==='continueBrands');
   assert.equal(await page.evaluate(()=>RfqAssistant.snapshot().categoryCount),4);await shot('04-categories');
@@ -50,7 +50,7 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
    return p.review&&p.review.revision===2&&p.categories&&p.categories.reviewRevision===2
     ?route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'模拟新版分类簿绑定保存失败'})}):route.continue();});
   await showDetail();await page.locator('[data-stage="review"].workflow-step-button').click();
-  await page.evaluate(row=>window.__setCell(row,9,'新版审核备注'),fixture.CONFLICT_ROW);await page.locator('#sheet-review-confirm').click();
+  await page.evaluate(row=>window.__setCell(row,10,'新版审核备注'),fixture.CONFLICT_ROW);await page.locator('#sheet-review-confirm').click();
   await page.waitForFunction(()=>document.getElementById('project-message').textContent.includes('模拟新版分类簿绑定保存失败'));
   if(await page.getByRole('alertdialog').count())await page.keyboard.press('Escape');await showSimple();
   assert.equal(await page.evaluate(()=>RfqAssistant.view().action),'saveProject','不能用上版已保存分类簿代替本版保存');

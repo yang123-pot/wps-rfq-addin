@@ -465,7 +465,8 @@
       var groups=classifier.groups?classifier.groups():[],source=currentLibrary();
       if(!groups.length||!source||!source.categories||!source.categories.length)return null;
       return RfqClassificationReviewModel.build(groups,{library:source,
-        memory:classifier.memory?classifier.memory():null,projectId:projects.identity()});
+        memory:classifier.memory?classifier.memory():null,projectId:projects.identity(),
+        mergeAllWorkbooks:mergeAll.checked===true});
     }
     function renderReview(){
       var banner=reviewEl('classification-review-banner'),stats=reviewEl('classification-review-stats'),status=reviewEl('classification-review-status'),

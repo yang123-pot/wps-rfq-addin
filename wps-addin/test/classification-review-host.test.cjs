@@ -29,7 +29,7 @@ test('建议文件名安全，绑定含路径/SHA/表位/rowId/固定字段/库�
   const {result,binding}=bound();
   assert.equal(binding.schemaVersion,1);
   assert.equal(binding.sheet,'分类审核成果');
-  assert.equal(binding.headerRow,3);assert.equal(binding.firstRow,4);assert.equal(binding.rowIdColumn,11);
+  assert.equal(binding.headerRow,3);assert.equal(binding.firstRow,4);assert.equal(binding.rowIdColumn,12);
   assert.equal(binding.lastRow,11,'8行数据到第11行');
   assert.equal(binding.rowIds.length,8);
   assert.equal(binding.fields[0].rowId,result.rows[0].rowId);
@@ -56,7 +56,7 @@ test('读回按稳定rowId核对：整表排序后仍逐行对上，未保存编
   }),binding);
   assert.deepEqual(sorted.issues,[],'表内排序不得误判为内容变化');
   assert.equal(sorted.rows[0].rowId,happy.rows[7].rowId,'仍按rowId对应');
-  const edited=host.readSheet(readerOf(sheet.values,grid=>{grid[5][7]='汽车充电桩';grid[5][8]='现场确认';}),binding);
+  const edited=host.readSheet(readerOf(sheet.values,grid=>{grid[5][8]='汽车充电桩';grid[5][9]='现场确认';}),binding);
   assert.deepEqual(edited.issues,[]);
   const row=edited.rows.filter(item=>item.rowId===happy.rows[2].rowId)[0];
   assert.equal(row.finalCategoryName,'汽车充电桩','用户表内修改必须能读回');
@@ -72,12 +72,16 @@ test('读回拦住固定字段改动、缺行、重复行与未知行，并给�
   assert.equal(changed.issues[0].code,'field-changed');
   assert.equal(changed.issues[0].row,4);assert.equal(changed.issues[0].column,5,'工程量在第5列');
   assert.match(changed.issues[0].message,/工程量/);
+  const traceChanged=host.readSheet(readerOf(sheet.values,grid=>{grid[3][5]='被改写的来源';}),binding);
+  assert.equal(traceChanged.issues.length,1);
+  assert.equal(traceChanged.issues[0].column,6,'清单溯源在第6列');
+  assert.match(traceChanged.issues[0].message,/清单溯源/);
   const missingRow=host.readSheet(readerOf(sheet.values,grid=>{grid.splice(10,1);}),binding);
   assert.equal(missingRow.issues.some(item=>item.code==='row-id-missing'),true,'删行后该行必须报缺标识');
   assert.equal(missingRow.issues.some(item=>item.code==='row-missing'),true,'绑定里的材料行不得静默丢失');
-  const duplicate=host.readSheet(readerOf(sheet.values,grid=>{grid[4][10]=grid[3][10];}),binding);
+  const duplicate=host.readSheet(readerOf(sheet.values,grid=>{grid[4][11]=grid[3][11];}),binding);
   assert.equal(duplicate.issues.some(item=>item.code==='row-id-duplicate'),true,'复制行必须报重复标识');
-  const unknown=host.readSheet(readerOf(sheet.values,grid=>{grid[3][10]='row-foreign';}),binding);
+  const unknown=host.readSheet(readerOf(sheet.values,grid=>{grid[3][11]='row-foreign';}),binding);
   assert.equal(unknown.issues.some(item=>item.code==='row-id-unknown'),true,'外来行标识必须报未知');
 });
 
@@ -110,6 +114,7 @@ test('读表复用已打开簿，只关闭自开簿，并恢复宏安全值与�
   assert.throws(()=>host.readBack({AutomationSecurity:null,Workbooks:{Count:0},ActiveWorkbook:null},binding),/宏安全设置/);
   assert.throws(()=>host.readBack(reused.app,Object.assign({},binding,{sheet:'不存在'})),/找不到工作表/);
   assert.throws(()=>host.readSheet(()=>'',Object.assign({},binding,{fields:[]})),/固定字段快照/);
+  assert.throws(()=>host.readSheet(()=>'',Object.assign({},binding,{layoutVersion:1})),/版式已更新/);
 });
 
 // 删除公开页激活、误选最后的内部页，或吞掉缺页错误，都必须让这些打开行为测试失败。
@@ -162,7 +167,7 @@ for(const alreadyOpen of [false,true]){
 }
 
 // R5：整表读回要能按自动建议重算“匹配情况”，因此绑定必须记下生成时的自动建议并把它当固定字段核对。
-test('绑定保存自动建议：冲突行记“待核对”，用户改动“自动建议”列会定位到第6列',()=>{
+test('绑定保存自动建议：冲突行记“待核对”，用户改动“自动建议”列会定位到第7列',()=>{
   const {result,binding}=bound();
   assert.equal(binding.fields[0].autoCategoryName,'水泵');
   assert.equal(binding.fields[0].autoCategoryId,'pump');
@@ -171,9 +176,9 @@ test('绑定保存自动建议：冲突行记“待核对”，用户改动“�
   assert.equal(conflict.autoCategoryId,null);
   const sheet=model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'});
   assert.deepEqual(host.readSheet(readerOf(sheet.values),binding).issues,[]);
-  const changed=host.readSheet(readerOf(sheet.values,grid=>{grid[3][5]='阀门';}),binding);
+  const changed=host.readSheet(readerOf(sheet.values,grid=>{grid[3][6]='阀门';}),binding);
   assert.equal(changed.issues.length,1);
-  assert.deepEqual([changed.issues[0].code,changed.issues[0].row,changed.issues[0].column],['field-changed',4,6]);
+  assert.deepEqual([changed.issues[0].code,changed.issues[0].row,changed.issues[0].column],['field-changed',4,7]);
   assert.match(changed.issues[0].message,/自动建议/);
 });
 
@@ -192,16 +197,16 @@ test('定位问题单元格并原位刷新“匹配情况”：只写需要改�
    Workbooks:{Count:1,Item(){return book;}}};
   const located=host.locate(app,binding,{row:10,column:8});
   assert.deepEqual(located,{path:binding.path,sheet:binding.sheet,row:10,column:8});
-  assert.deepEqual(selects,[[10,8]],'必须选中具体问题单元格供用户修改');
+   assert.deepEqual(selects,[[10,8]],'必须选中具体问题单元格供用户修改');
   assert.equal(app.AutomationSecurity,1,'宏安全值必须恢复');
   const unchanged=host.refreshMatchColumn(app,binding,[{row:4,label:'匹配成功'}]);
   assert.equal(unchanged.updated,0);
   assert.deepEqual(writes,[]);
   const refreshed=host.refreshMatchColumn(app,binding,[{row:4,label:'一致'},{row:10,label:'存在差异'}]);
   assert.equal(refreshed.updated,2);
-  assert.deepEqual(writes,[[4,7,'一致'],[10,7,'存在差异']],'匹配情况固定在公开第7列');
+  assert.deepEqual(writes,[[4,8,'一致'],[10,8,'存在差异']],'匹配情况固定在公开第8列');
   assert.equal(book.saves,0,'只刷新显示，不保存文件，磁盘SHA与绑定仍可核');
-  assert.throws(()=>host.locate(app,binding,{row:0,column:8}),/行号/);
+  assert.throws(()=>host.locate(app,binding,{row:0,column:9}),/行号/);
   assert.throws(()=>host.refreshMatchColumn(app,Object.assign({},binding,{sheet:'不存在'}),[{row:4,label:'一致'}]),
    /找不到工作表/);
 });
@@ -290,7 +295,7 @@ test('F1末行后追加的无标识材料行必须拒绝、定位并阻断确认
   const {result,binding}=bound();
   const sheet=model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'});
   const read=host.readSheet(readerOf(sheet.values,grid=>{
-    grid[binding.lastRow]=['9','钢索','规格C','m','10','无需询价','匹配成功','无需询价',''];
+    grid[binding.lastRow]=['9','钢索','规格C','m','10','来源待核对','无需询价','匹配成功','无需询价','','',''];
   }),binding);
   const extra=read.issues.filter(item=>item.code==='row-extra');
   assert.equal(extra.length,1,'末行后追加的材料行必须报出，不能静默忽略');
@@ -328,7 +333,7 @@ test('F1格式化的空白尾行不误报，额外行扫描有界且保留原有
   }),binding);
   assert.deepEqual(blank.issues,[],'仅被格式化的空白尾行（含空格）不得误报');
   const far=host.readSheet(readerOf(sheet.values,grid=>{
-    grid[400]=['9','远处的行','规格X','m','1','水泵','匹配成功','水泵',''];
+    grid[400]=['9','远处的行','规格X','m','1','来源待核对','水泵','匹配成功','水泵','','',''];
   }),binding);
   assert.equal(far.rows.length,8);
   assert.deepEqual(far.issues,[],'扫描窗口之外的行不作为绑定材料行处理，也不得让读回崩溃');
@@ -336,7 +341,7 @@ test('F1格式化的空白尾行不误报，额外行扫描有界且保留原有
     const head=grid.slice(0,3),data=grid.slice(3).reverse();
     head.forEach((row,index)=>{grid[index]=row;});
     data.forEach((row,index)=>{grid[3+index]=row;});
-    grid[11]=['9','钢索','规格C','m','10','无需询价','匹配成功','无需询价',''];
+    grid[11]=['9','钢索','规格C','m','10','来源待核对','无需询价','匹配成功','无需询价','','',''];
   }),binding);
   assert.equal(sortedThenAppended.rows.length,8,'表内排序后绑定行仍按rowId全部对上');
   assert.equal(sortedThenAppended.issues.filter(item=>item.code==='row-extra').length,1,

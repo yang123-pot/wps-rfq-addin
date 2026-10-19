@@ -181,7 +181,9 @@
             quantity: parsedQuantity, quantityDefaulted: blankQuantity,
             quantityRaw: qty == null ? '' : qty, issueCodes: [],
             source: { file: snapshot.name, path: snapshot.path, sheet: sheet.name, row: absoluteRow,
-              rows: [absoluteRow], column: sheet.startColumn + map.name, engineering: engineering, profession: itemProfession,
+              rows: [absoluteRow], column: sheet.startColumn + map.name,
+              sequence: map.sequence != null ? text(values[map.sequence]).trim() : '',
+              engineering: engineering, profession: itemProfession,
               professionBasis: itemBasis, section: section } };
           if (!present(codeRaw)) issue('code-missing', 'review', absoluteRow, sheet.startColumn + map.code, '项目编码为空，请核对。', item);
           if (typeof codeRaw === 'number') issue('code-display-unverified', 'review', absoluteRow, sheet.startColumn + map.code,
