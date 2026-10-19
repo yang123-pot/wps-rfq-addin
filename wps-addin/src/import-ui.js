@@ -952,8 +952,19 @@
       if(!readBack||readBack.ok!==true||!Array.isArray(pages)||pages.length!==expected.length)return false;
       return expected.every(function(sheet,index){
         var actual=pages[index]||{};
-        return String(actual.sheetName||'')===sheet.sheetName&&Number(actual.rowCount)===Number(sheet.rowCount);
+        return String(actual.sheetName||'')===sheet.sheetName&&Number(actual.rowCount)>=Number(sheet.rowCount);
       });
+    }
+    async function verifyCategoryFile(filePath,sha256,expected){
+      var inspected=null;
+      try{inspected=await exportRequest('inspect',{target:filePath,sha256:sha256,structure:true});}
+      catch(_){inspected=await exportRequest('inspect',{target:filePath,sha256:sha256});}
+      if(!inspected.matches)return {matches:false,inspected:inspected};
+      var source=Array.isArray(inspected.sheets)?'xlsx-structure':'wps';
+      var verified=source==='xlsx-structure'?
+        RfqCategoryWorkbooks.compareSheets(inspected.sheets,expected):
+        RfqCategoryWorkbooks.verifySheets(options.application,filePath,expected);
+      return {matches:true,source:source,sha256:inspected.sha256,bytes:inspected.bytes,verified:verified};
     }
     function categoryPages(){
       return categorySheets().filter(function(sheet){return sheet&&sheet.isSummary!==true&&sheet.isNoInquiry!==true;});
@@ -1192,17 +1203,15 @@
       try{
         // 1) 同一路径已有“整本成功”记录：先按记录SHA核对。页结构已有可信读回则跳过；
         // 旧回执缺少读回时，用当前文件补做一次只读页核，通过后直接恢复，不必重复生成。
-        if(previous&&previous.status==='complete'&&previous.sha256&&previous.file===plan.file&&
+        if(previous&&previous.sha256&&previous.file===plan.file&&
           previous.layoutVersion===RfqCategoryWorkbooks.LAYOUT_VERSION){
-          var actual=await exportRequest('inspect',{target:plan.path,sha256:previous.sha256});
+          var actual=await verifyCategoryFile(plan.path,previous.sha256,expectedSheets);
           if(actual.matches){
             receipt.sha256=actual.sha256;receipt.bytes=actual.bytes;
-            var trusted=readBackMatches(previous,expectedSheets),verified=null;
+            var trusted=readBackMatches(previous,expectedSheets),verified=actual.verified;
             if(trusted)receipt.readBack=previous.readBack;
             else{
-              try{verified=RfqCategoryWorkbooks.verifySheets(options.application,plan.path,expectedSheets);}
-              catch(error){verified={ok:false,issues:[error.message],sheets:[]};}
-              receipt.readBack={at:new Date().toISOString(),ok:verified.ok,sheets:verified.sheets};
+              receipt.readBack={at:new Date().toISOString(),ok:verified.ok,sheets:verified.sheets,source:actual.source};
             }
             if(!trusted&&!verified.ok){
               var verifyReason=(verified.issues||['实际页结构未通过核对']).join('；');
@@ -1224,7 +1233,7 @@
             renderCategories();render();
             return {ok:true,receipt:receipt,plan:plan,skipped:true,recovered:!trusted};
           }
-          var reason=actual.exists?'文件已被外部修改，未覆盖':'文件已不存在';
+          var reason=actual.inspected.exists?'文件已被外部修改，未覆盖':'文件已不存在';
           RfqCategoryWorkbooks.setSheetsStatus(receipt,'needs-verification',reason);
           receipt.updatedAt=new Date().toISOString();categoryReceipt=receipt;
           categoryBlocked=[{file:{name:plan.file,path:plan.path},error:reason}];
@@ -1248,8 +1257,9 @@
         receipt.updatedAt=new Date().toISOString();categoryReceipt=receipt;
         await projects.save();
         // 3) 发布后按页读回：第 1 页＝汇总页、其后每类一页，页名与行数逐页核对。
-        var readBack=RfqCategoryWorkbooks.verifySheets(options.application,receipt.path,expectedSheets);
-        receipt.readBack={at:new Date().toISOString(),ok:readBack.ok,sheets:readBack.sheets};
+        var checkedFile=await verifyCategoryFile(receipt.path,receipt.sha256,expectedSheets),readBack=checkedFile.verified;
+        if(!checkedFile.matches)readBack={ok:false,issues:['发布后文件不存在或SHA不一致。'],sheets:[]};
+        receipt.readBack={at:new Date().toISOString(),ok:readBack.ok,sheets:readBack.sheets,source:checkedFile.source||null};
         if(!readBack.ok){
           RfqCategoryWorkbooks.setSheetsStatus(receipt,'needs-verification',readBack.issues.join('；'));
           receipt.updatedAt=new Date().toISOString();categoryReceipt=receipt;
@@ -1672,6 +1682,7 @@
        reviewGenerated:freshReview,reviewOpened:!!(freshReview&&reviewOpenedPath===reviewBinding.path),reviewPending:pendingReview,
        reviewConfirmed:savedReview,noInquiry:!!(savedReview&&confirmed.rows.every(function(r){return r.skip;})),
        categoriesReady:!!(stages.categories.ready&&verdicts.categories.ready&&categoriesSaved),
+       categoriesRecover:!!(savedReview&&categoryReceipt&&categoryReceipt.path&&categoryReceipt.sha256&&!verdicts.categories.ready),
        categoriesPendingSave:!!(savedReview&&verdicts.categories.ready&&!categoriesSaved),categoryCount:categoryPages().length,
        noInquiryPage:!!(categoryReceipt&&(categoryReceipt.sheets||[]).some(function(sheet){return sheet.isNoInquiry===true;})),
        summaryReady:!!(summaryState().ok&&summaryReceipt&&saved&&saved.summary&&saved.summary.path===summaryReceipt.path&&saved.summary.sha256===summaryReceipt.sha256&&saved.summary.layout===summaryReceipt.layout),brandsOpened:!!(summaryReceipt&&brandsOpenedPath===summaryReceipt.path),

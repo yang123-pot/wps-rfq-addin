@@ -25,7 +25,10 @@
    if(s.inquiryPendingSave)at(6,'询价文件已生成，项目尚未保存','保留已生成文件，保存成功后再继续。','saveProject','重试保存项目');
    if(s.splitPendingSave)at(7,'拆分文件已保留，项目尚未保存','保存成功后才显示全部完成，无需重新拆分。','saveProject','重试保存项目');
   }else if(s.reviewConfirmed){
-   at(4,'生成分类工作簿','首页是分类汇总表，后面每类材料一张工作表。','categoriesGenerate','生成分类工作簿');
+   if(s.categoriesRecover&&!s.categoriesReady)
+    at(4,'核对已有分类工作簿','分类工作簿和首页汇总表已经生成；这里只需核对现有文件，不会再写一份。','categoriesGenerate','核对现有分类工作簿');
+   else
+    at(4,'生成分类工作簿','首页是分类汇总表，后面每类材料一张工作表。','categoriesGenerate','生成分类工作簿');
    if(s.categoriesReady)at(4,'分类工作簿已生成',s.categoryCount+' 类询价材料，已放在同一本工作簿。首页是汇总表，每类材料一张工作表'+
      (s.noInquiryPage?'；“无需询价”明细在最后一张工作表。':'。'),'continueBrands','下一步：填写品牌和供应商');
    if(s.categoriesReady&&s.summaryReady&&s.brandsOpened)at(5,'填写品牌和供应商','在黄色区域填写，每类至少填一组。','brandsConfirm','填写完成，下一步');

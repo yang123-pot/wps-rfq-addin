@@ -347,10 +347,10 @@ function readSheets(app,filePath){
  if(error)throw error;
  return list;
 }
-function verifySheets(app,filePath,sheets){
+function compareSheets(actual,sheets){
  var expected=(sheets||[]).map(function(item){
   return {sheetName:text(item.sheetName),rowCount:Number(item.rowCount)||0};});
- var actual=readSheets(app,filePath),issues=[];
+ actual=Array.isArray(actual)?actual:[];var issues=[];
  if(actual.length!==expected.length)
   issues.push('工作表页数不一致：期望 '+expected.length+' 页，实际 '+actual.length+' 页。');
  // 值逐格一致由导出宿主在写入阶段（保存重开逐值核）与发布SHA证明；这里补的是逐页结构与行数。
@@ -365,6 +365,7 @@ function verifySheets(app,filePath,sheets){
  });
  return {ok:issues.length===0,issues:issues,sheets:actual};
 }
+function verifySheets(app,filePath,sheets){return compareSheets(readSheets(app,filePath),sheets);}
  return {SCHEMA_VERSION:SCHEMA_VERSION,LAYOUT_VERSION:LAYOUT_VERSION,SHEET:SHEET,FOLDER:FOLDER,NO_INQUIRY:NO_INQUIRY,
   COLUMNS:COLUMNS.slice(),ROW_ID_COLUMN:ROW_ID_COLUMN,HEADER_ROW:HEADER_ROW,FIRST_ROW:FIRST_ROW,
   text:text,safeName:safeName,fileNameFor:fileNameFor,directoryOf:directoryOf,
@@ -373,6 +374,6 @@ function verifySheets(app,filePath,sheets){
  sheetNameFor:safeSheetName,
  writeAll:writeAll,
   statusOf:statusOf,statusItems:statusItems,setSheetsStatus:setSheetsStatus,
-  readSheets:readSheets,verifySheets:verifySheets,
+   readSheets:readSheets,verifySheets:verifySheets,compareSheets:compareSheets,
   mainSheet:mainSheet,workbook:workbook,write:write,openForEditing:openForEditing};
 }));

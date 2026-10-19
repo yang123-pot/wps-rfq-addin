@@ -107,7 +107,7 @@ function createServer({root, importDirectory = null, projectDirectory = null, li
         if(url.pathname==='/api/export/freeze')return json(200,await exports.freeze(data.ticket));
         if(url.pathname==='/api/export/commit')return json(200,await exports.commit(data.ticket));
         if(url.pathname==='/api/export/verify')return json(200,await exports.verify(data.ticket,data.target,data.sha256));
-        if(url.pathname==='/api/export/inspect')return json(200,await exports.inspect(data.target,data.sha256));
+        if(url.pathname==='/api/export/inspect')return json(200,await exports.inspect(data.target,data.sha256,{structure:data.structure===true}));
         if(url.pathname==='/api/export/discard')return json(200,await exports.discard(data.ticket));
         const files=await prepareFiles(data.paths,{directory:importDirectory,existing:data.existing});
         return json(200,{files});

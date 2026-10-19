@@ -330,6 +330,7 @@ function initScript(context){
   // 回执显示40页但缺少实际文件读回（本次真实故障形态）：不得继续显示完成，重新生成必须换新批次。
   const missingReadBack=await projectRecord(),beforeMissingBatch=missingReadBack.categories.directory;
   delete missingReadBack.categories.readBack;
+  missingReadBack.categories.status='pending';
   await fs.writeFile(await projectFile(),JSON.stringify(missingReadBack,null,2));
   await page.reload();
   await installCategoryStub();

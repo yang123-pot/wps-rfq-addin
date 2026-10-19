@@ -1,6 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
 const {execFileSync}=require('node:child_process');
 const {createExportStore}=require('../dev/export-files.cjs');
+const xlsxFixture=require('./fixtures/xlsx-container.cjs');
 async function fixture(t){const root=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-export-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));return {root,store:createExportStore({directory:path.join(root,'staging')}),target:path.join(root,'清单.xlsx')};}
 const zip=Buffer.from([0x50,0x4b,0x03,0x04,1,2,3,4]);
 test('prepares a new target, publishes exact bytes and supports idempotent result checks',async t=>{
@@ -179,6 +180,18 @@ test('inspect按记录SHA核对已发布文件，可发现缺失与外部改写'
  assert.equal((await store.inspect(target,result.sha256)).matches,false,'外部改写后不得沿用旧成功');
  await assert.rejects(store.inspect(path.join(root,'out.xls')),/绝对路径/);
  await assert.rejects(store.inspect('relative.xlsx'),/绝对路径/);
+});
+test('inspect可直接读取xlsx页名与行数，不依赖WPS打开同名文件',async t=>{
+ const {store,target}=await fixture(t);
+ const bytes=xlsxFixture.workbook([
+  {name:'分类汇总表',values:[['标题'],[1],[2]]},
+  {name:'无需询价',values:[['标题'],[1]]}
+ ]);
+ await fs.writeFile(target,bytes);
+ const report=await store.inspect(target,null,{structure:true});
+ assert.equal(report.exists,true);
+ assert.deepEqual(report.sheets.map(item=>[item.sheetName,item.rowCount]),
+  [['分类汇总表',3],['无需询价',2]]);
 });
 // R12-J 补强：只读目标目录必须在“写第一份”之前就明确拒绝，不产生任何目标文件，权限恢复后照常可用。
 test('R12-J：目标目录不可写时prepare先拒绝且不创建任何文件',{skip:process.platform!=='win32'},async t=>{

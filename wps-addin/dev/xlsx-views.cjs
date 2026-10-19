@@ -101,4 +101,40 @@ function patchWorkbook(bytes,plan){
  const reopened=archive(result);for(const [part,text]of changes)if(reopened.read(part,32*1024*1024).toString('utf8')!==text)throw Error('冻结XML保存读回不一致。');
  return {bytes:result,sheets:changes.size};
 }
-module.exports={patchWorkbook};
+function readStructure(bytes){
+ const zip=archive(bytes),workbook=xmlTree(zip.read('xl/workbook.xml',1024*1024).toString('utf8')),
+  relations=xmlTree(zip.read('xl/_rels/workbook.xml.rels',1024*1024).toString('utf8'));
+ if(workbook.local!=='workbook'||namespace(workbook)!==NS)throw Error('工作簿XML无效。');
+ const sheets=workbook.children.find(n=>n.local==='sheets'&&namespace(n)===NS);
+ const items=sheets?sheets.children.filter(n=>n.local==='sheet'):[];
+ if(!items.length||items.length>1000)throw Error('工作表数量不符合限制。');
+ const paths=new Set(),result=[];
+ for(let index=0;index<items.length;index++){
+  const sheet=items[index],name=String(sheet.attrs.name||'');
+  if(!name)throw Error('工作表名称为空。');
+  const ridKey=Object.keys(sheet.attrs).find(key=>key.includes(':')&&key.split(':').pop()==='id'),rid=sheet.attrs[ridKey];
+  const matches=relations.children.filter(node=>node.local==='Relationship'&&node.attrs.Id===rid);
+  if(matches.length!==1||matches[0].attrs.TargetMode==='External'||matches[0].attrs.Type!==REL+'/worksheet')
+   throw Error('工作表关系无效：'+name);
+  const uri=new URL(matches[0].attrs.Target,'https://xlsx.invalid/xl/workbook.xml'),part=decodeURIComponent(uri.pathname.slice(1));
+  if(uri.origin!=='https://xlsx.invalid'||uri.search||uri.hash||!part.startsWith('xl/worksheets/')||paths.has(part)||!zip.has(part))
+   throw Error('工作表关系路径无效：'+name);
+  paths.add(part);
+  const tree=xmlTree(zip.read(part,32*1024*1024).toString('utf8'));
+  if(tree.local!=='worksheet'||namespace(tree)!==NS)throw Error('工作表XML无效：'+name);
+  const dimension=tree.children.find(node=>node.local==='dimension'&&namespace(node)===NS);
+  let rowCount=0,ref=String((dimension&&dimension.attrs&&dimension.attrs.ref)||''),match;
+  if(ref&&(match=/:(?:[A-Z]+)(\d+)$/i.exec(ref)||/^[A-Z]+(\d+)$/i.exec(ref)))rowCount=Number(match[1])||0;
+  if(!rowCount){
+   const stack=[tree];
+   while(stack.length){
+    const node=stack.pop();
+    if(node.local==='row'&&namespace(node)===NS)rowCount=Math.max(rowCount,Number(node.attrs.r)||0);
+    for(const child of node.children)stack.push(child);
+   }
+  }
+  result.push({index:index+1,sheetName:name,rowCount:rowCount});
+ }
+ return result;
+}
+module.exports={patchWorkbook,readStructure};

@@ -1,6 +1,7 @@
 const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto');
 const {constants}=require('node:fs');
 const {validatePlan,freezeFile}=require('./file-freeze.cjs');
+const {readStructure}=require('./xlsx-views.cjs');
 function digest(bytes){return crypto.createHash('sha256').update(bytes).digest('hex');}
 async function absent(file){try{await fs.lstat(file);}catch(e){if(e.code==='ENOENT')return;throw e;}throw Error('目标文件已存在，请使用新文件名，禁止覆盖。');}
 // 相邻暂存清理：提交成功立即删；提交前失败、宿主仍占用或提交失败时，由下一次同目标prepare兜底清理足够陈旧的残留。
@@ -157,7 +158,7 @@ function createExportStore({directory}){
   return {target:entry.target,sha256:entry.result.sha256};
  }
  // 重启后按记录SHA核对已经发布的文件：不依赖内存票据，已发布未记账（needs-verification）也用同一入口。
- async function inspect(target,expected){
+ async function inspect(target,expected,options){
   if(typeof target!=='string'||target.length>4096||!path.isAbsolute(target)||path.extname(target).toLowerCase()!=='.xlsx')
    throw Error('请提供有效的xlsx绝对路径。');
   let info;try{info=await fs.lstat(target);}
@@ -165,8 +166,10 @@ function createExportStore({directory}){
   if(!info.isFile())throw Error('目标不是文件，未核对。');
   if(info.size>256*1024*1024)throw Error('目标文件过大，未核对。');
   const bytes=await fs.readFile(target),sha256=digest(bytes);
-  return {target,exists:true,sha256,bytes:bytes.length,
+  const result={target,exists:true,sha256,bytes:bytes.length,
    matches:typeof expected==='string'&&expected?sha256===expected.toLowerCase():null};
+  if(options&&options.structure===true)result.sheets=readStructure(bytes);
+  return result;
  }
  return {prepare,freeze,commit,verify,inspect,discard};
 }

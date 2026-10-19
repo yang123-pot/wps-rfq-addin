@@ -22,7 +22,17 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
    RfqPathPicker.open=opts=>{if(opts.mode==='save')opts.onConfirm({target:reviewTarget,name:'核对.xlsx'});else if(opts.mode==='directory')opts.onConfirm([out]);};
    RfqPathPicker.selectFolder=()=>({supported:true,path:out});
    RfqClassificationReviewHost.write=async(app,model,file,opts)=>{const sheet=RfqClassificationReviewModel.mainSheet(model,{title:opts.title});window.__seedReview(sheet.values);await window.__writeFixture(file,[sheet]);};
-   RfqCategoryWorkbooks.writeAll=async(app,plan,file,opts)=>{window.__summary=opts.summarySheet;window.__plan=plan;await window.__writeFixture(file,[opts.summarySheet]);};
+   RfqCategoryWorkbooks.writeAll=async(app,plan,file,opts)=>{
+    window.__summary=opts.summarySheet;window.__plan=plan;
+    const sheets=[opts.summarySheet];
+    (plan.files||[]).forEach(entry=>{
+     const sheet=RfqCategoryWorkbooks.mainSheet(entry,{});sheet.name=entry.sheetName;sheets.push(sheet);
+    });
+    if(plan.noInquiry){
+     const sheet=RfqCategoryWorkbooks.mainSheet(plan.noInquiry,{});sheet.name=plan.noInquiry.sheetName;sheets.push(sheet);
+    }
+    await window.__writeFixture(file,sheets);
+   };
    RfqCategoryWorkbooks.verifySheets=(app,file,expected)=>({ok:true,issues:[],sheets:expected.map((s,i)=>({index:i+1,sheetName:s.sheetName,rowCount:s.rowCount}))});
    RfqBrandHost.openSummary=(app,file)=>{window.__openedSummary=file;app.Workbooks.Open(file).Activate();return {path:file,opened:true};};
    RfqBrandHost.selectTarget=()=>inquiryTarget;
@@ -30,7 +40,13 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
    RfqBrandHost.openDirectory=()=>{};
   },{reviewTarget,inquiryTarget,out});
   const primary=page.locator('#simple-primary');
-  async function action(label){try{await page.waitForFunction(text=>document.getElementById('simple-primary').textContent===text&&!document.getElementById('simple-primary').disabled,label);}catch(e){throw Error(label+' 未就绪：'+JSON.stringify(await page.evaluate(()=>({state:RfqAssistant.snapshot(),problem:document.getElementById('assistant-problem').textContent,message:document.getElementById('import-message').textContent})))+'；'+errors.join('；'));}await primary.click();console.log('操作：'+label);}
+  async function action(label){
+   try{await page.waitForFunction(text=>document.getElementById('simple-primary').textContent===text&&!document.getElementById('simple-primary').disabled,label);}
+   catch(e){throw Error(label+' 未就绪：'+JSON.stringify(await page.evaluate(()=>({state:RfqAssistant.snapshot(),problem:document.getElementById('assistant-problem').textContent,message:document.getElementById('import-message').textContent})))+'；'+errors.join('；'));}
+   if(await page.getByRole('alertdialog').count())await page.keyboard.press('Escape');
+   await page.waitForFunction(()=>!document.querySelector('.assistant-overlay'));
+   await primary.click();console.log('操作：'+label);
+  }
   async function shot(name){await page.waitForFunction(()=>!RfqAssistant.snapshot().busy);if(process.env.RFQ_UI_V2_SCREENSHOTS){await fs.mkdir(process.env.RFQ_UI_V2_SCREENSHOTS,{recursive:true});await page.screenshot({path:path.join(process.env.RFQ_UI_V2_SCREENSHOTS,name+'.png')});}}
   await action('选择清单文件');await action('我已看完预览');
   await page.locator('#simple-duplicate-merge').check();
@@ -43,7 +59,13 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   await page.keyboard.press('Escape');assert.equal(await page.locator('#assistant-problem').isVisible(),true);
   await page.evaluate(row=>window.__setCell(row,9,'汽车充电桩'),fixture.CONFLICT_ROW);
   await action('核对完成，生成分类工作簿');
-  await page.waitForFunction(()=>RfqAssistant.view().action==='continueBrands');
+  try{await page.waitForFunction(()=>RfqAssistant.view().action==='continueBrands');}
+  catch(_){throw Error('分类工作簿未进入下一步：'+JSON.stringify(await page.evaluate(()=>({
+   view:RfqAssistant.view(),categories:{banner:document.querySelector('#categories-banner').textContent,
+    stats:document.querySelector('#categories-stats').textContent,status:document.querySelector('#categories-status').textContent,
+    message:document.querySelector('#categories-message').textContent},
+   receipt:RfqAssistant.snapshot().categories
+  })))+'；'+errors.join('；'));}
   assert.equal(await page.evaluate(()=>RfqAssistant.snapshot().categoryCount),4);await shot('04-categories');
   // 旧分类簿仍在项目里，新版分类簿的保存失败时不能借旧绑定推进。
   await page.route('**/api/project/save',route=>{const p=route.request().postDataJSON().project;
@@ -52,8 +74,11 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   await showDetail();await page.locator('[data-stage="review"].workflow-step-button').click();
   await page.evaluate(row=>window.__setCell(row,10,'新版审核备注'),fixture.CONFLICT_ROW);await page.locator('#sheet-review-confirm').click();
   await page.waitForFunction(()=>document.getElementById('project-message').textContent.includes('模拟新版分类簿绑定保存失败'));
+  await page.waitForFunction(()=>!RfqAssistant.snapshot().busy);
   if(await page.getByRole('alertdialog').count())await page.keyboard.press('Escape');await showSimple();
-  assert.equal(await page.evaluate(()=>RfqAssistant.view().action),'saveProject','不能用上版已保存分类簿代替本版保存');
+  const afterFailure=await page.evaluate(()=>({action:RfqAssistant.view().action,state:RfqAssistant.snapshot(),
+   projectMessage:document.querySelector('#project-message').textContent}));
+  assert.equal(afterFailure.action,'saveProject','不能用上版已保存分类簿代替本版保存：'+JSON.stringify(afterFailure));
   await page.unroute('**/api/project/save');await action('重试保存项目');
   await page.route('**/api/project/save',route=>route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'模拟磁盘保存失败'})}));
   for(let attempt=0;attempt<2;attempt++){

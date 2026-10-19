@@ -50,3 +50,9 @@ test('新版分类簿生成而保存仍为旧版时，只重试保存',()=>{
  const s=api.create({reviewConfirmed:true,categoriesReady:false,categoriesPendingSave:true});
  assert.equal(s.view().step,4);assert.equal(s.view().action,'saveProject');
 });
+test('分类工作簿已存在但待核对时，主按钮核对现有文件而不是重复生成',()=>{
+ const s=api.create({reviewConfirmed:true,categoriesRecover:true,categoriesReady:false});
+ assert.equal(s.view().step,4);assert.equal(s.view().action,'categoriesGenerate');
+ assert.equal(s.view().label,'核对现有分类工作簿');
+ assert.match(s.view().description,/已经生成.*不会再写一份/);
+});
