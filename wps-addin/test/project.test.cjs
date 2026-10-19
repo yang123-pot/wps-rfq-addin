@@ -170,6 +170,12 @@ test('stage readiness comes from real content, never from a non-empty field',()=
  assert.equal(bare.matching.ready,false);
  const merged=project.assess({collection:base,mergeIdentical:false,preview:preview,groups:groups,mergeConfirmedKey:bare.mergeKey});
  assert.equal(merged.import.ready,true);
+ const reviewedPreview=Object.assign({},preview,{issues:[{code:'source-unresolved'}],canFinalize:true,
+  reviewIssueCount:1,blockingIssueCount:0});
+ const reviewed=project.assess({collection:base,mergeIdentical:false,preview:reviewedPreview,groups:groups,
+  mergeConfirmedKey:bare.mergeKey});
+ assert.equal(reviewed.import.ready,true,'已明确确认的来源/区段提示不得在重算时阻断导入');
+ assert.match(reviewed.import.detail,/1条来源\/区段提示已确认/);
  assert.equal(merged.matching.ready,false,'没有自动分类结论时匹配阶段不得完成');
  assert.equal(project.assess({collection:base,mergeIdentical:false,preview:preview,groups:groups,
   mergeConfirmedKey:bare.mergeKey,matching:{}}).matching.ready,false,'空对象不能冒充已完成');

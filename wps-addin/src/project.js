@@ -352,9 +352,11 @@
    return !metadata.originalPath||!metadata.originalName||!metadata.copyPath||
     !/^[a-f\d]{64}$/i.test(String(metadata.fingerprint||''))||!snapshot.sheets;
   }).length;
-  var preview=input.preview||null,issues=(preview&&preview.issues||[]).length;
+  var preview=input.preview||null,issues=(preview&&preview.issues||[]).length,
+    reviewNotes=preview&&Number.isSafeInteger(preview.reviewIssueCount)?preview.reviewIssueCount:0;
   var sourcesReady=entries.length>0&&invalidSources===0;
-  var previewClean=sourcesReady&&!!preview&&preview.canFinalize===true&&issues===0;
+  // canFinalize只允许“来源/区段待核对”类问题经用户明确确认后继续；同名合并键只有 confirmSelection 成功后才保存。
+  var previewClean=sourcesReady&&!!preview&&preview.canFinalize===true;
   var mergeIdentical=input.mergeIdentical===true;
   var mergeAllWorkbooks=input.mergeAllWorkbooks===true;
   var rows=(input.groups&&input.groups.length)?input.groups:rowsFromPreview(preview);
@@ -381,9 +383,10 @@
   var inquiryKey=contentKey(Object.assign({},key,{stage:'inquiry'}));
   var splitKey=contentKey(Object.assign({},key,{stage:'split'}));
   return {
-   import:{ready:importReady,detail:importReady?('已导入'+entries.length+'份清单，合并选择已确认'):
+   import:{ready:importReady,detail:importReady?('已导入'+entries.length+'份清单，合并选择已确认'+
+     (reviewNotes?'（'+reviewNotes+'条来源/区段提示已确认）':'')):
     (!sourcesReady?(invalidSources?'有'+invalidSources+'份导入记录不完整':'尚未导入清单'):
-     (issues?issues+'个来源问题仍待核对':'本次合并选择尚未确认'))},
+     (preview&&preview.canFinalize===false&&issues?issues+'个来源问题需要处理':'本次合并选择尚未确认'))},
    matching:stageInfo(importReady,input.matching,'自动匹配完成，尚未人工确认','尚未生成自动分类建议','导入与合并未完成'),
    review:stageInfo(matchingReady,input.review,'整表已确认并保存快照','尚未完成整表审核确认','自动分类未完成'),
    categories:stageInfo(reviewReady,input.categories,'分类工作簿已生成并校验','尚未生成分类工作簿','表内审核未确认'),
