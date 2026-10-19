@@ -64,6 +64,16 @@ test('读回按稳定rowId核对：整表排序后仍逐行对上，未保存编
   assert.equal(row.reviewNote,'现场确认');
 });
 
+test('新类别名称相同但当前绑定暂缺编号时，不误报最终分类变化',()=>{
+ const snapshot={rows:[{rowId:'row-new',index:'1',name:'配管',feature:'SC20',unit:'m',quantity:'1',
+  trace:'示例工程 / 强电 / 清单序号 1（原表第4行）',autoCategoryName:'待核对',
+  categoryId:'category-new-electric-steel',categoryName:'电气钢管',note:'',match:'存在差异'}]};
+ const read={rows:[{rowId:'row-new',index:'1',name:'配管',feature:'SC20',unit:'m',quantity:'1',
+  trace:'示例工程 / 强电 / 清单序号 1（原表第4行）',autoCategoryName:'待核对',autoCategoryId:null,
+  finalCategoryName:'电气钢管',finalCategoryId:'',reviewNote:''}],issues:[]};
+ assert.equal(host.compareSnapshot(read,snapshot).matches,true,'文字一致时旧绑定缺编号不得误报');
+});
+
 test('读回拦住固定字段改动、缺行、重复行与未知行，并给出单元格位置',()=>{
   const {result,binding}=bound();
   const sheet=model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'});

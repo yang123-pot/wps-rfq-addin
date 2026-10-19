@@ -795,6 +795,11 @@
           newCategoryNote='';
         if(checked.ok&&checked.newCategoryNames.length){
           var plan=await classifier.adoptCategories(checked.newCategoryNames);
+          // 新类别入库后，审核表绑定必须同步使用新类别编号表；否则“电气钢管”等文字相同也因编号解析为空而误报差异。
+          reviewBinding.categories=plan.categories.map(function(category){
+            return {id:category.id,name:category.name};
+          });
+          if(classifier.library&&classifier.library())reviewBinding.libraryVersion=classifier.library().version;
           checked=RfqClassificationReviewModel.validateRead(read,{categories:plan.categories,
             allowNewCategories:true,newCategoryIds:plan.idByName});
           if(plan.created&&plan.created.length)
@@ -812,7 +817,7 @@
           return;
         }
         var next=RfqClassificationReviewModel.confirmation(checked.rows,{projectId:projects.identity(),
-          inputKey:matchingKey(),libraryVersion:(reviewModel&&reviewModel.libraryVersion)||null,binding:reviewBinding,
+          inputKey:matchingKey(),libraryVersion:reviewBinding.libraryVersion||(reviewModel&&reviewModel.libraryVersion)||null,binding:reviewBinding,
           revision:previous&&Number.isSafeInteger(previous.revision)?previous.revision+1:1});
         if(previous&&RfqClassificationReviewModel.sameRows(previous,next)){
           refreshMatchDisplay(checked);renderReviewIssues([]);

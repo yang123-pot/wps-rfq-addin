@@ -310,6 +310,8 @@ async function run(options={}){
   const adoptedRow=(await projectRecord()).review.rows.filter(row=>row.name==='水泵'&&row.feature==='DN50')[0];
   assert.equal(adoptedRow.categoryName,'临时类别','确认快照保存用户输入的类别名');
   assert.equal(adoptedRow.categoryId,created[0].id,'确认快照使用类别库里的新编号');
+  assert.equal((await projectRecord()).matching.categories.some(item=>item.name==='临时类别'),true,
+   '新类别入库后审核表绑定必须同步类别编号表，避免现表同名被误报为不一致');
   assert.equal(adopted.memory.memories.filter(record=>record.categoryId===created[0].id&&record.state==='active').length,1,
    '新类别同时进入经验库，供下次自动建议使用');
   // 复原为用户原本的选择，后面用例继续按已确认状态走。

@@ -187,12 +187,14 @@
     differences.push({rowId:rowId,code:'field-changed',field:pair[0],label:pair[1],expected:expected,actual:actualValue,
      message:'“'+expectedName+'”的“'+pair[1]+'”业务内容不一致：确认快照“'+expected+'”，现表“'+actualValue+'”'});
    });
-   var expectedId=compareCategoryId(row),actualId=compareCategoryId(actual);
-   if(expectedId!==actualId)
+   // 表格里保存的是类别文字；编号只是当时的库映射。新类别刚入库时旧绑定可能还没有该名称，
+   // 只要确认快照与现表文字一致，就不能因“现表编号暂时为空”误报分类改变。
+   var expectedCategory=compareCategoryName(row).trim(),actualCategory=compareCategoryName(actual).trim();
+   if(expectedCategory!==actualCategory)
     differences.push({rowId:rowId,code:'category-changed',field:'categoryId',label:'最终分类',
-     expected:compareCategoryName(row),actual:compareCategoryName(actual),
-     message:'“'+expectedName+'”的“最终分类”不一致：确认快照“'+(compareCategoryName(row)||'（空）')+
-      '”，现表“'+(compareCategoryName(actual)||'（空）')+'”'});
+     expected:expectedCategory,actual:actualCategory,
+     message:'“'+expectedName+'”的“最终分类”不一致：确认快照“'+(expectedCategory||'（空）')+
+      '”，现表“'+(actualCategory||'（空）')+'”'});
    var expectedNote=compareNote(row),actualNote=compareNote(actual);
    if(expectedNote!==actualNote)
     differences.push({rowId:rowId,code:'note-changed',field:'note',label:'审核备注',expected:expectedNote,actual:actualNote,
