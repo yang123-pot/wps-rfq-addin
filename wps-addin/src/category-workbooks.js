@@ -4,8 +4,8 @@
  else root.RfqCategoryWorkbooks=factory(root.RfqWorkbookLayout,root.RfqExportHost);
 }(typeof window==='object'?window:globalThis,function(layout,exportHost){
  'use strict';
- // R6：按整表确认快照生成独立分类工作簿。每个询价类别一个.xlsx（不是一个工作簿里多个分类页），
- // 每簿只含本类材料，公开10列，品牌/报价单价/金额留空；无需询价行只保留在审核成果表中。
+ // R6：按整表确认快照生成一本多页分类工作簿；询价类别各一页，无需询价明细保留在最后，
+ // 每页公开10列，品牌/报价单价/金额留空。
  var SCHEMA_VERSION=1,LAYOUT_VERSION=2,SHEET='材料明细',FOLDER='分类工作簿',NO_INQUIRY='no-inquiry';
  var COLUMNS=['序号','项目编码','项目名称','项目特征描述','单位','工程量','品牌','报价单价','金额','备注'];
  var ROW_ID_COLUMN=11;                 // K列：随行隐藏辅助列，保存稳定rowId，公开列仍固定10列

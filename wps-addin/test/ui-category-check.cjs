@@ -327,6 +327,25 @@ function initScript(context){
   assert.deepEqual(await fs.readFile(beforeFile),beforeBytes,'旧批次文件内容未被覆盖');
   assert.deepEqual(await listXlsx(beforeBatch),await listXlsx(beforeBatch),'旧批次目录保留原文件');
   assert.match(after.categories.path,/_分类工作簿\.xlsx$/);
+  // 回执显示40页但缺少实际文件读回（本次真实故障形态）：不得继续显示完成，重新生成必须换新批次。
+  const missingReadBack=await projectRecord(),beforeMissingBatch=missingReadBack.categories.directory;
+  delete missingReadBack.categories.readBack;
+  await fs.writeFile(await projectFile(),JSON.stringify(missingReadBack,null,2));
+  await page.reload();
+  await installCategoryStub();
+  await openProject();
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="categories"]').click();
+  await page.waitForFunction(()=>/分类工作簿需要重新生成/.test(document.querySelector('#categories-banner').textContent));
+  assert.match(await page.locator('#categories-stats').innerText(),/缺少可信的实际页结构读回记录/);
+  assert.equal(await page.locator('#categories-summary').isDisabled(),true,'缺少实际页读回时不得解锁汇总');
+  await waitIdle();
+  await page.locator('#categories-generate').click();
+  await page.waitForFunction(()=>/分类工作簿已生成（1 本 · 4 类 · 无需询价1页）/.test(document.querySelector('#categories-banner').textContent),
+   null,{timeout:30000});
+  const repaired=await projectRecord();
+  assert.notEqual(repaired.categories.directory,beforeMissingBatch,'不可信旧回执重新生成必须另建批次');
+  assert.equal(repaired.categories.readBack.ok,true);
+  assert.equal(repaired.categories.readBack.sheets.length,6);
   await shot(SHOT?SHOT.replace(/\.png$/,'-rebatch.png'):null);
   await dumpEvidence('category-regenerated.json',{before:beforeBatch,after:after.categories.directory,
    files:await listXlsx(after.categories.directory)});
