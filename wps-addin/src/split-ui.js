@@ -43,6 +43,7 @@
   function currentGeneration(){
    var value=generation();
    if(!value||!value.modelSnapshot||!value.target||!value.sha256)return null;
+   if(value.modelSnapshot.layoutVersion!==RfqInquiryModel.LAYOUT_VERSION)return null;
    return value;
   }
   function localPlan(){

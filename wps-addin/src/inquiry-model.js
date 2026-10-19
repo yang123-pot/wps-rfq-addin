@@ -7,12 +7,12 @@
  'use strict';
  // R9：品牌唯一来源是分类汇总表读回（R8）。按每类选定方式生成总询价工作簿：
  // 按品牌分别生成＝每组一个询价对象、每张含本类完整材料；合成一份＝每类一个对象、全部品牌组、材料只列一次。
- var SCHEMA_VERSION=1,
+ var SCHEMA_VERSION=1,LAYOUT_VERSION=2,
   COLUMNS=['序号','项目编码','项目名称','项目特征描述','单位','工程量','品牌','报价单价','金额','备注'],
   INQUIRY='inquiry',TRACE='内部追溯',RECORD='处理记录',
   MODES=['synthesize','per-brand'],MODE_LABELS={synthesize:'合成一份','per-brand':'按品牌分别生成'},
   BRAND_SEPARATOR=' / ',MULTI_SUPPLIER='多供应商',COMBINED_NAME='合成询价',
-  HEADER_FONT_SIZE=10,TITLE_COLUMN_SPAN=5,
+  HEADER_FONT_SIZE=10,TITLE_COLUMN_SPAN=8,
   COLUMN_WIDTHS=[6,16,22,46,8,10,20,12,12,16];
  function text(value){return value==null?'':String(value);}
  function trim(value){return text(value).trim();}
@@ -65,18 +65,34 @@
   return trim(entry.categoryName)+(suffix?'_'+suffix:'');
  }
  function sheetLayout(block,rowCount,categoryId,mode){
-  var columnSpan=COLUMNS.length,totalRows=block.headerRow+rowCount,merges=[],index;
-  merges.push({row:block.titleRow,column:1,columnSpan:columnSpan});
-  [block.infoRow,block.contactRow].forEach(function(row){
-   merges.push({row:row,column:1,columnSpan:TITLE_COLUMN_SPAN});
-   merges.push({row:row,column:TITLE_COLUMN_SPAN+1,columnSpan:columnSpan-TITLE_COLUMN_SPAN});
-  });
-  if(block.addressRow)merges.push({row:block.addressRow,column:1,columnSpan:columnSpan});
-  merges.push({row:block.supplierFirstRow,column:1,rowSpan:block.supplierRowCount});
-  for(index=0;index<block.supplierRowCount;index++)
-   merges.push({row:block.supplierFirstRow+index,column:2,columnSpan:columnSpan-1});
+  var columnSpan=COLUMNS.length,totalRows=block.headerRow+rowCount,
+   merges=[{row:1,column:1,columnSpan:8},{row:1,column:9,columnSpan:2},
+    {row:2,column:1,columnSpan:6},{row:2,column:7,columnSpan:4},
+    {row:3,column:1,columnSpan:3},{row:3,column:4,columnSpan:3},{row:3,column:7,columnSpan:4},
+    {row:4,column:1,columnSpan:10},{row:5,column:1,columnSpan:10}];
+  // 合并区无法可靠AutoFit；按区域宽度与字数预留换行高度，不截断用户填写。
+  function height(row){
+   var regions=merges.filter(function(merge){return merge.row===row;}),maxLines=1,size=row===1?24:12;
+   regions.forEach(function(region){
+    var width=COLUMN_WIDTHS.slice(region.column-1,region.column-1+region.columnSpan).reduce(function(a,b){return a+b;},0)*7,
+     value=block.lines[row-1][region.column-1]||'',lines=0;
+    value.split(/\r?\n/).forEach(function(line){
+     var units=0;for(var i=0;i<line.length;i++)units+=line.charCodeAt(i)>255?1:0.6;
+     lines+=Math.max(1,Math.ceil(units*size*1.34/Math.max(20,width-20)));
+    });
+    maxLines=Math.max(maxLines,lines);
+   });
+   return Math.max(row===1?48:32,Math.ceil(maxLines*size*1.5+12));
+  }
   return layout.build({fontSize:HEADER_FONT_SIZE,
    columns:COLUMNS.map(function(_,position){return {index:position+1,width:COLUMN_WIDTHS[position]};}),
+   rows:[1,2,3,4,5].map(function(row){return {index:row,height:height(row)};}),
+   fonts:[{row:2,column:1,rowSpan:4,columnSpan:10,name:'宋体',size:12,color:'#000000',bold:false},
+    {row:1,column:1,columnSpan:8,name:'宋体',size:24,color:'#000000',bold:true},
+    {row:1,column:9,columnSpan:2,name:'宋体',size:22,color:'#000000',bold:false}],
+   alignments:[{row:2,column:1,rowSpan:4,columnSpan:10,horizontal:'left',vertical:'center'},
+    {row:1,column:1,columnSpan:8,horizontal:'center',vertical:'center'},
+    {row:1,column:9,columnSpan:2,horizontal:'center',vertical:'center'}],
    headerRows:[block.titleRow,block.headerRow],freeze:{row:block.headerRow+1,column:1},merges:merges,
    fills:[layout.headerFill(block.headerRow,columnSpan)],
    print:{area:{row:1,column:1,rowSpan:totalRows,columnSpan:columnSpan},repeatRow:block.headerRow,
@@ -124,7 +140,7 @@
      values:guard(values,sheetName),layout:sheetLayout(block,categoryRows.length,entry.categoryId,entry.mode)});
    });
   });
-  return {schemaVersion:SCHEMA_VERSION,inputKey:text(source.inputKey),header:header.normalize(source.header),
+  return {schemaVersion:SCHEMA_VERSION,layoutVersion:LAYOUT_VERSION,inputKey:text(source.inputKey),header:header.normalize(source.header),
    projectName:header.normalize(source.header).projectName,mode:source.mode||'summary',rowCount:rows.length,
    sheetCount:sheets.length,sheets:sheets,
    trace:guard([['询价工作表','类别','品牌','供应商','序号','材料行标识','来源标识','工程量','来源']].concat(trace),TRACE)};
@@ -162,11 +178,11 @@
   var sheets=ensureSheets(model).map(function(sheet){
    return {name:sheet.name,values:sheet.values,layout:sheet.layout};});
   sheets.push({name:TRACE,values:model.trace});
-  sheets.push({name:RECORD,values:[['项目','内容'],['工作簿版本','wps-rfq-inquiry-v1'],['内容键',model.inputKey],
+  sheets.push({name:RECORD,values:[['项目','内容'],['工作簿版本','wps-rfq-inquiry-v2'],['内容键',model.inputKey],
    ['项目名称',model.projectName],['询价工作表数',String(model.sheets.length)],['材料行数',String(model.rowCount)],
    ['生成时间',text(generatedAt||'')],
    ['品牌来源','品牌与供应商取自分类汇总表读回结果；报价单价与金额留空，原价与历史报价不带入'],
-   ['供应商信息区','每张询价页的供应商信息区按品牌组逐组对应；合成一份时材料行只出现一次'],
+   ['供应商信息区','第4行供货单位取当前供应商，多组完整列出；合成一份时材料行只出现一次'],
    ['用途','对供应商询价的工作簿；内部追溯页只留内部，拆分时不随文件外发']]});
   return {mode:'inquiry',inputKey:model.inputKey,sheets:sheets};
  }
@@ -182,9 +198,10 @@
  function isCurrent(generation,currentKey){
   if(!generation||generation.schemaVersion!==SCHEMA_VERSION)return false;
   if(typeof currentKey!=='string'||!currentKey||generation.inputKey!==currentKey)return false;
-  return Array.isArray(generation.sheetIds)&&generation.sheetIds.length>0&&!!generation.modelSnapshot;
+  return Array.isArray(generation.sheetIds)&&generation.sheetIds.length>0&&!!generation.modelSnapshot&&
+   generation.modelSnapshot.layoutVersion===LAYOUT_VERSION;
  }
- return {SCHEMA_VERSION:SCHEMA_VERSION,COLUMNS:COLUMNS,INQUIRY:INQUIRY,TRACE:TRACE,RECORD:RECORD,
+ return {SCHEMA_VERSION:SCHEMA_VERSION,LAYOUT_VERSION:LAYOUT_VERSION,COLUMNS:COLUMNS,INQUIRY:INQUIRY,TRACE:TRACE,RECORD:RECORD,
   MODES:MODES.slice(),MODE_LABELS:MODE_LABELS,MULTI_SUPPLIER:MULTI_SUPPLIER,COMBINED_NAME:COMBINED_NAME,
   build:build,workbook:workbook,record:record,isCurrent:isCurrent,sanitize:sanitize,
   categorySummary:categorySummary,summaryLines:summaryLines,countsText:countsText,modeLabel:modeLabel};

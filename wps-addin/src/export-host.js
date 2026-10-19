@@ -122,6 +122,7 @@
   }
   // 版式落地：等宽矩阵之上再写列宽、行高、合并、浅色填充、冻结、打印、原生链接与区域下拉。
   // 宿主缺API时明确报出具体缺哪一个，绝不静默产出“看起来像获批版式”的文件。
+  function alignmentValue(value){return {left:-4131,center:-4108,right:-4152,top:-4160,bottom:-4107}[value];}
   function applyLayout(app,sheet,model,spec){
     if(!spec)return;
     var rowCount=(deep(model,sheet)||{}).values;
@@ -188,9 +189,16 @@
     (spec.fonts||[]).forEach(function(font){
       var range=sheet.Range(address(font));
       if(!range.Font)throw Error('当前WPS不支持字体样式API（Range.Font），未按获批版式输出“'+sheet.Name+'”。');
+      if(font.name!=null)range.Font.Name=font.name;
+      if(font.size!=null)range.Font.Size=font.size;
       if(font.color!=null)range.Font.Color=layout.toColor(font.color);
       if(font.bold!=null)range.Font.Bold=font.bold===true;
       if(font.underline!=null)range.Font.Underline=font.underline===true?2:0;
+    });
+    (spec.alignments||[]).forEach(function(item){
+      var range=sheet.Range(address(item));
+      if(item.horizontal!=null)range.HorizontalAlignment=alignmentValue(item.horizontal);
+      if(item.vertical!=null)range.VerticalAlignment=alignmentValue(item.vertical);
     });
     (spec.validations||[]).forEach(function(rule){
       var range=sheet.Range(address(rule));
@@ -297,8 +305,17 @@
         var range=sheet.Range(address(merge));
         if(range.MergeCells!==true)throw Error('“'+s.name+'”合并读回不一致：'+address(merge));
       });
+      (spec.rows||[]).forEach(function(row){
+        var actual=sheet.Rows.Item(row.index).RowHeight;
+        if(!Number.isFinite(Number(actual))||Math.abs(Number(actual)-row.height)>0.75||actual==null)
+          throw Error('“'+s.name+'”行高读回不一致：第'+row.index+'行');
+      });
       (spec.fonts||[]).forEach(function(font){
         var range=sheet.Range(address(font)),target=range.Font||{};
+        if(font.name!=null&&target.Name!==font.name)
+          throw Error('“'+s.name+'”字体名称读回不一致：'+address(font));
+        if(font.size!=null&&Number(target.Size)!==font.size)
+          throw Error('“'+s.name+'”字号读回不一致：'+address(font));
         if(font.underline===true&&!target.Underline)
           throw Error('“'+s.name+'”下划线读回缺失：'+address(font));
         // 真机实测：先在锚点上落地获批蓝色再建原生链接会被宿主链接样式覆盖；把字体放到链接之后写，
@@ -306,6 +323,12 @@
         if(font.color!=null&&target.Color!=null&&Number(target.Color)!==Number(layout.toColor(font.color)))
           throw Error('“'+s.name+'”字体颜色读回不一致：'+address(font)+
             '（期望'+font.color+'/'+Number(layout.toColor(font.color))+'，实际'+String(target.Color)+'）');
+      });
+      (spec.alignments||[]).forEach(function(item){
+        var range=sheet.Range(address(item));
+        if((item.horizontal!=null&&Number(range.HorizontalAlignment)!==alignmentValue(item.horizontal))||
+           (item.vertical!=null&&Number(range.VerticalAlignment)!==alignmentValue(item.vertical)))
+          throw Error('“'+s.name+'”对齐读回不一致：'+address(item));
       });
       (spec.hyperlinks||[]).forEach(function(link){
         var anchor=sheet.Range(address(link));

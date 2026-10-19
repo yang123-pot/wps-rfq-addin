@@ -339,6 +339,27 @@ function writingFixture(overrides){
  }
  return {app,written,writtenRows,closedUser,previous,sheets,sheet};
 }
+
+test('询价抬头区域字体字号、居中及行高写入并保存重开核验',()=>{
+ const lm=require('../src/workbook-layout.js'),spec=lm.build({columns:[{index:1},{index:2}],
+  rows:[{index:1,height:48}],merges:[{row:1,column:1,columnSpan:2}],
+  fonts:[{row:1,column:1,columnSpan:2,name:'宋体',size:24,bold:true}],
+  alignments:[{row:1,column:1,columnSpan:2,horizontal:'center',vertical:'center'}]});
+ const model={sheets:[{name:'询价',values:[['示例公司','']],layout:spec}]},h=layoutFixture();
+ host.write(h.app,model,'C:\\temp\\rfq-layout.xlsx');
+ const range=h.sheets[0].Range('A1:B1');
+ assert.equal(range.Font.Name,'宋体');assert.equal(range.Font.Size,24);
+ assert.equal(range.HorizontalAlignment,-4108);assert.equal(range.VerticalAlignment,-4108);
+ assert.equal(h.sheets[0].Rows.Item(1).RowHeight,48);
+ for(const [corrupt,pattern] of [
+  [r=>{r.Font.Size=10;},/字号读回/],
+  [r=>{r.HorizontalAlignment=-4131;},/对齐读回/],
+  [r=>{r.Font.Name='其他字体';},/字体名称读回/]]){
+  const fault=layoutFixture(),open=fault.app.Workbooks.Open;
+  fault.app.Workbooks.Open=function(...args){const book=open(...args);corrupt(fault.sheets[0].Range('A1:B1'));return book;};
+  assert.throws(()=>host.write(fault.app,model,'C:\\temp\\rfq-layout.xlsx'),pattern);
+ }
+});
 test('writes and verifies sheets longer than 500 rows in bounded chunks',()=>{
  const h=writingFixture(),values=[['编码','量']];
  for(let i=0;i<500;i++)values.push(['000'+String(i).padStart(3,'0'),String(i)+'.5']);
@@ -663,13 +684,14 @@ test('R9 inquiry workbook keeps the 图06 layout: title merge, header fill, free
  const h=layoutFixture({dropUninitializedPrint:true});
  host.write(h.app,book,'C:\\temp\\rfq-inquiry.xlsx');
  const sheet=h.sheets[0];
- assert.deepEqual(sheet.Range('A1:J9').Value2,model.sheets[0].values,'公开值逐格写回且与模型一致');
- assert.equal(sheet.Range('A1:J1').MergeCells,true,'标题合并成整行');
+ assert.deepEqual(sheet.Range('A1:J8').Value2,model.sheets[0].values,'公开值逐格写回且与模型一致');
+ assert.equal(sheet.Range('A1:H1').MergeCells,true,'公司名居中合并左侧');
+ assert.equal(sheet.Range('I1:J1').MergeCells,true,'询价合并右侧');
  assert.equal(sheet.Columns.Item(4).ColumnWidth,46,'项目特征描述列加宽以便长特征换行');
- assert.equal(sheet.Rows.Item(7).Font.Bold,true,'材料表头行加粗');
- assert.equal(sheet.Range('A7:J7').Interior.Color,layoutModule.toColor('#DCE6F1'),'表头浅色填充');
- assert.equal(sheet.PageSetup.PrintTitleRows,'$7:$7','打印重复表头');
- assert.equal(sheet.PageSetup.PrintArea,'A1:J9','打印区域覆盖标题到末行');
+ assert.equal(sheet.Rows.Item(6).Font.Bold,true,'材料表头行加粗');
+ assert.equal(sheet.Range('A6:J6').Interior.Color,layoutModule.toColor('#DCE6F1'),'表头浅色填充');
+ assert.equal(sheet.PageSetup.PrintTitleRows,'$6:$6','打印重复表头');
+ assert.equal(sheet.PageSetup.PrintArea,'A1:J8','打印区域覆盖标题到末行');
  assert.equal(sheet.PageSetup.Orientation,2,'横向打印');
  assert.equal(sheet.PageSetup.PaperSize,9,'显式A4使打印设置保存重开后仍保留');
  assert.equal(sheet.PageSetup.Zoom,false,'关闭固定百分比缩放，使适合页宽生效');

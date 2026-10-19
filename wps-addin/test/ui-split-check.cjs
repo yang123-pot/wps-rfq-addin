@@ -117,6 +117,10 @@ async function run(){
    '图07目录选择与一键拆分必须属于第七步主面板');
   assert.equal(await page.locator('#stage-panel-split #split-run').isVisible(),true,
    '进入第七步直接显示拆分主操作，无需展开辅助功能');
+  await page.evaluate(function(){delete window.__splitGeneration.modelSnapshot.layoutVersion;window.__splitPanel.refresh();});
+  assert.equal(await page.locator('#split-run').isDisabled(),true,'旧式总表不能直接在第7步拆分');
+  assert.match(await page.locator('#split-status').innerText(),/重新生成|请先生成/);
+  await page.evaluate(function(){window.__splitGeneration.modelSnapshot.layoutVersion=RfqInquiryModel.LAYOUT_VERSION;window.__splitPanel.refresh();});
   assert.doesNotMatch(await page.locator('#stage-panel-split').innerText(),/将在 R10 开发包实现/,
    '已实现拆分不可继续展示未实现占位说明');
   await page.evaluate(function(){document.getElementById('split-directory').click();});

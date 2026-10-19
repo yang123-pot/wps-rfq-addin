@@ -99,7 +99,7 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   assert.equal(await page.locator('#assistant-header [aria-invalid=true]').count(),0,'填好后立即移除错误红框，不等待再点击生成');
   await shot('06-header');await action('生成询价总表');await page.waitForFunction(()=>RfqAssistant.view().action==='goSplit');
   const generated=await record();assert.equal(generated.generation.modelSnapshot.sheets.length,5);
-  const valve=generated.generation.modelSnapshot.sheets.find(s=>s.name==='阀门_合成询价');assert.deepEqual(valve.values.slice(7,9).map(r=>r[5]),['20','12']);assert.equal(valve.values[7][6],'通达 / 海岳');
+  const valve=generated.generation.modelSnapshot.sheets.find(s=>s.name==='阀门_合成询价');assert.deepEqual(valve.values.slice(valve.headerRow).map(r=>r[5]),['20','12']);assert.equal(valve.values[valve.headerRow][6],'通达 / 海岳');
   await action('下一步：拆分询价文件');await action('选择输出文件夹');await shot('07-split-ready');
   // 拆分写入复用业务模型与真实发布/冻结/回执链；只替代宿主落盘。
   await page.evaluate(()=>{RfqExportHost.writeWorkbook=async(app,model,file,opts)=>{await window.__writeFixture(file,model.sheets);if(opts&&opts.finalizeFreeze)await opts.finalizeFreeze();};});

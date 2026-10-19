@@ -3,6 +3,16 @@ const layout=require('../src/workbook-layout.js');
 
 // 材料明细：短标题行＋10列公共列，模拟“分块宽度取首行”导致的截断/错位。
 const DETAIL_HEADER=['序号','项目编码','项目名称','项目特征描述','单位','工程量','品牌','报价单价','金额','备注'];
+test('区域字体字号及对齐受校验和边界约束',()=>{
+ const spec=layout.build({columns:[{index:1}],fonts:[{row:1,column:1,name:'宋体',size:24}],
+  alignments:[{row:1,column:1,horizontal:'center',vertical:'center'}]});
+ assert.equal(spec.fonts[0].size,24);
+ for(const font of [{row:1,column:1,size:-1},{row:1,column:1,name:''}])
+  assert.equal(layout.validate({...spec,fonts:[font]}).ok,false);
+ assert.equal(layout.validate({...spec,alignments:[{row:1,column:1,horizontal:'invalid'}]}).ok,false);
+ assert.equal(layout.validate({...spec,alignments:[{row:1,column:2,horizontal:'left'}]},
+  {rowCount:1,columnCount:1}).ok,false);
+});
 
 test('等宽矩阵：短标题行和被补齐的行不决定列宽，也不截断任何内容',()=>{
  const values=[['示例园区材料询价表'],

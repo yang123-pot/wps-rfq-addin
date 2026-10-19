@@ -68,7 +68,7 @@
   });
   (layout.rows||[]).forEach(function(row){
    if(!isObject(row)||!integer(row.index)||!Number.isFinite(row.height)||row.height<=0)errors.push('行高定义无效。');});
-  ['merges','fills','fonts','hyperlinks','validations'].forEach(function(field){
+  ['merges','fills','fonts','alignments','hyperlinks','validations'].forEach(function(field){
    if(layout[field]!=null&&!Array.isArray(layout[field]))errors.push(field+'必须是数组。');
   });
   (layout.merges||[]).forEach(function(merge,index){rect(merge,'第'+(index+1)+'个合并',errors);});
@@ -79,9 +79,17 @@
   (layout.fonts||[]).forEach(function(font,index){
    rect(font,'第'+(index+1)+'个字体',errors);
    if(!isObject(font))return;
+   if(font.name!=null&&(typeof font.name!=='string'||!font.name.trim()))errors.push('字体名称无效。');
+   if(font.size!=null&&(!Number.isFinite(font.size)||font.size<=0||font.size>409))errors.push('字体字号无效。');
    if(font.color!=null){try{toColor(font.color);}catch(error){errors.push(error.message);}}
    ['bold','underline'].forEach(function(field){
     if(font[field]!=null&&typeof font[field]!=='boolean')errors.push('第'+(index+1)+'个字体'+field+'设置无效。');});
+  });
+  (layout.alignments||[]).forEach(function(item,index){
+   rect(item,'第'+(index+1)+'个对齐',errors);
+   if(!isObject(item))return;
+   if(item.horizontal!=null&&['left','center','right'].indexOf(item.horizontal)<0)errors.push('水平对齐设置无效。');
+   if(item.vertical!=null&&['top','center','bottom'].indexOf(item.vertical)<0)errors.push('垂直对齐设置无效。');
   });
   (layout.hyperlinks||[]).forEach(function(link,index){
    rect(link,'第'+(index+1)+'个链接',errors);
@@ -124,6 +132,7 @@
    (layout.hyperlinks||[]).forEach(function(link,index){within(link,'第'+(index+1)+'个链接');});
    (layout.validations||[]).forEach(function(rule,index){within(rule,'第'+(index+1)+'个下拉');});
    (layout.fonts||[]).forEach(function(font,index){within(font,'第'+(index+1)+'个字体');});
+   (layout.alignments||[]).forEach(function(item,index){within(item,'第'+(index+1)+'个对齐');});
    (layout.columns||[]).forEach(function(column,index){
     if(integer(columnCount)&&integer(column.index)&&column.index>columnCount)errors.push('第'+(index+1)+'列超出工作表列范围。');});
   }
@@ -147,6 +156,7 @@
    merges:(input.merges||[]).map(function(merge){return Object.assign({rowSpan:1,columnSpan:1},merge);}),
    fills:(input.fills||[]).map(function(fill){return Object.assign({rowSpan:1,columnSpan:1},fill);}),
    fonts:(input.fonts||[]).map(function(font){return Object.assign({rowSpan:1,columnSpan:1},font);}),
+   alignments:(input.alignments||[]).map(function(item){return Object.assign({rowSpan:1,columnSpan:1},item);}),
    hyperlinks:(input.hyperlinks||[]).map(function(link){return Object.assign({rowSpan:1,columnSpan:1},link);}),
    validations:(input.validations||[]).map(function(rule){
     return Object.assign({rowSpan:1,columnSpan:1,allowBlank:true,inCellDropdown:true},rule);}),

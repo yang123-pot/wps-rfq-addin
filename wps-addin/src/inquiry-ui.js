@@ -48,7 +48,7 @@
    }else if(!header.ok){
     banner.textContent='询价抬头未填齐';banner.className='result-banner';
     progress.textContent='当前进度 6 / 7 · 品牌已读回，等待填写询价抬头';
-    stats.textContent='抬头包含项目名称、单位名称、材料经办人、联系方式（必填）与原公司地址（可选）。';
+    stats.textContent='抬头包含项目名称、单位名称、材料经办人、联系方式（必填）与原公司地址、传真、邮箱（可选）。';
     status.textContent='还缺：'+header.errors.join('；')+'。请在“辅助功能 → 询价抬头”里填写。';
    }else if(error){
     banner.textContent='询价表还不能生成';banner.className='result-banner';
@@ -62,9 +62,9 @@
     status.textContent=RfqInquiryHeader.summary(ctx.header);
    }else if(!current){
     banner.textContent='总询价工作簿已过期';banner.className='result-banner';
-    progress.textContent='当前进度 6 / 7 · 品牌、抬头或分类已变化，需要重新生成总询价工作簿';
+    progress.textContent='当前进度 6 / 7 · 内容或询价表样式已变化，需要重新生成总询价工作簿';
     stats.textContent='上次生成：'+fileName(generation.target)+'（'+generation.sheetIds.length+' 张询价页），不再作为当前依据。';
-    status.textContent='修改汇总表或抬头后必须重新生成；旧文件保留，拆分不再沿用。';
+    status.textContent='内容或询价表样式更新后须重新生成，请另选新文件名保存；旧文件保留。';
    }else{
     banner.textContent='询价表已生成并校验';banner.className='result-banner is-done';
     progress.textContent='当前进度 6 / 7 · 总询价工作簿已生成，可进入第7步拆分';

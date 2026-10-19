@@ -4,14 +4,16 @@
  else root.RfqInquiryHeader=factory();
 }(typeof window==='object'?window:globalThis,function(){
  'use strict';
- // 图06获批抬头：项目名称、单位名称、材料经办人、联系方式必填；原公司地址辅助可选。
+ // 用户2026-10-19补充：前五行参考样式，四项必填保持；地址、传真、邮箱可选。
  // 版本号保持1：项目记录里的 header 字段由项目校验器要求 schemaVersion===1，升级字段不能升版本。
- var SCHEMA_VERSION=1,SUPPLIER_LABEL='供应商信息',SUPPLIER_DASH=' — ',
+ var SCHEMA_VERSION=1,SUPPLIER_LABEL='供货单位',
   FIELDS=[{key:'projectName',label:'项目名称',prefix:'项目名称：',required:true},
    {key:'company',label:'单位名称',prefix:'单位名称：',required:true},
    {key:'contact',label:'材料经办人',prefix:'材料经办人：',required:true},
    {key:'phone',label:'联系方式',prefix:'联系方式：',required:true},
-   {key:'address',label:'原公司地址',prefix:'原公司地址：',required:false}],
+   {key:'address',label:'原公司地址',prefix:'公司地址：',required:false},
+   {key:'fax',label:'传真',prefix:'传真：',required:false},
+   {key:'email',label:'邮箱',prefix:'邮箱：',required:false}],
   REQUIRED=FIELDS.filter(function(field){return field.required;}).map(function(field){return field.key;});
  function text(value){return value==null?'':String(value).trim();}
  function fieldOf(key){return FIELDS.filter(function(field){return field.key===key;})[0];}
@@ -52,27 +54,16 @@
   if(suppliers==null||suppliers==='')return [];
   return [{brand:'',supplier:text(suppliers)}];
  }
- function supplierLine(group){
-  if(group.brand&&group.supplier)return group.brand+SUPPLIER_DASH+group.supplier;
-  return group.brand||group.supplier||'';
- }
- // 图06抬头块：标题行、空行、项目名称/单位名称行、材料经办人行、可选地址行、供应商信息区（每组一行）。
- // 返回具体行号供模型生成合并区、冻结、打印重复表头时使用。
+ // 固定五行；供货单位只取供应商，品牌仍在材料品牌列，空供应商不借用品牌填补。
  function block(input,suppliers){
   var value=normalize(input),groups=groupList(suppliers),lines=[];
-  lines.push([value.projectName+'材料询价表']);
-  lines.push(['']);
-  lines.push([FIELDS[0].prefix+value.projectName,'','','','',FIELDS[1].prefix+value.company]);
-  lines.push([FIELDS[2].prefix+value.contact,'','','','',FIELDS[3].prefix+value.phone]);
-  var addressRow=null;
-  if(value.address){addressRow=lines.length+1;lines.push([FIELDS[4].prefix+value.address]);}
-  var supplierFirstRow=lines.length+1,supplierRowCount=Math.max(groups.length,1);
-  if(groups.length){
-   groups.forEach(function(group,position){lines.push([position===0?SUPPLIER_LABEL:'',supplierLine(group)]);});
-  }else lines.push([SUPPLIER_LABEL,'']);
-  return {lines:lines,projectName:value.projectName,titleRow:1,infoRow:3,contactRow:4,addressRow:addressRow,
-   supplierFirstRow:supplierFirstRow,supplierRowCount:supplierRowCount,groups:groups,
-   headerRow:lines.length+1};
+  lines.push([value.company,'','','','','','','','询价']);
+  lines.push(['公司地址：'+value.address,'','','','','','联系人：'+value.contact]);
+  lines.push(['电话：'+value.phone,'','','传真：'+value.fax,'','','邮箱：'+value.email]);
+  lines.push([SUPPLIER_LABEL+'：'+groups.map(function(group){return group.supplier;}).filter(function(value){return value;}).join(' / ')]);
+  lines.push(['工程名称：'+value.projectName]);
+  return {lines:lines,projectName:value.projectName,titleRow:1,infoRow:2,contactRow:3,addressRow:2,
+   supplierFirstRow:4,supplierRowCount:1,groups:groups,headerRow:6};
  }
  // 兼容旧调用：只取抬头块的行内容。
  function rows(input,suppliers){return block(input,suppliers).lines;}

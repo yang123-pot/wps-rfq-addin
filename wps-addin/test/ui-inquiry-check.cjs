@@ -266,7 +266,7 @@ async function run(){
   assert.equal(switchWork.focused,'header-company');
   await page.evaluate(function(){
    const values={'header-projectName':'示例园区','header-company':'示例建设公司','header-contact':'测试员',
-    'header-phone':'示例联系方式','header-address':''};
+    'header-phone':'示例联系方式','header-address':'','header-fax':'示例传真','header-email':'example@example.com'};
    Object.keys(values).forEach(function(id){
     const input=document.getElementById(id);input.value=values[id];
     input.dispatchEvent(new Event('change',{bubbles:true}));});
@@ -289,23 +289,22 @@ async function run(){
   assert.deepEqual(sheetNames.slice(5),['内部追溯','处理记录'],'内部页留在总表内，拆分只取kind=inquiry');
   const valve=written.sheets.filter(function(sheet){return sheet.name==='阀门_合成询价';})[0];
   assert.equal(written.sheets.slice(5).every(function(sheet){return !sheet.layout;}),true,'内部追溯/处理记录页不带公开询价版式');
-  assert.deepEqual(valve.values.slice(7).map(function(row){return row.slice(0,10);}),
+  assert.deepEqual(valve.values.slice(6).map(function(row){return row.slice(0,10);}),
    [['1','FM-001','阀门','DN50','个','20','通达 / 海岳','','',''],
     ['2','FM-002','阀门','DN65','个','12','通达 / 海岳','','','']],'阀门两行20/12、品牌通达 / 海岳');
-  assert.deepEqual(valve.values.slice(4,6).map(function(row){return row[1];}),
-   ['通达 — 正通商贸','海岳 — 安合设备'],'供应商信息区逐组对应');
-  assert.deepEqual(valve.values.slice(0,4).map(function(row){return row[0];}),
-   ['示例园区材料询价表','','项目名称：示例园区','材料经办人：测试员'],
-   '图06抬头块：标题、信息行、经办人行、供应商信息');
-  assert.equal(valve.values[4][0],'供应商信息');
-  assert.equal(valve.values[2][5],'单位名称：示例建设公司');
-  assert.equal(valve.values[3][5],'联系方式：示例联系方式');
-  assert.deepEqual(valve.values[6],inquiryModel.COLUMNS,'公开材料列固定10列');
+  assert.deepEqual(valve.values.slice(0,5).map(function(row){return row[0];}),
+   ['示例建设公司','公司地址：','电话：示例联系方式','供货单位：正通商贸 / 安合设备','工程名称：示例园区'],
+   '用户指定前五行：公司、地址、联系方式、供货单位、工程名称');
+  assert.equal(valve.values[0][8],'询价');
+  assert.equal(valve.values[1][6],'联系人：测试员');
+  assert.equal(valve.values[2][3],'传真：示例传真');
+  assert.equal(valve.values[2][6],'邮箱：example@example.com');
+  assert.deepEqual(valve.values[5],inquiryModel.COLUMNS,'公开材料列固定10列');
   assert.equal(valve.values.every(function(row){return row.every(function(value){return typeof value==='string';})}),true);
-  assert.equal(valve.layout.metadata.headerRow,7);
-  assert.equal(valve.layout.print.repeatRow,7,'打印重复表头');
-  assert.equal(valve.layout.merges.some(function(merge){return merge.row===1&&merge.columnSpan===10;}),true,'标题合并整行');
-  assert.equal(valve.layout.fills.some(function(fill){return fill.row===7;}),true,'表头浅色填充');
+  assert.equal(valve.layout.metadata.headerRow,6);
+  assert.equal(valve.layout.print.repeatRow,6,'打印重复表头');
+  assert.equal(valve.layout.merges.some(function(merge){return merge.row===1&&merge.columnSpan===8;}),true,'公司名合并左侧');
+  assert.equal(valve.layout.fills.some(function(fill){return fill.row===6;}),true,'表头浅色填充');
   [['水泵_青源','青源'],['水泵_恒流','恒流']].forEach(function(entry){
    const sheet=written.sheets.filter(function(item){return item.name===entry[0];})[0],
     rows=sheet.values.slice(sheet.layout.metadata.headerRow);
@@ -335,8 +334,8 @@ async function run(){
   assert.equal(await page.locator('#inquiry-back').isEnabled(),true,'可返回汇总表修改');
   await shot(SHOT);
   await dump('inquiry-model.json',{sheetNames:sheetNames,
-   valve:{headerRow:valve.layout.metadata.headerRow,supplierLines:valve.values.slice(4,6).map(function(row){return row[1];}),
-    columns:valve.values[6],rows:valve.values.slice(7).map(function(row){return row.slice(0,10);}),
+   valve:{headerRow:valve.layout.metadata.headerRow,supplierLines:[valve.values[3][0]],
+    columns:valve.values[5],rows:valve.values.slice(6).map(function(row){return row.slice(0,10);}),
     merges:valve.layout.merges,fills:valve.layout.fills,print:valve.layout.print,freeze:valve.layout.freeze,
     widths:valve.layout.columns.map(function(column){return column.width;})},
    pumpSheets:['水泵_青源','水泵_恒流'].map(function(name){
@@ -352,6 +351,8 @@ async function run(){
   assert.match(saved.generation.sha256,/^[a-f0-9]{64}$/,'生成记录必须带SHA');
   assert.match(String(saved.generation.inputKey),/^ck2-[0-9a-f]{16}$/);
   assert.equal(saved.generation.modelSnapshot.sheets.length,5,'固定modelSnapshot只含询价页');
+  assert.equal(saved.header.fax,'示例传真','传真随项目保存');
+  assert.equal(saved.header.email,'example@example.com','邮箱随项目保存');
   assert.equal(saved.generation.modelSnapshot.sheets.every(function(sheet){return sheet.kind==='inquiry';}),
    true,'生成快照只保留kind=inquiry的询价页');
   assert.deepEqual(saved.generation.sheetIds,saved.generation.modelSnapshot.sheets.map(function(sheet){return sheet.sheetId;}));

@@ -73,15 +73,17 @@ test('品牌和供应商留空时仍生成询价页，品牌列与供应商信�
 
 test('图06抬头块、10列公开值、报价与金额留空、长特征换行',()=>{
  const model=build(),valve=sheetNamed(model,'阀门_合成询价');
- assert.equal(valve.headerRow,7,'标题/信息/经办人/供应商信息后为表头行');
- assert.deepEqual(valve.values[0][0],'示例园区材料询价表');
- assert.equal(valve.values[2][0],'项目名称：示例园区');
- assert.equal(valve.values[2][5],'单位名称：示例建设公司');
- assert.equal(valve.values[3][0],'材料经办人：测试员');
- assert.equal(valve.values[3][5],'联系方式：示例联系方式');
- assert.equal(valve.values[4][0],'供应商信息');
- assert.equal(valve.values[5][1],'海岳 — 安合设备');
- assert.deepEqual(valve.values[6],inquiry.COLUMNS,'公开材料列固定10列');
+ assert.equal(valve.headerRow,6,'前五行固定，材料表头第6行');
+ assert.equal(valve.values[0][0],'示例建设公司');
+ assert.equal(valve.values[0][8],'询价');
+ assert.equal(valve.values[1][0],'公司地址：');
+ assert.equal(valve.values[1][6],'联系人：测试员');
+ assert.equal(valve.values[2][0],'电话：示例联系方式');
+ assert.equal(valve.values[2][3],'传真：');
+ assert.equal(valve.values[2][6],'邮箱：');
+ assert.equal(valve.values[3][0],'供货单位：正通商贸 / 安合设备');
+ assert.equal(valve.values[4][0],'工程名称：示例园区');
+ assert.deepEqual(valve.values[5],inquiry.COLUMNS,'公开材料列固定10列');
  assert.equal(valve.values.every(function(row){return row.every(function(value){return typeof value==='string';})}),
   true,'公开值全部按文本写出');
  assert.equal(valve.values.every(function(row){return row.length===10;}),true,'等宽矩阵补齐到10列');
@@ -97,14 +99,17 @@ test('图06抬头块、10列公开值、报价与金额留空、长特征换行'
 test('图06版式：标题合并、表头填充、冻结、打印重复表头随模型给出',()=>{
  const model=build(),valve=sheetNamed(model,'阀门_合成询价'),spec=valve.layout;
  assert.equal(spec.metadata.profile,'inquiry-sheet');
- assert.deepEqual(spec.headerRows,[1,7],'标题行与表头行加粗');
- assert.deepEqual(spec.freeze,{row:8,column:1},'冻结表头以上');
+ assert.deepEqual(spec.headerRows,[1,6],'标题行与表头行加粗');
+ assert.deepEqual(spec.freeze,{row:7,column:1},'冻结表头以上');
  const titleMerge=spec.merges.filter(function(merge){return merge.row===1;})[0];
- assert.deepEqual([titleMerge.column,titleMerge.columnSpan],[1,10],'标题合并成整行');
- const supplierMerge=spec.merges.filter(function(merge){return merge.row===5&&merge.rowSpan===2;})[0];
- assert.deepEqual([supplierMerge.column,supplierMerge.rowSpan],[1,2],'供应商信息标签纵向合并两行');
- assert.equal(spec.fills.some(function(fill){return fill.row===7&&fill.color===layout.COLORS.header;}),true,'表头浅色填充');
- assert.deepEqual(spec.print.repeatRow,7,'打印重复表头行');
+ assert.deepEqual([titleMerge.column,titleMerge.columnSpan],[1,8],'公司名占左侧，右侧独立询价');
+ assert.ok(spec.merges.some(m=>m.row===1&&m.column===9&&m.columnSpan===2));
+ assert.ok(spec.merges.some(m=>m.row===4&&m.column===1&&m.columnSpan===10));
+ assert.equal(spec.fills.some(function(fill){return fill.row===6&&fill.color===layout.COLORS.header;}),true,'保留材料表头浅色填充');
+ assert.deepEqual(spec.print.repeatRow,6,'打印重复表头行');
+ assert.ok(spec.fonts.some(f=>f.row===1&&f.column===1&&f.name==='宋体'&&f.size===24));
+ assert.ok(spec.alignments.some(a=>a.row===1&&a.column===1&&a.horizontal==='center'));
+ assert.ok(spec.rows.find(r=>r.index===1).height>=48);
  assert.equal(spec.print.area.rowSpan,valve.values.length,'打印区域覆盖整张询价表');
  assert.equal(spec.print.orientation,'landscape','十列材料横向打印');
  assert.equal(spec.print.paperSize,9,'A4纸张随询价及拆分版式传递');
@@ -117,10 +122,10 @@ test('抬头四项必填、原公司地址可选；缺项或非文本拒绝生�
  assert.throws(function(){build({header:Object.assign({},head,{company:''})});},/缺少单位名称/);
  const optional=build({header:Object.assign({},head,{address:''})});
  assert.equal(optional.sheets.length,5,'原公司地址可选，不填不影响生成');
- assert.equal(sheetNamed(optional,'阀门_合成询价').headerRow,7);
+ assert.equal(sheetNamed(optional,'阀门_合成询价').headerRow,6);
  const withAddress=build({header:Object.assign({},head,{address:'示例市示例路1号'})});
- assert.equal(sheetNamed(withAddress,'阀门_合成询价').headerRow,8,'填写地址后多一行，表头行随之下移');
- assert.equal(sheetNamed(withAddress,'阀门_合成询价').values[4][0],'原公司地址：示例市示例路1号');
+ assert.equal(sheetNamed(withAddress,'阀门_合成询价').headerRow,6,'选填地址不移动材料表头');
+ assert.equal(sheetNamed(withAddress,'阀门_合成询价').values[1][0],'公司地址：示例市示例路1号');
 });
 
 test('没有汇总表读回品牌、条数不符或类别缺行都拒绝生成',()=>{
@@ -157,6 +162,8 @@ test('总表工作簿含内部页，生成记录跟踪sheetId、内容键与固�
  assert.equal(record.sheetCount,5);
  assert.equal(record.modelSnapshot.sheets.length,5);
  assert.equal(inquiry.isCurrent(record,model.inputKey),true);
+ const old=JSON.parse(JSON.stringify(record));delete old.modelSnapshot.layoutVersion;
+ assert.equal(inquiry.isCurrent(old,model.inputKey),false,'旧式询价总表需重生成，禁止拆分沿用旧式');
  assert.equal(inquiry.isCurrent(record,'ck2-别的键'),false);
  assert.equal(inquiry.isCurrent(record,''),false);
  assert.equal(inquiry.isCurrent(null,model.inputKey),false);

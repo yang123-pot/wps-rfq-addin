@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
 const header=require('../src/inquiry-header.js'),{createHeaderStore,FILE_NAME}=require('../dev/header-store.cjs');
 const filled={schemaVersion:1,projectName:'示例园区',company:'示例建设公司',contact:'测试员',
- phone:'010-12345678',address:'示例市示例路1号'};
+ phone:'010-12345678',address:'示例市示例路1号',fax:'010-12345679',email:'example@example.com'};
 test('the header requires the four 图06 fields, keeps address optional and never invents real defaults',()=>{
  assert.deepEqual(header.validate(filled),{ok:true,errors:[]});
  assert.equal(header.validate(Object.assign({},filled,{address:''})).ok,true,'原公司地址可选，留空仍可生成');
@@ -16,22 +16,30 @@ test('the header requires the four 图06 fields, keeps address optional and neve
  assert.equal(header.create().company,'','默认值必须是空字符串，不得填真实公司信息');
  assert.deepEqual(header.REQUIRED,['projectName','company','contact','phone'],'四项必填，原公司地址不在必填内');
 });
-test('header block follows 图06 with a per-group supplier area',()=>{
+test('header block uses five reference rows and supplier names without brands',()=>{
  const block=header.block(Object.assign({},filled,{address:''}),
   [{brand:'通达',supplier:'正通商贸'},{brand:'海岳',supplier:'安合设备'}]);
  assert.deepEqual(block.lines.map(row=>row[0]),
-  ['示例园区材料询价表','','项目名称：示例园区','材料经办人：测试员','供应商信息','']);
- assert.equal(block.lines[2][5],'单位名称：示例建设公司');
- assert.equal(block.lines[3][5],'联系方式：010-12345678');
- assert.equal(block.lines[4][1],'通达 — 正通商贸');
- assert.equal(block.lines[5][1],'海岳 — 安合设备');
- assert.equal(block.supplierFirstRow,5);
- assert.equal(block.supplierRowCount,2);
- assert.equal(block.headerRow,7,'两组供应商时表头在第7行（与图06一致）');
+  ['示例建设公司','公司地址：','电话：010-12345678','供货单位：正通商贸 / 安合设备','工程名称：示例园区']);
+ assert.equal(block.lines[0][8],'询价');
+ assert.equal(block.lines[1][6],'联系人：测试员');
+ assert.equal(block.lines[2][3],'传真：010-12345679');
+ assert.equal(block.lines[2][6],'邮箱：example@example.com');
+ assert.equal(block.supplierFirstRow,4);
+ assert.equal(block.supplierRowCount,1);
+ assert.equal(block.headerRow,6,'材料表头固定第6行');
  const withAddress=header.block(filled,[{brand:'通达',supplier:'正通商贸'}]);
- assert.equal(withAddress.addressRow,5);
- assert.equal(withAddress.headerRow,7,'填写可选地址后表头行随之下移');
- assert.equal(withAddress.lines[4][0],'原公司地址：示例市示例路1号');
+ assert.equal(withAddress.addressRow,2);
+ assert.equal(withAddress.headerRow,6,'地址不改变材料区位置');
+ assert.equal(withAddress.lines[1][0],'公司地址：示例市示例路1号');
+ const legacy={...filled};delete legacy.fax;delete legacy.email;
+ assert.equal(header.validate(legacy).ok,true,'旧模板无新增项仍有效');
+ assert.equal(header.normalize(legacy).fax,'');
+ assert.equal(header.normalize(legacy).email,'');
+ assert.equal(header.block(legacy,[{brand:'仅品牌',supplier:''}]).lines[3][0],'供货单位：');
+ assert.equal(header.validate({...filled,fax:22}).ok,false);
+ assert.equal(header.validate({...filled,email:'x'.repeat(201)}).ok,false);
+ assert.equal(header.same(filled,{...filled,email:'other@example.com'}),false);
  assert.match(header.summary(filled),/项目名称：示例园区/);
  assert.match(header.summary(filled),/材料经办人：测试员/);
  assert.equal(header.same(filled,Object.assign({},filled,{address:'示例市示例路1号 '})),true,'首尾空格不算变化');

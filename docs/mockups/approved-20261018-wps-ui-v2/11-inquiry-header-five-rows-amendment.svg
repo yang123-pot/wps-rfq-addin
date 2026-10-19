@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="720" viewBox="0 0 1500 720">
+ <rect width="1500" height="720" fill="#f4f7f6"/>
+ <g font-family="Microsoft YaHei, sans-serif" fill="#24372e">
+ <text x="40" y="48" font-size="27" font-weight="700">询价表前五行：按用户参考图调整</text>
+ <text x="40" y="83" font-size="17">材料10列及明细样式保持；新增选填传真、邮箱，第一行取公司名称，第4行取供应商。</text>
+ </g>
+ <rect x="40" y="115" width="1420" height="470" fill="#fff" stroke="#c6d0ca"/>
+ <g font-family="SimSun, serif" fill="#000">
+ <text x="265" y="173" font-size="36" font-weight="700">示例建设公司</text><text x="1270" y="173" font-size="34">询价</text>
+ <text x="60" y="228" font-size="22">公司地址：示例市示例路1号</text><text x="880" y="228" font-size="22">联系人：测试员</text>
+ <text x="60" y="278" font-size="22">电话：示例联系方式</text><text x="480" y="278" font-size="22">传真：示例传真</text><text x="950" y="278" font-size="22">邮箱：example@example.com</text>
+ <text x="60" y="328" font-size="22">供货单位：正通商贸 / 安合设备</text>
+ <text x="60" y="378" font-size="22">工程名称：示例园区</text>
+ </g>
+ <g font-family="Microsoft YaHei, sans-serif" font-size="16" fill="#24372e">
+ <rect x="40" y="405" width="1420" height="47" fill="#dce6f1"/>
+ <text x="52" y="435">序号</text><text x="120" y="435">项目编码</text><text x="280" y="435">项目名称</text><text x="460" y="435">项目特征描述</text><text x="800" y="435">单位</text><text x="870" y="435">工程量</text><text x="1000" y="435">品牌</text><text x="1145" y="435">报价单价</text><text x="1285" y="435">金额</text><text x="1380" y="435">备注</text>
+ <text x="52" y="492">1</text><text x="120" y="492">FM-001</text><text x="280" y="492">阀门</text><text x="460" y="492">DN50</text><text x="800" y="492">个</text><text x="870" y="492">20</text><text x="1000" y="492">通达 / 海岳</text>
+ <text x="52" y="550">2</text><text x="120" y="550">FM-002</text><text x="280" y="550">阀门</text><text x="460" y="550">DN65</text><text x="800" y="550">个</text><text x="870" y="550">12</text><text x="1000" y="550">通达 / 海岳</text>
+ <text x="40" y="635">前五行为白底黑字：公司名大字居中，“询价”位于右侧；地址与联系信息分区，不复制参考图中的历史信息。</text>
+ <text x="40" y="672">供货单位只显示供应商；品牌仍保留在材料品牌列。传真与邮箱留空不阻断；新样式用于新生成总表及其拆分件。</text>
+ </g>
+ <path d="M40 452H1460M40 515H1460M40 585H1460" stroke="#c6d0ca" fill="none"/>
+</svg>
