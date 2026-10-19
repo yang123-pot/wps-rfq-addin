@@ -19,7 +19,7 @@ async function run(){
     Activate(){window.Application.ActiveWorkbook=this;}};
    window.Application={ActiveWorkbook:previous,AutomationSecurity:1,Workbooks:{Count:1,Item(){return previous;}},
     GetSaveAsFilename(){throw Error('R11不应调用系统另存');},GetOpenFilename(){throw Error('R11不应调用系统打开');}};
-   window.__inspect=Object.assign({},args.inspect);window.__saves=[];
+   window.__inspect=Object.assign({},args.inspect);window.__saves=[];window.__regenerateClicks=0;
    const nativeFetch=window.fetch;
    window.fetch=async function(url,options){
     const route=String(url);
@@ -40,7 +40,7 @@ async function run(){
     return nativeFetch.apply(null,arguments);
    };
   },{project:null,inspect:{}});
-  await require('./assistant-test-ui.cjs').acknowledgeProblems(page);
+  const autoAck=await require('./assistant-test-ui.cjs').acknowledgeProblems(page);
   await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html?mode=detail');
   await page.evaluate(function(args){
    ['save-project','open-project','refresh-projects','relocate-project','project-message','project-status','project-list']
@@ -78,6 +78,7 @@ async function run(){
     restoreAssignments:function(){},restoreHeader:function(){},restoreGeneration:function(value){live.generation=value;},
     restoreSplit:function(value){live.split=value;},getReviewBinding:function(){return live.matching;},
     compareReviewContent:function(){return window.__reviewContent||null;},
+    regenerateReview:function(){window.__regenerateClicks++;return true;},
     getCategories:function(){return live.categories;},getSummary:function(){return live.summary;},
     getBrands:function(){return live.brands;},getGeneration:function(){return live.generation;},getSplit:function(){return live.split;},
     onBusy:function(){}});
@@ -144,6 +145,11 @@ async function run(){
   assert.equal(stale.issues.some(function(item){return item.code==='layout-stale';}),true);
   assert.equal(await page.evaluate(function(){return document.getElementById('relocate-project').hidden;}),true);
   assert.match(await page.evaluate(function(){return document.getElementById('project-message').textContent;}),/旧版.*重新生成/);
+  await page.removeLocatorHandler(autoAck.locator,autoAck.handler);
+  const regenerate=page.getByRole('alertdialog').getByRole('button',{name:'去重新生成'});
+  assert.equal(await regenerate.isVisible(),true,'旧版审核表必须提供直接重新生成入口');
+  await regenerate.click();
+  assert.equal(await page.evaluate(function(){return window.__regenerateClicks;}),1);
   if(SHOT){await fs.mkdir(path.dirname(SHOT),{recursive:true});
    await page.evaluate(function(){document.getElementById('aux-section').open=true;
     document.getElementById('project-section').scrollIntoView({block:'start'});});

@@ -111,6 +111,7 @@
       getSplit:function(){return splitPanel?splitPanel.receipt():null;},
       restoreSplit:function(value){if(splitPanel)splitPanel.restore(value);},
       getSplitVerdict:function(){return splitPanel?splitPanel.verdict():null;},
+      regenerateReview:regenerateReview,
       onBusy:function(value){
         busy=value;options.onBusy(value);
         // 项目恢复在忙状态下重绘；结束时单独恢复主按钮，不重绘或再次读写成果。
@@ -122,7 +123,8 @@
     // R5起“表内审核”只认整表确认快照：侧栏逐行确认（辅助功能里的过渡工具）不再代表该阶段完成。
     function stageVerdicts(){
       var matched=!!reviewModel&&selectionConfirmed();
-      var confirmation=reviewConfirmation(),fresh=matched&&confirmation&&confirmation.inputKey===matchingKey();
+      var bindingFresh=!!(reviewBinding&&RfqClassificationReviewModel.bindingState(reviewBinding,matchingKey()).ok);
+      var confirmation=reviewConfirmation(),fresh=matched&&bindingFresh&&confirmation&&confirmation.inputKey===matchingKey();
       var draft=projects.reviewDraft?projects.reviewDraft():null;
       return {
         matching:matched?{ready:true,detail:'自动匹配完成，尚未人工确认'}
@@ -461,6 +463,15 @@
         groups:result?result.groups:[]});
     }
     function selectionConfirmed(){return !!mergeConfirmedKey&&mergeConfirmedKey===mergeSelectionKey();}
+    function regenerateReview(){
+      if(!workflow)return false;
+      workflow.openDetail('matching');
+      setTimeout(function(){
+        var button=document.getElementById('classification-review-generate');
+        if(button){button.focus();if(button.scrollIntoView)button.scrollIntoView({block:'center'});}
+      },0);
+      return true;
+    }
     function buildReview(){
       var groups=classifier.groups?classifier.groups():[],source=currentLibrary();
       if(!groups.length||!source||!source.categories||!source.categories.length)return null;
@@ -486,12 +497,13 @@
       var summary=RfqClassificationReviewModel.summary(reviewModel);
       banner.textContent='自动匹配完成';
       banner.className='result-banner is-done';
-      var fresh=reviewBinding&&reviewBinding.inputKey===matchingKey();
+      var bindingState=reviewBinding?RfqClassificationReviewModel.bindingState(reviewBinding,matchingKey()):null;
+      var fresh=!!(bindingState&&bindingState.ok);
       if(stats)stats.textContent=summary.rows+(fresh?' 行结果已写入成果表':' 行自动分类结果待写入成果表')+
         ' · 当前自动建议：'+summary.detail+' · 尚未人工确认';
       if(status)status.textContent=fresh?'成果表已生成：'+reviewBinding.path+'（可打开审核）'
-        :'尚未生成审核成果表：请先生成独立成果簿，再在表内审核。';
-      if(generate)generate.textContent=fresh?'重新生成审核成果表':'生成审核成果表';
+        :(reviewBinding&&bindingState&&!bindingState.ok?bindingState.message:'尚未生成审核成果表：请先生成独立成果簿，再在表内审核。');
+      if(generate)generate.textContent=reviewBinding?'重新生成审核成果表':'生成审核成果表';
       if(generate)generate.disabled=reviewBusy||!options.application;
       if(open)open.disabled=!(fresh&&options.application);
     }

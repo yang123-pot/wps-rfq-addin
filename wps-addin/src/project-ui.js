@@ -322,14 +322,21 @@
       pendingId=null;
       renderStatus();
       var recomputed=JSON.stringify(current.stages)!==JSON.stringify(loaded.stages);
-      tell('已恢复项目'+loaded.projectId+'（版本 '+loaded.revision+'）。'+(upgradedFrom?'旧版项目'+upgradedFrom+'已保留，本次继续写入v2副本，需重新确认合并与整表审核。':'')+
+      var restoredMessage='已恢复项目'+loaded.projectId+'（版本 '+loaded.revision+'）。'+(upgradedFrom?'旧版项目'+upgradedFrom+'已保留，本次继续写入v2副本，需重新确认合并与整表审核。':'')+
         (rebuilt?'已按原件SHA校验重建'+rebuilt+'份工作副本。':'工作副本完整。')+
         restoreSummary(audit)+
         (physicalRefreshed?'审核成果表仅另存/格式变化，业务内容与已保存审核内容一致，物理校验已更新。':'')+
         (physicalRefreshFailed?('审核成果表仅另存/格式变化，业务内容与已保存审核内容一致，但物理校验未写回项目记录（'+
           physicalRefreshFailed.message+'）：已保存的物理校验与内容原样保留，请重试（重新打开项目或保存项目）。'):'')+
-        '原件不变，快照可用于继续核对。'+(recomputed?'阶段状态已按当前来源与确认内容重算，保存后写回项目记录。':''),
-        !audit.ok||!!physicalRefreshFailed);
+        '原件不变，快照可用于继续核对。'+(recomputed?'阶段状态已按当前来源与确认内容重算，保存后写回项目记录。':'');
+      var staleOnly=!physicalRefreshFailed&&audit.issues.length===1&&audit.issues[0].code==='layout-stale';
+      tell(restoredMessage,!audit.ok&&!staleOnly);
+      if(staleOnly&&window.RfqFeedback){
+        window.RfqFeedback.notify({stage:'project',force:true,title:'审核成果表需要重新生成',
+          message:'旧审核成果表不能套用新版列位。请先生成新版审核成果表，再继续填写最终分类。',
+          issues:audit.issues,solution:'进入自动分类步骤，点击“重新生成审核成果表”，并为旧表保留原文件、为新表另选文件名。',
+          actionLabel:'去重新生成',resolve:options.regenerateReview||function(){return false;}});
+      }
       return true;
     }catch(error){tell('项目未打开。'+error.message,true);return false;}
     finally{restoringId=null;busy=false;if(options.onBusy)options.onBusy(false);}
