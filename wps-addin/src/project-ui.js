@@ -51,13 +51,21 @@
       return RfqProject.STAGE_LABELS[stage]+'：'+(STATE[RfqProject.stageState(project,stage)]||'未完成')+(detail?'（'+detail+'）':'');
     }).join(' · ');
   }
+  function restoreSummary(audit){
+    if(!audit||audit.ok)return '各阶段持久文件已核对。';
+    var stale=(audit.issues||[]).filter(function(issue){return issue.code==='layout-stale';});
+    if(stale.length)return '审核成果表是旧版（新增清单溯源并调整列位），请重新生成新版；旧审核表会保留。'+
+      ((audit.issues||[]).length>stale.length?'其余'+((audit.issues||[]).length-stale.length)+'项请按阶段提示处理。':'');
+    if(audit.relocatable)return '有'+(audit.issues||[]).length+'项持久文件缺失；若项目目录已搬移，可使用“重新定位项目文件”。';
+    return '有'+(audit.issues||[]).length+'项持久文件未通过核对，请按项目状态中的阶段提示重新生成或修复。';
+  }
   function renderStatus(){
     if(!current){status.textContent='尚未保存项目记录。导入清单后可保存，重启WPS后再打开恢复。';return;}
     status.textContent='项目 '+current.projectId+' · 版本 '+current.revision+' · '+
       (current.mergeIdentical?'合并全部工作簿并累加相同材料':current.mergeAllWorkbooks?'合并全部工作簿':'保留每个工作簿')+'\n'+stageText(current);
     if(restoreAudit&&restoreAudit.issues.length)
       status.textContent+='\n恢复核对：'+restoreAudit.issues.slice(0,3).map(function(issue){return issue.message;}).join('；')+
-        (restoreAudit.issues.length>3?'；其余'+(restoreAudit.issues.length-3)+'项请重新定位或重做对应阶段':'');
+        (restoreAudit.issues.length>3?'；其余'+(restoreAudit.issues.length-3)+'项请按阶段提示处理':'');
     if(document&&document.dispatchEvent){
       try{document.dispatchEvent(new CustomEvent('rfq:project-status'));}catch(_){}
     }
@@ -175,6 +183,17 @@
       }
     }
     var audit=RfqProjectRestore.audit(project,checks);
+    // 新版审核表改变了公开列和隐藏rowId位置；旧表不能靠重新定位变成兼容表，必须重新生成。
+    var expectedLayout=RfqClassificationReviewModel&&RfqClassificationReviewModel.LAYOUT_VERSION;
+    if(project.matching&&project.matching.path&&expectedLayout&&project.matching.layoutVersion!==expectedLayout){
+      audit.issues=audit.issues.filter(function(issue){return issue.stage!=='review';});
+      audit.physicalRefresh=(audit.physicalRefresh||[]).filter(function(entry){return entry.stage!=='review';});
+      var stale={stage:'review',code:'layout-stale',path:project.matching.path,label:'审核成果表',
+        message:'审核成果表是旧版，没有“清单溯源”列且行标识位置已变化，必须重新生成新版成果表。'};
+      audit.issues.push(stale);audit.blocks.review=stale.message;
+      audit.ok=audit.issues.length===0;
+      audit.relocatable=audit.issues.length>0&&audit.issues.every(function(issue){return issue.code==='missing';});
+    }
     applyRestoreAudit(project,audit);
     return audit;
   }
@@ -305,7 +324,7 @@
       var recomputed=JSON.stringify(current.stages)!==JSON.stringify(loaded.stages);
       tell('已恢复项目'+loaded.projectId+'（版本 '+loaded.revision+'）。'+(upgradedFrom?'旧版项目'+upgradedFrom+'已保留，本次继续写入v2副本，需重新确认合并与整表审核。':'')+
         (rebuilt?'已按原件SHA校验重建'+rebuilt+'份工作副本。':'工作副本完整。')+
-        (audit.ok?'各阶段持久文件已核对。':'有'+audit.issues.length+'项持久文件未核对通过，未恢复为已完成；缺失文件可尝试“重新定位项目文件”。')+
+        restoreSummary(audit)+
         (physicalRefreshed?'审核成果表仅另存/格式变化，业务内容与已保存审核内容一致，物理校验已更新。':'')+
         (physicalRefreshFailed?('审核成果表仅另存/格式变化，业务内容与已保存审核内容一致，但物理校验未写回项目记录（'+
           physicalRefreshFailed.message+'）：已保存的物理校验与内容原样保留，请重试（重新打开项目或保存项目）。'):'')+

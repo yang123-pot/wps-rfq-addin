@@ -46,8 +46,8 @@ async function run(){
    ['save-project','open-project','refresh-projects','relocate-project','project-message','project-status','project-list']
     .forEach(function(id){const old=document.getElementById(id),clone=old.cloneNode(true);old.parentNode.replaceChild(clone,old);});
    const p=window.RfqProject.create({entries:[]},true,{projectId:'p-restore-ui-01'});
-   p.revision=3;p.name='恢复样例';p.matching={schemaVersion:1,path:args.oldRoot+'\\示例园区_分类审核成果.xlsx',
-    sha256:args.shas.review,inputKey:'ck2-restore'};
+   p.revision=3;p.name='恢复样例';p.matching={schemaVersion:1,layoutVersion:2,path:args.oldRoot+'\\示例园区_分类审核成果.xlsx',
+    sha256:args.shas.review,rowIdColumn:12,inputKey:'ck2-restore'};
    p.review={schemaVersion:1,sheet:{path:p.matching.path},rows:[{rowId:'r1'}]};
    p.categories={schemaVersion:1,inputKey:'ck2-restore',root:args.oldRoot,directory:args.oldRoot+'\\分类工作簿',
     files:[{fileId:'f1',name:'水泵.xlsx',path:args.oldRoot+'\\分类工作簿\\水泵.xlsx',sha256:args.shas.category,status:'succeeded'}]};
@@ -134,6 +134,16 @@ async function run(){
    window.__projectPanel.restoreAudit().ok===true;});
   assert.match(await page.evaluate(function(){return window.__projectPanel.current().summary.path;}),/^E:\\moved\\示例园区/);
   assert.equal(await page.evaluate(function(){return window.__projectPanel.current().split.files[0].target;}),NEW_ROOT+'\\询价输出\\水泵_华川设备.xlsx');
+  // 审核表版式变化不能靠重新定位恢复；必须提示重新生成，且不出现目录搬移入口。
+  await page.evaluate(function(){
+   window.__project=JSON.parse(JSON.stringify(window.__projectPanel.current()));
+   window.__project.matching.layoutVersion=1;
+   return window.__projectPanel.open('p-restore-ui-01');
+  });
+  const stale=await page.evaluate(function(){return window.__projectPanel.restoreAudit();});
+  assert.equal(stale.issues.some(function(item){return item.code==='layout-stale';}),true);
+  assert.equal(await page.evaluate(function(){return document.getElementById('relocate-project').hidden;}),true);
+  assert.match(await page.evaluate(function(){return document.getElementById('project-message').textContent;}),/旧版.*重新生成/);
   if(SHOT){await fs.mkdir(path.dirname(SHOT),{recursive:true});
    await page.evaluate(function(){document.getElementById('aux-section').open=true;
     document.getElementById('project-section').scrollIntoView({block:'start'});});
