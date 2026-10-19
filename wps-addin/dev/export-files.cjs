@@ -36,8 +36,12 @@ async function assertWritableDirectory(destination){
  }
  throw Error('保存目录不可写，未写入任何文件：'+parent+'（探测文件名连续冲突）');
 }
-function createExportStore({directory}){
- const tickets=new Map(),owned=new Map(),root=path.resolve(directory);
+function createExportStore({directory,copyRoot}){
+ const tickets=new Map(),owned=new Map(),root=path.resolve(directory),sourceRoot=copyRoot?path.resolve(copyRoot):null;
+ function within(rootPath,targetPath){
+  const relative=path.relative(rootPath,targetPath);
+  return relative===''||(!relative.startsWith('..'+path.sep)&&relative!=='..'&&!path.isAbsolute(relative));
+ }
  // 只有在本进程prepare里登记过的相邻暂存路径才算“可证明属于本插件”的残留。
  function ownStage(stagePath){owned.set(path.resolve(stagePath),Date.now());}
  function releaseStage(stagePath){owned.delete(path.resolve(stagePath));}
@@ -94,7 +98,21 @@ function createExportStore({directory}){
   }
   const ticket=crypto.randomBytes(24).toString('hex');
   tickets.set(ticket,{created:Date.now(),target:destination,stagePath,busy:false,result:null,adjacent,freezePlan,freezeResult:null});
+  let copiedFrom=null;
+  if(settings.copyFrom!=null){
+   if(!sourceRoot)throw Error('当前服务未启用来源审核副本复制。');
+   if(typeof settings.copyFrom!=='string'||!path.isAbsolute(settings.copyFrom)||
+      !/\.(?:xlsx?)$/i.test(settings.copyFrom))throw Error('来源审核副本原文件路径无效。');
+   const source=await fs.realpath(settings.copyFrom),rootReal=await fs.realpath(sourceRoot);
+   if(!within(rootReal,source))throw Error('来源审核副本只能复制本次导入的工作副本。');
+   const info=await fs.stat(source);
+   if(!info.isFile()||info.size<4||info.size>256*1024*1024)throw Error('来源审核副本原文件类型或大小不符合限制。');
+   try{await fs.copyFile(source,stagePath,constants.COPYFILE_EXCL);}
+   catch(error){tickets.delete(ticket);releaseStage(stagePath);throw Error('来源审核副本基础文件复制失败：'+error.message);}
+   copiedFrom=source;
+  }
   const prepared={ticket,target:destination,stagePath};
+  if(copiedFrom)prepared.copiedFrom=copiedFrom;
   if(staleCleanup)prepared.staleCleanup=staleCleanup;
   return prepared;
  }

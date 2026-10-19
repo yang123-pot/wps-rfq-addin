@@ -34,7 +34,11 @@
  function requirements(project){
   var out=[],matching=project&&project.matching,categories=project&&project.categories,
    summary=project&&project.summary,generation=project&&project.generation,split=project&&project.split;
-  if(matching&&matching.path)out.push(req('review',matching.path,matching.sha256,'审核成果表'));
+  if(matching&&Array.isArray(matching.files)&&matching.files.length){
+   matching.files.forEach(function(file){
+    out.push(req('review',file&&file.path,file&&file.sha256,'审核副本：'+(file&&file.originalName||'')));
+   });
+  }else if(matching&&matching.path)out.push(req('review',matching.path,matching.sha256,'审核成果表'));
   ((categories&&categories.files)||[]).forEach(function(file){
    out.push(req('categories',file&&file.path,file&&file.sha256,'分类工作簿：'+(file&&file.name||''),file&&file.status,file&&file.fileId));
   });
@@ -104,7 +108,10 @@
   if(!absolute(from)||!absolute(to))throw Error('目录搬移需要有效的原目录与新目录。');
   var next=copy(project);
   function fix(value){return rebase(value,from,to);}
-  if(next.matching&&next.matching.path)next.matching.path=fix(next.matching.path);
+  if(next.matching){
+   if(next.matching.path)next.matching.path=fix(next.matching.path);
+   (next.matching.files||[]).forEach(function(file){if(file&&file.path)file.path=fix(file.path);});
+  }
   if(next.review&&next.review.sheet&&next.review.sheet.path)next.review.sheet.path=fix(next.review.sheet.path);
   if(next.reviewDraft&&next.reviewDraft.sheet&&next.reviewDraft.sheet.path)
    next.reviewDraft.sheet.path=fix(next.reviewDraft.sheet.path);

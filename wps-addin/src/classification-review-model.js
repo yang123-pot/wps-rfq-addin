@@ -161,8 +161,10 @@
    'row-missing':'材料行缺失','field-changed':'固定字段被改动','row-extra':'绑定以外的材料行'}[code]||'读回问题';
  }
  function mapIssue(issue){
-  return {row:issue&&issue.row!=null?issue.row:null,column:issue&&issue.column!=null?issue.column:null,
+  var mapped={row:issue&&issue.row!=null?issue.row:null,column:issue&&issue.column!=null?issue.column:null,
    code:text(issue&&issue.code),title:issueTitle(issue&&issue.code),message:text(issue&&issue.message)};
+  ['path','file','sheet'].forEach(function(field){if(issue&&issue[field]!=null)mapped[field]=text(issue[field]);});
+  return mapped;
  }
  function blocking(readResult){
   return ((readResult&&readResult.issues)||[]).filter(function(issue){
@@ -195,7 +197,8 @@
   readResult.rows.forEach(function(record){
    var name=text(record.name)||'（名称待补）',where='第'+record.row+'行',categoryName=text(record.finalCategoryName),
      categoryId=text(record.finalCategoryId),typedNew=false;
-   if(!categoryName)errors.push({row:record.row,column:FINAL_COLUMN,code:'category-empty',title:issueTitle('category-empty'),
+   if(!categoryName)errors.push({row:record.row,column:record.finalColumn||FINAL_COLUMN,code:'category-empty',title:issueTitle('category-empty'),
+    path:record.path||null,file:record.file||null,sheet:record.sheet||null,
     message:where+'“最终分类”为空：'+name+' 还没有选择类别或“无需询价”。'});
    else if(categoryId&&known[categoryId]){/* 库内既有类别：直接放行 */}
    else if(allowNew){
@@ -203,8 +206,9 @@
     if(assigned)categoryId=assigned;
     typedNew=true;   // 用户自行输入的库外类别名（建类后才有编号）
     if(newNames.indexOf(categoryName)<0)newNames.push(categoryName);
-   }else errors.push({row:record.row,column:FINAL_COLUMN,code:'category-unknown',
-    title:issueTitle('category-unknown'),message:where+'“最终分类”“'+categoryName+'”不在当前分类库里，请用下拉重新选择。'});
+   }else errors.push({row:record.row,column:record.finalColumn||FINAL_COLUMN,code:'category-unknown',
+    title:issueTitle('category-unknown'),path:record.path||null,file:record.file||null,sheet:record.sheet||null,
+    message:where+'“最终分类”“'+categoryName+'”不在当前分类库里，请重新选择或输入确认。'});
    rows.push({rowId:text(record.rowId),row:record.row,index:text(record.index),name:name,feature:text(record.feature),
     unit:text(record.unit),quantity:text(record.quantity),trace:text(record.trace),
     autoCategoryId:text(record.autoCategoryId)||null,autoCategoryName:text(record.autoCategoryName),

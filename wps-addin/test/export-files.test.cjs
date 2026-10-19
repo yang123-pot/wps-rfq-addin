@@ -21,6 +21,17 @@ test('rejects existing target including a race after preparation and never overw
  await assert.rejects(store.commit(p.ticket),/存在/);assert.equal(await fs.readFile(target,'utf8'),'existing');
  await assert.rejects(store.prepare(target),/存在/);
 });
+test('来源审核副本由服务端复制本次导入字节到暂存，拒绝目录外文件',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-export-copy-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ const sources=path.join(root,'imports'),store=createExportStore({directory:path.join(root,'staging'),copyRoot:sources});
+ await fs.mkdir(sources);const source=path.join(sources,'原始副本.xlsx'),outside=path.join(root,'外部.xlsx'),
+  target=path.join(root,'审核副本.xlsx'),bytes=xlsxFixture.workbook([{name:'原表',values:[['项目名称'],['水泵']]}]);
+ await fs.writeFile(source,bytes);await fs.writeFile(outside,bytes);
+ const prepared=await store.prepare(target,{adjacent:true,copyFrom:source});
+ assert.equal(prepared.copiedFrom,await fs.realpath(source));
+ assert.deepEqual(await fs.readFile(prepared.stagePath),bytes,'复制阶段不得重写原表字节');
+ await assert.rejects(store.prepare(path.join(root,'拒绝.xlsx'),{copyFrom:outside}),/本次导入|路径|无效/);
+});
 test('invalid destinations, tickets and incomplete stage files cannot be published',async t=>{
  const {store,target,root}=await fixture(t);
  for(const name of ['relative.xlsx',path.join(root,'out.xls'),path.join(root,'no-directory','out.xlsx'),path.join(root,'bad:name.xlsx')])await assert.rejects(store.prepare(name));

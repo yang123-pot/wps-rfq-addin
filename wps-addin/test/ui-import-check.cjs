@@ -45,7 +45,7 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   assert.equal(await page.locator('#merge-section input[type=checkbox]:visible').count(),1,'详细模式也只有一个整理开关');
   assert.match(await page.locator('#multi-workbook-hint').innerText(),/逐张查看原表/);
   assert.equal(await page.locator('#merge-all-workbooks').isChecked(),false,'默认不合并全部工作簿');
-  assert.match(await page.locator('#merge-separate').locator('..').innerText(),/按工作簿、工作表保留来源/);
+  assert.match(await page.locator('#merge-separate').locator('..').innerText(),/原表审核副本.*原标签和顺序/);
   assert.match(await page.locator('#merge-summary').innerText(),/2 份清单 · 保留工作簿来源/);
   assert.match(await page.locator('#merge-summary').innerText(),/2.*2/);
   if(process.env.RFQ_IMPORT_DEFAULT_SCREENSHOT)await page.screenshot({path:process.env.RFQ_IMPORT_DEFAULT_SCREENSHOT,fullPage:true});

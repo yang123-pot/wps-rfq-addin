@@ -186,7 +186,7 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.match(await page.locator('#classification-review-stats').innerText(),/7 行有建议 · 1 行需重点核对/,'7行建议＋1行重点核对');
   assert.match(await page.locator('#classification-review-stats').innerText(),/尚未人工确认/,'自动建议不得当成人工确认');
   assert.equal(await page.locator('#classification-review-open').isDisabled(),true,'尚未生成成果表时不能打开');
-  assert.equal(await page.locator('#classification-review-generate').innerText(),'生成审核成果表');
+  assert.equal(await page.locator('#classification-review-generate').innerText(),'生成审核副本');
   assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage'),'matching');
   assert.equal(await page.locator('#workflow-back').isVisible(),true,'详细流程第2步必须能返回上一步');
   assert.equal(await page.locator('#workflow-back').innerText(),'返回上一步：导入与合并');
@@ -219,7 +219,7 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   await page.waitForFunction(()=>document.querySelector('#classification-review-message').textContent.includes('已生成并校验'));
   assert.equal(require('node:fs').existsSync(reviewTarget),true,'成果表必须真实发布到所选位置');
   assert.equal(await page.locator('#classification-review-open').isDisabled(),false,'生成后才能打开成果表审核');
-  assert.equal(await page.locator('#classification-review-generate').innerText(),'重新生成审核成果表');
+  assert.equal(await page.locator('#classification-review-generate').innerText(),'重新生成审核副本');
   assert.match(await page.locator('#classification-review-stats').innerText(),/8 行结果已写入成果表/,'文件发布校验后才能显示已写入');
   const written=await page.evaluate(()=>window.__reviewWritten);
   assert.equal(written.title,'示例园区_分类审核成果.xlsx','文件名按“项目名_分类审核成果.xlsx”');

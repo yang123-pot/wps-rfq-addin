@@ -17,7 +17,8 @@ const ASSETS = new Set(['/src/assistant-state.js','/src/assistant-problems.js','
   '/src/import-host.js', '/src/collection.js', '/src/import-ui.js', '/src/export-model.js',
   '/src/workbook-layout.js', '/src/workflow-ui.js', '/src/import-preview-model.js', '/src/export-host.js', '/src/export-ui.js', '/src/project.js', '/src/project-ui.js',
   '/src/project-host.js', '/src/category-library.js', '/src/classify.js', '/src/classification.js',
-  '/src/classification-review-model.js', '/src/classification-review-host.js', '/src/classification-ui.js', '/src/category-memory.js', '/src/library-ui.js', '/src/project-restore.js', '/rules/defaults.json',
+  '/src/classification-review-model.js', '/src/source-review-model.js', '/src/source-review-host.js',
+  '/src/classification-review-host.js', '/src/classification-ui.js', '/src/category-memory.js', '/src/library-ui.js', '/src/project-restore.js', '/rules/defaults.json',
   '/src/category-workbooks.js',
   '/src/brand-table.js', '/src/brand-model.js', '/src/brand-host.js', '/src/brand-ui.js', '/src/decimal.js',
   '/src/brand-reference.js', '/src/inquiry-header.js', '/src/inquiry-model.js', '/src/split-plan.js',
@@ -70,7 +71,7 @@ function createServer({root, importDirectory = null, projectDirectory = null, li
     codeVersion:codeVersionForRoot(appDir)
   };
   const importToken = crypto.randomBytes(32).toString('hex');
-  const exports = importDirectory ? createExportStore({directory:path.join(importDirectory,'exports')}) : null;
+  const exports = importDirectory ? createExportStore({directory:path.join(importDirectory,'exports'),copyRoot:importDirectory}) : null;
   const projects = createProjectStore({directory: projectDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'projects')});
   const libraries = createLibraryStore({directory: libraryDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'library')});
   const headers = createHeaderStore({directory: headerDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'headers')});
@@ -103,7 +104,8 @@ function createServer({root, importDirectory = null, projectDirectory = null, li
         let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'导入请求无效。'});}
         if(!data||Array.isArray(data))return json(400,{error:'导入请求无效。'});
         if(url.pathname==='/api/export/prepare')return json(200,await exports.prepare(data.target,
-          {adjacent:data.adjacent===true,createParent:data.createParent===true,freezePlan:data.freezePlan}));
+          {adjacent:data.adjacent===true,createParent:data.createParent===true,freezePlan:data.freezePlan,
+           copyFrom:data.copyFrom}));
         if(url.pathname==='/api/export/freeze')return json(200,await exports.freeze(data.ticket));
         if(url.pathname==='/api/export/commit')return json(200,await exports.commit(data.ticket));
         if(url.pathname==='/api/export/verify')return json(200,await exports.verify(data.ticket,data.target,data.sha256));

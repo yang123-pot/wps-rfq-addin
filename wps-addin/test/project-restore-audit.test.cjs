@@ -56,6 +56,21 @@ test('整目录搬移按原根目录重写全部绑定路径，再用新路径�
  assert.equal(restore.audit(relocated,checks(relocated)).ok,true,'新目录逐项核SHA后恢复ready');
  assert.equal(restore.commonRoot(value),'C:\\成果\\示例园区');
 });
+test('来源原表审核恢复时逐份核对全部副本路径与SHA，搬移后全部重写',()=>{
+ const value=project(),root='C:\\成果\\示例园区';
+ value.matching={schemaVersion:1,layoutVersion:2,mode:'source-tables',path:root+'\\来源审核\\给排水清单_分类审核.xlsx',
+  sha256:sha('1'),sheet:'多份原表',inputKey:'ck2-review',files:[
+   {originalName:'给排水清单.xlsx',path:root+'\\来源审核\\给排水清单_分类审核.xlsx',sha256:sha('1')},
+   {originalName:'机电清单.xlsx',path:root+'\\来源审核\\机电清单_分类审核.xlsx',sha256:sha('2')}]};
+ const all=checks(value);
+ assert.equal(restore.audit(value,all).ok,true);
+ const changed=Object.assign({},all);
+ changed[root+'\\来源审核\\机电清单_分类审核.xlsx']={exists:true,sha256:sha('9')};
+ assert.match(restore.audit(value,changed).blocks.review,/外部修改/);
+ const moved=restore.relocate(value,{fromRoot:root,toRoot:'E:\\搬移\\示例园区'});
+ assert.equal(moved.matching.files[1].path,'E:\\搬移\\示例园区\\来源审核\\机电清单_分类审核.xlsx');
+ assert.equal(restore.audit(moved,checks(moved)).ok,true);
+});
 
 // R12-C：审核成果表SHA相同不代表业务内容一致。磁盘空分类/H11与确认快照“汽车充电桩”的矛盾必须报出。
 test('R12-C：SHA相同但业务内容与确认快照不同，不得恢复为已一致',()=>{

@@ -307,17 +307,30 @@
       // F2：只有写回成功才算刷新；失败（409/写错误）时内存SHA与版本一起回滚，不改持久绑定语义。
       var physicalRefreshed=0,physicalRefreshFailed=null;
       if(audit.ok&&audit.physicalRefresh&&audit.physicalRefresh.length&&loaded.matching){
-        var applied=[];
+        var applied=[],previousTopSha=loaded.matching.sha256;
         audit.physicalRefresh.forEach(function(entry){
           if(entry.stage!=='review')return;
-          applied.push(loaded.matching.sha256);
-          loaded.matching.sha256=entry.sha256;
+          if(Array.isArray(loaded.matching.files)&&loaded.matching.files.length){
+            var file=loaded.matching.files.filter(function(item){return item&&item.path===entry.path;})[0];
+            if(file){
+              applied.push({file:file,sha256:file.sha256});
+              file.sha256=entry.sha256;
+              if(loaded.matching.path===entry.path)loaded.matching.sha256=entry.sha256;
+            }
+          }else{
+            applied.push({file:loaded.matching,sha256:loaded.matching.sha256});
+            loaded.matching.sha256=entry.sha256;
+          }
         });
         try{
           var syncReceipt=await request('save',{project:loaded,expectedRevision:loaded.revision});
           loaded.revision=Number(syncReceipt.revision);physicalRefreshed=audit.physicalRefresh.length;
         }catch(error){
-          applied.forEach(function(previous){loaded.matching.sha256=previous;});
+          applied.forEach(function(previous){
+            previous.file.sha256=previous.sha256;
+            if(previous.file===loaded.matching)loaded.matching.sha256=previous.sha256;
+          });
+          loaded.matching.sha256=previousTopSha;
           physicalRefreshFailed=error;
         }
       }

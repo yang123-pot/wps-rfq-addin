@@ -1,8 +1,8 @@
 (function(root,factory){
  'use strict';
- if(typeof module==='object'&&module.exports)module.exports=factory(require('./export-host.js'),require('./classification-review-model.js'));
- else root.RfqClassificationReviewHost=factory(root.RfqExportHost,root.RfqClassificationReviewModel);
-}(typeof window==='object'?window:globalThis,function(exportHost,model){
+ if(typeof module==='object'&&module.exports)module.exports=factory(require('./export-host.js'),require('./classification-review-model.js'),require('./source-review-host.js'));
+ else root.RfqClassificationReviewHost=factory(root.RfqExportHost,root.RfqClassificationReviewModel,root.RfqSourceReviewHost);
+}(typeof window==='object'?window:globalThis,function(exportHost,model,sourceHost){
  'use strict';
  // R4宿主：把审核成果表交给export-host写入并校验（含版式/下拉），保存绑定，并支持按稳定rowId整表读回。
  var SCHEMA_VERSION=1;
@@ -20,6 +20,7 @@
   return null;
  }
  function validateBinding(binding){
+  if(binding&&binding.mode==='source-tables')return sourceHost.validateBinding(binding);
   if(!binding||typeof binding!=='object')throw Error('审核成果绑定无效，请重新生成成果表。');
   if(binding.schemaVersion!==SCHEMA_VERSION)throw Error('审核成果绑定版本不支持：'+String(binding.schemaVersion));
   if(binding.layoutVersion!==model.LAYOUT_VERSION)throw Error('审核成果表版式已更新，请重新生成成果表。');
@@ -213,6 +214,7 @@
  }
  // 读表优先用同路径已打开簿及其最新修改；只关闭插件自己打开的簿，并恢复宏安全值与活动工作簿。
  function readBack(app,binding){
+  if(binding&&binding.mode==='source-tables')return sourceHost.readBack(app,binding);
   validateBinding(binding);
   var previous=app.ActiveWorkbook,security=app.AutomationSecurity,opened=null,result=null,error=null;
   if(typeof security!=='number')throw Error('不能读取宏安全设置，未读取成果表。');
@@ -272,6 +274,7 @@
  }
  // 定位问题单元格：打开成果表并选中具体单元格，让用户直接修改；打开的簿保持打开供编辑。
  function locate(app,binding,target){
+  if(binding&&binding.mode==='source-tables')return sourceHost.locate(app,binding,target);
   if(!target||!Number.isSafeInteger(target.row)||target.row<1)throw Error('定位需要有效的成果表行号。');
   var column=Number.isSafeInteger(target.column)&&target.column>0?target.column:2;
   return withSheet(app,binding,function(book,sheet){
@@ -282,6 +285,7 @@
  }
  // 图03：整表读回后把“匹配情况”列原位刷新为一致/存在差异。只更新显示、不保存文件，磁盘SHA与绑定仍可核。
  function refreshMatchColumn(app,binding,entries){
+  if(binding&&binding.mode==='source-tables')return {updated:0,path:binding.path,sheet:binding.sheet,total:0};
   var list=(entries||[]).filter(function(entry){
    return entry&&Number.isSafeInteger(entry.row)&&entry.row>=binding.firstRow&&entry.row<=binding.lastRow&&
     typeof entry.label==='string';});
@@ -298,6 +302,9 @@
  }
  // 成果表是给用户在WPS里直接编辑的，因此打开后【故意】保持打开并置前，不恢复原活动工作簿。
  function openForEditing(app,path){
+  if(path&&typeof path==='object'&&path.mode==='source-tables')
+   return sourceHost.openForEditing(app,path);
+  if(path&&typeof path==='object')path=path.path;
   if(typeof path!=='string'||!/^(?:[a-z]:[\\/]|\\\\)/i.test(path))throw Error('审核成果表路径无效，未打开。');
   var security=app.AutomationSecurity,error=null,book=null;
   if(typeof security!=='number')throw Error('不能读取宏安全设置，未打开成果表。');

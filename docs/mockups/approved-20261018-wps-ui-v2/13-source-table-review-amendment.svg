@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="720" viewBox="0 0 1400 720">
+<rect width="1400" height="720" fill="#f4f7f6"/>
+<g font-family="Microsoft YaHei,sans-serif" fill="#20382c">
+<text x="40" y="54" font-size="28" font-weight="bold">不合并清单：在原表右侧审核分类</text>
+<text x="40" y="88" font-size="17">2026-10-19 用户指定；保留每本来源、工作表顺序、小标题和格式，原件不改。</text>
+
+<rect x="40" y="118" width="620" height="470" rx="8" fill="#fff" stroke="#b8c9bf"/>
+<text x="64" y="151" font-size="20" font-weight="bold">给排水清单_分类审核.xlsx</text>
+<text x="64" y="180" font-size="15" fill="#596962">原工作表：给排水（原顺序不变）</text>
+<line x1="64" y1="197" x2="636" y2="197" stroke="#dfe6e2"/>
+<g font-size="14">
+<rect x="64" y="216" width="78" height="34" fill="#e4ece8"/><rect x="142" y="216" width="112" height="34" fill="#e4ece8"/>
+<rect x="254" y="216" width="126" height="34" fill="#e4ece8"/><rect x="380" y="216" width="58" height="34" fill="#e4ece8"/>
+<rect x="438" y="216" width="70" height="34" fill="#e4ece8"/><rect x="508" y="216" width="128" height="34" fill="#dce6f1"/>
+<text x="82" y="239">项目编码</text><text x="158" y="239">项目名称</text><text x="270" y="239">项目特征描述</text>
+<text x="399" y="239">单位</text><text x="456" y="239">工程量</text><text x="524" y="239">建议分类</text>
+<rect x="64" y="250" width="78" height="34" fill="#fff"/><rect x="142" y="250" width="112" height="34" fill="#fff"/>
+<rect x="254" y="250" width="126" height="34" fill="#fff"/><rect x="380" y="250" width="58" height="34" fill="#fff"/>
+<rect x="438" y="250" width="70" height="34" fill="#fff"/><rect x="508" y="250" width="128" height="34" fill="#f4f8fb"/>
+<text x="82" y="272">SB-001</text><text x="158" y="272">水泵</text><text x="270" y="272">DN50</text>
+<text x="399" y="272">台</text><text x="456" y="272">1</text><text x="524" y="272">水泵</text>
+<rect x="64" y="284" width="78" height="34" fill="#fff"/><rect x="142" y="284" width="112" height="34" fill="#fff"/>
+<rect x="254" y="284" width="126" height="34" fill="#fff"/><rect x="380" y="284" width="58" height="34" fill="#fff"/>
+<rect x="438" y="284" width="70" height="34" fill="#fff"/><rect x="508" y="284" width="128" height="34" fill="#f4f8fb"/>
+<text x="82" y="306">FM-001</text><text x="158" y="306">阀门</text><text x="270" y="306">DN50</text>
+<text x="399" y="306">个</text><text x="456" y="306">20</text><text x="524" y="306">阀门</text>
+</g>
+<rect x="64" y="338" width="572" height="88" rx="6" fill="#e7f2eb"/>
+<text x="84" y="366" font-size="16" font-weight="bold">追加列位于原表最右侧</text>
+<text x="84" y="393" font-size="14">建议分类｜最终分类（浅黄可改）｜审核备注</text>
+<text x="84" y="414" font-size="13" fill="#596962">另有一列隐藏行标识，仅用于整表核对，不作为公开业务字段。</text>
+<text x="64" y="466" font-size="14" fill="#596962">工作表标签顺序、小标题、合并区、列宽和原材料内容均保持。</text>
+<text x="64" y="492" font-size="14" fill="#596962">用户在这里填写后，插件统一读取结果，不把原表整理成扁平明细。</text>
+<path d="M64 522 L636 522" stroke="#dfe6e2"/>
+<text x="64" y="554" font-size="13" fill="#217346">审核副本单独保存；原件和工作副本不变</text>
+
+<rect x="700" y="118" width="660" height="470" rx="8" fill="#fff" stroke="#b8c9bf"/>
+<text x="724" y="151" font-size="20" font-weight="bold">机电清单_分类审核.xlsx</text>
+<text x="724" y="180" font-size="15" fill="#596962">原工作表：机电安装（原顺序不变）</text>
+<line x1="724" y1="197" x2="1336" y2="197" stroke="#dfe6e2"/>
+<g font-size="14">
+<rect x="724" y="216" width="78" height="34" fill="#e4ece8"/><rect x="802" y="216" width="112" height="34" fill="#e4ece8"/>
+<rect x="914" y="216" width="126" height="34" fill="#e4ece8"/><rect x="1040" y="216" width="58" height="34" fill="#e4ece8"/>
+<rect x="1098" y="216" width="70" height="34" fill="#e4ece8"/><rect x="1168" y="216" width="168" height="34" fill="#dce6f1"/>
+<text x="742" y="239">项目编码</text><text x="818" y="239">项目名称</text><text x="930" y="239">项目特征描述</text>
+<text x="1059" y="239">单位</text><text x="1116" y="239">工程量</text><text x="1184" y="239">建议分类</text>
+<rect x="724" y="250" width="78" height="34" fill="#fff"/><rect x="802" y="250" width="112" height="34" fill="#fff"/>
+<rect x="914" y="250" width="126" height="34" fill="#fff"/><rect x="1040" y="250" width="58" height="34" fill="#fff"/>
+<rect x="1098" y="250" width="70" height="34" fill="#fff"/><rect x="1168" y="250" width="168" height="34" fill="#f4f8fb"/>
+<text x="742" y="272">SB-101</text><text x="818" y="272">水泵</text><text x="930" y="272">DN50</text>
+<text x="1059" y="272">台</text><text x="1116" y="272">1</text><text x="1184" y="272">水泵</text>
+<rect x="724" y="284" width="78" height="34" fill="#fff"/><rect x="802" y="284" width="112" height="34" fill="#fff"/>
+<rect x="914" y="284" width="126" height="34" fill="#fff"/><rect x="1040" y="284" width="58" height="34" fill="#fff"/>
+<rect x="1098" y="284" width="70" height="34" fill="#fff"/><rect x="1168" y="284" width="168" height="34" fill="#f4f8fb"/>
+<text x="742" y="306">CD-101</text><text x="818" y="306">充电桩配电箱</text><text x="930" y="306">充电桩配套</text>
+<text x="1059" y="306">台</text><text x="1116" y="306">1</text><text x="1184" y="306">待核对</text>
+</g>
+<rect x="724" y="338" width="612" height="88" rx="6" fill="#fff7d6"/>
+<text x="744" y="366" font-size="16" font-weight="bold">最终分类保持浅黄色可编辑</text>
+<text x="744" y="393" font-size="14">冲突或无可靠建议留空，由用户在原表相同行直接决定。</text>
+<text x="744" y="414" font-size="13" fill="#596962">可输入库外新类别，整表确认时统一入库并学习。</text>
+<text x="724" y="466" font-size="14" fill="#596962">每本来源仍是独立工作簿；不在预览中把所有原表拼成一张。</text>
+<text x="724" y="492" font-size="14" fill="#596962">进入下一步时只需一次整表确认，分类结果汇总到当前项目。</text>
+<path d="M724 522 L1336 522" stroke="#dfe6e2"/>
+<text x="724" y="554" font-size="13" fill="#217346">仅追加列，不重建原表</text>
+</g>
+<rect x="40" y="618" width="1320" height="62" rx="8" fill="#e7f2eb"/>
+<text x="64" y="646" font-size="16">验收：两份来源＝两份审核副本；原表/工作表顺序和小标题不变；每行只追加建议、最终、备注及隐藏标识。</text>
+<text x="64" y="668" font-size="15">读取、整表确认、分类工作簿、品牌、询价和拆分继续使用同一项目链路。</text>
+</svg>

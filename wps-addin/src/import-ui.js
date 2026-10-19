@@ -297,8 +297,8 @@
       }
       if(mergeSeparateTitle)mergeSeparateTitle.textContent=labels.separate;
       if(mergeSeparateNote)mergeSeparateNote.textContent=labels.multi?
-        '保留全部材料行，不累加重复项；仍生成同一份审核成果，并按工作簿、工作表保留来源。':
-        '保留全部材料行，不累加重复项；适用于需要保留原始明细的场景。';
+        '保留全部材料行，不累加重复项；每份来源各生成原表审核副本，右侧追加分类列并保留原标签和顺序。':
+        '保留全部材料行，不累加重复项；生成原表审核副本，右侧追加分类列并保留原标签和顺序。';
       if(mergeIdenticalTitle)mergeIdenticalTitle.textContent=labels.merge;
       if(mergeIdenticalNote)mergeIdenticalNote.textContent=labels.multi?
         '所有工作簿中项目名称＋项目特征描述＋单位完全相同的材料合并，数量精确累加；仍属于当前项目。':
@@ -378,7 +378,7 @@
     function modeTell(combined){
       var labels=modeLabels();
       tell(combined?'已选择“'+labels.merge+'”，下方预览按精确合并更新；确认后才进入自动分类。':
-        '已选择“'+labels.separate+'”，全部材料仍汇入当前项目，审核成果按工作簿分组保留来源；确认后才进入自动分类。');
+        '已选择“'+labels.separate+'”，全部材料逐条保留；审核时每份来源生成原表副本，只在右侧追加分类列；确认后才进入自动分类。');
     }
     merge.addEventListener('change',function(){chooseMode(merge.checked);modeTell(merge.checked);});
     if(mergeSeparate)mergeSeparate.addEventListener('change',function(){chooseMode(false);modeTell(false);});
@@ -527,9 +527,12 @@
       var fresh=!!(bindingState&&bindingState.ok);
       if(stats)stats.textContent=summary.rows+(fresh?' 行结果已写入成果表':' 行自动分类结果待写入成果表')+
         ' · 当前自动建议：'+summary.detail+' · 尚未人工确认';
-      if(status)status.textContent=fresh?'成果表已生成：'+reviewBinding.path+'（可打开审核）'
+      if(status)status.textContent=fresh?(reviewBinding.mode==='source-tables'?
+          ('已生成 '+reviewBinding.files.length+' 份原表审核副本：'+
+            reviewBinding.files.map(function(file){return file.originalName;}).join('、')+'（原表顺序与格式保留，可打开审核）'):
+          ('成果表已生成：'+reviewBinding.path+'（可打开审核）'))
         :(reviewBinding&&bindingState&&!bindingState.ok?bindingState.message:'尚未生成审核成果表：请先生成独立成果簿，再在表内审核。');
-      if(generate)generate.textContent=reviewBinding?'重新生成审核成果表':'生成审核成果表';
+      if(generate)generate.textContent=reviewBinding?'重新生成审核副本':'生成审核副本';
       if(generate)generate.disabled=reviewBusy||!options.application;
       if(open)open.disabled=!(fresh&&options.application);
     }
@@ -545,6 +548,25 @@
     }
     function reviewTargetName(){
       return RfqClassificationReviewHost.suggestedName(projectDisplayName());
+    }
+    function pickReviewDirectory(){
+      try{
+        if(options.application&&window.RfqPathPicker&&typeof RfqPathPicker.selectFolder==='function'){
+          var picked=RfqPathPicker.selectFolder(options.application,'','选择来源审核副本保存文件夹');
+          if(picked&&picked.supported){
+            if(picked.path)return Promise.resolve(picked.path);
+            tell(picked.error||'已取消选择审核副本文件夹，当前阶段不变。');
+            return Promise.resolve(null);
+          }
+        }
+        if(!window.__RFQ_IMPORT__||!RfqPathPicker)return Promise.reject(Error('请重新打开助手后再选择保存文件夹。'));
+        return new Promise(function(resolve){
+          RfqPathPicker.open({mode:'directory',token:window.__RFQ_IMPORT__.token,title:'选择来源审核副本保存文件夹',
+            confirmLabel:'使用此文件夹',onConfirm:function(value){
+              if(value&&value.directory)resolve(value.directory);else resolve(null);
+            },onCancel:function(){resolve(null);}});
+        });
+      }catch(error){return Promise.reject(error);}
     }
     // 项目名优先取清单里的“工程名称”（图02即示例园区），没有工程名时退回文件名。
     function projectDisplayName(){
@@ -582,6 +604,56 @@
         function requireCurrent(){
           if(!selectionConfirmed()||matchingKey()!==plannedKey)
             throw Error('来源或合并选择已变化，请重新确认并生成审核成果表。');
+        }
+        // 未勾选“合并清单”：每份来源保留原表，只追加审核列，不另造扁平成果表。
+        if(mergeAll.checked!==true){
+          var directory=await pickReviewDirectory(),tickets=[],receipts=[];
+          if(!directory)return;
+          var sourcePlan=RfqSourceReviewModel.build(collection.entries,plannedModel,{title:projectDisplayName()}),
+            targetDirectory=RfqSourceReviewModel.batchDirectory(directory,projectDisplayName()),
+            targets=RfqSourceReviewModel.targets(sourcePlan,targetDirectory);
+          reviewBusy=true;renderReview();
+          reviewTell('正在复制 '+sourcePlan.files.length+' 份原表并追加审核列…');
+          try{
+            for(var fileIndex=0;fileIndex<targets.length;fileIndex++){
+              requireCurrent();
+              var sourceCopy=targets[fileIndex].file.copyPath,exactCopy=/\.xlsx$/i.test(sourceCopy),
+                ticket=await exportRequest('prepare',{target:targets[fileIndex].path,adjacent:true,createParent:true,
+                  copyFrom:exactCopy?sourceCopy:null});
+              tickets.push({ticket:ticket,committed:false});
+              await RfqSourceReviewHost.write(options.application,targets[fileIndex].file,ticket.stagePath,
+                {title:projectDisplayName(),prepared:exactCopy});
+            }
+            for(var commitIndex=0;commitIndex<tickets.length;commitIndex++){
+              requireCurrent();
+              var receipt=await exportRequest('commit',{ticket:tickets[commitIndex].ticket.ticket});
+              tickets[commitIndex].committed=true;
+              await exportRequest('verify',{ticket:tickets[commitIndex].ticket.ticket,target:receipt.target,sha256:receipt.sha256});
+              receipts.push(receipt);
+            }
+            reviewBinding=RfqSourceReviewHost.bindingFor(receipts,sourcePlan,{inputKey:plannedKey,title:projectDisplayName()});
+            if(options.setReviewBinding)options.setReviewBinding(reviewBinding);
+            renderSheetReview();
+            tell('来源审核副本已生成：'+targetDirectory);
+            var openedText='';
+            try{
+              RfqClassificationReviewHost.openForEditing(options.application,reviewBinding);
+              reviewOpenedPath=reviewBinding.path;
+              openedText='已打开，按来源工作簿和原工作表顺序审核。';
+            }catch(openError){openedText='已生成、未打开：'+openError.message+'。可点“打开核对表”重试。';}
+            var sourceSummaryText=RfqSourceReviewModel.rowSummary(sourcePlan).text+'.所有工作表顺序和小标题保持原样，'+
+              '只在材料行右侧追加“建议分类、最终分类、审核备注”；隐藏的行标识用于整表核对。'+openedText;
+            reviewTell('已生成并校验 '+sourceSummaryText);
+            if(ui)ui.set({statusMessage:'已生成并校验 '+sourceSummaryText});
+          }catch(error){
+            for(var discardIndex=0;discardIndex<tickets.length;discardIndex++){
+              if(!tickets[discardIndex].committed)
+                try{await exportRequest('discard',{ticket:tickets[discardIndex].ticket.ticket});}catch(_){}
+            }
+            reviewTell('来源审核副本未完整生成。'+error.message,true);
+            if(ui)ui.set({statusMessage:'来源审核副本未完整生成：'+error.message});
+          }finally{reviewBusy=false;renderReview();renderSheetReview();publishAssistant();}
+          return;
         }
         var name=reviewTargetName(),selection=await pickReviewTarget(name);
         if(!selection||!selection.target){tell('已取消选择成果表位置，当前阶段不变。');return;}
@@ -673,12 +745,13 @@
       list.textContent='';
       (errors||[]).slice(0,20).forEach(function(issue){
         var li=node('li');
-        li.appendChild(node('strong',(issue.title||'读回问题')+(issue.row==null?'':'（第'+issue.row+'行'+
+        li.appendChild(node('strong',(issue.title||'读回问题')+(issue.file?(' · '+issue.file+' / '+issue.sheet):'')+
+          (issue.row==null?'':'（第'+issue.row+'行'+
           (columnName(issue.column)?' '+columnName(issue.column)+'列':'')+'）')));
         li.appendChild(node('p',issue.message,'note'));
         if(issue.row!=null)li.appendChild(button('定位到'+(columnName(issue.column)?' '+columnName(issue.column)+' 单元格':''),function(){
           try{
-            RfqClassificationReviewHost.locate(options.application,reviewBinding,{row:issue.row,column:issue.column});
+            RfqClassificationReviewHost.locate(options.application,reviewBinding,issue);
             sheetTell('已定位到成果表第'+issue.row+'行'+(columnName(issue.column)?'的'+(columnName(issue.column))+'列':'')+'，请就地修改后重新确认。');
           }catch(problem){sheetTell('未能定位到该单元格：'+problem.message,true);}
         }));
@@ -721,7 +794,8 @@
         stats.textContent=confirmation.counts.consistent+' 行与自动建议一致 · '+confirmation.counts.different+
           ' 行存在差异 · '+confirmation.counts.noInquiry+' 行无需询价 · 审核备注 '+confirmation.counts.notes+' 条';
         status.textContent='确认快照：'+confirmation.confirmedAt+'（第 '+confirmation.revision+' 次确认）'+
-          (confirmation.sheet?' · '+confirmation.sheet.path:'');
+          (confirmation.sheet?' · '+(reviewBinding.mode==='source-tables'?
+            (reviewBinding.files.length+' 份原表审核副本'):confirmation.sheet.path):'');
         if(!RfqClassificationReviewModel.bindingState(reviewBinding,matchingKey()).ok)
           status.textContent+=' · 成果表绑定的是旧内容：需重新生成审核成果表后才能再次整表确认。';
       }else{
@@ -733,7 +807,8 @@
           :(draft?('上次草稿：'+draft.counts.filled+' / '+draft.counts.rows+' 行已填（'+draft.savedAt+'），尚未确认')
             :'成果表：'+(reviewBinding?reviewBinding.path:'尚未生成'));
         status.textContent='确认后会把整表（'+((reviewBinding&&reviewBinding.rowIds&&reviewBinding.rowIds.length)||0)+
-          ' 行）作为分类工作簿的依据并保存快照；“保存审核成果”只存草稿。';
+          ' 行）作为分类工作簿的依据并保存快照；'+(reviewBinding&&reviewBinding.mode==='source-tables'?
+            '原表审核副本保持各工作簿与原工作表顺序。':'')+'“保存审核成果”只存草稿。';
       }
       if(confirm)confirm.disabled=sheetReviewBusy||!ready;
       if(save)save.disabled=sheetReviewBusy||!ready;
@@ -1731,7 +1806,7 @@
       bind('previewResume',async function(){await syncImportPreview(true);if(ui.snapshot().previewAvailable)ui.navigateImport('preview',true);});
       bind('mergeConfirm',confirmSelection);
       bind('reviewGenerate',generateReview);
-      bind('reviewOpen',function(){if(!reviewBinding)throw Error('请先生成分类核对表。');RfqClassificationReviewHost.openForEditing(options.application,reviewBinding.path);reviewOpenedPath=reviewBinding.path;if(workflow)workflow.goTo('review');});
+      bind('reviewOpen',function(){if(!reviewBinding)throw Error('请先生成分类核对表。');RfqClassificationReviewHost.openForEditing(options.application,reviewBinding);reviewOpenedPath=reviewBinding.path;if(workflow)workflow.goTo('review');});
       bind('reviewConfirm',confirmSheetReview);
       bind('categoriesGenerate',function(){return generateCategoryWorkbooks({auto:true});});
       bind('continueBrands',async function(){if(!summaryState().ok||!ui.snapshot().summaryReady){var made=await generateSummary(false);if(!made||!made.ok)return;}
