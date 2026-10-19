@@ -267,7 +267,7 @@
    savedAt:input.savedAt!=null?text(input.savedAt):new Date().toISOString(),
    sheet:input.binding?{path:text(input.binding.path),sheet:text(input.binding.sheet)}:null,
    counts:rows.reduce(function(counts,row){
-    counts.rows++;if(row.categoryId)counts.filled++;else counts.empty++;
+    counts.rows++;if(row.categoryId||row.categoryName)counts.filled++;else counts.empty++;
     if(row.note)counts.notes++;return counts;},{rows:0,filled:0,empty:0,notes:0}),rows:rows}};
  }
  function decisionOf(row){return [text(row&&row.rowId),text(row&&row.categoryId),text(row&&row.note)].join('\u0000');}

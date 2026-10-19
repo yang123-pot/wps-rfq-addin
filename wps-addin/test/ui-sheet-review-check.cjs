@@ -188,6 +188,7 @@ async function run(options={}){
   await page.locator('#sheet-review-save').click();
   await page.waitForFunction(()=>document.querySelector('#sheet-review-message').textContent.includes('审核草稿已保存'));
   assert.match(await page.locator('#sheet-review-message').innerText(),/尚未确认、未学习、未生成分类工作簿/);
+  assert.equal(await page.evaluate(()=>RfqAssistant.snapshot().reviewPending),0,'保存草稿后待填数量必须按整表结果刷新');
   const draft=await projectRecord();
   assert.equal(draft.review,null,'草稿不得写成整表确认');
   assert.equal(draft.reviewDraft.state,'draft');

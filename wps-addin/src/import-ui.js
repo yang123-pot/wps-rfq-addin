@@ -605,7 +605,8 @@
     function sheetTell(text,error){
       var box=sheetEl('sheet-review-message');
       if(box){box.textContent=text;box.className=error?'error':'';}
-      if(!document.body.classList.contains('detail-mode')&&ui)ui.set({statusMessage:text});
+      if(ui&&document.body&&document.body.classList&&!document.body.classList.contains('detail-mode'))
+        ui.set({statusMessage:text});
       if(window.RfqFeedback)RfqFeedback.tell(text,error,'review');
     }
     function columnName(column){return Number.isSafeInteger(column)&&column>0&&column<=26?String.fromCharCode(64+column):'';}
@@ -759,6 +760,7 @@
         var checked=RfqClassificationReviewModel.validateRead(read,{categories:reviewBinding.categories,
           allowNewCategories:true});
         lastReviewRead=checked;
+        if(ui)ui.set({reviewPending:checked.ok?0:checked.errors.length});
         if(!result.ok){
           renderReviewIssues(result.errors);renderSheetReview();
           sheetTell('审核成果表未保存为草稿：'+result.errors[0].message,true);
@@ -1601,10 +1603,13 @@
       var genReady=!!(stages.inquiry.ready&&inquiryPanel&&inquiryPanel.verdict().ready),genSaved=!!(generation&&saved&&saved.generation&&saved.generation.sha256===generation.sha256);
       var splitSaved=!!(receipt&&saved&&saved.split&&JSON.stringify(saved.split.files)===JSON.stringify(receipt.files));
       var counts=reviewModel?RfqClassificationReviewModel.summary(reviewModel):null;
+      var currentDraft=projects.reviewDraft?projects.reviewDraft():null;
+      var pendingReview=lastReviewRead?(lastReviewRead.ok?0:lastReviewRead.errors.length):
+        (currentDraft?currentDraft.counts.empty:(counts?counts.conflict:null));
       ui.set({projectName:projectDisplayName(),layout:selectedLayout(),files:collection.entries.map(function(e){return {name:e.metadata.originalName,sheets:(e.snapshot.sheets||[]).map(function(sh){return sh.name;})};}),
        rows:collection.entries.reduce(function(n,e){return n+e.parsed.materials.length;},0),mergedRows:collection.entries.length?currentPreview().outputCount:0,
        previewReviewed:previewReviewed,mergeAll:mergeAll.checked,mergeIdentical:merge.checked,mergeConfirmed:currentMatch,
-       reviewGenerated:freshReview,reviewOpened:!!(freshReview&&reviewOpenedPath===reviewBinding.path),reviewPending:counts?counts.conflict:null,
+       reviewGenerated:freshReview,reviewOpened:!!(freshReview&&reviewOpenedPath===reviewBinding.path),reviewPending:pendingReview,
        reviewConfirmed:savedReview,noInquiry:!!(savedReview&&confirmed.rows.every(function(r){return r.skip;})),
        categoriesReady:!!(stages.categories.ready&&verdicts.categories.ready&&categoriesSaved),categoriesPendingSave:!!(savedReview&&verdicts.categories.ready&&!categoriesSaved),categoryCount:categoryPages().length,
        summaryReady:!!(summaryState().ok&&summaryReceipt&&saved&&saved.summary&&saved.summary.path===summaryReceipt.path&&saved.summary.sha256===summaryReceipt.sha256&&saved.summary.layout===summaryReceipt.layout),brandsOpened:!!(summaryReceipt&&brandsOpenedPath===summaryReceipt.path),
