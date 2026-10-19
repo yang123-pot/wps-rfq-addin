@@ -83,3 +83,5 @@
 - 根因：`RfqProject.assess`把`preview.issues.length===0`作为导入阶段完成条件；但流程实际允许`source-unresolved/source-inferred/section-ambiguous`等经用户点击确认后继续，`preview.canFinalize=true`且项目已保存匹配的合并键。353条中并无新的阻断错误，只是已确认提示。
 - 修正：导入完成条件改为“来源有效＋`canFinalize=true`＋保存的合并键与当前内容一致”。合并键只有用户确认合并选择（含明确接受来源/区段提示）后才写入，因此可作为确认凭证。若`canFinalize=false`，阻断问题仍使导入未完成；状态文案会显示已确认提示数，例如“已导入1份清单，合并选择已确认（353条来源/区段提示已确认）”。
 - 回归：`project.test`新增“`canFinalize=true`且有review级提示、合并键一致时导入ready”用例；项目/工作流及`ui-project-check`通过。该修正需重启加载，之后重开revision3应恢复导入完成，进而按新版审核表恢复自动分类/审核阶段。
+- 真机修正后重开：文件审计通过，页面显示导入与合并已确认（1份清单，353条来源/区段提示已确认）、自动分类已确认（自动匹配完成，尚未人工确认）、表内审核未完成；符合实际，不把自动建议或V2成果表当作人工确认。
+- 用户保存后项目为revision4：`import=ready`、`matching=ready`、`review=missing`；V2审核绑定保持layoutVersion2和960个rowId，reviewDraft/review均0行。阶段重算与项目保存真机闭环完成。
