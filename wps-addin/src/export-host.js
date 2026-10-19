@@ -448,8 +448,10 @@
   }
   function previewShapeMatches(book,model){
     try{
-      if(!book||book.Worksheets.Count!==model.sheets.length)return false;
-      for(var n=0;n<model.sheets.length;n++)if(book.Worksheets.Item(n+1).Name!==model.sheets[n].name)return false;
+      var names=model.sheets.map(function(sheet){return sheet.name;});
+      (model.sourceCopies||[]).forEach(function(source){source.sheets.forEach(function(sheet){names.push(sheet.previewName);});});
+      if(!book||book.Worksheets.Count!==names.length)return false;
+      for(var n=0;n<names.length;n++)if(book.Worksheets.Item(n+1).Name!==names[n])return false;
       return true;
     }catch(_){return false;}
   }
@@ -477,15 +479,17 @@
   function storedPreview(app){
     try{
       return {name:app.PluginStorage.getItem('rfq.preview.book')||null,
-        token:app.PluginStorage.getItem('rfq.preview.token')||null};
+        token:app.PluginStorage.getItem('rfq.preview.token')||null,sourceKey:app.PluginStorage.getItem('rfq.preview.sources')||''};
     }catch(_){return {name:null,token:null};}
   }
-  function rememberPreview(app,book){
+  function previewSourceKey(model){return JSON.stringify(model.sourceCopies||[]);}
+  function rememberPreview(app,book,model){
     var name=previewIdentity(book),token=name?stampPreview(book):null;
     try{
       if(name&&token){
         app.PluginStorage.setItem('rfq.preview.book',name);
         app.PluginStorage.setItem('rfq.preview.token',token);
+        app.PluginStorage.setItem('rfq.preview.sources',previewSourceKey(model));
       }else if(typeof app.PluginStorage.removeItem==='function'){
         app.PluginStorage.removeItem('rfq.preview.book');app.PluginStorage.removeItem('rfq.preview.token');
       }
@@ -494,7 +498,7 @@
   // 侧栏重建/刷新会丢掉内存句柄：按名字、工作表形状和归属标记三者同时命中才找回同一个草稿簿。
   function findStoredPreview(app,model){
     var stored=storedPreview(app);
-    if(!stored.name||!stored.token)return null;
+    if(!stored.name||!stored.token||((model.sourceCopies||[]).length&&stored.sourceKey!==previewSourceKey(model)))return null;
     for(var n=1;n<=app.Workbooks.Count;n++){
       var candidate=app.Workbooks.Item(n);
       try{
@@ -510,7 +514,8 @@
     var book=null,previous=app.ActiveWorkbook;
     if(handle&&handle.book){
       try{
-        if(handle.book.FullName===handle.name&&previewShapeMatches(handle.book,model)){
+        if(handle.book.FullName===handle.name&&previewShapeMatches(handle.book,model)&&
+            (!(model.sourceCopies||[]).length||handle.sourceKey===previewSourceKey(model))){
           for(var n=1;n<=app.Workbooks.Count;n++)if(app.Workbooks.Item(n)===handle.book)book=handle.book;
         }
       }catch(_){book=null;}
@@ -532,16 +537,49 @@
         applyLayout(app,sheet,model,s.layout);
       });
       applySheetVisibility(book,model);
-      verify(book,model);
+      if(reused&&(model.sourceCopies||[]).length){
+        if(!previewShapeMatches(book,model))throw Error('来源预览页数量或顺序不一致。');
+        model.sheets.forEach(function(sheet){chunks(book.Worksheets.Item(sheet.name),sheet.values,false);});
+      }else verify(book,model);
+      if(!reused)copyPreviewSources(app,book,model.sourceCopies||[]);
+      if((model.sourceCopies||[]).length&&!previewShapeMatches(book,model))throw Error('来源预览页复制不完整。');
       var first=book.Worksheets.Item(1);if(typeof first.Activate==='function')first.Activate();
-      rememberPreview(app,book);
-      return {book:book,name:book.FullName};
+      rememberPreview(app,book,model);
+      return {book:book,name:book.FullName,sourceKey:previewSourceKey(model)};
     }catch(error){
       // 新建失败簿由插件负责清理；已有预览保持打开，避免丢失用户可能的另存操作。
       if(!reused)try{book.Close(false);}catch(_){}
       try{if(previous)previous.Activate();}catch(_){}
       throw error;
     }
+  }
+  // 以WPS原生整张工作表Copy保留格式/小标题；只打开导入副本，不把快照材料重排成原表。
+  function copyPreviewSources(app,target,sources){
+    if(!sources.length)return;
+    var security=app.AutomationSecurity;
+    if(typeof security!=='number')throw Error('无法读取宏安全设置，未打开来源副本。');
+    try{
+      app.AutomationSecurity=3;
+      if(app.AutomationSecurity!==3)throw Error('无法禁用来源副本自动宏。');
+      sources.forEach(function(source){
+        if(!source.copyPath||!source.originalPath||key(source.copyPath)===key(source.originalPath)||
+            !/^[a-f\d]{64}$/i.test(source.fingerprint||''))throw Error('缺少可核对的来源工作副本。');
+        var copy=findOpenBook(app,source.copyPath),owned=false;
+        if(copy&&(copy.ReadOnly!==true||copy.Saved===false))throw Error('来源副本已打开且可能有修改，请先保存项目并关闭副本。');
+        try{
+          if(!copy){copy=app.Workbooks.Open(source.copyPath,0,true);owned=!!copy&&key(copy.FullName)===key(source.copyPath);}
+          if(!copy||key(copy.FullName)!==key(source.copyPath)||copy.Worksheets.Count!==source.sheets.length)
+            throw Error('来源副本工作表数量不一致，不能显示不完整原表。');
+          source.sheets.forEach(function(plan,index){
+            var original=copy.Worksheets.Item(index+1),count=target.Worksheets.Count;
+            if(original.Name!==plan.sourceName||typeof original.Copy!=='function')throw Error('无法原样复制来源工作表：'+plan.sourceName);
+            original.Copy(null,target.Worksheets.Item(count));
+            if(target.Worksheets.Count!==count+1)throw Error('来源工作表复制未完成：'+plan.sourceName);
+            target.Worksheets.Item(count+1).Name=plan.previewName;
+          });
+        }finally{if(owned)copy.Close(false);}
+      });
+    }finally{app.AutomationSecurity=security;}
   }
   // R12-E：拆分待核对的内容证明。打开已有供应商文件，逐值核公开值、工作表/隐藏列范围、必需合并与抬头，
   // 并在核对前后各取一次本机实际SHA；只读核对，绝不覆盖或改写外部文件，也不把“首次观察SHA”当证明。

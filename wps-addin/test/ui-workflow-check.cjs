@@ -78,6 +78,7 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   // 导入两份清单：显示文件与行数，合并前不进入匹配。
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);
+  await page.waitForFunction(()=>window.__previews.length>0);
   assert.match(await page.locator('#workflow-note').innerText(),/已成功导入 2 个文件，共 10 行数据/);
   assert.match(await page.locator('#workflow-note').innerText(),/先查看导入预览/);
   assert.equal(await page.locator('#preview-gate').isVisible(),true,'导入后先显示预览确认入口');
@@ -87,6 +88,17 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.deepEqual(await page.evaluate(()=>window.__previews[0].sheets.map(s=>s.name)),['导入预览'],
    '预览完成前只显示工作簿和工作表结构');
   assert.equal(await page.evaluate(()=>window.__previews[0].previewOnly),true);
+  // 已导入副本被外部改写后，不能把新内容复制到旧统计后面。
+  const previewCopy=await page.evaluate(()=>window.__previews[0].sourceCopies[0].copyPath);
+  const previewCalls=await page.evaluate(()=>window.__previews.length);
+  await fs.writeFile(previewCopy,'externally changed copy');
+  await page.evaluate(()=>document.getElementById('merge-detail').click());
+  await page.waitForFunction(()=>document.getElementById('import-preview-status').textContent.includes('来源工作副本已变化'),null,{timeout:3000});
+  assert.equal(await page.evaluate(()=>RfqAssistant.snapshot().previewAvailable),false);
+  assert.equal(await page.evaluate(()=>window.__previews.length),previewCalls,'SHA不匹配时不得进入WPS写预览边界');
+  await fs.writeFile(previewCopy,await fs.readFile(files[0]));
+  await page.evaluate(()=>document.getElementById('merge-detail').click());
+  await page.waitForFunction(()=>RfqAssistant.snapshot().previewAvailable===true);
   await showSimple();
   assert.equal(await page.locator('#simple-home').isVisible(),true);
   assert.equal(await page.locator('#stage-panel-import').isHidden(),true,'预览阶段不展开技术面板');
@@ -113,15 +125,12 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.match(await page.locator('#merge-summary').innerText(),/10[\s\S]*10/,'材料处理摘要仍由工作表预览提供');
   assert.equal(await page.locator('#simple-primary').innerText(),'确认选择，开始自动分类','完成后在同一位置显示下一步按钮');
   if(process.env.RFQ_PREVIEW_READY_SCREENSHOT)await page.screenshot({path:process.env.RFQ_PREVIEW_READY_SCREENSHOT,fullPage:true});
-  assert.equal(await page.locator('#simple-merge-all').isChecked(),false,'默认不合并全部工作簿');
-  assert.equal(await page.locator('#simple-duplicate-merge').isChecked(),false,'默认分别保留');
-  await page.locator('#simple-merge-all').check();
-  assert.equal(await page.locator('#merge-all-workbooks').isChecked(),true,'简版工作簿选择必须同步');
-  await page.locator('#simple-merge-all').uncheck();
-  assert.equal(await page.locator('#merge-all-workbooks').isChecked(),false);
+  assert.equal(await page.locator('#simple-merge-choice input[type=checkbox]:visible').count(),1,'用户只做一次合并选择');
+  assert.equal(await page.locator('#simple-duplicate-merge').isChecked(),false,'默认逐条保留');
   await page.locator('#simple-duplicate-merge').check();
   await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='8');
   assert.equal(await page.locator('#merge-identical').isChecked(),true,'简版选择必须同步到实际处理方式');
+  assert.equal(await page.locator('#merge-all-workbooks').isChecked(),true,'勾选合并同时统一全部来源');
   await page.locator('#simple-duplicate-merge').uncheck();
   await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='10');
   assert.equal(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth),true,'简版不得横向溢出');
@@ -137,7 +146,6 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
 
   // 选择“合并完全相同项”才更新精确预览：10→8。
   assert.equal(await page.locator('#merge-list > li').count(),10,'分别保留时逐条预览');
-  await page.locator('#merge-all-workbooks').check();
   await page.locator('#merge-identical').check();
   await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='8');
   assert.equal(await page.locator('#workflow-merged').innerText(),'8','合并后行数');
@@ -148,7 +156,7 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
    '勾选只试算，不把材料行铺成新表');
   assert.equal(await page.locator('#merge-separate').isChecked(),false,'两个选项互斥');
   assert.equal(await page.locator('#merge-list > li').count(),8,'合并预览只显示合并结果');
-  await page.locator('#merge-separate').check();
+  await page.locator('#merge-identical').uncheck();
   await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='10');
   await page.locator('#merge-identical').check();
   await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='8');
@@ -269,7 +277,7 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
 
   // F3 三态（stale）：改回“分别保留”再次确认后，下游已确认阶段必须显示“已过期”且主操作仍未解锁。
   await page.locator('#workflow-nav .workflow-step-button[data-stage="import"]').click();
-  await page.locator('#merge-separate').check();
+  await page.locator('#merge-identical').uncheck();
   await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='10');
   await page.locator('#confirm-merge').click();
   await page.waitForFunction(()=>/自动匹配完成|尚未自动分类/.test(document.querySelector('#classification-review-banner').textContent));

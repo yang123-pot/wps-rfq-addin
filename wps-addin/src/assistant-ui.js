@@ -9,7 +9,6 @@
   home.dataset.step=String(v.step);home.classList.toggle('is-complete',v.step===8);
   var primary=by('simple-primary');primary.textContent=v.label;primary.disabled=!!v.disabled||!store.hasAction(v.action);
   by('simple-merge-choice').hidden=!v.mergeVisible;
-  by('simple-merge-all').checked=!!s.mergeAll;
   by('simple-duplicate-merge').checked=!!s.mergeIdentical;
   text('simple-merge-summary','整理前 '+s.rows+' 条 → 整理后 '+s.mergedRows+' 条');
   var nav=by('simple-seven-list');nav.textContent='';

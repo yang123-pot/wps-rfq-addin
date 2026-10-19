@@ -35,7 +35,17 @@
   values.push(['原文件、导入副本的内容、格式、小标题和工作表顺序保持不变；不生成合并明细。']);
   var merges=[{row:1,column:1,columnSpan:7},{row:2,column:1,columnSpan:7}];
   for(var index=4+sheetCount;index<=values.length;index++)merges.push({row:index,column:1,columnSpan:7});
-  return {inputCount:preview.inputCount,outputCount:preview.outputCount,sheetCount:sheetCount,
+  var usedNames=Object.create(null);usedNames['导入预览']=true;
+  var sourceCopies=source.entries.map(function(entry,fileIndex){return {
+   originalPath:entry.metadata.originalPath,copyPath:entry.metadata.copyPath,fingerprint:entry.metadata.fingerprint,
+   sheets:(entry.snapshot.sheets||[]).map(function(sheet,index){
+    var prefix=source.entries.length>1?(fileIndex+1)+'_'+(index+1)+'_':sheet.name==='导入预览'?'原表_':'';
+    var base=prefix+sheet.name.slice(0,31-prefix.length),previewName=base,n=2;
+    while(usedNames[previewName.toLowerCase()]){var suffix='_'+n++;previewName=base.slice(0,31-suffix.length)+suffix;}
+    usedNames[previewName.toLowerCase()]=true;
+    return {sourceName:sheet.name,previewName:previewName};
+   })};});
+  return {inputCount:preview.inputCount,outputCount:preview.outputCount,sheetCount:sheetCount,sourceCopies:sourceCopies,
    mode:preview.mode,previewOnly:opts.previewOnly===true,sheets:[
     {name:'导入预览',values:layout.equalize(values,7),layout:layout.build({
      columns:[9,30,30,30,32,12,20].map(function(width){return {width:width};}),

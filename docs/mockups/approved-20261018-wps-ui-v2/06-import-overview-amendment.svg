@@ -17,9 +17,10 @@
 <text x="70" y="628">9</text><text x="285" y="628">9号工作表</text><text x="465" y="628">9号单体</text><text x="850" y="628">1</text>
 <text x="70" y="670">10</text><text x="285" y="670">10号工作表</text><text x="465" y="670">10号单体</text><text x="850" y="670">1</text></g>
 <text x="55" y="723" font-size="18" fill="#20764f">原始10条 → 预计整理后9条，减少1条重复材料（勾选合并相同材料时）</text>
-<text x="55" y="760" font-size="16">按原文件标签顺序列出；不生成“合并明细”，不改写原表、小标题或顺序。</text>
+<text x="55" y="760" font-size="16">下方保留全部来源工作表原样副本，按原标签顺序翻看；原文件不改。</text>
+<text x="45" y="820" font-size="17">[导入预览] [原工作表1] [原工作表2] [原工作表3] … [原工作表10]（数量按实际文件）</text>
 <rect x="1050" y="120" width="360" height="670" rx="10" fill="white" stroke="#d4e1dd"/>
 <text x="1075" y="165" font-size="23" font-weight="bold">材料整理助手</text><text x="1075" y="210" font-size="17">①选清单 ②分类 ③核对 … ⑦拆分</text>
-<text x="1075" y="285" font-size="24" font-weight="bold">选择整理方式</text><text x="1075" y="340" font-size="17">□ 合并全部工作簿</text><text x="1075" y="390" font-size="17">☑ 合并完全相同的材料，数量相加</text>
+<text x="1075" y="285" font-size="24" font-weight="bold">选择整理方式</text><text x="1075" y="340" font-size="17">☑ 合并清单</text><text x="1075" y="390" font-size="16">相同名称、特征、单位的材料数量累加</text>
 <text x="1075" y="445" font-size="16">选择变化只更新预计条数。</text><text x="1075" y="480" font-size="16">原件与各张工作表保持原样。</text><text x="1075" y="515" font-size="16">确认后才进入自动分类。</text>
 <rect x="1075" y="705" width="310" height="50" rx="6" fill="#20764f"/><text x="1097" y="737" font-size="19" fill="white">确认选择，开始自动分类</text></g></svg>

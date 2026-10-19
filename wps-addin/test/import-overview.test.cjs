@@ -25,6 +25,10 @@ test('TRIAL-001：同文件十张工作表遵循原标签顺序，标题不计�
   fingerprint:'c'.repeat(64),sheets}}]);
  const before=JSON.stringify(source),result=model.build(source,true,{});
  assert.equal(result.sheetCount,10);assert.equal(result.inputCount,10);assert.equal(result.outputCount,9);
+ assert.deepEqual(result.sourceCopies.map(book=>book.sheets.map(sheet=>sheet.sourceName)),[['1','2','3','4','5','6','7','8','9','10']],
+  '统计页后必须附带全部原工作表的原生复制计划，不能只保留磁盘原件');
+ assert.equal(result.sourceCopies[0].copyPath,'C:\\copies\\十表清单.xlsx');
+ assert.equal(result.sourceCopies[0].originalPath,'C:\\samples\\十表清单.xlsx');
  assert.deepEqual(rows(result).map(row=>row[2]),['1','2','3','4','5','6','7','8','9','10']);
  assert.equal(rows(result)[0][3],'单体1');assert.equal(rows(result)[9][3],'单体10');
  assert.match(rows(result)[0][4],/暖通/);assert.equal(rows(result).every(row=>row[5]==='1'),true);
@@ -44,4 +48,14 @@ test('TRIAL-001：关闭相同材料合并保留原条数；空表与问题提�
  assert.match(data[0][6],/待核对/);assert.equal(data[1][5],'0');assert.match(data[1][6],/未识别到材料/);
  assert.equal(data[1][3],'待核对');assert.doesNotMatch(data[2][6],/待核对/);
  assert.match(result.sheets[0].values.flat().join(' '),/不累加/);
+});
+
+test('原表浏览：来源表名与统计页/预留原表名前缀冲突时仍全部保留',()=>{
+ const input=JSON.parse(JSON.stringify(sample.inputs[0]));
+ input.snapshot.sheets=[{...input.snapshot.sheets[0],name:'导入预览'},
+  {...input.snapshot.sheets[0],name:'原表_导入预览'}];
+ const source=collection.add(collection.create(),[input]);
+ const plan=model.build(source,false,{}).sourceCopies[0].sheets;
+ assert.deepEqual(plan.map(sheet=>sheet.sourceName),['导入预览','原表_导入预览']);
+ assert.deepEqual(plan.map(sheet=>sheet.previewName),['原表_导入预览','原表_导入预览_2']);
 });

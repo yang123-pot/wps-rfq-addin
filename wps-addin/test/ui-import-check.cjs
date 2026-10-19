@@ -42,7 +42,8 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.locator('#preview-confirm').click();
   await page.waitForFunction(()=>document.querySelector('#merge-section').hidden===false);
   assert.equal(await page.locator('#merge-identical').isChecked(),false);
-  assert.match(await page.locator('#multi-workbook-hint').innerText(),/请选择是否合并全部工作簿，再决定是否累加完全相同的材料/);
+  assert.equal(await page.locator('#merge-section input[type=checkbox]:visible').count(),1,'详细模式也只有一个整理开关');
+  assert.match(await page.locator('#multi-workbook-hint').innerText(),/逐张查看原表/);
   assert.equal(await page.locator('#merge-all-workbooks').isChecked(),false,'默认不合并全部工作簿');
   assert.match(await page.locator('#merge-separate').locator('..').innerText(),/按工作簿、工作表保留来源/);
   assert.match(await page.locator('#merge-summary').innerText(),/2 份清单 · 保留工作簿来源/);

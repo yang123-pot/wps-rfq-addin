@@ -61,6 +61,40 @@ test('导入预览只创建自有工作簿、不保存原件；改选择更新�
  assert.equal(next.added,1,'用户另存后的预览不再被刷新覆盖');
  assert.equal(book.FullName,'C:\\user-saved-preview.xlsx');
 });
+
+test('原表浏览：预览后原生复制全部来源页；刷新统计不重写原表，来源异常不保留半成品',()=>{
+ for(const fail of [false,true]){
+  const h=fixture(),closed=[],copied=[],sourceSheets=[{Name:'1',format:'原合并单元格/小标题/列宽'},{Name:'10',format:'第二页格式'}];
+  let target;
+  const oldAdd=h.app.Workbooks.Add;
+  h.app.Workbooks.Add=function(){target=oldAdd();return target;};
+  sourceSheets.forEach((source,index)=>{source.Copy=function(before,after){
+   assert.equal(before,null);assert.equal(h.app.AutomationSecurity,3);
+   assert.equal(after,h.sheets[h.sheets.length-1]);
+   if(fail&&index===1)throw Error('复制失败');
+   copied.push(source.Name);h.sheets.push({Name:source.Name,format:source.format});
+  };});
+  h.app.Workbooks.Open=function(file,links,readOnly){
+   assert.equal(file,'C:\\copies\\来源.xlsx');assert.equal(links,0);assert.equal(readOnly,true);
+   return {FullName:file,Worksheets:{Count:2,Item:i=>sourceSheets[i-1]},Close:save=>{assert.equal(save,false);closed.push(file);}};
+  };
+  const overview={sheets:[{name:'导入预览',values:[['统计'],['2张表']]}],sourceCopies:[{
+   originalPath:'C:\\原件.xlsx',copyPath:'C:\\copies\\来源.xlsx',fingerprint:'a'.repeat(64),
+   sheets:[{sourceName:'1',previewName:'1'},{sourceName:'10',previewName:'10'}]}]};
+  if(fail){assert.throws(()=>host.showPreview(h.app,overview),/复制失败/);assert.equal(h.closed,1);}
+  else{
+   const handle=host.showPreview(h.app,overview);
+   assert.deepEqual(h.sheets.map(sheet=>sheet.Name),['导入预览','1','10']);
+   assert.equal(h.sheets[1].format,'原合并单元格/小标题/列宽');
+   h.app.Workbooks.Count=2;h.app.Workbooks.Item=i=>i===1?h.previous:target;
+   h.sheets[0].UsedRange={UnMerge(){},Clear(){}};
+   host.showPreview(h.app,overview,handle);
+   assert.deepEqual(copied,['1','10'],'改变整理选项只刷新统计，不再次复制或清空后面的原表');
+   assert.equal(h.added,1);
+  }
+  assert.equal(closed.length,1);assert.equal(h.app.AutomationSecurity,1);
+ }
+});
 // R12真机遗留观察②：侧栏重建会丢掉内存句柄，必须靠PluginStorage＋草稿簿归属标记找回同一个草稿簿，
 // 不能每次导入都新开预览，也不能仅凭“名字＋表形状”就把用户自己新建的同名同结构工作簿当成插件草稿。
 function previewStorage(){

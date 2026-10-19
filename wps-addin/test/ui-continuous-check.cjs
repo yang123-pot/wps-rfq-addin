@@ -33,7 +33,7 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   async function action(label){try{await page.waitForFunction(text=>document.getElementById('simple-primary').textContent===text&&!document.getElementById('simple-primary').disabled,label);}catch(e){throw Error(label+' 未就绪：'+JSON.stringify(await page.evaluate(()=>({state:RfqAssistant.snapshot(),problem:document.getElementById('assistant-problem').textContent,message:document.getElementById('import-message').textContent})))+'；'+errors.join('；'));}await primary.click();console.log('操作：'+label);}
   async function shot(name){await page.waitForFunction(()=>!RfqAssistant.snapshot().busy);if(process.env.RFQ_UI_V2_SCREENSHOTS){await fs.mkdir(process.env.RFQ_UI_V2_SCREENSHOTS,{recursive:true});await page.screenshot({path:path.join(process.env.RFQ_UI_V2_SCREENSHOTS,name+'.png')});}}
   await action('选择清单文件');await action('我已看完预览');
-  await page.locator('#simple-merge-all').check();await page.locator('#simple-duplicate-merge').check();
+  await page.locator('#simple-duplicate-merge').check();
   assert.match(await page.locator('#simple-merge-summary').innerText(),/10.*8/);await shot('01-merge');
   await action('确认选择，开始自动分类');await shot('02-classified');
   await action('生成分类核对表');await page.waitForFunction(()=>RfqAssistant.view().step===3);

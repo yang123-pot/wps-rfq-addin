@@ -78,7 +78,7 @@ const {initScript}=require('./ui-sheet-review-check.cjs');
   });
   await page.locator('#classification-review-generate').click();await waiting;
   await page.locator('#workflow-nav button[data-stage="import"]').click();
-  await page.locator('#merge-separate').check();
+  await page.locator('#merge-identical').uncheck();
   release();
   await page.waitForFunction(()=>document.querySelector('#classification-review-message').textContent.includes('未生成'));
   assert.match(await page.locator('#classification-review-message').textContent(),/变化/);
