@@ -115,6 +115,24 @@ async function run(){
   assert.match(audit.blocks.brands,/外部修改/);
   assert.equal(await page.evaluate(function(){return window.__projectPanel.assessment().brands.ready;}),false);
   assert.match(await page.evaluate(function(){return document.getElementById('project-status').textContent;}),/恢复核对/);
+  // 实际项目：版本18报错，外部恢复为19后重新打开，简版不能继续显示旧版18的红色摘要。
+  assert.equal(await page.locator('#assistant-problem').evaluate(el=>el.hidden),false);
+  await page.evaluate(function(args){
+   window.__project.revision=19;
+   window.__inspect[args.oldRoot+'\\分类汇总表.xlsx']={exists:true,sha256:args.sha};
+   return window.__projectPanel.open('p-restore-ui-01');
+  },{oldRoot:OLD_ROOT,sha:SHA('c')});
+  assert.equal(await page.evaluate(function(){return window.__projectPanel.current().revision;}),19);
+  assert.equal(await page.evaluate(function(){return window.__projectPanel.restoreAudit().ok;}),true);
+  assert.match(await page.locator('#project-message').textContent(),/版本 19.*各阶段持久文件已核对/);
+  assert.equal(await page.locator('#assistant-problem').evaluate(el=>el.hidden),true,
+   '重新打开最新记录且核对成功后，必须清除旧项目错误摘要');
+  await page.evaluate(function(){
+   window.RfqFeedback.updateSummary({stage:'categories',message:'分类工作簿仍待核对'});
+   return window.__projectPanel.open('p-restore-ui-01');
+  });
+  assert.equal(await page.locator('#assistant-problem').evaluate(el=>el.hidden),false,'项目成功不能清除其他阶段的错误');
+  assert.match(await page.locator('#assistant-problem').textContent(),/分类工作簿仍待核对/);
   // 再模拟整目录搬移：旧路径全缺失，新路径内容SHA一致；点“重新定位项目文件”后保存并恢复ready。
   await page.evaluate(function(args){
    const map={},paths=[
