@@ -192,7 +192,12 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.equal(await page.locator('#workflow-back').innerText(),'返回上一步：导入与合并');
   await page.locator('#workflow-back').click();
   assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage'),'import');
-  assert.equal(await page.locator('#workflow-back').isHidden(),true,'第1步没有上一步');
+  assert.equal(await page.locator('#workflow-back').isVisible(),true,'第1步整理方式仍能返回预览');
+  await page.locator('#workflow-back').click();
+  assert.equal(await page.locator('#preview-gate').isVisible(),true);
+  assert.match(await page.locator('#workflow-navigation-message').innerText(),/已返回.*预览/);
+  await page.locator('#workflow-back').click();
+  assert.equal(await page.locator('#workflow-back').isHidden(),true,'选文件起始页没有更早操作');
   await page.locator('#workflow-nav .workflow-step-button[data-stage="matching"]').click();
   assert.deepEqual(designIssues,[],'获批图02/03/05：状态必须真实，旧确认入口不得继续暴露');
 

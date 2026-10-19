@@ -15,12 +15,12 @@
   store.LABELS.forEach(function(label,index){var item=document.createElement('div');item.className='simple-seven-row'+(v.step===index+1?' current':'')+(v.step>index+1?' done':'');item.setAttribute('data-stage',store.STAGES[index]);
    var num=document.createElement('span');num.className='n';num.textContent=String(index+1);
    var name=document.createElement('span');name.className='label';name.textContent=label;item.appendChild(num);item.appendChild(name);nav.appendChild(item);});
-  var tree=by('assistant-files');tree.hidden=v.step!==1||!s.files.length||!!s.previewReviewed;tree.textContent='';
+  var tree=by('assistant-files');tree.hidden=v.step!==1||!s.files.length||v.importPhase==='options';tree.textContent='';
   if(!tree.hidden)s.files.forEach(function(file){var li=document.createElement('li'),name=document.createElement('strong');name.textContent=file.name;li.appendChild(name);(file.sheets||[]).forEach(function(sheet){var p=document.createElement('p');p.textContent=sheet;li.appendChild(p);});tree.appendChild(li);});
   text('simple-result',v.busy?(s.busyLabel||'正在处理，请稍候…'):s.statusMessage||((v.step===1&&s.files.length&&!s.previewReviewed)?'已导入 '+s.files.length+' 本工作簿，共 '+s.rows+' 条材料。':''));
   by('simple-result').hidden=!by('simple-result').textContent;
   var fileNote=by('assistant-file-note');if(fileNote){var note=v.step===1&&s.files.length&&!s.previewReviewed?'原始文件不会修改。':v.step===5?'可再填写第三组品牌和供应商。':'';fileNote.textContent=note;fileNote.hidden=!note;}
-  var changeFiles=by('assistant-change-files');if(changeFiles)changeFiles.hidden=!(v.step===1&&s.files.length&&!s.previewReviewed);
+  var changeFiles=by('assistant-change-files');if(changeFiles)changeFiles.hidden=!(v.step===1&&s.files.length&&v.importPhase!=='options');
   var header=by('header-section'),mount=by('assistant-header'),placeholder=by('assistant-header-origin');
   if(header&&mount&&placeholder){var inlineHeader=v.step===6&&!document.body.classList.contains('detail-mode');if(inlineHeader){if(header.parentNode!==mount)mount.appendChild(header);}else if(header.parentNode===mount)placeholder.after(header);mount.hidden=!inlineHeader;}
   var stats=by('assistant-stats'),statsText='',statsClass='assistant-stats';
@@ -41,7 +41,15 @@
   by('assistant-layout-row').hidden=true;
   by('assistant-layout').value=s.layout||'separated';
   by('assistant-new-project').hidden=v.step!==8;
-  var back=by('simple-back');if(back)back.hidden=v.step<=1;
+  var back=by('simple-back');if(back){back.hidden=!v.canBack;back.disabled=!!v.busy;}
+  var detailBack=by('workflow-back');if(detailBack)detailBack.disabled=!!v.busy;
+  var importActive=document.querySelector('#workflow-nav .is-current[data-stage="import"]');
+  if(importActive&&v.step===1){
+   if(detailBack){detailBack.hidden=!v.canBack;detailBack.textContent='返回上一步';}
+   var gate=by('preview-gate'),choice=by('merge-section');
+   if(gate)gate.hidden=!s.files.length||v.importPhase!=='preview';
+   if(choice)choice.hidden=!s.files.length||v.importPhase!=='options';
+  }
   var saveReview=by('simple-save-review');if(saveReview)saveReview.hidden=v.step!==3;
   var key=[v.step,v.title,v.action,s.previewReviewed,s.reviewGenerated,s.reviewConfirmed,s.categoriesReady,s.summaryReady,s.brandsReady,s.inquiryReady,s.splitStarted,s.outputDirectory,s.splitVerified].join('|');
   if(key!==lastRenderKey){var scroll=document.querySelector('.assistant-scroll');if(scroll)scroll.scrollTop=0;lastRenderKey=key;}
@@ -52,7 +60,7 @@
  by('assistant-change-directory').onclick=function(){store.run('chooseDirectory').catch(function(e){RfqFeedback.notify({message:e.message});});};
  by('simple-back').onclick=function(){
   var step=store.view().step;
-  if(step>1)document.dispatchEvent(new CustomEvent('rfq:simple-back',{detail:{step:step}}));
+  if(store.view().canBack)document.dispatchEvent(new CustomEvent('rfq:simple-back',{detail:{step:step}}));
  };
  by('simple-save-review').onclick=function(){
   var save=by('sheet-review-save');

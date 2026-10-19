@@ -43,7 +43,7 @@
     simpleGuide=document.getElementById('simple-guide'),simpleHelp=document.getElementById('simple-help');
   var simpleMergeRadios=simpleMergeChoice?simpleMergeChoice.querySelectorAll('input[name="simple-merge-mode"]'):[];
   var current='import',stats={files:0,rows:0,mergedRows:0},stageState={},panels={},buttons={},navigationWatch=null;
-  var viewMode='home';
+  var viewMode='home',auxiliaryOrigin='flow';
   if(!nav||!host||!importPanel)return null;
   function statsText(){
    if(rowsCell)rowsCell.textContent=String(stats.rows||0);
@@ -76,10 +76,23 @@
    setViewMode('home');
   }
   function renderSimple(){if(window.RfqAssistantUI)window.RfqAssistantUI.render();}
-  function showSimpleHelp(text){
+  function backFeedback(label){
+   var text='已返回'+label+'。已选文件、填写内容和处理记录已保留。';
+   if(window.RfqAssistant)RfqAssistant.set({statusMessage:text});
+   var box=document.getElementById('workflow-navigation-message');
+   if(box){box.textContent=text;box.hidden=false;}
+  }
+  function backImport(){
+   var ui=window.RfqAssistant,v=ui&&ui.view(),target=v&&v.backTarget;
+   if(!ui||ui.snapshot().busy||!target||!target.phase)return;
+   if(ui.navigateImport(target.phase))backFeedback(target.phase==='preview'?'清单预览':'选择文件');
+  }
+  function showSimpleHelp(text,force){
    if(!simpleHelp)return;
-   simpleHelp.textContent=text;
-   simpleHelp.hidden=!simpleHelp.hidden;
+   if(!simpleHelp.hidden&&!force){simpleHelp.hidden=true;backFeedback('当前操作页面');return;}
+   simpleHelp.textContent='';simpleHelp.appendChild(node('p',text));
+   var back=node('button','返回上一步','simple-close');back.type='button';
+   back.onclick=function(){simpleHelp.hidden=true;backFeedback('当前操作页面');};simpleHelp.appendChild(back);simpleHelp.hidden=false;
   }
   function noteFor(step){
    if(step.id==='import'){
@@ -140,9 +153,10 @@
    renderSimple();
   }
   function goTo(stage){
-   if(stage==='project'||stage==='help'){if(stage==='project'){var aux=document.getElementById('aux-section');if(aux)aux.open=true;setViewMode('detail');document.getElementById('project-section').scrollIntoView({block:'start'});}else{closeSettings();setViewMode('home');if(simpleHelp){simpleHelp.textContent='按右侧主按钮逐步完成。需要保存、打开项目、选择布局或排查问题时使用设置。';simpleHelp.hidden=false;}}return true;}
+   if(stage==='project'||stage==='help'){if(stage==='project'){auxiliaryOrigin='flow';var aux=document.getElementById('aux-section');if(aux)aux.open=true;setViewMode('detail');document.getElementById('project-section').scrollIntoView({block:'start'});}else{closeSettings();setViewMode('home');showSimpleHelp('按右侧主按钮逐步完成。需要保存、打开项目、选择布局或排查问题时使用设置。',true);}return true;}
    if(!STEPS.some(function(item){return item.id===stage;}))return false;
    current=stage;
+   if(window.RfqAssistant&&typeof RfqAssistant.navigate==='function')RfqAssistant.navigate(stage,true);
    show();
    var panel=stepPanel(STEPS.filter(function(item){return item.id===stage;})[0]);
    if(panel&&typeof panel.scrollIntoView==='function')panel.scrollIntoView({block:'start'});
@@ -158,7 +172,7 @@
    button.setAttribute('title',step.title);
    button.appendChild(node('span',String(index+1),'workflow-step-number'));
    button.appendChild(node('span',step.label,'workflow-step-label'));
-   button.addEventListener('click',function(){goTo(step.id);});
+   button.addEventListener('click',function(){if(window.RfqAssistant&&RfqAssistant.snapshot().busy)return;goTo(step.id);});
    item.appendChild(button);
    nav.appendChild(item);
    buttons[step.id]=button;
@@ -178,12 +192,13 @@
   if(simpleSettingsToggle)simpleSettingsToggle.addEventListener('click',openSettings);
   if(simpleSettings){
    var settingsClose=document.getElementById('simple-settings-close');
-   if(settingsClose)settingsClose.addEventListener('click',closeSettings);
+   if(settingsClose)settingsClose.addEventListener('click',function(){closeSettings();backFeedback('当前操作页面');});
    Array.prototype.forEach.call(simpleSettings.querySelectorAll('[data-simple-section]'),function(button){
     button.addEventListener('click',function(){
      var id=button.getAttribute('data-simple-section');
      closeSettings();
      setViewMode('detail');
+     auxiliaryOrigin='settings';
      var aux=document.getElementById('aux-section');if(aux)aux.open=true;
      var target=document.getElementById(id);if(target&&typeof target.scrollIntoView==='function')target.scrollIntoView({block:'start'});
     });
@@ -193,20 +208,35 @@
    if(helpSetting&&settingHelp)helpSetting.addEventListener('click',function(){
     settingHelp.textContent='如果画面卡住：先保存项目，再点功能区“重建窗口”。项目、分类库和已生成文件都不会删除。需要逐步排查时，点“详细步骤”。';
     settingHelp.hidden=!settingHelp.hidden;
+    if(!settingHelp.hidden){var back=node('button','返回上一步','simple-close');back.type='button';back.onclick=function(){settingHelp.hidden=true;var note=document.getElementById('simple-settings-navigation');if(note){note.hidden=false;note.textContent='已返回设置。';}};settingHelp.appendChild(back);}
    });
    var detailLink=document.getElementById('simple-detail-link');
    if(detailLink)detailLink.addEventListener('click',function(){closeSettings();setViewMode('detail');});
   }
+  Array.prototype.forEach.call(document.querySelectorAll('#aux-section > section'),function(section){
+   var back=node('button','返回上一步','locate');back.type='button';back.setAttribute('data-aux-back','');
+   back.onclick=function(){
+    if(window.RfqAssistant&&RfqAssistant.snapshot().busy)return;
+    if(auxiliaryOrigin==='settings'){
+     openSettings();var note=document.getElementById('simple-settings-navigation');if(note){note.hidden=false;note.textContent='已返回设置。填写内容已保留。';}
+    }else{setViewMode('home');backFeedback('当前操作页面');}
+   };
+   section.insertBefore(back,section.firstChild);
+  });
   if(simpleGuide)simpleGuide.addEventListener('click',function(){
    showSimpleHelp('七步：选清单、核对分类、审核确认、分类工作簿、填品牌、生成询价表、拆分文件。第一次只做当前这一步即可，遇到问题再打开右上角“设置”。');
   });
   if(document&&typeof document.addEventListener==='function'){
    document.addEventListener('rfq:simple-back',function(event){
     var step=Number(event&&event.detail&&event.detail.step)||0;
-    if(step<=1)return;
+    if(window.RfqAssistant&&RfqAssistant.snapshot().busy)return;
+    if(step===1){backImport();return;}
+    if(step<1)return;
+    if(step===8){var previous=window.RfqAssistant&&RfqAssistant.snapshot().noInquiry?2:6;setViewMode('home');goTo(STEPS[previous].id);backFeedback('第 '+(previous+1)+' 步：'+STEPS[previous].label);return;}
     var index=Math.min(STEPS.length-1,step-1);
     setViewMode('home');
     goTo(STEPS[index-1].id);
+    backFeedback('第 '+index+' 步：'+STEPS[index-1].label);
    });
   }
   Array.prototype.forEach.call(simpleMergeRadios,function(radio){
@@ -224,8 +254,10 @@
   });
   if(typeof location!=='undefined'&&/[?&]mode=detail(?:&|$)/.test(location.search||''))setViewMode('detail');
   if(workflowBack)workflowBack.addEventListener('click',function(){
+   if(window.RfqAssistant&&RfqAssistant.snapshot().busy)return;
    var index=STEPS.map(function(step){return step.id;}).indexOf(current);
-   if(index>0)goTo(STEPS[index-1].id);
+   if(index>0){goTo(STEPS[index-1].id);backFeedback('第 '+index+' 步：'+STEPS[index-1].label);}
+   else backImport();
   });
   renderSimple();
   var handle={goTo:goTo,openDetail:openDetail,openTask:openTask,current:function(){return current;},

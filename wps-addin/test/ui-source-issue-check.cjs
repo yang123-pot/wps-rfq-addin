@@ -56,7 +56,7 @@ async function run(){
   assert.equal(await dialog.locator('li').count(),2,'不同目录的同名文件、同一单元格问题不能被合并丢失');
   assert.match(await dialog.textContent(),/E26/);
   if(process.env.RFQ_SOURCE_ISSUE_EVIDENCE){await fs.mkdir(process.env.RFQ_SOURCE_ISSUE_EVIDENCE,{recursive:true});await page.screenshot({path:path.join(process.env.RFQ_SOURCE_ISSUE_EVIDENCE,'01-source-error.png')});}
-  await dialog.getByRole('button',{name:'暂不处理',exact:true}).click();
+  await dialog.getByRole('button',{name:'返回上一步',exact:true}).click();
   assert.equal(await page.locator('#assistant-problem').isVisible(),true,'关闭弹窗后仍保留问题摘要');
   assert.equal(await page.locator('#simple-duplicate-merge').isChecked(),false,'关闭弹窗不改变整理方式');
   await page.locator('#simple-primary').click();
@@ -100,7 +100,7 @@ async function run(){
   const pending=target.locator('.continuation-form').filter({hasText:'第 5 行特征续行'});
   await pending.locator('input').fill('6');await pending.getByRole('button',{name:'确认第 5 行归属',exact:true}).click();
   assert.equal(await page.locator('#confirm-merge').isEnabled(),true,'剩余续行真实确认后解除阻断');
-  await reopen(removal);await dialog.getByRole('button',{name:'暂不处理',exact:true}).click();
+  await reopen(removal);await dialog.getByRole('button',{name:'返回上一步',exact:true}).click();
   await page.locator('#simple-mode-toggle').click();await page.locator('#imported-books li').getByRole('button',{name:'移除此文件',exact:true}).click();
   await page.locator('#simple-mode-toggle').click();
   assert.equal(await page.locator('#imported-books li').count(),0);

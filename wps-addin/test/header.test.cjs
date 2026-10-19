@@ -41,7 +41,7 @@ test('header block uses five reference rows and supplier names without brands',(
  assert.equal(header.validate({...filled,email:'x'.repeat(201)}).ok,false);
  assert.equal(header.same(filled,{...filled,email:'other@example.com'}),false);
  assert.match(header.summary(filled),/项目名称：示例园区/);
- assert.match(header.summary(filled),/材料经办人：测试员/);
+ assert.match(header.summary(filled),/材料经办人及联系电话：测试员/);
  assert.equal(header.same(filled,Object.assign({},filled,{address:'示例市示例路1号 '})),true,'首尾空格不算变化');
  assert.equal(header.same(filled,Object.assign({},filled,{address:'另一个地址'})),false);
 });

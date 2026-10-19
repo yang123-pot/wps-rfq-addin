@@ -2,7 +2,7 @@
 async function acknowledgeProblems(page){
  const locator=page.getByRole('alertdialog');
  const handler=async dialog=>{
-  await dialog.getByRole('button',{name:/^(我知道了|暂不处理)$/}).click();
+  await dialog.getByRole('button',{name:'返回上一步',exact:true}).click();
  };
  await page.addLocatorHandler(locator,handler);
  return {locator,handler};

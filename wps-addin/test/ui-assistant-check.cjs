@@ -38,6 +38,8 @@ const assert=require('node:assert/strict');const path=require('node:path');const
    '简版返回必须进入上一步自动分类');
   assert.equal(await page.locator('#simple-home').isVisible(),true,'简版返回应留在简版，不把用户切到详细流程');
   assert.equal(await page.evaluate(()=>document.body.classList.contains('detail-mode')),false);
+  assert.equal(await page.locator('#simple-home').getAttribute('data-step'),'2','返回改变实际简版页面');
+  await page.evaluate(()=>RfqAssistant.followProgress());
   await page.evaluate(()=>RfqAssistant.set({reviewConfirmed:true,categoriesReady:true,summaryReady:true,brandsOpened:true,brandsReady:true,expectedSheets:9}));
   // 1366×768/1920×1080 扣除功能区及常用缩放后的CSS等效操作区；真实WPS尺寸另行验收。
   for(const [width,height] of [[400,600],[400,900],[320,499],[320,360]]){
@@ -60,6 +62,10 @@ const assert=require('node:assert/strict');const path=require('node:path');const
   await page.evaluate(()=>{RfqFeedback.arm();RfqFeedback.notify({stage:'review',message:'空分类',issues:[{sheet:'分类审核成果',row:7,column:8,message:'最终分类为空'}],resolve:()=>{}});RfqFeedback.tell('整表未通过校验',true,'review');});
   assert.match(await page.getByRole('alertdialog').innerText(),/H7/,'通用错误文字不能抹掉具体位置和去修改入口');
   await page.keyboard.press('Escape');
+  await page.evaluate(()=>RfqFeedback.notify({stage:'header',message:'返回测试',force:true}));
+  await page.getByRole('alertdialog').getByRole('button',{name:'返回上一步',exact:true}).click();
+  assert.equal(await page.getByRole('alertdialog').count(),0,'问题弹窗返回原操作页');
+  assert.match(await page.locator('#simple-result').innerText(),/已返回/);
   await page.setViewportSize({width:400,height:500});
   await page.evaluate(()=>{
    RfqFeedback.arm();

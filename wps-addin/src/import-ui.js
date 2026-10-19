@@ -218,6 +218,7 @@
       onBusy:function(value){busy=value;options.onBusy(value);}});
     function tell(text,error){message.textContent=text;message.className=error?'error':'';if(window.RfqFeedback)RfqFeedback.tell(text,error,"import");}
     function restoreProject(project){
+      if(ui&&ui.followProgress)ui.followProgress();
       var inputs=(project.sources||[]).map(function(source){
         return {metadata:{originalPath:source.originalPath,originalName:source.originalName,copyPath:source.copyPath,fingerprint:source.fingerprint},snapshot:source.snapshot,record:source.reviewRecord};
       });
@@ -387,6 +388,7 @@
     function confirmPreview(){
       if(!collection.entries.length)return;
       previewReviewed=true;page=0;render();
+      if(ui&&ui.navigateImport)ui.navigateImport('options',true);
       tell('导入预览已确认。请选择是否合并全部工作簿，以及是否累加完全相同的材料。');
     }
     if(previewConfirm)previewConfirm.addEventListener('click',confirmPreview);
@@ -847,6 +849,8 @@
           refreshMatchDisplay(checked);renderReviewIssues([]);
           sheetTell('整表内容与上次确认一致，未重复确认（'+next.rows.length+' 行）。');
           renderSheetReview();
+          if(next.rows.every(function(row){return row.skip;})){if(ui&&ui.followProgress)ui.followProgress();}
+          else if(workflow&&!document.body.classList.contains('detail-mode'))workflow.goTo('categories');
           return;
         }
         sheetReviewBusy=true;renderSheetReview();
@@ -885,6 +889,7 @@
         await generateCategoryWorkbooks({auto:true}).catch(function(error){
           categoryTell('分类工作簿未生成：'+error.message,true);
         });
+        if(next.rows.every(function(row){return row.skip;})&&ui&&ui.followProgress)ui.followProgress();
       }catch(error){sheetTell('整表确认未完成：'+error.message,true);}
       finally{sheetReviewBusy=false;renderSheetReview();}
     }
@@ -1651,7 +1656,7 @@
           entries.push({metadata:prepared.files[i],snapshot:RfqImportHost.readCopy(options.application,prepared.files[i])});
         }
         previewReviewed=false;
-        var next=RfqCollection.add(collection,entries);collection=next;added=true;render();
+        var next=RfqCollection.add(collection,entries);collection=next;added=true;if(ui&&ui.followProgress)ui.followProgress();render();
         if(!selected)activate(collection.entries[0].id);
         tell('已导入 '+entries.length+' 份清单并生成导入预览。原件未打开；请先查看预览，再选择是否合并全部工作簿。');
       }catch(error){tell((added?'文件已加入，但界面更新失败，请重新选择文件核对。':'本批未加入，已有列表保留。')+error.message,true);}
@@ -1723,13 +1728,14 @@
       bind('import',function(){return runImport(function(){return RfqImportHost.selectFiles(options.application);});});
       bind('previewConfirm',function(){if(!ui.snapshot().previewAvailable){syncImportPreview(true);return;}confirmPreview();});
       bind('previewRetry',function(){return syncImportPreview(true);});
+      bind('previewResume',async function(){await syncImportPreview(true);if(ui.snapshot().previewAvailable)ui.navigateImport('preview',true);});
       bind('mergeConfirm',confirmSelection);
       bind('reviewGenerate',generateReview);
-      bind('reviewOpen',function(){if(!reviewBinding)throw Error('请先生成分类核对表。');RfqClassificationReviewHost.openForEditing(options.application,reviewBinding.path);reviewOpenedPath=reviewBinding.path;});
+      bind('reviewOpen',function(){if(!reviewBinding)throw Error('请先生成分类核对表。');RfqClassificationReviewHost.openForEditing(options.application,reviewBinding.path);reviewOpenedPath=reviewBinding.path;if(workflow)workflow.goTo('review');});
       bind('reviewConfirm',confirmSheetReview);
       bind('categoriesGenerate',function(){return generateCategoryWorkbooks({auto:true});});
       bind('continueBrands',async function(){if(!summaryState().ok||!ui.snapshot().summaryReady){var made=await generateSummary(false);if(!made||!made.ok)return;}
-       if(brandsOpenedPath!==summaryReceipt.path)RfqBrandHost.openSummary(options.application,summaryReceipt.path);var b=options.application.ActiveWorkbook;b.Worksheets.Item(summaryReceipt.sheet||'分类汇总表').Activate();brandsOpenedPath=summaryReceipt.path;});
+       RfqBrandHost.openSummary(options.application,summaryReceipt.path,{sheet:summaryReceipt.sheet||'分类汇总表',layout:summaryReceipt.layout,focus:true});brandsOpenedPath=summaryReceipt.path;if(workflow)workflow.goTo('brands');ui.set({statusMessage:'已切换到分类汇总表，请在黄色区域填写品牌和供应商，也可留空。'});});
       bind('brandsConfirm',readSummaryBrands);
       bind('inquiryGenerate',async function(){var check=RfqInquiryHeader.validate(headerPanel.header());if(!check.ok){var fields=RfqInquiryHeader.FIELDS.filter(function(f){return f.required&&!String(headerPanel.header()[f.key]||'').trim();});
        RfqInquiryHeader.FIELDS.forEach(function(f){var n=document.getElementById('header-'+f.key);n.setAttribute('aria-invalid',fields.indexOf(f)>=0?'true':'false');});

@@ -23,6 +23,25 @@ test('writes text to a new book, saves XLSX, reopens and verifies exact values, 
  assert.equal(h.app.ActiveWorkbook,h.previous);assert.equal(h.app.AutomationSecurity,1);
  assert.deepEqual(h.sheets[0].Range('A1:B3').Value2,model.sheets[0].values);
 });
+test('WPS新建返回null时只接管本次唯一新增的未保存工作簿，绝不写入原活动簿',()=>{
+ const h=fixture(),add=h.app.Workbooks.Add;
+ h.app.Workbooks.Add=function(){add();h.app.Workbooks.Count=2;return null;};
+ h.app.Workbooks.Item=i=>i===1?h.previous:h.app.ActiveWorkbook;
+ host.write(h.app,model,stage);
+ assert.equal(h.added,1,'只新建一次，不重试制造多余文件');
+ assert.equal(h.opened,1);assert.equal(h.app.ActiveWorkbook,h.previous);
+ assert.deepEqual(h.sheets[0].Range('A1:B3').Value2,model.sheets[0].values);
+});
+test('WPS新建返回null且没有唯一新增草稿时明确报错，不触碰用户工作簿',()=>{
+ for(const ambiguous of [false,true]){
+  const h=fixture();let saved=0,closed=0;
+  h.previous.SaveAs=()=>saved++;h.previous.Close=()=>closed++;
+  h.app.Workbooks.Add=()=>{if(ambiguous)h.app.Workbooks.Count=3;return null;};
+  assert.throws(()=>host.write(h.app,model,stage),/WPS新建输出工作簿未返回有效对象/);
+  assert.equal(saved,0);assert.equal(closed,0);assert.equal(h.opened,0);
+  assert.equal(h.app.ActiveWorkbook,h.previous);assert.equal(h.app.AutomationSecurity,1);
+ }
+});
 test('source audit fields stay single line and source rows shrink after writing',()=>{
  const h=fixture();
  const audit={sheets:[{name:'清单',values:[['编码'],['000123']]},

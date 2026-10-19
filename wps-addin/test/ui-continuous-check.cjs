@@ -34,7 +34,8 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
     await window.__writeFixture(file,sheets);
    };
    RfqCategoryWorkbooks.verifySheets=(app,file,expected)=>({ok:true,issues:[],sheets:expected.map((s,i)=>({index:i+1,sheetName:s.sheetName,rowCount:s.rowCount}))});
-   RfqBrandHost.openSummary=(app,file)=>{window.__openedSummary=file;app.Workbooks.Open(file).Activate();return {path:file,opened:true};};
+   const openSummary=RfqBrandHost.openSummary;
+   RfqBrandHost.openSummary=(app,file,options)=>{window.__openedSummary=file;if(!window.__stores[file])window.__seedSummary(file,window.__summary.values);return openSummary(app,file,options);};
    RfqBrandHost.selectTarget=()=>inquiryTarget;
    RfqBrandHost.write=async(app,model,file,opts)=>{window.__inquiry=model;await window.__writeFixture(file,model.sheets);if(opts&&opts.finalizeFreeze)await opts.finalizeFreeze();};
    RfqBrandHost.openDirectory=()=>{};
@@ -51,9 +52,32 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   await action('选择清单文件');await action('我已看完预览');
   await page.locator('#simple-duplicate-merge').check();
   assert.match(await page.locator('#simple-merge-summary').innerText(),/10.*8/);await shot('01-merge');
+  assert.equal(await page.locator('#simple-back').isVisible(),true,'选择整理方式也必须有返回上一步');
+  await shot('back-options');
+  await page.locator('#simple-back').click();
+  assert.equal(await primary.innerText(),'我已看完预览');
+  assert.equal(await page.locator('#assistant-files').isVisible(),true,'返回预览显示原工作表目录');
+  assert.match(await page.locator('#simple-result').innerText(),/已返回.*预览/,'点击有明确反馈');
+  await shot('back-preview-feedback');
+  await page.locator('#simple-back').click();
+  assert.equal(await primary.innerText(),'查看已选清单预览','再返回是选文件页，保留已选文件以便继续');
+  assert.equal(await page.evaluate(()=>RfqAssistant.snapshot().files.length),2);
+  await action('查看已选清单预览');await action('我已看完预览');
+  assert.equal(await page.locator('#simple-duplicate-merge').isChecked(),true,'返回和重进保持合并选择');
   await action('确认选择，开始自动分类');await shot('02-classified');
+  await page.locator('#simple-back').click();
+  assert.equal(await page.locator('#simple-home').getAttribute('data-step'),'1','第2步返回必须真的显示第1步');
+  assert.equal(await page.locator('#simple-merge-choice').isVisible(),true);
+  assert.equal(await page.evaluate(()=>RfqAssistant.snapshot().mergeConfirmed),true,'返回不撤销已确认选择');
+  await action('确认选择，开始自动分类');
   await action('生成分类核对表');await page.waitForFunction(()=>RfqAssistant.view().step===3);
   assert.equal(await primary.innerText(),'核对完成，生成分类工作簿');await shot('03-review');
+  await page.locator('#simple-back').click();
+  assert.equal(await page.locator('#simple-home').getAttribute('data-step'),'2','截图中的第3步返回必须显示第2步');
+  assert.match(await page.locator('#simple-result').innerText(),/已返回.*第 2 步/);
+  assert.equal(await primary.innerText(),'打开核对表','返回后复用已有成果，不要求重新生成');
+  await action('打开核对表');await page.waitForFunction(()=>RfqAssistant.view().step===3);
+  await showDetail();assert.equal(await page.locator('#workflow-nav .is-current').getAttribute('data-stage'),'review','打开核对表后切详细版也应是第3步');await showSimple();
   // 错误先集中提醒，去修改定位到成果表；关闭后保留摘要。
   await primary.click();await page.getByRole('alertdialog').waitFor();assert.match(await page.getByRole('alertdialog').innerText(),/分类/);
   await page.keyboard.press('Escape');assert.equal(await page.locator('#assistant-problem').isVisible(),true);
@@ -67,6 +91,10 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
    receipt:RfqAssistant.snapshot().categories
   })))+'；'+errors.join('；'));}
   assert.equal(await page.evaluate(()=>RfqAssistant.snapshot().categoryCount),4);await shot('04-categories');
+  await page.locator('#simple-back').click();
+  assert.equal(await page.locator('#simple-home').getAttribute('data-step'),'3','第4步返回核对页');
+  await action('核对完成，生成分类工作簿');
+  assert.equal(await page.locator('#simple-home').getAttribute('data-step'),'4','内容未变的再次确认也能继续前进，不重复生成');
   // 旧分类簿仍在项目里，新版分类簿的保存失败时不能借旧绑定推进。
   await page.route('**/api/project/save',route=>{const p=route.request().postDataJSON().project;
    return p.review&&p.review.revision===2&&p.categories&&p.categories.reviewRevision===2
@@ -89,18 +117,40 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   }
   await page.unroute('**/api/project/save');
   await action('下一步：填写品牌和供应商');await page.waitForFunction(()=>RfqAssistant.view().step===5);
+  await showDetail();assert.equal(await page.locator('#workflow-nav .is-current').getAttribute('data-stage'),'brands','打开品牌表后两种模式阶段一致');await showSimple();
+  await page.locator('#simple-back').click();
+  assert.equal(await page.locator('#simple-home').getAttribute('data-step'),'4','第5步返回分类工作簿');
+  await page.evaluate(file=>{Application.Workbooks.Open(file).Activate();window.__activeSheet=null;window.__selectedCell=null;},reviewTarget);
+  await action('下一步：填写品牌和供应商');await page.waitForFunction(()=>RfqAssistant.view().step===5);
   const record=async()=>JSON.parse(await fs.readFile(path.join(projectDirectory,(await fs.readdir(projectDirectory)).find(n=>n.endsWith('.json'))),'utf8'));
   const saved=await record(),summary=await page.evaluate(()=>({values:window.__summary.values,layout:window.__summary.layout.metadata.layout}));
+  assert.deepEqual(await page.evaluate(()=>({book:Application.ActiveWorkbook.FullName,sheet:window.__activeSheet,cell:window.__selectedCell})),
+   {book:saved.summary.path,sheet:{file:saved.summary.path,name:'分类汇总表'},cell:{file:saved.summary.path,sheet:'分类汇总表',row:4,column:4}},'每次进入都激活正确工作簿、汇总页和首组品牌格');
+  assert.match(await page.locator('#simple-result').innerText(),/已切换到分类汇总表/);
   await page.evaluate(({file,values})=>window.__seedSummary(file,values),{file:saved.summary.path,values:fixture.fillSummaryGrid(summary,fixture.SUMMARY_FILLS)});
   await shot('05-brands');await action('下一步：生成询价表');await page.waitForFunction(()=>RfqAssistant.view().step===6);
+  await page.locator('#simple-back').click();
+  assert.equal(await page.locator('#simple-home').getAttribute('data-step'),'5','第6步返回品牌汇总');
+  await action('下一步：生成询价表');await page.waitForFunction(()=>RfqAssistant.view().step===6);
   await action('生成询价总表');await page.getByRole('alertdialog').waitFor();await page.getByRole('alertdialog').getByRole('button',{name:'去填写'}).click();
   assert.equal(await page.locator('#header-projectName').evaluate(n=>n===document.activeElement),true);
-  for(const [key,value] of Object.entries({projectName:'示例园区',company:'示例建设公司',contact:'测试员',phone:'示例联系方式'}))await page.locator('#header-'+key).fill(value);
+  for(const [key,value] of Object.entries({projectName:'示例园区',company:'示例建设公司',contact:'测试员',phone:'示例联系方式',address:'示例市示例路1号'}))await page.locator('#header-'+key).fill(value);
   assert.equal(await page.locator('#assistant-header [aria-invalid=true]').count(),0,'填好后立即移除错误红框，不等待再点击生成');
   await shot('06-header');await action('生成询价总表');await page.waitForFunction(()=>RfqAssistant.view().action==='goSplit');
   const generated=await record();assert.equal(generated.generation.modelSnapshot.sheets.length,5);
+  assert.equal(generated.header.address,'示例市示例路1号','公司地址随项目保存');
+  assert.equal(generated.generation.modelSnapshot.sheets[0].values[1][0],'公司地址：示例市示例路1号','公司地址带入询价表第二行');
   const valve=generated.generation.modelSnapshot.sheets.find(s=>s.name==='阀门_合成询价');assert.deepEqual(valve.values.slice(valve.headerRow).map(r=>r[5]),['20','12']);assert.equal(valve.values[valve.headerRow][6],'通达 / 海岳');
   await action('下一步：拆分询价文件');await action('选择输出文件夹');await shot('07-split-ready');
+  const beforeBack=await record();
+  await page.waitForFunction(()=>!RfqAssistant.snapshot().busy&&!document.getElementById('simple-back').disabled);
+  await page.locator('#simple-back').press('Enter');
+  await page.waitForFunction(()=>document.getElementById('simple-home').dataset.step==='6',null,{timeout:3000});
+  assert.equal(await page.locator('#simple-home').getAttribute('data-step'),'6','第7步键盘返回询价表');
+  assert.equal(await page.locator('#header-company').inputValue(),'示例建设公司','返回保留已填写抬头');
+  assert.deepEqual(await record(),beforeBack,'返回不保存或改写业务记录');
+  await action('下一步：拆分询价文件');await page.waitForFunction(()=>RfqAssistant.view().step===7);
+  assert.equal(await page.evaluate(()=>RfqAssistant.snapshot().outputDirectory),out,'返回再前进保留输出目录');
   // 拆分写入复用业务模型与真实发布/冻结/回执链；只替代宿主落盘。
   await page.evaluate(()=>{RfqExportHost.writeWorkbook=async(app,model,file,opts)=>{await window.__writeFixture(file,model.sheets);if(opts&&opts.finalizeFreeze)await opts.finalizeFreeze();};});
   await page.evaluate(()=>{window.__supplierWriteCount=0;const write=RfqBrandHost.write;RfqBrandHost.write=async function(){window.__supplierWriteCount++;return write.apply(this,arguments);};});
@@ -117,6 +167,26 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   assert.equal((await fs.readdir(out)).length,7);assert.equal(await page.locator('#assistant-output-files li').count(),7);
   const complete=done.split.files.find(f=>f.kind==='complete-workbook');assert.ok(complete);assert.deepEqual(await fs.readFile(complete.target),await fs.readFile(inquiryTarget),'导出的完整工作簿必须原样保留');
   assert.match(await page.locator('#simple-desc').innerText(),/7/);await shot('08-complete');
+  await page.waitForLoadState('networkidle');
+  const stableBeforeBack=await record();
+  for(let expected=7;expected>=1;expected--){
+   await page.locator('#simple-back').click();
+   assert.equal(await page.locator('#simple-home').getAttribute('data-step'),String(expected),'完成后连续返回到第'+expected+'步');
+   assert.equal(await page.locator('#simple-home').isVisible(),true);
+   assert.equal(await page.locator('body').evaluate(el=>el.classList.contains('detail-mode')),false,'返回仍为简版');
+  }
+  await page.locator('#simple-back').click();await page.locator('#simple-back').click();
+  assert.equal(await primary.innerText(),'查看已选清单预览');
+  assert.equal(await page.locator('#simple-back').isHidden(),true,'选文件起始页没有更早操作');
+  assert.deepEqual(await record(),stableBeforeBack,'连续返回不清除确认、品牌、总表或拆分回执');
+  await showDetail();
+  for(const [stage,previous] of [['split','inquiry'],['inquiry','brands'],['brands','categories'],['categories','review'],['review','matching'],['matching','import']]){
+   await page.locator('#workflow-nav [data-stage="'+stage+'"].workflow-step-button').click();
+   await page.locator('#workflow-back').click();
+   assert.equal(await page.locator('#workflow-nav .is-current').getAttribute('data-stage'),previous,'详细版'+stage+'返回'+previous);
+   assert.equal(await page.locator('#stage-panel-'+previous).isVisible(),true);
+  }
+  assert.deepEqual(await record(),stableBeforeBack,'详细版全部返回同样不改业务记录');
   const stores=await page.evaluate(()=>window.__stores);await page.addInitScript(stored=>{window.__stores=stored;},stores);
   await page.reload();await page.evaluate(()=>{RfqExportHost.showPreview=(app,model)=>({name:'预览'});});await page.locator('#simple-settings-toggle').click();await page.locator('[data-simple-section="project-section"]').click();
   await page.locator('#open-project').click();await page.locator('#project-list > li button').first().click();
@@ -130,6 +200,21 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   await page.waitForFunction(()=>document.querySelector('#project-message').textContent.includes('已恢复项目'));
   if(await page.getByRole('alertdialog').count())await page.keyboard.press('Escape');await showSimple();
   assert.equal(await page.evaluate(()=>RfqAssistant.view().step),6,'恢复检查发现总询价文件缺失时不得继续显示完成或允许拆分');
+  await showDetail();await page.locator('#workflow-nav [data-stage="review"].workflow-step-button').click();
+  await page.evaluate(rows=>rows.forEach((row,index)=>{if(row[11])window.__setCell(index+1,9,'无需询价');}),fixture.REVIEW_VALUES);
+  await page.locator('#sheet-review-confirm').click();
+  await page.waitForFunction(()=>RfqAssistant.snapshot().noInquiry&&!document.getElementById('sheet-review-confirm').disabled);
+  await showSimple();
+  assert.equal(await page.locator('#simple-home').getAttribute('data-step'),'8','全部无需询价应直接完成');
+  // 本夹具保留了旧拆分批次；改成全无需询价后，旧批次不一致提示仍是合法边界。
+  if(await page.getByRole('alertdialog').count()){
+   assert.match(await page.getByRole('alertdialog').innerText(),/该批次回执与当前拆分清单不一致/);
+   await page.keyboard.press('Escape');
+  }
+  await page.locator('#simple-back').click();
+  assert.equal(await page.locator('#simple-home').getAttribute('data-step'),'3','无需询价完成页返回审核');
+  await action('核对完成，生成分类工作簿');
+  assert.equal(await page.locator('#simple-home').getAttribute('data-step'),'8','无需询价再次确认回到完成，不落入无材料的品牌流程');
   assert.deepEqual(errors,[]);console.log('PASS: 新版单主按钮真实服务链10→8→整表确认→4类→5询价→5供应商，错误集中提醒及抬头聚焦。');
  }finally{await browser.close();await new Promise(r=>server.close(r));await fs.rm(root,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

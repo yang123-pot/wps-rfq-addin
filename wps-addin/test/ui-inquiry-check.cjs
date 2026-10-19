@@ -73,11 +73,11 @@ function initScript(context){
   const store=storeFor(file);
   return {Name:typeof requested==='string'?requested:store.sheet,
    UsedRange:{Row:1,Column:1,Rows:{Count:store.values.length},Columns:{Count:store.values[0].length},Value2:store.values},
-   Activate(){},
+   Activate(){window.__activeSheet={file: file,name:this.Name};},
    Cells:{Item(row,column){return {NumberFormat:'',
     get Value2(){const value=store.cells[row+':'+column];return value===undefined?(store.values[row-1]||[])[column-1]:value;},
     set Value2(value){store.cells[row+':'+column]=value;},
-    get HasFormula(){return false;},Select(){}};}}};
+    get HasFormula(){return false;},Select(){window.__selectedCell={file: file,sheet:typeof requested==='string'?requested:store.sheet,row,column};}};}}};
  }
  function openBook(file,readOnly){
   const book={FullName:file,ReadOnly:!!readOnly,

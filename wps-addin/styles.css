@@ -254,9 +254,9 @@ body:not(.detail-mode) #assistant-header input{margin:0;padding:9px 10px;border:
 body:not(.detail-mode) #assistant-header .filter{margin-top:9px;font-size:13px;color:#4e5b69}
 body:not(.detail-mode) #assistant-header .review-actions{margin-top:6px}
 body:not(.detail-mode) #assistant-header .review-actions button{font-size:12px;padding:8px}
-body:not(.detail-mode) #assistant-header .library-list>li:nth-child(5),
 body:not(.detail-mode) #assistant-header .filter,
 body:not(.detail-mode) #assistant-header .review-actions{display:none!important}
+body:not(.detail-mode) #assistant-header [data-aux-back]{display:none!important}
 body:not(.detail-mode) .assistant-actions{border-top:1px solid #dfe3e8;padding:12px 0 10px;min-height:58px}
 body:not(.detail-mode) .simple-primary{border-radius:3px;background:#217346;font-size:14px;font-weight:700;min-height:42px}
 body:not(.detail-mode) .simple-link{color:#1768bb;font-size:12px;padding:8px 0}

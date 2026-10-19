@@ -2,7 +2,7 @@
  <rect width="1500" height="720" fill="#f4f7f6"/>
  <g font-family="Microsoft YaHei, sans-serif" fill="#24372e">
  <text x="40" y="48" font-size="27" font-weight="700">询价表前五行：按用户参考图调整</text>
- <text x="40" y="83" font-size="17">材料10列及明细样式保持；新增选填传真、邮箱，第一行取公司名称，第4行取供应商。</text>
+ <text x="40" y="83" font-size="17">材料10列保持；第6步直接填写公司地址、传真、邮箱（选填），经办人栏改为“材料经办人及联系电话”。</text>
  </g>
  <rect x="40" y="115" width="1420" height="470" fill="#fff" stroke="#c6d0ca"/>
  <g font-family="SimSun, serif" fill="#000">

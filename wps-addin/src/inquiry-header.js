@@ -9,9 +9,9 @@
  var SCHEMA_VERSION=1,SUPPLIER_LABEL='供货单位',
   FIELDS=[{key:'projectName',label:'项目名称',prefix:'项目名称：',required:true},
    {key:'company',label:'单位名称',prefix:'单位名称：',required:true},
-   {key:'contact',label:'材料经办人',prefix:'材料经办人：',required:true},
+   {key:'contact',label:'材料经办人及联系电话',prefix:'材料经办人及联系电话：',required:true},
    {key:'phone',label:'联系方式',prefix:'联系方式：',required:true},
-   {key:'address',label:'原公司地址',prefix:'公司地址：',required:false},
+   {key:'address',label:'公司地址',prefix:'公司地址：',required:false},
    {key:'fax',label:'传真',prefix:'传真：',required:false},
    {key:'email',label:'邮箱',prefix:'邮箱：',required:false}],
   REQUIRED=FIELDS.filter(function(field){return field.required;}).map(function(field){return field.key;});

@@ -35,7 +35,7 @@
    r.title='品牌和供应商填写有问题';r.actionLabel='去修改';
    r.solution='请在对应类别的黄色区域补齐成对的品牌和供应商，删除重复组合；填写多组时选择“合成一份”或“按品牌分别生成”。';
   }else if(p.stage==='header'){
-   r.title='请补全询价抬头';r.actionLabel='去填写';r.solution='请填写项目名称、单位名称、材料经办人和联系方式，再生成询价表。';
+   r.title='请补全询价抬头';r.actionLabel='去填写';r.solution='请填写项目名称、单位名称、材料经办人及联系电话和联系方式，再生成询价表。';
   }
   if(p.status===409||/其他窗口|版本冲突|已被其他/.test(message)){r.title='项目尚未保存';r.solution='当前草稿已保留。请先保留本次填写，再打开最新项目记录核对后保存，不能覆盖其他窗口的新记录。';}
   else if(/已存在|同名|EEXIST/.test(message)){r.title='目标位置已有同名文件';r.solution='请选择新的输出文件夹或另存新文件名；已有文件不会覆盖。';r.actionLabel='更换保存位置';}

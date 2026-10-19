@@ -302,6 +302,20 @@ test('打开汇总表：已打开的同路径工作簿直接复用，未打开�
  assert.throws(()=>host.openSummary({AutomationSecurity:null,Workbooks:{Count:0}},filePath),/宏安全设置/);
  assert.throws(()=>host.openSummary(fresh,'relative.xlsx'),/路径无效/);
 });
+test('进入品牌填写每次激活绑定工作簿和分类汇总页，定位首组品牌格并回到表头',()=>{
+ for(const layout of ['separated','combined']){
+  const file='C:\\out\\分类工作簿.xlsx',events=[];
+  const sheet={Name:'分类汇总表',Activate(){events.push('summary');},Cells:{Item(row,column){return {Select(){events.push([row,column]);}};}}};
+  const target={FullName:file,Activate(){events.push('book');},Worksheets:{Count:1,Item(){return sheet;}}};
+  const other={FullName:'C:\\out\\其他.xlsx',Activate(){assert.fail('不应激活其他工作簿');}};
+  const app={AutomationSecurity:1,ActiveWorkbook:null,ActiveWindow:{ScrollRow:58,ScrollColumn:20},Workbooks:{Count:2,Item:i=>i===1?other:target,Open(){assert.fail('已打开不重复打开');}}};
+  host.openSummary(app,file,{sheet:'分类汇总表',layout,focus:true});
+  host.openSummary(app,file,{sheet:'分类汇总表',layout,focus:true});
+  const row=layout==='combined'?5:4;
+  assert.deepEqual(events,['book','summary',[row,4],'book','summary',[row,4]]);
+  assert.equal(app.ActiveWindow.ScrollRow,1);assert.equal(app.ActiveWindow.ScrollColumn,1);
+ }
+});
 
 // 2026-10-11（图04/05变更“一本多页”）：汇总表就是那本分类工作簿的第 1 页，
 // 名称列由“指向独立文件的相对链接”改为“文件内跳转到对应分类页”。

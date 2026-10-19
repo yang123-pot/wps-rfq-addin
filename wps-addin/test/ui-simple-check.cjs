@@ -48,8 +48,26 @@ const { createServer } = require('../dev/server.cjs');
     assert.equal(await page.locator('#simple-home').isHidden(), true);
     assert.equal(await page.locator('#simple-settings .simple-setting').count() >= 5, true, '设置包含项目/单位/分类/帮助/详细步骤');
     await page.locator('#simple-settings-close').click();
+    for(const id of ['header-section','library-section','brand-reference-section','export-section']){
+      await page.locator('#simple-settings-toggle').click();
+      await page.locator('[data-simple-section="'+id+'"]').click();
+      await page.locator('#'+id+' [data-aux-back]').click();
+      assert.equal(await page.locator('#simple-settings').isVisible(),true,id+'返回设置');
+      await page.locator('#simple-settings-close').click();
+    }
+    await page.evaluate(()=>{RfqRibbonNavigation.request(Application.PluginStorage,'help');window.dispatchEvent(new Event('focus'));});
+    await page.waitForFunction(()=>!document.getElementById('simple-help').hidden);
+    await page.locator('#simple-help').getByRole('button',{name:'返回上一步',exact:true}).click();
+    assert.equal(await page.locator('#simple-help').isHidden(),true,'帮助页能返回当前操作');
     assert.equal(await page.locator('#simple-settings').isHidden(), true);
     assert.equal(await page.locator('#simple-home').isVisible(), true);
+    assert.match(await page.locator('#simple-result').innerText(),/已返回/,'关闭设置返回当前操作页并反馈');
+    await page.locator('#simple-settings-toggle').click();
+    await page.locator('[data-simple-section="project-section"]').click();
+    await page.locator('#project-section [data-aux-back]').click();
+    assert.equal(await page.locator('#simple-settings').isVisible(),true,'项目操作页返回设置');
+    assert.match(await page.locator('#simple-settings-navigation').innerText(),/已返回设置/);
+    await page.locator('#simple-settings-close').click();
 
     await page.evaluate(()=>{RfqRibbonNavigation.request(Application.PluginStorage,'help');window.dispatchEvent(new Event('focus'));});
     await page.waitForFunction(()=>!document.getElementById('simple-help').hidden);
@@ -83,6 +101,8 @@ const { createServer } = require('../dev/server.cjs');
     assert.equal(await page.locator('#simple-primary').innerText(),'生成询价总表');
     assert.equal(await page.locator('#assistant-header #header-fax').isVisible(),true,'简版第6步可填写传真');
     assert.equal(await page.locator('#assistant-header #header-email').isVisible(),true,'简版第6步可填写邮箱');
+    assert.equal(await page.locator('#assistant-header #header-address').isVisible(),true,'简版第6步直接填写公司地址');
+    assert.match(await page.locator('#header-contact').getAttribute('aria-label'),/^材料经办人及联系电话$/);
     await page.setViewportSize({width:400,height:768});
     assert.equal(await page.locator('body').evaluate(el=>el.scrollWidth<=400),true,'新增字段不导致窄窗横向溢出');
     if(process.env.RFQ_UI_SIMPLE_HEADER_SCREENSHOT)await page.screenshot({path:process.env.RFQ_UI_SIMPLE_HEADER_SCREENSHOT,fullPage:true});

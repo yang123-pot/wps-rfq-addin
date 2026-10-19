@@ -48,7 +48,7 @@
    }else if(!header.ok){
     banner.textContent='询价抬头未填齐';banner.className='result-banner';
     progress.textContent='当前进度 6 / 7 · 品牌已读回，等待填写询价抬头';
-    stats.textContent='抬头包含项目名称、单位名称、材料经办人、联系方式（必填）与原公司地址、传真、邮箱（可选）。';
+    stats.textContent='抬头包含项目名称、单位名称、材料经办人及联系电话、联系方式（必填）与公司地址、传真、邮箱（可选）。';
     status.textContent='还缺：'+header.errors.join('；')+'。请在“辅助功能 → 询价抬头”里填写。';
    }else if(error){
     banner.textContent='询价表还不能生成';banner.className='result-banner';

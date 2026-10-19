@@ -83,8 +83,9 @@ test('打开完成项目先绑定身份，再恢复拆分；不得为临时身�
   const splitPlan=require('../src/split-plan.js'),splitState=require('../src/split-state.js');
   window.RfqSplitPlan=global.RfqSplitPlan=splitPlan;
   window.RfqSplitState=global.RfqSplitState=splitState;
+  window.RfqInquiryModel=global.RfqInquiryModel=require('../src/inquiry-model.js');
   delete require.cache[require.resolve('../src/split-ui.js')];require('../src/split-ui.js');
-  const model={inputKey:'ck1-restore-split',rowCount:1,sheets:[{sheetId:'sheet-a',kind:'inquiry',
+  const model={layoutVersion:2,inputKey:'ck1-restore-split',rowCount:1,sheets:[{sheetId:'sheet-a',kind:'inquiry',
     name:'水泵询价',categoryName:'水泵',brand:'青源',supplier:'华川设备',values:[['序号'],['1']],layout:{headerRow:1}}]};
   value.generation={inputKey:model.inputKey,modelSnapshot:model,target:'C:\\成果\\总询价.xlsx',sha256:SHA('b'),sheetIds:['sheet-a']};
   const plan=splitPlan.build({model,generation:value.generation,targetDirectory:'C:\\成果\\供应商件'});

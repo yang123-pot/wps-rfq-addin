@@ -56,3 +56,37 @@ test('分类工作簿已存在但待核对时，主按钮核对现有文件而�
  assert.equal(s.view().label,'核对现有分类工作簿');
  assert.match(s.view().description,/已经生成.*不会再写一份/);
 });
+test('返回已完成步骤只改变当前页面，保留全部业务状态并提供本步动作',()=>{
+ const s=api.create({files:[{name:'示例.xlsx'}],previewAvailable:true,previewReviewed:true,mergeConfirmed:true,
+  reviewGenerated:true,reviewOpened:true,reviewConfirmed:true,categoriesReady:true,summaryReady:true,brandsOpened:true,
+  brandsReady:true,inquiryReady:true,splitStarted:true,outputDirectory:'D:/test',splitVerified:true,
+  split:{planned:2,complete:2,failed:0,pending:0,needsVerification:0,completeWorkbookCount:1,files:[]},statusMessage:'原摘要'});
+ assert.equal(typeof s.navigate,'function');const original=s.snapshot();
+ const actions={1:'mergeConfirm',2:'reviewOpen',3:'reviewConfirm',4:'continueBrands',5:'brandsConfirm',6:'goSplit',7:'openFolder'};
+ for(let step=7;step>=1;step--){
+  assert.equal(s.navigate(step),true);assert.equal(s.view().step,step);assert.equal(s.view().action,actions[step]);
+  assert.equal(s.view().progressStep,8);assert.deepEqual(s.snapshot(),original,'返回不能改业务完成标志');
+  s.set({statusMessage:'状态刷新'});assert.equal(s.view().step,step,'刷新不弹回最后完成步骤');
+  s.set({statusMessage:'原摘要'});
+ }
+ s.followProgress();assert.equal(s.view().step,8);
+});
+test('导航不能越过就绪步骤，业务处理中不能返回，上游失效后不能停在无效页面',()=>{
+ const s=api.create({mergeConfirmed:true,reviewGenerated:true,reviewOpened:true});
+ assert.equal(typeof s.navigate,'function');assert.equal(s.navigate(4),false);assert.equal(s.navigate(0),false);
+ assert.equal(s.navigate('matching'),true);assert.equal(s.view().step,2);
+ s.set({busy:true});assert.equal(s.navigate(1),false);assert.equal(s.view().step,2);
+ s.set({busy:false,mergeConfirmed:false,reviewGenerated:false,reviewOpened:false});
+ assert.equal(s.view().step,1,'来源或合并失效时回到真实阻断处');
+});
+test('第一步的整理选择、预览、选文件可逐级返回，不丢文件或合并选择',()=>{
+ const s=api.create({files:[{name:'示例.xlsx'}],previewAvailable:true,previewReviewed:true,mergeIdentical:true});
+ assert.equal(s.view().canBack,true,'整理方式页面也有上一步');
+ assert.equal(typeof s.navigateImport,'function');const before=s.snapshot();
+ s.navigateImport('preview');assert.equal(s.view().action,'previewConfirm');assert.equal(s.view().mergeVisible,false);
+ assert.equal(s.view().backTarget.phase,'select');assert.deepEqual(s.snapshot(),before);
+ s.navigateImport('select');assert.equal(s.view().action,'previewResume');assert.deepEqual(s.snapshot(),before);
+ s.navigateImport('options');assert.equal(s.view().mergeVisible,true);
+ s.set({files:[],previewReviewed:false,previewAvailable:false});
+ assert.equal(s.view().canBack,false,'来源清空后不残留无效返回入口');assert.equal(s.view().action,'import');
+});

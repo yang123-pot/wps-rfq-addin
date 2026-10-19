@@ -386,7 +386,20 @@
     var previous=app.ActiveWorkbook,security=app.AutomationSecurity,created=null,reopened=null,error=null;
     if(typeof security!=='number')throw Error('不能读取宏安全设置，未创建文件。');
     try{
+      var beforeCount=Number(app.Workbooks.Count),beforeNames={};
+      for(var index=1;index<=beforeCount;index++)beforeNames[key(app.Workbooks.Item(index).FullName)]=true;
       created=app.Workbooks.Add(-4167);
+      // 部分WPS调用会完成新建但返回null。只接管集合中本次唯一新增的未保存簿；
+      // 不能把当前活动簿当成输出，也不能重试Add制造更多窗口。
+      if(!created&&Number(app.Workbooks.Count)===beforeCount+1){
+        var candidates=[];
+        for(var item=1;item<=app.Workbooks.Count;item++){
+          var candidate=app.Workbooks.Item(item),name=previewIdentity(candidate);
+          if(name&&!beforeNames[key(name)])candidates.push(candidate);
+        }
+        if(candidates.length===1)created=candidates[0];
+      }
+      if(!created||!created.Worksheets)throw Error('WPS新建输出工作簿未返回有效对象，未写入所选目标。请确认WPS没有未关闭的对话框，保留填写内容后重试。');
       model.sheets.forEach(function(s,i){
         var sheet=i===0?created.Worksheets.Item(1):created.Worksheets.Add(null,created.Worksheets.Item(i));
         sheet.Name=s.name;chunks(sheet,s.values,true);
