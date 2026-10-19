@@ -174,6 +174,8 @@ function initScript(context){
   };
   await require('./assistant-test-ui.cjs').acknowledgeProblems(page);
   await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html?mode=detail');
+  assert.match(await page.locator('#categories-note').innerText(),/最后单独保留一页“无需询价”/,
+   '第4步说明必须明确无需询价保留在分类簿最后，不进入品牌汇总');
   // 图01→图02→图03：导入、合并确认、生成成果表、整表确认（含用户改选汽车充电桩）。
   await page.locator('#import-files').click();
   await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===2);

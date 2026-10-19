@@ -15,6 +15,12 @@ const assert=require('node:assert/strict');const path=require('node:path');const
   await page.evaluate(()=>RfqAssistant.set({previewReviewed:true}));assert.equal(await page.locator('#simple-merge-choice').isVisible(),true);
   await page.evaluate(()=>RfqAssistant.set({layout:'combined'}));assert.equal(await page.locator('#assistant-layout').inputValue(),'combined','恢复或详细模式改变布局后，简版选择也必须同步');
   await page.evaluate(()=>RfqAssistant.set({mergeConfirmed:true,reviewGenerated:true,reviewOpened:true}));assert.match(await page.locator('#simple-primary').innerText(),/核对完成/);
+  assert.equal(await page.locator('#simple-back').isVisible(),true,'简版第3步必须能返回上一步');
+  assert.equal(await page.locator('#simple-back').innerText(),'返回上一步');
+  await page.setViewportSize({width:320,height:500});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,
+   '第3步“返回上一步＋保存审核成果”不得横向溢出');
+  await page.setViewportSize({width:400,height:768});
   assert.equal(await page.locator('#simple-save-review').innerText(),'保存审核成果','简版第3步必须能直接保存审核草稿');
   assert.equal(await page.locator('#simple-save-review').isVisible(),true);
   await page.evaluate(()=>{
@@ -27,6 +33,11 @@ const assert=require('node:assert/strict');const path=require('node:path');const
   await page.locator('#simple-save-review').click();
   assert.equal(await page.evaluate(()=>window.__simpleSaveClicks),1,'简版保存入口必须触发真实草稿保存按钮');
   assert.match(await page.locator('#simple-result').innerText(),/正在保存审核草稿/);
+  await page.locator('#simple-back').click();
+  assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage'),'matching',
+   '简版返回必须进入上一步自动分类');
+  assert.equal(await page.locator('#simple-home').isVisible(),true,'简版返回应留在简版，不把用户切到详细流程');
+  assert.equal(await page.evaluate(()=>document.body.classList.contains('detail-mode')),false);
   await page.evaluate(()=>RfqAssistant.set({reviewConfirmed:true,categoriesReady:true,summaryReady:true,brandsOpened:true,brandsReady:true,expectedSheets:9}));
   // 1366×768/1920×1080 扣除功能区及常用缩放后的CSS等效操作区；真实WPS尺寸另行验收。
   for(const [width,height] of [[400,600],[400,900],[320,499],[320,360]]){

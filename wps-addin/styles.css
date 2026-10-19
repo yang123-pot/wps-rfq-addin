@@ -129,6 +129,7 @@ body:not(.detail-mode) footer{display:none!important}
 .simple-primary{width:100%;border:0;border-radius:8px;background:#237555;color:#fff;font:inherit;font-size:14px;font-weight:700;padding:12px;cursor:pointer}
 .simple-primary:disabled{background:#e4eae6;color:#89998e;cursor:default}
 .simple-link{display:block;margin:9px auto 0;border:0;background:transparent;color:#4f7460;font:inherit;font-size:11px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.workflow-back-row{margin:8px 0 12px}.workflow-back-row button{margin:0;font-size:12px}
 .simple-next{display:flex;justify-content:space-between;gap:8px;align-items:center;background:#fbfcfb;border:1px solid #e7ece8;border-radius:8px;padding:10px 12px;color:#7b8c82;font-size:11px}
 .simple-next strong{color:#5b7062;font-size:11px}
 .simple-hint{display:flex;justify-content:space-between;gap:8px;align-items:center;background:#fff8e8;border:1px solid #f1dfb8;border-radius:8px;padding:9px 10px;margin-top:10px;color:#8a6420;font-size:11px;line-height:1.6}

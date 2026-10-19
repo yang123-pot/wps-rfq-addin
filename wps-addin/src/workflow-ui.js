@@ -29,13 +29,14 @@
   var config=options||{};
   var nav=document.getElementById('workflow-nav'),note=document.getElementById('workflow-note'),
     rowsCell=document.getElementById('workflow-rows'),mergedCell=document.getElementById('workflow-merged'),
-    host=document.getElementById('workflow-stage-extra'),importPanel=document.getElementById('stage-panel-import');
+    host=document.getElementById('workflow-stage-extra'),importPanel=document.getElementById('stage-panel-import'),
+    workflowBack=document.getElementById('workflow-back');
   var simpleHome=document.getElementById('simple-home'),simpleSettings=document.getElementById('simple-settings'),
     simpleModeToggle=document.getElementById('simple-mode-toggle'),simpleSettingsToggle=document.getElementById('simple-settings-toggle'),
     simpleProgress=document.getElementById('simple-progress-text'),simpleBar=document.getElementById('simple-bar-fill'),
     simpleSevenList=document.getElementById('simple-seven-list'),simpleTitle=document.getElementById('simple-title'),
     simpleDesc=document.getElementById('simple-desc'),simpleExample=document.getElementById('simple-example'),
-    simplePrimary=document.getElementById('simple-primary'),simpleExampleLink=document.getElementById('simple-example-link'),
+    simplePrimary=document.getElementById('simple-primary'),
     simpleMergeChoice=document.getElementById('simple-merge-choice'),simpleMergeSummary=document.getElementById('simple-merge-summary'),
     simpleMergeAll=document.getElementById('simple-merge-all'),
     simpleResult=document.getElementById('simple-result'),
@@ -113,6 +114,11 @@
    if(status)status.textContent='当前状态：'+stateText(current)+'（按真实内容判定，未实现的阶段不会显示已确认）';
   }
   function show(){
+   var currentIndex=STEPS.map(function(step){return step.id;}).indexOf(current);
+   if(workflowBack){
+    workflowBack.hidden=currentIndex<=0;
+    workflowBack.textContent=currentIndex>0?('返回上一步：'+STEPS[currentIndex-1].label):'返回上一步';
+   }
    STEPS.forEach(function(step){
     var panel=stepPanel(step);
     panel.hidden=step.id!==current;
@@ -196,10 +202,11 @@
   });
   if(document&&typeof document.addEventListener==='function'){
    document.addEventListener('rfq:simple-back',function(event){
-    var step=Number(event&&event.detail&&event.detail.step)||0,index=step-1;
-    if(index>=STEPS.length)return;
-    setViewMode('detail');
-    goTo(STEPS[Math.max(0,index-1)].id);
+    var step=Number(event&&event.detail&&event.detail.step)||0;
+    if(step<=1)return;
+    var index=Math.min(STEPS.length-1,step-1);
+    setViewMode('home');
+    goTo(STEPS[index-1].id);
    });
   }
   Array.prototype.forEach.call(simpleMergeRadios,function(radio){
@@ -216,7 +223,10 @@
    else renderSimple();
   });
   if(typeof location!=='undefined'&&/[?&]mode=detail(?:&|$)/.test(location.search||''))setViewMode('detail');
-  if(simpleExampleLink)simpleExampleLink.onclick=function(){showSimpleHelp('选择清单→先看预览→确认整理方式→表内核对分类→汇总表填写品牌→填写抬头→拆分文件。每步完成后，下方主按钮会出现下一项操作。');};
+  if(workflowBack)workflowBack.addEventListener('click',function(){
+   var index=STEPS.map(function(step){return step.id;}).indexOf(current);
+   if(index>0)goTo(STEPS[index-1].id);
+  });
   renderSimple();
   var handle={goTo:goTo,openDetail:openDetail,openTask:openTask,current:function(){return current;},
    panel:function(stage){

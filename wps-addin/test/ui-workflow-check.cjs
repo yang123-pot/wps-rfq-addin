@@ -188,6 +188,12 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.equal(await page.locator('#classification-review-open').isDisabled(),true,'尚未生成成果表时不能打开');
   assert.equal(await page.locator('#classification-review-generate').innerText(),'生成审核成果表');
   assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage'),'matching');
+  assert.equal(await page.locator('#workflow-back').isVisible(),true,'详细流程第2步必须能返回上一步');
+  assert.equal(await page.locator('#workflow-back').innerText(),'返回上一步：导入与合并');
+  await page.locator('#workflow-back').click();
+  assert.equal(await page.locator('#workflow-nav .workflow-step-button.is-current').getAttribute('data-stage'),'import');
+  assert.equal(await page.locator('#workflow-back').isHidden(),true,'第1步没有上一步');
+  await page.locator('#workflow-nav .workflow-step-button[data-stage="matching"]').click();
   assert.deepEqual(designIssues,[],'获批图02/03/05：状态必须真实，旧确认入口不得继续暴露');
 
   // 生成独立成果簿：过真实prepare/commit/verify，只把写盘换成夹具，并核对成果簿内容与绑定。

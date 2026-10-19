@@ -83,6 +83,8 @@ async function run(){
    await fs.writeFile(stagePath,xlsxFixture.workbook(payload));});
   await require('./assistant-test-ui.cjs').acknowledgeProblems(page);
   await page.goto('http://127.0.0.1:'+server.address().port+'/taskpane.html?mode=detail');
+  assert.match(await page.locator('#split-note').innerText(),/无需询价.*完整总表/,
+   '第7步说明必须同时标明无需询价文件和拆分前完整总表');
   await page.evaluate(function(args){
    ['split-message','split-status','split-directory','split-directory-label','split-preview','split-run','split-retry','split-open']
     .forEach(function(id){const old=document.getElementById(id),clone=old.cloneNode(true);old.parentNode.replaceChild(clone,old);});
