@@ -6,7 +6,7 @@
     refreshButton=document.getElementById('refresh-projects'),message=document.getElementById('project-message'),
     status=document.getElementById('project-status'),list=document.getElementById('project-list'),
     relocateButton=document.getElementById('relocate-project');
-  var current=null,busy=false,pendingId=null,lastReport=null;
+  var current=null,busy=false,pendingId=null,lastReport=null,restoringId=null;
   // R5：整表审核确认快照与草稿。只有确认快照存在（且inputKey仍是本次内容）才把“表内审核”置为已确认。
   var reviewConfirmation=null,reviewDraft=null,lastError=null;
   var restoreBlocks={},restoreAudit=null,restoreRecord=null;
@@ -40,6 +40,7 @@
   }
   // 未保存项目也要有稳定身份，本机分类习惯按它记录确认来源；保存或打开其他项目前不重新生成。
   function identity(){
+    if(restoringId)return restoringId;
     if(current&&current.projectId)return current.projectId;
     if(!pendingId)pendingId=RfqProject.newId();
     return pendingId;
@@ -270,6 +271,8 @@
         }catch(error){failed.push((sources[index].originalName||sources[index].originalPath)+'：'+error.message);}
       }
       if(failed.length)throw Error('原件已变化或不可读取，旧进度不能沿用，请重新导入：'+failed.join('；'));
+      // 恢复钩子会准备拆分回执；此时必须使用目标项目身份，不能用临时或上个项目编号。
+      restoringId=loaded.projectId;
       if(!options.restore||options.restore(loaded)===false)throw Error('项目内容无法恢复到侧栏。');
       if(options.restoreClassification)options.restoreClassification(
         loaded.classification||(loaded.carried&&loaded.carried.classification)||null);
@@ -310,7 +313,7 @@
         !audit.ok||!!physicalRefreshFailed);
       return true;
     }catch(error){tell('项目未打开。'+error.message,true);return false;}
-    finally{busy=false;if(options.onBusy)options.onBusy(false);}
+    finally{restoringId=null;busy=false;if(options.onBusy)options.onBusy(false);}
   }
   async function relocateTo(target,fromRoot){
     if(!target)return;

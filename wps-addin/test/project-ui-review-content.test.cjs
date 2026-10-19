@@ -68,11 +68,56 @@ function installFetch(routes,saves){
     if(!handler)throw Error('未预期的请求：'+route);
     const result=handler.handle(body,route);
     if(result&&result.status&&result.status>=400)
-      return {ok:false,status:result.status,json:async function(){return {error:result.error||'错误'};}};
+      return {ok:false,status:result.status,json:async function(){return {error:result.error||'错误'};},
+        text:async function(){return JSON.stringify({error:result.error||'错误'});}};
     if(route.indexOf('/api/project/save')>=0&&saves)saves.push(body);
-    return {ok:true,status:200,json:async function(){return result;}};
+    return {ok:true,status:200,json:async function(){return result;},text:async function(){return JSON.stringify(result);}};
   };
 }
+
+test('打开完成项目先绑定身份，再恢复拆分；不得为临时身份准备另一批回执',async()=>{
+  const {project,ui,elements}=boot(),live={},value=record(project),requests=[];
+  const splitPlan=require('../src/split-plan.js'),splitState=require('../src/split-state.js');
+  window.RfqSplitPlan=global.RfqSplitPlan=splitPlan;
+  window.RfqSplitState=global.RfqSplitState=splitState;
+  delete require.cache[require.resolve('../src/split-ui.js')];require('../src/split-ui.js');
+  const model={inputKey:'ck1-restore-split',rowCount:1,sheets:[{sheetId:'sheet-a',kind:'inquiry',
+    name:'水泵询价',categoryName:'水泵',brand:'青源',supplier:'华川设备',values:[['序号'],['1']],layout:{headerRow:1}}]};
+  value.generation={inputKey:model.inputKey,modelSnapshot:model,target:'C:\\成果\\总询价.xlsx',sha256:SHA('b'),sheetIds:['sheet-a']};
+  const plan=splitPlan.build({model,generation:value.generation,targetDirectory:'C:\\成果\\供应商件'});
+  value.split=splitState.create(plan,SHA('b'),{projectId:value.projectId,batchId:'b-restore-split',outputDirectory:plan.directory});
+  value.split.files.forEach(file=>{value.split=splitState.mark(value.split,file.fileId,'succeeded',SHA('c'));});
+  const inspect=new Map([[REVIEW_PATH,SHA('a')],[value.generation.target,SHA('b')],...value.split.files.map(file=>[file.target,SHA('c')])]);
+  let panel,generation=null;
+  installFetch([
+    {match:'/api/project/load',handle:()=>({project:value})},
+    {match:'/api/project/restore-copy',handle:body=>({copyPath:body.source.copyPath})},
+    {match:'/api/export/inspect',handle:body=>({target:body.target,exists:inspect.has(body.target),sha256:inspect.get(body.target)})},
+    {match:'/api/split/prepare',handle:body=>{
+      requests.push(body);
+      return {plan,canPublish:true,receipt:body.projectId===value.projectId?value.split:
+        splitState.create(plan,SHA('b'),{projectId:body.projectId,batchId:body.batchId,outputDirectory:plan.directory})};
+    }}],[]);
+  const split=window.RfqSplitUI.create({projectId:()=>panel.identity(),generation:()=>generation,context:()=>({inputKey:model.inputKey})});
+  panel=ui.create(options(live,{restoreGeneration:value=>{generation=value;},restoreSplit:value=>split.restore(value),
+    getGeneration:()=>generation,getSplit:()=>split.receipt(),getSplitVerdict:()=>split.verdict()}));
+  assert.equal(await panel.open('p-ui-r12c-0001'),true);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(requests.length,1);
+  assert.equal(requests[0].projectId,'p-ui-r12c-0001','拆分准备必须属于刚打开的持久项目，不能用临时身份');
+  assert.equal(requests[0].batchId,'b-restore-split','保留成功回执批次，不新建批次');
+  assert.equal(split.verdict().ready,true,'已有完整成功回执应恢复为完成');
+  assert.equal(elements['split-run'].disabled,false,'拆分准备响应必须成功处理，不能只靠预置回执判ready');
+  assert.match(elements['split-status'].textContent,/完成 2 · 失败 0 · 待处理 0$/);
+  assert.doesNotMatch(elements['split-message'].textContent,/拆分准备失败/);
+  value.projectId='p-ui-r12c-0002';value.split.projectId=value.projectId;value.split.batchId='b-second-split';
+  assert.equal(await panel.open('p-ui-r12c-0002'),true);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(requests[1].projectId,'p-ui-r12c-0002','从已打开项目切换时也不能沿用上个项目身份');
+  assert.equal(requests[1].batchId,'b-second-split');
+  assert.equal(split.verdict().ready,true);
+  assert.equal(elements['split-run'].disabled,false);
+});
 
 test('R12-C：审核成果表SHA相同但业务内容不同——重开不得判为已一致，review不ready',async()=>{
   const {project,ui}=boot(),live={},value=record(project);
