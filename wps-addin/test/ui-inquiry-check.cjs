@@ -200,7 +200,7 @@ async function run(){
   await page.evaluate(function(args){window.__setCell(args.row,9,'汽车充电桩');window.__setCell(args.row,10,'充电桩配套');},{row:CONFLICT_ROW});
   await page.locator('#sheet-review-confirm').click();
   await page.waitForFunction(function(){return /整表已确认（8 行）/.test(document.querySelector('#sheet-review-message').textContent);});
-  await page.waitForFunction(function(){return /分类工作簿已生成（1 本 · 4 页）/.test(document.querySelector('#categories-banner').textContent);});
+  await page.waitForFunction(function(){return /分类工作簿已生成（1 本 · 4 类 · 无需询价1页）/.test(document.querySelector('#categories-banner').textContent);});
   assert.deepEqual((await fs.readdir(workbookDirectory)).sort(),['示例园区_分类工作簿.xlsx'],
    '第4步只发布一本分类工作簿');
   // 图05A：分类汇总表＝同一本工作簿第 1 页（默认分列），一类一行，名称是文件内跳转链接。

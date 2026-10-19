@@ -49,7 +49,7 @@
    var current=currentGeneration(),ctx=context();
    if(!current)throw Error('请先生成并校验总询价工作簿。');
    return RfqSplitPlan.build({model:current.modelSnapshot,generation:current,targetDirectory:directory,
-    currentKey:ctx?ctx.inputKey:null});
+    currentKey:ctx?ctx.inputKey:null,noInquiry:ctx?ctx.noInquiry:null});
   }
   function receiptMatches(){
    var current=currentGeneration(),ctx=context();
@@ -86,7 +86,8 @@
     var state=record&&record.files?record.files.filter(function(item){return item.fileId===file.fileId;})[0]:null;
     var li=node('li');li.setAttribute('data-split-file',file.fileId);
     li.appendChild(node('strong',file.name));
-    li.appendChild(node('p',(file.kind==='complete-workbook'?'完整总表 · 保留全部工作表、内容和格式':file.categoryName+' · '+(file.brand||'（无品牌）')+' · '+(file.supplier||'（无供应商）')+' · 材料 '+file.materialRows+' 行')+
+    li.appendChild(node('p',(file.kind==='complete-workbook'?'完整总表 · 保留全部工作表、内容和格式':
+     file.kind==='no-inquiry'?'无需询价 · 保留 '+file.materialRows+' 行供核对':file.categoryName+' · '+(file.brand||'（无品牌）')+' · '+(file.supplier||'（无供应商）')+' · 材料 '+file.materialRows+' 行')+
      ' · 状态：'+stateLabel(state&&state.state)+(state&&state.error?'（'+state.error+'）':''),'source'));
     li.appendChild(node('p',file.target,'source'));
     previewList.appendChild(li);
@@ -150,7 +151,7 @@
   function preparePayload(){
    var current=currentGeneration(),ctx=context();
    return {projectId:projectId(),batchId:ensureBatch(),generation:current,targetDirectory:directory,
-    currentKey:ctx?ctx.inputKey:null};
+    currentKey:ctx?ctx.inputKey:null,noInquiry:ctx?ctx.noInquiry:null};
   }
   async function syncPlan(){
    if(!directory||!currentGeneration()){prepared=null;prepareError=null;render();return null;}
@@ -199,6 +200,13 @@
   function sheetWorkbook(sheet){
    return {mode:'inquiry',inputKey:'',sheets:[{name:sheet.name,values:sheet.values,layout:sheet.layout}]};
   }
+  function noInquiryWorkbook(){
+   var ctx=context(),entry=ctx&&ctx.noInquiry,current=currentGeneration();
+   if(!entry||!Array.isArray(entry.rows)||!entry.rows.length)throw Error('缺少无需询价明细，不能生成无需询价文件。');
+   var sheet=RfqCategoryWorkbooks.mainSheet(entry,{batchId:batchId});
+   sheet.name=entry.sheetName||'无需询价';
+   return {mode:'no-inquiry',inputKey:current?current.inputKey:'',sheets:[sheet]};
+  }
   function inspectFile(path){
    return exportRequest('inspect',{target:path}).then(function(result){return result||{target:path,exists:false,sha256:null};},
     function(){return {target:path,exists:false,sha256:null};});
@@ -215,7 +223,7 @@
    return receipt;
   }
   async function publish(file,sheet){
-   var workbook=sheetWorkbook(sheet);
+   var workbook=file.kind==='no-inquiry'?noInquiryWorkbook():sheetWorkbook(sheet);
    var preparedFile=await exportRequest('prepare',{target:file.target,freezePlan:RfqBrandHost.freezePlan(workbook)});
    if(!preparedFile||typeof preparedFile.ticket!=='string'||typeof preparedFile.stagePath!=='string')
     throw Error('拆分暂存信息不完整，未写入。');
@@ -294,7 +302,10 @@
     var outcome;
     try{
      if(file.kind==='complete-workbook')outcome={ok:true,sha256:await copyComplete(file,true)};
-     else{var sheet=findSheet(file);
+     else if(file.kind==='no-inquiry'){
+      var noInquiry=noInquiryWorkbook();
+      outcome=await RfqExportHost.verifyExistingOutput(options.application,file,noInquiry.sheets[0],inspectFile);
+     }else{var sheet=findSheet(file);
       if(!sheet)throw Error('冻结快照里找不到对应询价页，无法核对。');
       outcome=await RfqExportHost.verifyExistingOutput(options.application,file,sheet,inspectFile);}
     }catch(error){outcome={ok:false,sha256:null,mismatches:[error.message],layoutIssues:[]};}
@@ -353,6 +364,7 @@
      try{
       var sha;
       if(file.kind==='complete-workbook')sha=await copyComplete(file,false);
+      else if(file.kind==='no-inquiry')sha=await publish(file,null);
       else{var sheet=findSheet(file);
        if(!sheet)throw Error('生成快照里找不到对应询价页。');
        sha=await publish(file,sheet);}

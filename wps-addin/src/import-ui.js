@@ -180,7 +180,8 @@
       return {brands:ctx.brands,groups:ctx.preview?ctx.preview.groups:[],
         classification:{decisions:(confirmation&&confirmation.rows)||[]},
         header:ctx.header,inputKey:report.generationKey,projectName:projectDisplayName(),
-        summary:summaryVerdict(),summaryPath:summaryReceipt?summaryReceipt.path:null};
+        summary:summaryVerdict(),summaryPath:summaryReceipt?summaryReceipt.path:null,
+        noInquiry:categoryReceipt?categoryReceipt.noInquiry||null:null};
     }
     // R9：生成成功后把生成记录落盘，让“询价表”阶段按真实内容置为已确认。
     async function afterInquiryGeneration(){var saved=await projects.save();render();publishAssistant();return saved;}
@@ -919,7 +920,7 @@
         sheetTell(ok?'分类习惯已保存。':'分类习惯仍未保存，可再次重试。',!ok);
       });
     });
-    // 图04（一本多页，2026-10-11变更）：按整表确认快照的categoryId分组、排除无需询价，一次写入“一本多页”
+    // 图04（一本多页）：按整表确认快照分组；询价类别在前，“无需询价”保留为最后一张明细页。
     // 分类工作簿——第 1 页＝分类汇总表，其后每类一页（页名＝类别名）；先预检唯一目标（同名不覆盖→另建批次），
     // 整本写入→重开逐值核→独占发布→按页读回核行数→只打开一次。不再逐类生成独立文件，也没有单类导出入口。
     var categoryReceipt=null,categoryPlan=null,categoryIssues=[],categoryBusy=false,categoryBlocked=null;
@@ -942,7 +943,7 @@
     // 一本多页：receipt.sheets 逐页记录（第 1 页＝汇总页），categoryPages() 只取类别页。
     function categorySheets(){return ((categoryReceipt&&categoryReceipt.sheets)||[]);}
     function categoryPages(){
-      return categorySheets().filter(function(sheet){return sheet&&sheet.isSummary!==true;});
+      return categorySheets().filter(function(sheet){return sheet&&sheet.isSummary!==true&&sheet.isNoInquiry!==true;});
     }
     // 汇总页模型：一类一行，名称列是“文件内跳转到对应分类页”（页名＝类别名），隐藏列保存稳定类别ID。
     function summaryModelFor(planValue,layoutName){
@@ -976,15 +977,23 @@
     function categoryVerdict(){
       if(!reviewFresh())return {ready:false,detail:'尚未完成整表审核确认'};
       if(!categoryReceipt)return {ready:false,detail:'尚未生成分类工作簿'};
+      if(categoryReceipt.layoutVersion!==RfqCategoryWorkbooks.LAYOUT_VERSION)
+        return {ready:false,detail:'分类工作簿版式已更新（新增无需询价末页），请重新生成'};
       if(categoryReceipt.inputKey!==matchingKey())
         return {ready:false,detail:'分类工作簿绑定的是旧内容：请重新生成审核成果表并整表确认后再生成'};
       var confirmation=reviewConfirmation(),summary=RfqCategoryWorkbooks.summarize(categoryReceipt);
+      var expectedNoInquiry=!!(confirmation&&confirmation.rows&&confirmation.rows.some(function(row){
+        return row.skip===true||row.categoryId===RfqCategoryWorkbooks.NO_INQUIRY;}));
+      var hasNoInquiry=!!(categoryReceipt.sheets||[]).some(function(sheet){return sheet.isNoInquiry===true;});
+      if(expectedNoInquiry!==hasNoInquiry)
+        return {ready:false,detail:'分类工作簿与当前确认快照的无需询价页不一致，请重新生成'};
       if(!categoryPages().length&&summary.status==='empty')return {ready:true,detail:'全部为无需询价，无待输出的分类工作簿'};
       if(Number(categoryReceipt.reviewRevision)!==Number(confirmation.revision))
         return {ready:false,detail:'整表确认已更新（第'+(confirmation?confirmation.revision:'?')+'次），需要重新生成分类工作簿'};
       if(summary.status!=='complete')
         return {ready:false,detail:'分类工作簿尚未全部通过校验（'+summary.generated+' / '+summary.pages+' 页）'};
-      return {ready:true,detail:'分类工作簿已生成并校验（1 本 · '+summary.categories+' 页）',
+      return {ready:true,detail:'分类工作簿已生成并校验（1 本 · '+summary.categories+' 类'+
+        (summary.noInquiryPages?' · 无需询价1页':'')+'）',
         file:categoryReceipt.file,path:categoryReceipt.path,
         sheets:categorySheets().map(function(sheet){
           return {sheetName:sheet.sheetName,rowCount:sheet.rowCount,isSummary:sheet.isSummary===true};})};
@@ -1020,7 +1029,7 @@
         banner.textContent='尚未生成分类工作簿';
         banner.className='result-banner';
         progress.textContent='当前进度 4 / 7 · 整表已确认（'+(confirmation?confirmation.rows.length:0)+' 行），等待生成分类工作簿';
-        stats.textContent='生成一本分类工作簿：第 1 页是分类汇总表，其后每个询价类别一页（页名＝类别名）；无需询价行只保留在审核成果表中。';
+        stats.textContent='生成一本分类工作簿：第 1 页是分类汇总表，询价类别各一页，“无需询价”明细放最后供复核。';
         status.textContent=reviewBinding?('成果批次目录：'+RfqCategoryWorkbooks.rootOf(reviewBinding.path)+' · 分类工作簿子目录：'+
           RfqCategoryWorkbooks.batchDirectory(reviewBinding.path)):'';
       }else if(record.inputKey!==matchingKey()||Number(record.reviewRevision)!==Number(confirmation?confirmation.revision:NaN)){
@@ -1039,7 +1048,7 @@
         banner.textContent=report.text;
         banner.className='result-banner is-done';
         progress.textContent='当前进度 4 / 7 · 已生成并校验 1 本分类工作簿（'+report.categories+' 页）';
-        stats.textContent='第 1 页是分类汇总表，其后每类一页（页名＝类别名）· '+report.detail+' · 无需询价保留在审核成果表。';
+        stats.textContent='第 1 页是分类汇总表，询价类别各一页，“无需询价”明细放最后 · '+report.detail+'。';
         status.textContent='实际文件：'+(record.path||'')+(record.directory?('（批次目录：'+record.directory+'）'):'');
       }else{
         banner.textContent='分类工作簿已生成 '+report.generated+' / '+report.pages+' 页';
@@ -1616,13 +1625,18 @@
        previewReviewed:previewReviewed,mergeAll:mergeAll.checked,mergeIdentical:merge.checked,mergeConfirmed:currentMatch,
        reviewGenerated:freshReview,reviewOpened:!!(freshReview&&reviewOpenedPath===reviewBinding.path),reviewPending:pendingReview,
        reviewConfirmed:savedReview,noInquiry:!!(savedReview&&confirmed.rows.every(function(r){return r.skip;})),
-       categoriesReady:!!(stages.categories.ready&&verdicts.categories.ready&&categoriesSaved),categoriesPendingSave:!!(savedReview&&verdicts.categories.ready&&!categoriesSaved),categoryCount:categoryPages().length,
+       categoriesReady:!!(stages.categories.ready&&verdicts.categories.ready&&categoriesSaved),
+       categoriesPendingSave:!!(savedReview&&verdicts.categories.ready&&!categoriesSaved),categoryCount:categoryPages().length,
+       noInquiryPage:!!(categoryReceipt&&(categoryReceipt.sheets||[]).some(function(sheet){return sheet.isNoInquiry===true;})),
        summaryReady:!!(summaryState().ok&&summaryReceipt&&saved&&saved.summary&&saved.summary.path===summaryReceipt.path&&saved.summary.sha256===summaryReceipt.sha256&&saved.summary.layout===summaryReceipt.layout),brandsOpened:!!(summaryReceipt&&brandsOpenedPath===summaryReceipt.path),
        brandsReady:!!(stages.brands.ready&&summaryVerdict().ready&&brandsSaved),expectedSheets:summaryRead?summaryRead.expectedSheets:0,
        inquiryReady:genReady&&genSaved,inquiryPendingSave:genReady&&!genSaved,inquiryStale:!!generation&&!genReady,
        outputDirectory:splitPanel&&splitPanel.directory?splitPanel.directory():'',splitVerified:!!(stages.split.ready&&genReady&&splitPanel&&splitPanel.verdict().ready&&splitSaved),splitPendingSave:!!(genReady&&ss&&ss.done&&!splitSaved),
        plannedSplitFiles:splitPanel&&splitPanel.previewFiles?splitPanel.previewFiles():[],
-       split:{planned:receipt?receipt.files.length:0,complete:ss?ss.succeeded.length:0,failed:ss?ss.failed.length:0,pending:ss?ss.pending.length:0,needsVerification:ss?ss.needsVerification.length:0,supplierCount:receipt?receipt.files.filter(function(f){return f.kind!=='complete-workbook';}).length:0,completeWorkbookCount:receipt?receipt.files.filter(function(f){return f.kind==='complete-workbook';}).length:0,files:receipt?receipt.files:[]}});
+       split:{planned:receipt?receipt.files.length:0,complete:ss?ss.succeeded.length:0,failed:ss?ss.failed.length:0,pending:ss?ss.pending.length:0,needsVerification:ss?ss.needsVerification.length:0,
+        supplierCount:receipt?receipt.files.filter(function(f){return f.kind==='inquiry';}).length:0,
+        noInquiryCount:receipt?receipt.files.filter(function(f){return f.kind==='no-inquiry';}).length:0,
+        completeWorkbookCount:receipt?receipt.files.filter(function(f){return f.kind==='complete-workbook';}).length:0,files:receipt?receipt.files:[]}});
     }
     if(ui){
       function bind(name,action){ui.register(name,async function(){try{return await action();}finally{publishAssistant();}});}

@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="#f4f7f6"/>
+  <text x="55" y="52" font-family="Microsoft YaHei, sans-serif" font-size="30" font-weight="700" fill="#1f2f2b">无需询价材料保留规则</text>
+  <text x="55" y="82" font-family="Microsoft YaHei, sans-serif" font-size="16" fill="#5c6b67">分类工作簿最后保留“无需询价”明细页；第7步拆分时另存独立文件，便于后续复核。</text>
+  <rect x="55" y="112" width="470" height="650" rx="8" fill="#fff" stroke="#cbd8d3"/>
+  <text x="78" y="148" font-family="Microsoft YaHei, sans-serif" font-size="21" font-weight="700" fill="#1f6849">1. 分类工作簿</text>
+  <text x="78" y="176" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#5c6b67">一本工作簿，首页汇总；无需询价在最后。</text>
+  <rect x="78" y="200" width="424" height="42" fill="#e8f2ed" stroke="#9ec4b1"/>
+  <rect x="390" y="200" width="112" height="42" fill="#fff3cf" stroke="#d5b75d"/>
+  <text x="93" y="228" font-family="Microsoft YaHei, sans-serif" font-size="15" font-weight="700" fill="#1f6849">[分类汇总表] [配电箱] … [传感器] [无需询价]</text>
+  <rect x="78" y="260" width="424" height="156" rx="5" fill="#fbfdfb" stroke="#d7e0dc"/>
+  <text x="94" y="289" font-family="Microsoft YaHei, sans-serif" font-size="16" font-weight="700">无需询价</text>
+  <text x="94" y="316" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#4d5d57">序号 · 项目编码 · 项目名称 · 项目特征描述 · 单位 · 工程量</text>
+  <text x="94" y="344" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#4d5d57">钢索　　　GS-001　钢索　　规格C　　　m　10</text>
+  <text x="94" y="372" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#4d5d57">防火门　　FH-002　防火门　乙级·常闭　　樘　2</text>
+  <text x="94" y="400" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#42544e">品牌、报价单价、金额留空；备注明确写“无需询价”。</text>
+  <text x="78" y="456" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#1f6849">统计口径</text>
+  <text x="78" y="484" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#4d5d57">· 计入分类工作簿与整本读回校验</text>
+  <text x="78" y="512" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#4d5d57">· 不进入品牌汇总与供应商询价页</text>
+  <text x="78" y="540" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#4d5d57">· 不改变供应商询价文件数量</text>
+  <rect x="550" y="112" width="995" height="650" rx="8" fill="#fff" stroke="#cbd8d3"/>
+  <text x="575" y="148" font-family="Microsoft YaHei, sans-serif" font-size="21" font-weight="700" fill="#1f6849">2. 第7步拆分输出目录</text>
+  <text x="575" y="176" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#5c6b67">供应商件之后、完整总表之前，额外生成一份无需询价文件。</text>
+  <g font-family="Microsoft YaHei, sans-serif" font-size="15">
+    <rect x="575" y="205" width="920" height="55" fill="#f4f9f6" stroke="#d7e0dc"/>
+    <text x="598" y="238">水阀门_通达.xlsx</text>
+    <text x="980" y="238" fill="#6b7a74">供应商询价文件</text>
+    <rect x="575" y="260" width="920" height="55" fill="#fff" stroke="#d7e0dc"/>
+    <text x="598" y="293">通风机_瑞风.xlsx</text>
+    <text x="980" y="293" fill="#6b7a74">供应商询价文件</text>
+    <rect x="575" y="315" width="920" height="55" fill="#f4f9f6" stroke="#d7e0dc"/>
+    <text x="598" y="348">…… 其余供应商文件</text>
+    <text x="980" y="348" fill="#6b7a74">数量按实际品牌/供应商计算</text>
+    <rect x="575" y="370" width="920" height="68" fill="#fff3cf" stroke="#d5b75d"/>
+    <text x="598" y="399" font-weight="700">示例园区_无需询价.xlsx</text>
+    <text x="598" y="423" fill="#6f5b20">单独文件 · 保留全部无需询价材料及 10 个公开列</text>
+    <rect x="575" y="438" width="920" height="55" fill="#f4f9f6" stroke="#d7e0dc"/>
+    <text x="598" y="471">示例园区_询价总表_完整文件.xlsx</text>
+    <text x="980" y="471" fill="#6b7a74">完整总表原样副本</text>
+  </g>
+  <rect x="575" y="530" width="920" height="185" rx="6" fill="#f7faf8" stroke="#d7e0dc"/>
+  <text x="598" y="562" font-family="Microsoft YaHei, sans-serif" font-size="17" font-weight="700" fill="#1f6849">拆分计划与回执</text>
+  <text x="598" y="592" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#42544e">· 与供应商件一起预检，同名不覆盖。</text>
+  <text x="598" y="620" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#42544e">· 写入后读回公开列、版式和行数，并记录 SHA256。</text>
+  <text x="598" y="648" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#42544e">· 失败只重试未完成项；已有文件逐值核对后才记账。</text>
+  <text x="598" y="676" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#42544e">· 最终文件数＝供应商文件＋1份无需询价＋1份完整总表。</text>
+  <text x="575" y="742" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#6b7a74">说明：本补充覆盖原先“无需询价只保留在审核成果表”的旧口径。</text>
+</svg>

@@ -6,7 +6,7 @@
  'use strict';
  // R6：按整表确认快照生成独立分类工作簿。每个询价类别一个.xlsx（不是一个工作簿里多个分类页），
  // 每簿只含本类材料，公开10列，品牌/报价单价/金额留空；无需询价行只保留在审核成果表中。
- var SCHEMA_VERSION=1,SHEET='材料明细',FOLDER='分类工作簿',NO_INQUIRY='no-inquiry';
+ var SCHEMA_VERSION=1,LAYOUT_VERSION=2,SHEET='材料明细',FOLDER='分类工作簿',NO_INQUIRY='no-inquiry';
  var COLUMNS=['序号','项目编码','项目名称','项目特征描述','单位','工程量','品牌','报价单价','金额','备注'];
  var ROW_ID_COLUMN=11;                 // K列：随行隐藏辅助列，保存稳定rowId，公开列仍固定10列
  var HEADER_ROW=1,FIRST_ROW=2;
@@ -58,7 +58,7 @@ function batchDirectory(reviewPath){return workbookDirectory(rootOf(reviewPath))
    throw Error('生成分类工作簿需要审核成果表的内部绑定（含项目编码与来源边界）。');
   var directory=text(input.directory);
   if(!isAbsolute(directory))throw Error('分类工作簿目录无效，请先确认审核成果表的位置。');
-  var fields=indexFields(input.binding),issues=[],order=[],byId={},noInquiryRows=0;
+  var fields=indexFields(input.binding),issues=[],order=[],byId={},noInquiryRows=0,noInquiry=null;
   confirmation.rows.forEach(function(row){
    var rowId=text(row&&row.rowId);
    if(!rowId){
@@ -72,7 +72,15 @@ function batchDirectory(reviewPath){return workbookDirectory(rootOf(reviewPath))
     return;
    }
    var categoryId=text(row.categoryId),categoryName=text(row.categoryName);
-   if(row.skip===true||categoryId===NO_INQUIRY){noInquiryRows++;return;}
+   if(row.skip===true||categoryId===NO_INQUIRY){
+    noInquiryRows++;
+    if(!noInquiry)noInquiry={categoryId:NO_INQUIRY,categoryName:'无需询价',isNoInquiry:true,rows:[]};
+    noInquiry.rows.push({rowId:rowId,index:String(noInquiry.rows.length+1),code:text(field.code),
+     name:text(row.name)||text(field.name),feature:text(row.feature),unit:text(row.unit),quantity:text(row.quantity),
+     scopeId:text(field.scopeId),sourceIds:((field.sourceIds||[]).map(function(id){return text(id);})),
+     categoryId:NO_INQUIRY,categoryName:'无需询价',skip:true,note:'无需询价'});
+    return;
+   }
    if(!categoryId||!categoryName){
     issues.push(issue('category-missing','最终分类为空',
      '“'+(text(row.name)||text(field.name)||'（名称待补）')+'”没有有效类别，不能生成分类工作簿。',rowId));
@@ -108,6 +116,13 @@ function batchDirectory(reviewPath){return workbookDirectory(rootOf(reviewPath))
   entry.sheetName=safeSheetName(entry.categoryName,sheetTaken);
   sheetTaken[entry.sheetName.toLowerCase()]=entry.categoryName;
  });
+ if(noInquiry&&files.length){
+  noInquiry.file=workbookName;noInquiry.path=workbookPath;
+  noInquiry.splitFileName=safeName(projectName||'分类工作簿')+'_无需询价.xlsx';
+  noInquiry.rowCount=noInquiry.rows.length;noInquiry.rowIds=noInquiry.rows.map(function(row){return row.rowId;});
+  noInquiry.sheetName=safeSheetName('无需询价',sheetTaken);
+  sheetTaken[noInquiry.sheetName.toLowerCase()]='无需询价';
+ }
   var inquiryRows=files.reduce(function(total,entry){return total+entry.rowCount;},0);
   return {schemaVersion:SCHEMA_VERSION,sheet:SHEET,folder:FOLDER,
    inputKey:input.inputKey==null?null:text(input.inputKey),
@@ -115,8 +130,10 @@ function batchDirectory(reviewPath){return workbookDirectory(rootOf(reviewPath))
    batchId:input.batchId==null?null:text(input.batchId),
   file:workbookName,path:directory+'\\'+workbookName,
   sheets:files.map(function(entry){return {categoryId:entry.categoryId,categoryName:entry.categoryName,
-   sheetName:entry.sheetName,rowCount:entry.rowCount,rowIds:entry.rowIds.slice()};}),
-   directory:directory,files:files,issues:issues,ok:issues.length===0,
+   sheetName:entry.sheetName,rowCount:entry.rowCount,rowIds:entry.rowIds.slice()};}).concat(
+    noInquiry&&files.length?[{categoryId:NO_INQUIRY,categoryName:'无需询价',sheetName:noInquiry.sheetName,
+     rowCount:noInquiry.rowCount,rowIds:noInquiry.rowIds.slice(),isNoInquiry:true}]:[]),
+   directory:directory,files:files,noInquiry:noInquiry&&files.length?noInquiry:null,issues:issues,ok:issues.length===0,
    counts:{categories:files.length,inquiryRows:inquiryRows,noInquiryRows:noInquiryRows,
     totalRows:confirmation.rows.length}};
  }
@@ -137,19 +154,21 @@ function sheetEntry(item){
   var value=item||{};
   return {categoryId:value.categoryId==null?null:text(value.categoryId),categoryName:text(value.categoryName),
    sheetName:text(value.sheetName),rowCount:Number(value.rowCount)||0,rowIds:(value.rowIds||[]).slice(),
-   isSummary:value.isSummary===true,status:'pending',error:null};
+   isSummary:value.isSummary===true,isNoInquiry:value.isNoInquiry===true,status:'pending',error:null};
 }
 // 图04的侧栏口径：一本多页——类别页数、纳入询价行、无需询价行。
 function summarize(record){
   var source=record||{},items=statusItems(source),
-   categoryPages=items.filter(function(item){return item&&item.isSummary!==true;}).length;
+   inquiryPages=items.filter(function(item){return item&&item.isSummary!==true&&item.isNoInquiry!==true;}).length,
+   noInquiryPages=items.filter(function(item){return item&&item.isNoInquiry===true;}).length;
   var generated=items.filter(function(item){return item&&item.status==='succeeded';}).length;
   var failed=items.filter(function(item){return item&&(item.status==='failed'||item.status==='needs-verification');}).length;
   var counts=source.counts||{},status=statusOf(source),file=source.file==null?null:text(source.file);
-  return {status:status,categories:categoryPages,generated:generated,pending:items.length-generated,
+  return {status:status,categories:inquiryPages,generated:generated,pending:items.length-generated,
    failed:failed,pages:items.length,file:file,
+   noInquiryPages:noInquiryPages,
    inquiryRows:counts.inquiryRows||0,noInquiryRows:counts.noInquiryRows||0,totalRows:counts.totalRows||0,
-   text:file?('分类工作簿已生成（1 本 · '+categoryPages+' 页）'):(generated+' 个分类工作簿已生成'),
+   text:file?('分类工作簿已生成（1 本 · '+inquiryPages+' 类'+(noInquiryPages?' · 无需询价1页':'')+'）'):(generated+' 个分类工作簿已生成'),
    detail:(counts.inquiryRows||0)+' 行纳入询价 · '+(counts.noInquiryRows||0)+' 行无需询价'};
 }
 // 回执里的逐页状态随整本写入结果一起更新：一本多页只有“整本成功/整本未通过”两种真实结果。
@@ -166,6 +185,7 @@ function setSheetsStatus(record,status,error){
 function emptyReceipt(options){
   var input=options||{};
   return {schemaVersion:SCHEMA_VERSION,inputKey:input.inputKey==null?null:text(input.inputKey),
+   layoutVersion:LAYOUT_VERSION,
    root:input.root==null?null:text(input.root),batchId:input.batchId==null?null:text(input.batchId),
    directory:input.directory==null?null:text(input.directory),layout:input.layout||'separated',
    createdAt:input.createdAt==null?null:text(input.createdAt),updatedAt:null,status:'none',
@@ -186,6 +206,7 @@ function emptyReceipt(options){
   empty.counts.categories=planValue.files.length;empty.counts.inquiryRows=planValue.counts.inquiryRows;
   empty.file=planValue.file==null?null:text(planValue.file);
   empty.path=planValue.path==null?null:text(planValue.path);
+  empty.noInquiry=planValue.noInquiry?JSON.parse(JSON.stringify(planValue.noInquiry)):null;
   empty.files=planValue.files.map(function(entry){
    return {categoryId:entry.categoryId,categoryName:entry.categoryName,name:entry.file,path:entry.path,
     rowCount:entry.rowCount,rowIds:entry.rowIds.slice(),sha256:null,bytes:0,status:'pending',error:null};
@@ -201,7 +222,7 @@ function emptyReceipt(options){
    throw Error('分类工作簿缺少材料行（需要按本次整表确认分组的文件清单），未生成。');
   entry.rows.forEach(function(row){
    var line=[String(row.index),text(row.code),text(row.name),text(row.feature),text(row.unit),text(row.quantity),
-    '','','',''];
+    '','','',text(row.note)];
    line.push(row.rowId);            // K列：随行隐藏辅助列
    values.push(line);
   });
@@ -235,6 +256,11 @@ function writeAll(app,planValue,stagePath,options){
   model.name=text(entry.sheetName)||text(entry.categoryName)||model.name;
   sheets.push(model);
  });
+ if(planValue.noInquiry){
+  var noInquiryModel=mainSheet(planValue.noInquiry,input.sheetOptions||{});
+  noInquiryModel.name=text(planValue.noInquiry.sheetName)||'无需询价';
+  sheets.push(noInquiryModel);
+ }
  if(!sheets.length)throw Error('没有可写入的分类工作簿页。');
  var model={sheets:sheets};
  exportHost.write(app,model,stagePath);
@@ -315,7 +341,7 @@ function verifySheets(app,filePath,sheets){
  });
  return {ok:issues.length===0,issues:issues,sheets:actual};
 }
- return {SCHEMA_VERSION:SCHEMA_VERSION,SHEET:SHEET,FOLDER:FOLDER,NO_INQUIRY:NO_INQUIRY,
+ return {SCHEMA_VERSION:SCHEMA_VERSION,LAYOUT_VERSION:LAYOUT_VERSION,SHEET:SHEET,FOLDER:FOLDER,NO_INQUIRY:NO_INQUIRY,
   COLUMNS:COLUMNS.slice(),ROW_ID_COLUMN:ROW_ID_COLUMN,HEADER_ROW:HEADER_ROW,FIRST_ROW:FIRST_ROW,
   text:text,safeName:safeName,fileNameFor:fileNameFor,directoryOf:directoryOf,
   batchDirectory:batchDirectory,workbookDirectory:workbookDirectory,rootOf:rootOf,

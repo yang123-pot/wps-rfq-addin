@@ -5,7 +5,8 @@ const sample=require('./fixtures/workflow-v3-sample.cjs');
 const collection=require('../src/collection.js');
 const inquiryModel=require('../src/inquiry-model.js');
 const xlsxFixture=require('./fixtures/xlsx-container.cjs');
-const SPLIT_NAMES=sample.expectations.splitFiles.slice(),TOTAL_NAME='示例园区_询价总表_完整文件.xlsx';
+const SPLIT_NAMES=sample.expectations.splitFiles.slice(),TOTAL_NAME='示例园区_询价总表_完整文件.xlsx',
+ NO_INQUIRY_NAME='示例园区_无需询价.xlsx';
 const SHOT=process.env.RFQ_UI_SPLIT_SCREENSHOT,EVIDENCE=process.env.RFQ_UI_SPLIT_EVIDENCE;
 function digest(bytes){return crypto.createHash('sha256').update(bytes).digest('hex');}
 function columnName(index){let name='';for(;index>0;index=Math.floor((index-1)/26))name=String.fromCharCode(65+(index-1)%26)+name;return name;}
@@ -38,6 +39,9 @@ async function run(){
  const fixture=generationFixture(),generation={inputKey:fixture.model.inputKey,target:generationTarget,
   sha256:digest(generationBytes),sheetIds:fixture.model.sheets.map(function(sheet){return sheet.sheetId;}),
   modelSnapshot:fixture.model};
+  const noInquiry={categoryId:'no-inquiry',categoryName:'无需询价',sheetName:'无需询价',splitFileName:NO_INQUIRY_NAME,
+   rows:[{rowId:'no-inquiry-row-1',index:'1',code:'GS-001',name:'钢索',feature:'规格C',unit:'m',quantity:'10',
+    scopeId:'combined',sourceIds:[],categoryId:'no-inquiry',categoryName:'无需询价',skip:true,note:'无需询价'}]};
  const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:copies,projectDirectory:projectDirectory,
   splitDirectory:splitDirectory});
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -82,7 +86,7 @@ async function run(){
   await page.evaluate(function(args){
    ['split-message','split-status','split-directory','split-directory-label','split-preview','split-run','split-retry','split-open']
     .forEach(function(id){const old=document.getElementById(id),clone=old.cloneNode(true);old.parentNode.replaceChild(clone,old);});
-   window.__splitGeneration=args.generation;window.__splitOutput=args.outputDirectory;
+   window.__splitGeneration=args.generation;window.__splitOutput=args.outputDirectory;window.__splitNoInquiry=args.noInquiry;
    window.RfqPathPicker.open=function(options){window.__picker=options;options.onConfirm([window.__splitOutput]);return {close(){}};};
    window.RfqBrandHost.write=async function(app,book,stagePath,settings){
     const sheet=book.sheets[0];
@@ -95,11 +99,11 @@ async function run(){
    };
    window.Application.Shell=function(command){window.__openedFolder=command;};
    window.__splitPanel=window.RfqSplitUI.create({application:window.Application,
-    context:function(){return {inputKey:window.__splitGeneration.inputKey};},
+    context:function(){return {inputKey:window.__splitGeneration.inputKey,noInquiry:window.__splitNoInquiry};},
     generation:function(){return window.__splitGeneration;},projectId:function(){return 'p-split-ui-0001';},
     onReceipt:function(receipt){window.__receipts.push(receipt);}});
    window.__splitPanel.restore(null);
-  },{generation:generation,outputDirectory:outputDirectory});
+  },{generation:generation,outputDirectory:outputDirectory,noInquiry:noInquiry});
   await page.locator('#workflow-nav .workflow-step-button[data-stage="split"]').click();
   assert.equal(await page.locator('#stage-panel-split #split-directory').count(),1,
    '图07目录选择与一键拆分必须属于第七步主面板');
@@ -108,19 +112,19 @@ async function run(){
   assert.doesNotMatch(await page.locator('#stage-panel-split').innerText(),/将在 R10 开发包实现/,
    '已实现拆分不可继续展示未实现占位说明');
   await page.evaluate(function(){document.getElementById('split-directory').click();});
-  await page.waitForFunction(function(){return /计划 6 个文件/.test(document.getElementById('split-status').textContent)&&
+  await page.waitForFunction(function(){return /计划 7 个文件/.test(document.getElementById('split-status').textContent)&&
    !document.getElementById('split-run').disabled;});
   await page.evaluate(function(){window.__failSynthetic=true;document.getElementById('split-run').click();});
-  await page.waitForFunction(function(){return /拆分完成5份，失败1份/.test(document.getElementById('split-message').textContent)&&
-   window.__splitWrites.length===5;});
-  assert.deepEqual((await fs.readdir(outputDirectory)).sort(),SPLIT_NAMES.slice(0,2).concat(SPLIT_NAMES.slice(3),[TOTAL_NAME]).sort(),
-   '失败该份未发布，其余四份真实落盘');
+  await page.waitForFunction(function(){return /拆分完成6份，失败1份/.test(document.getElementById('split-message').textContent)&&
+   window.__splitWrites.length===6;});
+  assert.deepEqual((await fs.readdir(outputDirectory)).sort(),SPLIT_NAMES.slice(0,2).concat(SPLIT_NAMES.slice(3),
+   [NO_INQUIRY_NAME,TOTAL_NAME]).sort(),'失败该份未发布，其余供应商件、无需询价和完整总表真实落盘');
   const beforeRetry=await page.evaluate(function(){return window.__splitWrites.map(function(item){return item.name;});});
-  assert.deepEqual(beforeRetry,['水泵_青源','水泵_恒流','阀门_合成询价','风机_瑞风','汽车充电桩_驰电']);
+  assert.deepEqual(beforeRetry,['水泵_青源','水泵_恒流','阀门_合成询价','风机_瑞风','汽车充电桩_驰电','无需询价']);
   await page.locator('.rfq-split-result button').click();
   await page.evaluate(function(){document.getElementById('split-retry').click();});
-  await page.waitForFunction(function(){return /完成6份，失败0份/.test(document.getElementById('split-message').textContent)&&
-   window.__splitWrites.length===6;});
+  await page.waitForFunction(function(){return /完成7份，失败0份/.test(document.getElementById('split-message').textContent)&&
+   window.__splitWrites.length===7;});
   if(SHOT){await fs.mkdir(path.dirname(SHOT),{recursive:true});await page.screenshot({path:SHOT,fullPage:true});}
   if(EVIDENCE){
    await fs.mkdir(EVIDENCE,{recursive:true});
@@ -130,15 +134,20 @@ async function run(){
     receipt:window.__splitPanel.receipt(),openedFolder:window.__openedFolder};});
    await fs.writeFile(path.join(EVIDENCE,'split-result.json'),JSON.stringify(evidence,null,2));
   }
-  assert.deepEqual((await fs.readdir(outputDirectory)).sort(),SPLIT_NAMES.concat(TOTAL_NAME).sort(),'五个供应商文件及完整总表共六件全部存在');
+  assert.deepEqual((await fs.readdir(outputDirectory)).sort(),SPLIT_NAMES.concat([NO_INQUIRY_NAME,TOTAL_NAME]).sort(),
+   '五个供应商文件、无需询价清单及完整总表共七件全部存在');
   assert.deepEqual(await fs.readFile(path.join(outputDirectory,TOTAL_NAME)),generationBytes,'完整总表逐字节不变');
   const writes=await page.evaluate(function(){return window.__splitWrites;});
   assert.deepEqual(writes.map(function(item){return item.name;}),
-   ['水泵_青源','水泵_恒流','阀门_合成询价','风机_瑞风','汽车充电桩_驰电','阀门_合成询价'],
+   ['水泵_青源','水泵_恒流','阀门_合成询价','风机_瑞风','汽车充电桩_驰电','无需询价','阀门_合成询价'],
    '重试只补做失败的一份，不重复写已成功文件');
   assert.equal(writes.every(function(item){return item.hasLayout;}),true,'每份独立xlsx保留图06版式/抬头布局');
   assert.equal(writes.every(function(item){return item.values.every(function(row){return row.length===10;});}),true,
    '公开清单仍是10列，不复制内部追溯页');
+  const noInquiryWrite=writes.filter(function(item){return item.name==='无需询价';})[0];
+  assert.ok(noInquiryWrite,'无需询价必须单独生成一个文件');
+  assert.equal(noInquiryWrite.values[0][1],'GS-001');
+  assert.equal(noInquiryWrite.values[0][9],'无需询价','无需询价文件备注明确，供后续复核');
   assert.equal(writes.some(function(item){return item.values.some(function(row){return row.indexOf('内部追溯')>=0;});}),false);
   await page.locator('.rfq-split-result button').click();
   await page.evaluate(function(){document.getElementById('split-open').click();});
@@ -165,7 +174,7 @@ async function run(){
   await page.waitForFunction(function(){return !!document.querySelector('.rfq-split-result');});
   await page.locator('.rfq-split-result button').click();
   await page.evaluate(function(){window.__splitPanel.refresh();});
-  await page.waitForFunction(function(){return /完成 6/.test(document.getElementById('split-status').textContent);});
+  await page.waitForFunction(function(){return /完成 7/.test(document.getElementById('split-status').textContent);});
   const afterReopen=await page.evaluate(function(){return window.__splitPanel.receipt().files.map(function(file){
    return file.fileId+':'+file.state+':'+file.verifiedBy;});});
   assert.deepEqual(afterReopen,doneStates,'关闭/重开结果窗口和refresh都不改变逐文件状态');
@@ -214,7 +223,7 @@ async function run(){
     freeze:{FreezePanes:true,SplitRow:6,SplitColumn:0}};
   },{target:firstTarget,name:expectedSheet.name,values:expectedSheet.values,merges:mergeAddresses(expectedSheet.layout)});
   await page.evaluate(function(){document.getElementById('split-retry').click();});
-  await page.waitForFunction(function(){return /完成6份，失败0份/.test(document.getElementById('split-message').textContent)&&
+  await page.waitForFunction(function(){return /完成7份，失败0份/.test(document.getElementById('split-message').textContent)&&
    !/待核对/.test(document.getElementById('split-status').textContent);});
   const verified=await page.evaluate(function(){return window.__splitPanel.receipt().files[0];});
   assert.equal(verified.state,'succeeded');

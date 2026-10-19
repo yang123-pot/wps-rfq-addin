@@ -102,7 +102,7 @@ function createSplitStore({directory}={}){
   if(!ID_PATTERN.test(batchId))throw Error('拆分准备缺少有效批次编号。');
   if(!generation||!generation.modelSnapshot)throw Error('拆分准备缺少总询价工作簿快照。');
   const built=planModel.build({model:generation.modelSnapshot,generation:generation,
-   targetDirectory:targetDirectory,currentKey:source.currentKey});
+   targetDirectory:targetDirectory,currentKey:source.currentKey,noInquiry:source.noInquiry||null});
   const conflicts=built.conflicts.slice();
   try{
    const folder=await fs.stat(targetDirectory);
@@ -158,7 +158,8 @@ function createSplitStore({directory}={}){
  async function copyComplete(input){
   const source=input||{},generation=source.generation;
   if(!generation||!generation.modelSnapshot)throw Error('请先生成并校验完整询价总表。');
-  const built=planModel.build({model:generation.modelSnapshot,generation,targetDirectory:source.targetDirectory,currentKey:source.currentKey});
+  const built=planModel.build({model:generation.modelSnapshot,generation,targetDirectory:source.targetDirectory,
+   currentKey:source.currentKey,noInquiry:source.noInquiry||null});
   const record=await load(source.projectId,source.batchId);
   if(!record||!alignReceipt(record,built))throw Error('完整总表与已准备的批次回执不一致，请重新准备拆分。');
   if(!built.canPublish)throw Error(built.conflicts.map(item=>item.message).join('；'));

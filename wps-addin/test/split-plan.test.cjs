@@ -23,6 +23,17 @@ test('one inquiry sheet becomes one file and internal sheets are never split out
  assert.deepEqual(built.conflicts,[]);
  assert.equal(plan.build({model:model(),generation:generation,targetDirectory:'C:/out'}).files[0].target,'C:/out/水阀门_供应商A.xlsx');
 });
+test('无需询价作为单独文件排在供应商件之后、完整总表之前',()=>{
+ const noInquiry={categoryId:'no-inquiry',categoryName:'无需询价',splitFileName:'示例园区_无需询价.xlsx',
+  rows:[{rowId:'n1',name:'钢索',unit:'m',quantity:'10'}]};
+ const built=plan.build({model:model(),generation,targetDirectory:'C:\\out\\项目询价',noInquiry});
+ assert.deepEqual(built.files.map(file=>file.kind),['inquiry','inquiry','no-inquiry','complete-workbook']);
+ const extra=built.files[2];
+ assert.equal(extra.name,'示例园区_无需询价.xlsx');
+ assert.equal(extra.target,'C:\\out\\项目询价\\示例园区_无需询价.xlsx');
+ assert.equal(extra.materialRows,1);
+ assert.equal(built.canPublish,true);
+});
 test('duplicate names, missing generation and stale content are blocked before publishing',()=>{
  const duplicated=model();
  duplicated.sheets[1].sheetId='sheet-c';

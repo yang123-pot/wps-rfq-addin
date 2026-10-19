@@ -8,14 +8,16 @@
   var split=s.split||{};
   if(s.reviewConfirmed&&s.noInquiry)at(8,'核对已完成，无需生成询价文件','本次材料均为“无需询价”，核对记录已保留。','saveProject','保存项目');
   else if(s.splitVerified&&split.planned>0&&split.complete===split.planned&&!split.failed&&!split.pending&&!split.needsVerification)
-   at(8,split.completeWorkbookCount?'文件已全部导出':'已生成 '+split.complete+' 个询价文件',split.completeWorkbookCount?split.supplierCount+' 个供应商文件＋1 份完整总表，共 '+split.complete+' 个文件已保存并核对。':'共 '+split.complete+' 个文件已保存并核对。','openFolder','打开文件夹');
+   at(8,split.completeWorkbookCount?'文件已全部导出':'已生成 '+split.complete+' 个询价文件',
+    split.completeWorkbookCount?split.supplierCount+' 个供应商文件＋'+(split.noInquiryCount?'1 份无需询价清单＋':'')+
+     '1 份完整总表，共 '+split.complete+' 个文件已保存并核对。':'共 '+split.complete+' 个文件已保存并核对。','openFolder','打开文件夹');
   else if(s.brandsReady){
    at(6,'填写询价抬头','填写后会带到全部询价文件。','inquiryGenerate',s.inquiryStale?'重新生成询价总表':'生成询价总表');
    if(s.inquiryReady){
     at(6,'询价总表已生成','共 '+s.expectedSheets+' 张询价页，下一步生成可发送的独立文件。','goSplit','下一步：拆分询价文件');
     if(s.splitStarted){
-     at(7,'生成供应商文件','每张询价表生成一个独立文件，并保留完整总表。','chooseDirectory','选择输出文件夹');
-     if(s.outputDirectory)at(7,'生成供应商文件','每张询价表生成一个独立文件，并保留完整总表。','splitRun','开始拆分');
+     at(7,'生成供应商文件','每张询价表生成一个独立文件，同时单独保留无需询价清单和完整总表。','chooseDirectory','选择输出文件夹');
+     if(s.outputDirectory)at(7,'生成供应商文件','每张询价表生成一个独立文件，同时单独保留无需询价清单和完整总表。','splitRun','开始拆分');
      if(split.failed||split.pending&&split.complete)Object.assign(v,{action:'splitRetry',label:'重试未完成文件'});
      if(split.needsVerification)Object.assign(v,{action:'splitVerify',label:'核对已有文件'});
     }
@@ -24,7 +26,8 @@
    if(s.splitPendingSave)at(7,'拆分文件已保留，项目尚未保存','保存成功后才显示全部完成，无需重新拆分。','saveProject','重试保存项目');
   }else if(s.reviewConfirmed){
    at(4,'生成分类工作簿','首页是分类汇总表，后面每类材料一张工作表。','categoriesGenerate','生成分类工作簿');
-   if(s.categoriesReady)at(4,'分类工作簿已生成',s.categoryCount+' 类材料，已放在同一本工作簿。首页是汇总表，每类材料一张工作表。','continueBrands','下一步：填写品牌和供应商');
+   if(s.categoriesReady)at(4,'分类工作簿已生成',s.categoryCount+' 类询价材料，已放在同一本工作簿。首页是汇总表，每类材料一张工作表'+
+     (s.noInquiryPage?'；“无需询价”明细在最后一张工作表。':'。'),'continueBrands','下一步：填写品牌和供应商');
    if(s.categoriesReady&&s.summaryReady&&s.brandsOpened)at(5,'填写品牌和供应商','在黄色区域填写，每类至少填一组。','brandsConfirm','填写完成，下一步');
    if(s.categoriesPendingSave)at(4,'分类工作簿已生成，项目尚未保存','已生成文件会保留，请保存本次分类结果后继续。','saveProject','重试保存项目');
   }else if(s.mergeConfirmed){

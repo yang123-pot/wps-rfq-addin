@@ -141,6 +141,11 @@ function initScript(context){
      const sheet=window.RfqCategoryWorkbooks.mainSheet(entry,{});
      sheets.push({name:entry.sheetName,categoryName:entry.categoryName,rowCount:entry.rowCount,
       rowIds:entry.rowIds.slice(),values:sheet.values.map(row=>row.slice())});});
+    if(plan.noInquiry){
+     const extra=window.RfqCategoryWorkbooks.mainSheet(plan.noInquiry,{});
+     sheets.push({name:plan.noInquiry.sheetName,categoryName:'无需询价',rowCount:plan.noInquiry.rowCount,
+      rowIds:plan.noInquiry.rowIds.slice(),values:extra.values.map(row=>row.slice())});
+    }
     window.__categoryWrites.push({path:stagePath,file:plan.file,planPath:plan.path,sheets:sheets});
     if(window.__categoryFail)throw Error('模拟写入失败');
     await window.__writeCategoryFixture(stagePath,'pages:'+sheets.length+'#'+window.__categoryWrites.length);
@@ -198,7 +203,7 @@ function initScript(context){
    document.querySelector('#sheet-review-message').textContent));
   assert.match(await page.locator('#sheet-review-message').innerText(),/整表已确认（8 行）/,'整表一次确认必须通过并落盘');
   await page.waitForFunction(()=>/分类工作簿未生成/.test(document.querySelector('#categories-message').textContent));
-  assert.match(await page.locator('#categories-banner').innerText(),/分类工作簿已生成 0 \/ 5 页|尚未生成分类工作簿/);
+  assert.match(await page.locator('#categories-banner').innerText(),/分类工作簿已生成 0 \/ 6 页|尚未生成分类工作簿/);
   assert.equal(await page.locator('#categories-summary').isDisabled(),true,'整本未通过不得解锁生成汇总');
   assert.equal(await page.locator('#categories-layout').isDisabled(),true,'整本未通过不得解锁布局选择');
   assert.equal(await page.locator('#categories-retry').isHidden(),false,'未通过时提供重试入口');
@@ -211,20 +216,21 @@ function initScript(context){
   // 重试：仍只写这一本，页序/页名/页内跳转/逐页行数全部按真实模型核对。
   await page.evaluate(()=>{window.__categoryFail=null;});
   await page.locator('#categories-retry').click();
-  await page.waitForFunction(()=>/分类工作簿已生成（1 本 · 4 页）/.test(document.querySelector('#categories-banner').textContent));
+  await page.waitForFunction(()=>/分类工作簿已生成（1 本 · 4 类 · 无需询价1页）/.test(document.querySelector('#categories-banner').textContent));
   assert.deepEqual(await listXlsx(workbookDirectory),['示例园区_分类工作簿.xlsx'],'只生成一本分类工作簿');
   const writes=await page.evaluate(()=>window.__categoryWrites.map(item=>item));
   assert.equal(writes.length,2,'失败一次＋成功一次，共两次写入尝试');
   const model=writes[writes.length-1];
   assert.equal(model.file,'示例园区_分类工作簿.xlsx');
   assert.equal(model.planPath,workbookFile,'写入目标就是那一本工作簿');
-  assert.deepEqual(model.sheets.map(sheet=>sheet.name),['分类汇总表'].concat(PAGE_NAMES),
-   '第 1 页是分类汇总表，其后每类一页且页名＝类别名');
-  assert.deepEqual(model.sheets.slice(1).map(sheet=>sheet.rowCount),PAGE_ROWS,'逐页行数2/2/2/1');
-  assert.deepEqual(model.sheets.slice(1).map(sheet=>sheet.values.length-1),PAGE_ROWS,'逐页材料行数与回执一致');
+  assert.deepEqual(model.sheets.map(sheet=>sheet.name),['分类汇总表'].concat(PAGE_NAMES,['无需询价']),
+   '第 1 页是分类汇总表，其后询价类别各一页，无需询价在最后');
+  assert.deepEqual(model.sheets.slice(1).map(sheet=>sheet.rowCount),PAGE_ROWS.concat([1]),'逐页行数2/2/2/1/无需询价1');
+  assert.deepEqual(model.sheets.slice(1).map(sheet=>sheet.values.length-1),PAGE_ROWS.concat([1]),'逐页材料行数与回执一致');
   assert.equal(model.sheets.slice(1).every(sheet=>sheet.values[0].length===11),true,'公开10列＋K列随行rowId');
-  assert.deepEqual(model.sheets.slice(1).flatMap(sheet=>sheet.values.slice(1).map(row=>row.slice(6,10))),
-   Array.from({length:7},()=>['','','','']),'品牌/报价单价/金额/备注留空');
+  assert.equal(model.sheets.slice(1).flatMap(sheet=>sheet.values.slice(1).map(row=>row.slice(6,9))).every(row=>row.every(value=>value==='')),true,
+   '品牌/报价单价/金额留空');
+  assert.equal(model.sheets[model.sheets.length-1].values[1][9],'无需询价','无需询价末页明确标注');
   // 汇总页（第 1 页）：一类一行，名称列是文件内跳转（地址空、SubAddress＝页名!A1）。
   const summarySheet=model.sheets[0];
   assert.deepEqual(summarySheet.hyperlinks.map(link=>[link.address,link.subAddress,link.internal===true,link.display]),
@@ -236,8 +242,8 @@ function initScript(context){
   const verify=await page.evaluate(()=>window.__categoryVerify.map(item=>item));
   assert.equal(verify.length,1,'成功写入后必须按页读回核对一次');
   assert.equal(verify[0].path,workbookFile);
-  assert.deepEqual(verify[0].expected.map(item=>item.sheetName),['分类汇总表'].concat(PAGE_NAMES));
-  assert.deepEqual(verify[0].expected.map(item=>item.rowCount),[summarySheet.values.length].concat(PAGE_ROWS),
+  assert.deepEqual(verify[0].expected.map(item=>item.sheetName),['分类汇总表'].concat(PAGE_NAMES,['无需询价']));
+  assert.deepEqual(verify[0].expected.map(item=>item.rowCount),[summarySheet.values.length].concat(PAGE_ROWS,[1]),
    '按页核行数含第 1 页汇总页');
   assert.deepEqual(await page.evaluate(()=>window.__categoryOpens),[workbookFile],
    '整本只打开一次（不逐页、不逐份打开）');
@@ -245,20 +251,20 @@ function initScript(context){
   assert.equal(receipt.categories.status,'complete');
   assert.equal(receipt.categories.summaryLayout,'separated','默认布局为品牌、供应商分列');
   assert.deepEqual(receipt.categories.sheets.map(sheet=>[sheet.sheetName,sheet.isSummary===true,sheet.status]),
-   [['分类汇总表',true,'succeeded']].concat(PAGE_NAMES.map(name=>[name,false,'succeeded'])),
-   '第 1 页汇总＋逐类页全部已生成并校验');
+   [['分类汇总表',true,'succeeded']].concat(PAGE_NAMES.map(name=>[name,false,'succeeded']),[['无需询价',false,'succeeded']]),
+   '第 1 页汇总＋逐类页＋无需询价末页全部已生成并校验');
   assert.deepEqual(receipt.categories.counts,{categories:4,inquiryRows:7,noInquiryRows:1,totalRows:8});
   const bytes=await fs.readFile(receipt.categories.path);
   assert.equal(require('node:crypto').createHash('sha256').update(bytes).digest('hex'),receipt.categories.sha256,
    '落盘SHA与回执一致');
-  assert.match(await page.locator('#categories-banner').innerText(),/分类工作簿已生成（1 本 · 4 页）/);
+  assert.match(await page.locator('#categories-banner').innerText(),/分类工作簿已生成（1 本 · 4 类 · 无需询价1页）/);
   assert.match(await page.locator('#categories-status').innerText(),/实际文件：/);
   await waitIdle();
   assert.equal(await page.locator('#categories-layout').isEnabled(),true,'整本核实后解锁布局选择');
   assert.equal(await page.locator('#categories-layout').inputValue(),'separated');
   assert.equal(await page.locator('#categories-summary').isEnabled(),true,'整本核实后解锁生成分类汇总表');
-  assert.equal(await page.locator('#categories-files > li').count(),6,'1 行工作簿＋5 页');
-  assert.match(await page.locator('#categories-files').innerText(),/1 本工作簿 · 5 页/);
+  assert.equal(await page.locator('#categories-files > li').count(),7,'1 行工作簿＋6 页');
+  assert.match(await page.locator('#categories-files').innerText(),/1 本工作簿 · 6 页/);
   assert.match(await page.locator('#project-status').textContent(),/分类工作簿：已确认/);
   await dumpEvidence('category-receipt.json',receipt.categories);
   await dumpEvidence('category-workbook-pages.json',model.sheets.map(sheet=>({name:sheet.name,rowCount:sheet.rowCount,
@@ -310,7 +316,7 @@ function initScript(context){
   assert.equal(await page.locator('#categories-summary').isDisabled(),true,'过期时不得解锁生成汇总');
   assert.match(await page.locator('#project-status').textContent(),/分类工作簿：未完成/);
   await page.locator('#categories-generate').click();
-  await page.waitForFunction(()=>/分类工作簿已生成（1 本 · 4 页）/.test(document.querySelector('#categories-banner').textContent),
+  await page.waitForFunction(()=>/分类工作簿已生成（1 本 · 4 类 · 无需询价1页）/.test(document.querySelector('#categories-banner').textContent),
    null,{timeout:30000});
   const after=await projectRecord();
   assert.notEqual(after.categories.directory,beforeBatch,'重新生成必须创建新批次目录');

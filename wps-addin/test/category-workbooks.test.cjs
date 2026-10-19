@@ -46,7 +46,7 @@ test('批次目录：成果表所在目录＋分类工作簿子目录，路径�
   assert.equal(books.fileNameFor('汽车充电桩'),'汽车充电桩.xlsx');
 });
 
-test('plan：按确认快照categoryId分组、排除无需询价、保留rowId/scopeId和数量',()=>{
+test('plan：询价类别分组在前、无需询价保留为最后明细页，rowId/scopeId和数量不变',()=>{
   const plan=planned();
   assert.deepEqual(plan.issues,[]);
   assert.equal(plan.ok,true);
@@ -59,7 +59,7 @@ test('plan：按确认快照categoryId分组、排除无需询价、保留rowId/
   assert.deepEqual(plan.files.map(file=>file.file),['示例园区_分类工作簿.xlsx','示例园区_分类工作簿.xlsx','示例园区_分类工作簿.xlsx','示例园区_分类工作簿.xlsx'],
     '所有类别页都写进这一本工作簿');
   assert.deepEqual(plan.files.map(file=>file.path),[plan.path,plan.path,plan.path,plan.path]);
-  assert.deepEqual(plan.sheets.map(sheet=>[sheet.sheetName,sheet.rowCount]),[['水泵',2],['阀门',2],['风机',2],['汽车充电桩',1]]);
+  assert.deepEqual(plan.sheets.map(sheet=>[sheet.sheetName,sheet.rowCount]),[['水泵',2],['阀门',2],['风机',2],['汽车充电桩',1],['无需询价',1]]);
   const pump=plan.files[0];
   assert.equal(pump.rowIds.length,2);
   assert.equal(pump.rows.every(row=>!!row.rowId),true,'rowId必须保留，供汇总/询价关联');
@@ -67,7 +67,11 @@ test('plan：按确认快照categoryId分组、排除无需询价、保留rowId/
   assert.equal(pump.rows.every(row=>row.categoryId==='pump'),true);
   assert.deepEqual(pump.rows.map(row=>[row.index,row.name,row.feature,row.unit,row.quantity]),
     [['1','水泵','DN50','台','2'],['2','水泵','DN65','台','3']],'序号按本类重排，合并数量2/3不翻倍');
-  assert.equal(plan.files.some(file=>file.categoryId==='no-inquiry'),false,'无需询价不生成分类工作簿');
+  assert.equal(plan.files.some(file=>file.categoryId==='no-inquiry'),false,'无需询价不进入品牌/询价类别文件');
+  assert.equal(plan.noInquiry.sheetName,'无需询价');
+  assert.equal(plan.noInquiry.rowCount,1);
+  assert.equal(plan.noInquiry.rows[0].name,'钢索','无需询价末页保留原行供复核');
+  assert.equal(plan.noInquiry.rows[0].note,'无需询价');
   assert.deepEqual(plan.files[3].rows.map(row=>[row.name,row.feature,row.quantity]),[['充电桩配电箱','充电桩配套','1']]);
 });
 
@@ -137,8 +141,8 @@ test('receipt/summarize：逐页未完成不算完成，整本通过才complete�
   assert.equal(receipt.path,plan.path);
   assert.deepEqual(receipt.sheets.map(sheet=>[sheet.sheetName,sheet.rowCount,sheet.isSummary===true,sheet.status]),
     [['分类汇总表',9,true,'pending'],['水泵',2,false,'pending'],['阀门',2,false,'pending'],
-     ['风机',2,false,'pending'],['汽车充电桩',1,false,'pending']],
-    '第 1 页＝汇总页，其后每类一页（页名＝类别名），逐页都待生成');
+     ['风机',2,false,'pending'],['汽车充电桩',1,false,'pending'],['无需询价',1,false,'pending']],
+    '第 1 页＝汇总页，询价类别各一页，无需询价在最后，逐页都待生成');
   assert.deepEqual(receipt.counts,{categories:4,inquiryRows:7,noInquiryRows:1,totalRows:8});
   assert.equal(receipt.files.every(file=>file.status==='pending'&&file.sha256===null),true);
   assert.deepEqual(receipt.files[0].rowIds,plan.files[0].rowIds);
@@ -151,8 +155,9 @@ test('receipt/summarize：逐页未完成不算完成，整本通过才complete�
   assert.equal(books.statusOf(receipt),'partial','回执状态必须与逐页的真实状态一致');
   assert.equal(half.generated,1);
   assert.equal(half.categories,4,'categories 只数类别页');
-  assert.equal(half.pages,5,'pages 含第 1 页汇总页');
-  assert.equal(half.text,'分类工作簿已生成（1 本 · 4 页）');
+  assert.equal(half.pages,6,'pages 含汇总页和无需询价页');
+  assert.equal(half.noInquiryPages,1);
+  assert.equal(half.text,'分类工作簿已生成（1 本 · 4 类 · 无需询价1页）');
   assert.equal(half.detail,'7 行纳入询价 · 1 行无需询价');
   // 整本一次写入：所有页与整文件一起成功/失败。
   receipt.sha256='c'.repeat(64);receipt.bytes=1234;
@@ -163,7 +168,7 @@ test('receipt/summarize：逐页未完成不算完成，整本通过才complete�
   assert.equal(receipt.files.every(file=>file.status==='succeeded'&&file.sha256==='c'.repeat(64)),true,
     '整本写入成功后逐份记录同步指向同一个文件SHA');
   books.setSheetsStatus(receipt,'failed','写入失败');
-  assert.equal(books.summarize(receipt).failed,5);
+  assert.equal(books.summarize(receipt).failed,6);
   assert.equal(books.statusOf(receipt),'pending','整本失败时回执不得写complete');
   assert.equal(books.statusOf({files:[],counts:{inquiryRows:0}}),'empty');
   assert.equal(books.statusOf({files:[],counts:{inquiryRows:7}}),'pending');
@@ -171,8 +176,19 @@ test('receipt/summarize：逐页未完成不算完成，整本通过才complete�
   const none=books.plan({rows:confirmation.rows.filter(row=>row.skip&&row.categoryId==='no-inquiry')},
     {binding,directory:DIRECTORY,root:ROOT});
   assert.equal(none.files.length,0);
+  assert.equal(none.noInquiry,null,'没有询价类别时不生成半本分类工作簿');
   assert.equal(books.summarize(books.receipt(none,{})).status,'empty');
   assert.equal(books.summarize(null).status,'empty');
+});
+
+test('一本多页写入把无需询价放在最后，页面内保留十列并明确标注',()=>{
+  const plan=planned(),fixture=fakeApp(),stage='C:\\stage\\all.xlsx';
+  books.writeAll(fixture.app,plan,stage,{});
+  const stored=fixture.state.written[stage];
+  assert.equal(stored.length,5);
+  assert.equal(stored[4].name,'无需询价');
+  assert.deepEqual(stored[4].values[1].slice(0,10),
+    ['1','GS-001','钢索','规格C','m','10','','','','无需询价']);
 });
 
 test('绑定必须带项目编码与来源边界：R6从成果表内部绑定取编码/scopeId',()=>{

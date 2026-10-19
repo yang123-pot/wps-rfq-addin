@@ -4,7 +4,7 @@
  else root.RfqSplitPlan=factory();
 }(typeof window==='object'?window:globalThis,function(){
  'use strict';
- var SCHEMA_VERSION=1,INQUIRY='inquiry',
+ var SCHEMA_VERSION=1,INQUIRY='inquiry',NO_INQUIRY='no-inquiry',
   RESERVED=/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i,
   ILLEGAL=/[\\\/:\*\?"<>\|]/g,MAX_PATH=260;
  function text(value){return value==null?'':String(value);}
@@ -56,6 +56,19 @@
     brand:sheet.brand,brandLabel:sheet.brandLabel,supplier:sheet.supplier,sheetName:sheet.name,name:name,target:target,
     materialRows:sheet.values.length-headerRow,hasLayout:!!sheet.layout,issues:issues});
   });
+  var noInquiry=source.noInquiry;
+  if(noInquiry&&Array.isArray(noInquiry.rows)&&noInquiry.rows.length){
+   var noInquiryFile=safeName(text(noInquiry.splitFileName)||'无需询价')||'无需询价.xlsx';
+   if(!/\.xlsx$/i.test(noInquiryFile))noInquiryFile+='.xlsx';
+   var noInquiryTarget=join(directory,noInquiryFile),noInquiryIssues=[];
+   if(noInquiryTarget.length>MAX_PATH)
+    noInquiryIssues.push({code:'long-path',message:'无需询价清单输出路径过长，请选择更短的目录：'+noInquiryTarget});
+   if(seen[noInquiryTarget.toLowerCase()])
+    conflicts.push({code:'duplicate-target',message:'无需询价清单与其他拆分文件同名：'+noInquiryFile});
+   seen[noInquiryTarget.toLowerCase()]=true;
+   files.push({kind:NO_INQUIRY,fileId:'no-inquiry',categoryName:'无需询价',name:noInquiryFile,
+    target:noInquiryTarget,materialRows:noInquiry.rows.length,hasLayout:true,issues:noInquiryIssues});
+  }
   if(generation&&generation.target&&sheets.length){
    var completeFile=completeName(generation),completeTarget=join(directory,completeFile),completeIssues=[];
    if(completeTarget.length>MAX_PATH)completeIssues.push({code:'long-path',message:'完整总表输出路径过长，请选择更短的目录：'+completeTarget});
@@ -76,5 +89,5 @@
   });
   return {ok:conflicts.length===0,conflicts:conflicts,canPublish:(plan&&plan.canPublish)===true&&conflicts.length===0};
  }
- return {SCHEMA_VERSION:SCHEMA_VERSION,INQUIRY:INQUIRY,MAX_PATH:MAX_PATH,safeName:safeName,baseName:baseName,completeName:completeName,build:build,checkTargets:checkTargets};
+ return {SCHEMA_VERSION:SCHEMA_VERSION,INQUIRY:INQUIRY,NO_INQUIRY:NO_INQUIRY,MAX_PATH:MAX_PATH,safeName:safeName,baseName:baseName,completeName:completeName,build:build,checkTargets:checkTargets};
 }));

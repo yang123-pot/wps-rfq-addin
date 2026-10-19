@@ -18,9 +18,11 @@ function boot(){
   global.document={getElementById:function(id){return elements[id]||(elements[id]=fakeElement(id));},
     createElement:function(tag){return fakeElement(tag);}};
   window.__RFQ_IMPORT__={token:'test-token'};
-  const project=require('../src/project.js'),restore=require('../src/project-restore.js');
+  const project=require('../src/project.js'),restore=require('../src/project-restore.js'),
+    reviewModel=require('../src/classification-review-model.js');
   window.RfqProject=project;global.RfqProject=project;
   window.RfqProjectRestore=restore;global.RfqProjectRestore=restore;
+  window.RfqClassificationReviewModel=reviewModel;global.RfqClassificationReviewModel=reviewModel;
   delete require.cache[require.resolve('../src/project-ui.js')];
   require('../src/project-ui.js');
   return {project:project,ui:window.RfqProjectUI,elements:elements};
@@ -35,7 +37,8 @@ function record(project){
   const col=sample.buildCollection();
   const value=project.create(col,true,{projectId:'p-ui-r12c-0001'});
   value.revision=4;value.name='示例园区';value.mergeIdentical=true;
-  value.matching={schemaVersion:1,path:REVIEW_PATH,sha256:SHA('a'),inputKey:'ck2-0123456789abcdef'};
+  value.matching={schemaVersion:1,layoutVersion:2,path:REVIEW_PATH,sha256:SHA('a'),rowIdColumn:12,
+    inputKey:'ck2-0123456789abcdef'};
   value.review={schemaVersion:1,sheet:{path:REVIEW_PATH},inputKey:'ck2-0123456789abcdef',
     confirmedAt:'2026-09-27T10:01:15.871Z',revision:1,rows:reviewRows(),counts:{}};
   project.STAGES.forEach(function(stage){value.stages[stage]={state:'ready',revision:4,updatedAt:new Date().toISOString(),detail:'t'};});
