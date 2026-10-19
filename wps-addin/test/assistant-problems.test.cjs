@@ -2,7 +2,14 @@ const test=require('node:test');const assert=require('node:assert/strict');
 let api;try{api=require('../src/assistant-problems.js');}catch(_){api={};}
 test('具体问题显示工作表与单元格并给出填写方法',()=>{
  assert.equal(typeof api.describe,'function');const p=api.describe({stage:'review',message:'最终分类为空',issues:[{sheet:'分类审核成果',row:7,column:8,code:'category-empty',message:'最终分类为空'}]});
- assert.match(p.location,/分类审核成果.*H7/);assert.match(p.solution,/无需询价/);assert.equal(p.actionLabel,'去填写');
+ assert.match(p.location,/分类审核成果.*第 H 列第 7 行.*单元格 H7/);assert.match(p.solution,/无需询价/);assert.equal(p.actionLabel,'去填写');
+});
+test('集中错误把工作表坐标拆开显示，I891不能误读成清单序号1891',()=>{
+ const p=api.describe({stage:'review',message:'最终分类为空',issues:[{sheet:'分类审核成果',row:891,column:9,code:'category-empty',message:'最终分类为空'}]});
+ assert.match(p.location,/分类审核成果 · 第 I 列第 891 行（单元格 I891）/);
+ assert.doesNotMatch(p.location,/· 1891/);
+ const precomputed=api.describe({stage:'review',message:'错误',issues:[{sheet:'分类审核成果',cell:'J1888',code:'category-empty'}]});
+ assert.match(precomputed.location,/第 J 列第 1888 行（单元格 J1888）/);
 });
 test('抬头缺项、文件冲突和项目冲突有不同解决方式',()=>{
  assert.equal(typeof api.describe,'function');
