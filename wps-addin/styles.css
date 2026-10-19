@@ -186,8 +186,9 @@ body:not(.detail-mode) .simple-card{display:flex;flex-direction:column;flex:1;mi
 input[aria-invalid=true]{border:2px solid #b43a24!important;background:#fff4ef!important}
 #simple-settings{overflow:auto;padding:16px}.simple-setting{border-radius:3px;box-shadow:none}
 .assistant-overlay{position:fixed;inset:0;background:#17212d66;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:12px}
-.assistant-dialog{width:100%;max-height:95vh;overflow:auto;background:#fff;border:1px solid #bdc5d0;border-radius:4px;padding:18px;box-shadow:0 12px 36px #0003}
-.assistant-dialog h2{font-size:18px;color:#8d2b1a;margin:0 0 12px}.assistant-dialog p{font-size:14px;color:#263342}.assistant-dialog strong{display:block;overflow-wrap:anywhere;color:#8d2b1a}.assistant-dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}.assistant-dialog-actions{display:flex;gap:10px;margin-top:16px}.assistant-dialog-actions button{border-radius:3px;font-size:14px}
+.assistant-dialog{width:100%;max-height:95vh;overflow:hidden;display:flex;flex-direction:column;background:#fff;border:1px solid #bdc5d0;border-radius:4px;padding:18px;box-shadow:0 12px 36px #0003}
+#assistant-error-description{min-height:0;overflow:auto;padding-right:4px}
+.assistant-dialog h2{font-size:18px;color:#8d2b1a;margin:0 0 12px}.assistant-dialog p{font-size:14px;color:#263342}.assistant-dialog strong{display:block;overflow-wrap:anywhere;color:#8d2b1a}.assistant-dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}.assistant-dialog-actions{display:flex;flex:0 0 auto;gap:10px;margin-top:16px;padding-top:12px;border-top:1px solid #e1e6ec}.assistant-dialog-actions button{border-radius:3px;font-size:14px}
 .assistant-dialog-actions button{width:auto;min-width:0;flex:1}.assistant-dialog-actions .locate{flex:0 0 auto;white-space:nowrap}
 body.detail-mode #simple-settings{display:none!important}body.detail-mode #assistant-header{display:none}
 @media(max-width:340px){body:not(.detail-mode)>header{padding:12px}body:not(.detail-mode) #simple-home{padding:10px 12px 0}.simple-seven-list{gap:8px 2px}.simple-seven-row .label{font-size:11px}.assistant-actions{gap:8px}}

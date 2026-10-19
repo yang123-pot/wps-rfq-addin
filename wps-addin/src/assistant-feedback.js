@@ -17,8 +17,18 @@
   var body=el('div');body.id='assistant-error-description';body.appendChild(el('p',p.message));
   if(p.location)body.appendChild(el('strong','位置：'+p.location));
   body.appendChild(el('p','处理方法：'+p.solution));
-  if(p.issues.length>1){var list=el('ul');p.issues.slice(0,10).forEach(function(item){list.appendChild(el('li',(item.path||item.file||'')+' '+(item.sheet||'')+' '+(item.row?RfqAssistantProblems.column(item.column||1)+item.row:'')+' '+item.message));});body.appendChild(list);}
-  box.appendChild(body);var details=el('details');details.appendChild(el('summary','查看详情'));details.appendChild(el('pre',p.details));box.appendChild(details);
+  if(p.issues.length>1){
+   var list=el('ul'),shown=Math.min(p.issues.length,8);
+   if(p.issues.length>shown)body.appendChild(el('p','仅显示前 '+shown+' 项，共 '+p.issues.length+' 项；处理一项后会重新计算剩余问题。'));
+   p.issues.slice(0,shown).forEach(function(item){
+    var file=String(item.file||item.path||'').split(/[\\/]/).pop();
+    list.appendChild(el('li',(file?file+' · ':'')+(item.sheet||'')+
+      (item.row?' · '+RfqAssistantProblems.column(item.column||1)+item.row:'')+'：'+item.message));
+   });
+   body.appendChild(list);
+  }
+  var details=el('details');details.appendChild(el('summary','查看详情'));details.appendChild(el('pre',p.details));body.appendChild(details);
+  box.appendChild(body);
   var row=el('div');row.className='assistant-dialog-actions';var cancel=el('button','暂不处理');cancel.type='button';cancel.className='locate';cancel.onclick=close;row.appendChild(cancel);
   if(typeof input.resolve==='function'){var fix=el('button',p.actionLabel);fix.type='button';fix.onclick=async function(){close();try{await input.resolve();}catch(e){notify({message:e.message,force:true});}};row.appendChild(fix);}
   else cancel.textContent='我知道了';box.appendChild(row);active.appendChild(box);row.lastChild.focus();

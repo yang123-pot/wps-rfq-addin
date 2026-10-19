@@ -37,6 +37,20 @@ const assert=require('node:assert/strict');const path=require('node:path');const
   await page.evaluate(()=>{RfqFeedback.arm();RfqFeedback.notify({stage:'review',message:'空分类',issues:[{sheet:'分类审核成果',row:7,column:8,message:'最终分类为空'}],resolve:()=>{}});RfqFeedback.tell('整表未通过校验',true,'review');});
   assert.match(await page.getByRole('alertdialog').innerText(),/H7/,'通用错误文字不能抹掉具体位置和去修改入口');
   await page.keyboard.press('Escape');
+  await page.setViewportSize({width:400,height:500});
+  await page.evaluate(()=>{
+   RfqFeedback.arm();
+   RfqFeedback.notify({stage:'source',message:'请处理以下19处问题，再确认整理方式。',resolve:()=>{},
+    issues:Array.from({length:19},(_,index)=>({path:'C:\\Users\\刘杨\\Desktop\\先进材料创新研发基地项目(一期)(内装工程二标段).xlsx',
+     file:'先进材料创新研发基地项目(一期)(内装工程二标段).xlsx',sheet:'表E.2.1 分部分项工程项目清单计价表【1-2#特殊4.1',
+     row:443+index,column:6,code:'quantity-invalid',message:'工程量为空或不是有效非负十进制数，已保留原值。'}))});
+  });
+  const sourceFix=page.getByRole('alertdialog').getByRole('button',{name:'去核对来源'});
+  assert.equal(await sourceFix.isVisible(),true,'长问题列表不能把修正入口推到可视区外');
+  const sourceFixBox=await sourceFix.boundingBox();
+  assert.ok(sourceFixBox.y>=0&&sourceFixBox.y+sourceFixBox.height<=500,'修正入口必须在窄窗可视范围内');
+  assert.match(await page.getByRole('alertdialog').innerText(),/仅显示前 8 项，共 19 项/);
+  await page.keyboard.press('Escape');
   assert.deepEqual(errors,[]);process.stdout.write('PASS: 新版固定操作区、七步状态、动态数量、弹窗和聚焦。\n');
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
