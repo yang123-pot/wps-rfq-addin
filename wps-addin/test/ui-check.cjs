@@ -37,7 +37,7 @@ const {createServer} = require('../dev/server.cjs');
     await page.locator('#preview-list button.locate').click();
     assert.deepEqual(await page.evaluate(()=>window.__selection),{row:3,column:3});
     await page.locator('#preview-mode').selectOption('issues');
-    assert.match(await page.locator('#preview-list').innerText(),/工程量为空或不是有效/);
+    assert.match(await page.locator('#preview-list').innerText(),/工程量不是有效非负十进制数/);
     await page.evaluate(()=>{window.Application.ActiveWorkbook.FullName='C:\\其他.xlsx';window.__selection=null;});
     await page.locator('#preview-list button.locate').click();
     assert.match(await page.locator('#message').innerText(),/切换|原工作簿/);

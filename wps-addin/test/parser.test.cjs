@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {parseWorkbook} = require('../src/parser.js');
+const {preview} = require('../src/merge.js');
 
 const header = ['序号','项目编码','项目名称','项目特征描述','计量\n单位','工程量','综合单价','合价'];
 function sheet(values, name='清单', startRow=1, startColumn=1) {
@@ -56,8 +57,20 @@ test('missing material fields and invalid quantity remain visible candidates ins
   assert.ok(result.materials[0].issueCodes.includes('code-missing'));
   assert.ok(result.materials[1].issueCodes.includes('name-missing'));
   assert.ok(result.materials[2].issueCodes.includes('unit-missing'));
-  assert.deepEqual(result.materials.map(x=>x.quantity),['2.5',null,null,'0']);
+  assert.deepEqual(result.materials.map(x=>x.quantity),['2.5',null,'0','0']);
   assert.equal(result.materials[1].quantityRaw,'abc');
+  assert.equal(result.materials[2].quantityRaw,'');
+  assert.equal(result.materials[2].issueCodes.includes('quantity-invalid'),false,'空白工程量按0计入，不再阻断');
+});
+test('zero and blank quantities both remain classifiable material rows',()=>{
+  const result=parse(sheet([header,row('001','管道','DN50','m',0),row('002','阀门','DN50','个','')]));
+  assert.equal(result.materials.length,2);
+  assert.deepEqual(result.materials.map(x=>x.quantity),['0','0']);
+  assert.deepEqual(result.materials.map(x=>x.quantityRaw),[0,'']);
+  assert.equal(result.issues.some(x=>x.code==='quantity-invalid'),false);
+  const merged=preview([result],{mergeIdentical:true,mergeAllWorkbooks:true});
+  assert.equal(merged.canFinalize,true,'0和空白都不得阻断进入分类');
+  assert.deepEqual(merged.groups.map(x=>x.quantity),['0','0']);
 });
 test('quantity validation rejects partial parses, errors, negative and ambiguous separators',()=>{
   const quantities=['1,234.50','1,23','12m','待定','#VALUE!',-1,true,Infinity,0.0000001,' 0.10 '];

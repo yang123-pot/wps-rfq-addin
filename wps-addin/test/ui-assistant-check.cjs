@@ -43,7 +43,7 @@ const assert=require('node:assert/strict');const path=require('node:path');const
    RfqFeedback.notify({stage:'source',message:'请处理以下19处问题，再确认整理方式。',resolve:()=>{},
     issues:Array.from({length:19},(_,index)=>({path:'C:\\Users\\刘杨\\Desktop\\先进材料创新研发基地项目(一期)(内装工程二标段).xlsx',
      file:'先进材料创新研发基地项目(一期)(内装工程二标段).xlsx',sheet:'表E.2.1 分部分项工程项目清单计价表【1-2#特殊4.1',
-     row:443+index,column:6,code:'quantity-invalid',message:'工程量为空或不是有效非负十进制数，已保留原值。'}))});
+     row:443+index,column:6,code:'quantity-invalid',message:'工程量不是有效非负十进制数，已保留原值。'}))});
   });
   const sourceFix=page.getByRole('alertdialog').getByRole('button',{name:'去核对来源'});
   assert.equal(await sourceFix.isVisible(),true,'长问题列表不能把修正入口推到可视区外');

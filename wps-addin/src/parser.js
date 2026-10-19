@@ -154,6 +154,8 @@
         if (!map) { audit('unmapped'); return; }
         var codeRaw = values[map.code], name = values[map.name], feature = values[map.feature];
         var unit = values[map.unit], qty = values[map.quantity];
+        var blankQuantity = qty == null || (typeof qty === 'string' && qty.trim() === '');
+        var parsedQuantity = blankQuantity ? '0' : quantity(qty);
         var totalLabel = present(name) ? name : values[map.sequence != null ? map.sequence : 0];
         if (!present(codeRaw) && !present(feature) && !present(unit) && /^(?:(?:本页|分部|分部分项|单价措施|措施项目|总价措施|工程|本表|本专业|累计|本章))?(?:小计|合计|总计)$/.test(compact(totalLabel))) {
           audit('total'); return;
@@ -176,7 +178,8 @@
           var itemBasis = currentProfession ? currentBasis : itemProfession ? 'material-name' : 'unresolved';
           var item = { id: JSON.stringify([snapshot.path || snapshot.name, sheet.name, absoluteRow]),
             code: text(codeRaw), name: text(name), feature: text(feature), featureParts: [{ row: absoluteRow, text: text(feature) }], unit: text(unit),
-            quantity: quantity(qty), quantityRaw: qty == null ? '' : qty, issueCodes: [],
+            quantity: parsedQuantity, quantityDefaulted: blankQuantity,
+            quantityRaw: qty == null ? '' : qty, issueCodes: [],
             source: { file: snapshot.name, path: snapshot.path, sheet: sheet.name, row: absoluteRow,
               rows: [absoluteRow], column: sheet.startColumn + map.name, engineering: engineering, profession: itemProfession,
               professionBasis: itemBasis, section: section } };
@@ -186,7 +189,7 @@
           if (!present(name)) issue('name-missing', 'error', absoluteRow, sheet.startColumn + map.name, '项目名称为空，不能合并或输出。', item);
           if (!present(unit)) issue('unit-missing', 'error', absoluteRow, sheet.startColumn + map.unit, '单位为空，不能合并或输出。', item);
           if (item.quantity === null) issue('quantity-invalid', 'error', absoluteRow, sheet.startColumn + map.quantity,
-            '工程量为空或不是有效非负十进制数，已保留原值。', item);
+            '工程量不是有效非负十进制数，已保留原值。', item);
           if (itemBasis === 'material-name') issue('source-inferred', 'review', absoluteRow, sheet.startColumn + map.name,
             '缺少明确专业标题，已按项目名称识别专业，请核对。', item);
           if (!engineering || !itemProfession) issue('source-unresolved', 'review', absoluteRow, sheet.startColumn + map.name,
