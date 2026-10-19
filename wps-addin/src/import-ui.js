@@ -602,7 +602,12 @@
     // 空分类/未知分类/损坏行返回工作表＋单元格并定位。确认快照先落盘，落盘成功才学习，失败不回滚确认。
     var sheetReviewBusy=false,lastReviewRead=null,reviewDivergence=null;
     function sheetEl(id){return document.getElementById(id);}
-    function sheetTell(text,error){var box=sheetEl('sheet-review-message');if(box){box.textContent=text;box.className=error?'error':'';}if(window.RfqFeedback)RfqFeedback.tell(text,error,'review');}
+    function sheetTell(text,error){
+      var box=sheetEl('sheet-review-message');
+      if(box){box.textContent=text;box.className=error?'error':'';}
+      if(!document.body.classList.contains('detail-mode')&&ui)ui.set({statusMessage:text});
+      if(window.RfqFeedback)RfqFeedback.tell(text,error,'review');
+    }
     function columnName(column){return Number.isSafeInteger(column)&&column>0&&column<=26?String.fromCharCode(64+column):'';}
     function reviewConfirmation(){return projects.reviewConfirmation?projects.reviewConfirmation():null;}
     function reviewFresh(){

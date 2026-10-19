@@ -42,8 +42,9 @@
   by('assistant-layout').value=s.layout||'separated';
   by('assistant-new-project').hidden=v.step!==8;
   var secondary=by('simple-example-link');
-  secondary.hidden=!(v.step<8&&s.files.length);
-  secondary.textContent=v.step===3?'保存审核成果':'返回';
+  secondary.hidden=!(v.step<8&&s.files.length&&v.step!==3);
+  secondary.textContent='返回';
+  var saveReview=by('simple-save-review');if(saveReview)saveReview.hidden=v.step!==3;
   var key=[v.step,v.title,v.action,s.previewReviewed,s.reviewGenerated,s.reviewConfirmed,s.categoriesReady,s.summaryReady,s.brandsReady,s.inquiryReady,s.splitStarted,s.outputDirectory,s.splitVerified].join('|');
   if(key!==lastRenderKey){var scroll=document.querySelector('.assistant-scroll');if(scroll)scroll.scrollTop=0;lastRenderKey=key;}
  }
@@ -53,8 +54,11 @@
  by('assistant-change-directory').onclick=function(){store.run('chooseDirectory').catch(function(e){RfqFeedback.notify({message:e.message});});};
  by('simple-example-link').onclick=function(){
   var step=store.view().step;
-  if(step===3){var save=by('sheet-review-save');if(save){RfqFeedback.arm();save.click();}return;}
   document.dispatchEvent(new CustomEvent('rfq:simple-back',{detail:{step:step}}));
+ };
+ by('simple-save-review').onclick=function(){
+  var save=by('sheet-review-save');
+  if(save){store.set({statusMessage:'正在保存审核草稿…'});RfqFeedback.arm();save.click();}
  };
  by('assistant-layout').onchange=function(){var target=by('categories-layout');target.value=this.value;target.dispatchEvent(new Event('change',{bubbles:true}));};
  by('assistant-new-project').onclick=function(){store.run('newProject').catch(function(e){RfqFeedback.notify({message:e.message});});};
