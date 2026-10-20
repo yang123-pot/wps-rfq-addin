@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="840" viewBox="0 0 1440 840">
+<rect width="1440" height="840" fill="#f3f7f6"/><g font-family="Microsoft YaHei, sans-serif" fill="#243b36">
+<text x="40" y="55" font-size="27" font-weight="bold">第一步补充：原表保持，按工作表原顺序核对导入统计</text>
+<text x="40" y="88" font-size="16">2026-10-19 用户批准方案 · 补充图01／02 · 以下为示例，不是实际项目数据</text>
+<rect x="30" y="120" width="1000" height="670" rx="10" fill="white" stroke="#d4e1dd"/>
+<text x="55" y="160" font-size="25" font-weight="bold">导入预览</text><text x="55" y="194" font-size="17">1 本文件 · 10 张工作表 · 原始 10 条材料</text>
+<rect x="50" y="215" width="960" height="43" fill="#dfede7"/>
+<g font-size="16" font-weight="bold"><text x="65" y="242">序号</text><text x="130" y="242">文件</text><text x="285" y="242">工作表名称</text><text x="465" y="242">工程／单体</text><text x="650" y="242">专业／区段</text><text x="825" y="242">材料条数</text><text x="925" y="242">提示</text></g>
+<g font-size="16"><text x="70" y="292">1</text><text x="130" y="292">示例清单.xlsx</text><text x="285" y="292">1号工作表</text><text x="465" y="292">1号单体</text><text x="650" y="292">暖通</text><text x="850" y="292">1</text><text x="925" y="292">已识别</text>
+<text x="70" y="334">2</text><text x="130" y="334">示例清单.xlsx</text><text x="285" y="334">2号工作表</text><text x="465" y="334">2号单体</text><text x="650" y="334">暖通</text><text x="850" y="334">1</text><text x="925" y="334">已识别</text>
+<text x="70" y="376">3</text><text x="285" y="376">3号工作表</text><text x="465" y="376">3号单体</text><text x="850" y="376">1</text>
+<text x="70" y="418">4</text><text x="285" y="418">4号工作表</text><text x="465" y="418">4号单体</text><text x="850" y="418">1</text>
+<text x="70" y="460">5</text><text x="285" y="460">5号工作表</text><text x="465" y="460">5号单体</text><text x="850" y="460">1</text>
+<text x="70" y="502">6</text><text x="285" y="502">6号工作表</text><text x="465" y="502">6号单体</text><text x="850" y="502">1</text>
+<text x="70" y="544">7</text><text x="285" y="544">7号工作表</text><text x="465" y="544">7号单体</text><text x="850" y="544">1</text>
+<text x="70" y="586">8</text><text x="285" y="586">8号工作表</text><text x="465" y="586">8号单体</text><text x="850" y="586">1</text>
+<text x="70" y="628">9</text><text x="285" y="628">9号工作表</text><text x="465" y="628">9号单体</text><text x="850" y="628">1</text>
+<text x="70" y="670">10</text><text x="285" y="670">10号工作表</text><text x="465" y="670">10号单体</text><text x="850" y="670">1</text></g>
+<text x="55" y="723" font-size="18" fill="#20764f">原始10条 → 预计整理后9条，减少1条重复材料（勾选合并相同材料时）</text>
+<text x="55" y="760" font-size="16">下方保留全部来源工作表原样副本，按原标签顺序翻看；原文件不改。</text>
+<text x="45" y="820" font-size="17">[导入预览] [原工作表1] [原工作表2] [原工作表3] … [原工作表10]（数量按实际文件）</text>
+<rect x="1050" y="120" width="360" height="670" rx="10" fill="white" stroke="#d4e1dd"/>
+<text x="1075" y="165" font-size="23" font-weight="bold">材料整理助手</text><text x="1075" y="210" font-size="17">①选清单 ②分类 ③核对 … ⑦拆分</text>
+<text x="1075" y="285" font-size="24" font-weight="bold">选择整理方式</text><text x="1075" y="340" font-size="17">☑ 合并清单</text><text x="1075" y="390" font-size="16">相同名称、特征、单位的材料数量累加</text>
+<text x="1075" y="445" font-size="16">选择变化只更新预计条数。</text><text x="1075" y="480" font-size="16">原件与各张工作表保持原样。</text><text x="1075" y="515" font-size="16">确认后才进入自动分类。</text>
+<rect x="1075" y="705" width="310" height="50" rx="6" fill="#20764f"/><text x="1097" y="737" font-size="19" fill="white">确认选择，开始自动分类</text></g></svg>

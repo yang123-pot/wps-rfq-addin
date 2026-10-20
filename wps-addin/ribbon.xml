@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui" onLoad="OnAddinLoad">
+  <ribbon startFromScratch="false">
+    <tabs>
+      <tab id="rfqProjectTab" label="材料整理">
+        <group id="rfqStages" label="材料整理">
+          <button id="rfqStepImport" label="选择清单" size="large" tag="import" onAction="OnGotoStage" getImage="GetRfqImage"/>
+          <button id="rfqStepBrands" label="填写品牌" size="large" tag="brands" onAction="OnGotoStage" getImage="GetRfqImage"/>
+          <button id="rfqStepInquiry" label="生成文件" size="large" tag="inquiry" onAction="OnGotoStage" getImage="GetRfqImage"/>
+          <button id="rfqOpenProject" label="打开项目" size="large" tag="project" onAction="OnGotoStage" getImage="GetRfqImage"/>
+          <button id="rfqHelp" label="帮助" size="large" tag="help" onAction="OnGotoStage" getImage="GetRfqImage"/>
+        </group>
+        <group id="rfqWorkspace" label="更多">
+          <button id="rfqCategoryLibrary" label="分类学习库" size="large" onAction="OnOpenCategoryLibrary" getImage="GetRfqImage"/>
+          <button id="rfqOpenPane" label="打开材料整理助手" size="large" onAction="OnOpenRfqPane" getImage="GetRfqImage"/>
+          <button id="rfqReloadPane" label="重建窗口" onAction="OnReloadRfqPane"/>
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>

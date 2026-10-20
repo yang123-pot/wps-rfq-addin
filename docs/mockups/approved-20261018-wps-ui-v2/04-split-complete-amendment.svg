@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600">
+<rect width="960" height="600" fill="#f2f3f5"/><g font-family="Microsoft YaHei, sans-serif" fill="#243343">
+<text x="24" y="36" font-size="22" font-weight="bold">第7步补充：同一文件夹保留完整询价总表</text>
+<text x="24" y="62" font-size="13">用户2026-10-18新增要求 · 供应商文件数量与完整总表分别显示 · 全部落盘并校验后完成</text>
+<rect x="24" y="86" width="442" height="488" rx="5" fill="white" stroke="#d0d7de"/>
+<rect x="494" y="86" width="442" height="488" rx="5" fill="white" stroke="#d0d7de"/>
+<text x="46" y="122" font-size="15">第7步 / 共7步</text><text x="516" y="122" font-size="15">全部完成</text>
+<text x="46" y="164" font-size="23" font-weight="bold">导出询价文件</text>
+<text x="46" y="198" font-size="15">5 个供应商文件 ＋ 1 份完整总表</text>
+<text x="46" y="224" font-size="15">共 6 个文件，保存到同一个文件夹。</text>
+<text x="46" y="265" font-size="14">输出文件夹：桌面 / 示例园区 / 询价输出</text>
+<g font-size="14"><text x="46" y="312">水泵_华川设备.xlsx</text><text x="46" y="344">水泵_启明机电.xlsx</text><text x="46" y="376">阀门_多供应商.xlsx</text><text x="46" y="408">风机_瑞风设备.xlsx</text><text x="46" y="440">汽车充电桩_远程电气.xlsx</text>
+<text x="46" y="478" fill="#217346" font-weight="bold">示例园区_询价总表_完整文件.xlsx</text></g>
+<text x="516" y="164" font-size="22" font-weight="bold">文件已全部导出</text>
+<text x="516" y="198" font-size="15">5 个供应商文件＋1 份完整总表，共 6 个文件。</text>
+<text x="516" y="248" font-size="15">✓ 供应商文件：5 / 5</text>
+<text x="516" y="285" font-size="15">✓ 完整询价总表：1 / 1</text>
+<text x="516" y="336" font-size="14">完整总表保留第6步的全部工作表、内容和格式。</text>
+<text x="516" y="378" font-size="14">部分失败时，只重试未完成文件。</text>
+<text x="516" y="409" font-size="14">同名文件不覆盖，已成功文件保留。</text>
+<path d="M24 511h442M494 511h442" stroke="#d0d7de"/>
+<rect x="190" y="527" width="254" height="34" rx="3" fill="#217346"/>
+<rect x="660" y="527" width="254" height="34" rx="3" fill="#217346"/>
+<g fill="white" font-size="15" text-anchor="middle"><text x="317" y="550">开始拆分</text><text x="787" y="550">打开文件夹</text></g>
+</g></svg>

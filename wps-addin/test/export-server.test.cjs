@@ -1,0 +1,102 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
+const {createServer}=require('../dev/server.cjs');
+const xlsxFixture=require('./fixtures/xlsx-container.cjs');
+const http=require('node:http'),crypto=require('node:crypto');
+
+for(const heldAction of ['inspect','prepare'])test('read-only inspection remains available while '+heldAction+' request body is arriving',async t=>{
+ const folder=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-concurrent-inspect-'));
+ const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(folder,'copies')});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ t.after(async()=>{await new Promise(resolve=>server.close(resolve));await fs.rm(folder,{recursive:true,force:true});});
+ const origin='http://127.0.0.1:'+server.address().port;
+ const html=await(await fetch(origin+'/taskpane.html')).text();
+ const token=JSON.parse(html.match(/window\.__RFQ_IMPORT__=(\{[^;]+\});/)[1]).token;
+ const headers={'content-type':'application/json','x-rfq-import-token':token};
+ const target=path.join(folder,'source.xlsx'),bytes=Buffer.from('unchanged source workbook');
+ await fs.writeFile(target,bytes);
+ const firstBody=JSON.stringify({target:heldAction==='inspect'?target:path.join(folder,'new-output.xlsx')});
+ const requestStarted=new Promise(resolve=>server.once('request',resolve));
+ let firstRequest;
+ const firstResponse=new Promise((resolve,reject)=>{
+  firstRequest=http.request(origin+'/api/export/'+heldAction,{method:'POST',headers},response=>{
+   let body='';response.on('data',chunk=>body+=chunk);response.on('end',()=>resolve({status:response.statusCode,body}));
+  });firstRequest.on('error',reject);
+ });
+ firstRequest.write(firstBody.slice(0,1));
+ await requestStarted;
+ try{
+  const inspection=await fetch(origin+'/api/export/inspect',{method:'POST',headers,body:JSON.stringify({target})});
+  assert.equal(inspection.status,200,'预览和恢复并发核验不能因共享写入锁返回409');
+  const actual=await inspection.json();
+  assert.equal(actual.exists,true);
+  assert.equal(actual.sha256,crypto.createHash('sha256').update(bytes).digest('hex'));
+  assert.equal((await fetch(origin+'/api/export/inspect',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({target})})).status,403,
+   '只读并发不能绕过本地会话验证');
+  if(heldAction==='prepare'){
+   const secondWrite=await fetch(origin+'/api/export/prepare',{method:'POST',headers,body:JSON.stringify({target:path.join(folder,'blocked.xlsx')})});
+   assert.equal(secondWrite.status,409,'另一项写入仍须受互斥保护');
+  }
+ }finally{firstRequest.end(firstBody.slice(1));await firstResponse;}
+ assert.equal((await firstResponse).status,200);
+ assert.deepEqual(await fs.readFile(target),bytes);
+});
+
+test('file freeze endpoint uses local auth and the registered ticket plan, never a supplied path',async t=>{
+ const folder=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-freeze-api-')),server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(folder,'stages')});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{await new Promise(r=>server.close(r));await fs.rm(folder,{recursive:true,force:true});});
+ const origin='http://127.0.0.1:'+server.address().port,html=await(await fetch(origin+'/taskpane.html')).text(),token=JSON.parse(html.match(/window\.__RFQ_IMPORT__=(\{[^;]+\});/)[1]).token;
+ const headers={'content-type':'application/json','x-rfq-import-token':token},request=(route,data,h=headers)=>fetch(origin+'/api/export/'+route,{method:'POST',headers:h,body:JSON.stringify(data)});
+ assert.equal((await fetch(origin+'/api/export/freeze')).status,405);assert.equal((await request('freeze',{},{})).status,403);
+ assert.equal((await request('freeze',{}, {...headers,origin:'https://other.example'})).status,403);
+ assert.equal((await request('freeze',{ticket:'unknown'})).status,400);
+ const plan=[{name:'阀门',freeze:{row:7,column:1}}],p=await(await request('prepare',{target:path.join(folder,'result.xlsx'),freezePlan:plan})).json();
+ await fs.writeFile(p.stagePath,xlsxFixture.workbook(plan));assert.equal((await request('commit',{ticket:p.ticket})).status,400);
+ const outside=path.join(folder,'existing.xlsx');await fs.writeFile(outside,'untouched');
+ const response=await request('freeze',{ticket:p.ticket,stagePath:outside,freezePlan:[{name:'wrong',freeze:{row:2,column:1}}]});assert.equal(response.status,200);
+ const frozen=await response.json();assert.equal(frozen.sheets,1);assert.equal(await fs.readFile(outside,'utf8'),'untouched');
+ const xml=xlsxFixture.entries(await fs.readFile(p.stagePath))['xl/worksheets/sheet1.xml'].toString();assert.match(xml,/ySplit="6"/);
+ const committed=await request('commit',{ticket:p.ticket});assert.equal(committed.status,200);assert.equal((await committed.json()).sha256,frozen.sha256);
+});
+test('export endpoints require the local session and publish only server-issued stages without overwrite',async t=>{
+ const folder=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-export-api-')),server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(folder,'private')});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{await new Promise(r=>server.close(r));await fs.rm(folder,{recursive:true,force:true});});
+ const origin='http://127.0.0.1:'+server.address().port,html=await(await fetch(origin+'/taskpane.html')).text();
+ const token=JSON.parse(html.match(/window\.__RFQ_IMPORT__=(\{[^;]+\});/)[1]).token;
+ const headers={'content-type':'application/json','x-rfq-import-token':token};
+ const request=(route,data,h=headers)=>fetch(origin+'/api/export/'+route,{method:'POST',headers:h,body:JSON.stringify(data)});
+ assert.equal((await request('prepare',{},{})).status,403);assert.equal((await request('prepare',{}, {...headers,origin:'https://other.example'})).status,403);
+ assert.equal((await fetch(origin+'/api/export/prepare')).status,405);
+ const response=await request('prepare',{target:path.join(folder,'result.xlsx')});assert.equal(response.status,200);const p=await response.json();
+ await fs.writeFile(p.stagePath,Buffer.from([0x50,0x4b,3,4,1,2]));
+ const committed=await request('commit',{ticket:p.ticket});assert.equal(committed.status,200);const result=await committed.json();assert.equal(result.target,p.target);
+ assert.equal((await request('verify',{ticket:p.ticket,target:p.target,sha256:result.sha256},{})).status,403);
+ assert.equal((await request('verify',{ticket:p.ticket,target:p.target,sha256:result.sha256})).status,200);
+ await fs.writeFile(p.target,'changed after export');
+ assert.equal((await request('verify',{ticket:p.ticket,target:p.target,sha256:result.sha256})).status,400);
+ await fs.writeFile(p.target,Buffer.from([0x50,0x4b,3,4,1,2]));
+ assert.equal((await request('commit',{ticket:p.ticket})).status,200);
+ assert.equal((await request('prepare',{target:p.target})).status,400);
+ assert.equal((await request('commit',{ticket:'bad',stagePath:p.target})).status,400);
+});
+test('export discard endpoint releases only unpublished tickets and keeps published verification',async t=>{
+ const folder=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-export-discard-')),server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(folder,'private')});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{await new Promise(r=>server.close(r));await fs.rm(folder,{recursive:true,force:true});});
+ const origin='http://127.0.0.1:'+server.address().port,html=await(await fetch(origin+'/taskpane.html')).text();
+ const token=JSON.parse(html.match(/window\.__RFQ_IMPORT__=(\{[^;]+\});/)[1]).token;
+ const headers={'content-type':'application/json','x-rfq-import-token':token};
+ const request=(route,data,h=headers)=>fetch(origin+'/api/export/'+route,{method:'POST',headers:h,body:JSON.stringify(data)});
+ const abandoned=await(await request('prepare',{target:path.join(folder,'放弃.xlsx'),adjacent:true})).json();
+ await fs.writeFile(abandoned.stagePath,Buffer.from([0x50,0x4b,3,4,1,2]));
+ assert.equal((await request('discard',{ticket:abandoned.ticket},{})).status,403);
+ const discarded=await(await request('discard',{ticket:abandoned.ticket})).json();
+ assert.deepEqual(discarded,{discarded:true});
+ assert.equal(await fs.stat(abandoned.stagePath).then(()=>true,()=>false),false,'未发布票据的相邻暂存应被清理');
+ assert.equal((await request('verify',{ticket:abandoned.ticket,target:abandoned.target,sha256:'0'.repeat(64)})).status,400,'已清理票据不得再verify');
+ assert.deepEqual(await(await request('discard',{ticket:'unknown'})).json(),{discarded:false,reason:'unknown-ticket'});
+ const published=await(await request('prepare',{target:path.join(folder,'已发布.xlsx'),adjacent:true})).json();
+ await fs.writeFile(published.stagePath,Buffer.from([0x50,0x4b,3,4,1,2]));
+ const receipt=await(await request('commit',{ticket:published.ticket})).json();
+ assert.deepEqual(await(await request('discard',{ticket:published.ticket})).json(),{discarded:false,reason:'already-published'});
+ assert.equal((await request('verify',{ticket:published.ticket,target:receipt.target,sha256:receipt.sha256})).status,200,'已发布票据discard后仍可verify');
+ assert.deepEqual(await fs.readFile(receipt.target),Buffer.from([0x50,0x4b,3,4,1,2]));
+});

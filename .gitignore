@@ -3,6 +3,7 @@ node_modules/
 frontend/dist/
 data/
 outputs/
+/%SystemDrive%/
 dist/
 build/
 __pycache__/

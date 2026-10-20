@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="#f4f7f6"/>
+  <text x="55" y="52" font-family="Microsoft YaHei, sans-serif" font-size="30" font-weight="700" fill="#1f2f2b">分类审核成果表 · 布局补充</text>
+  <text x="55" y="82" font-family="Microsoft YaHei, sans-serif" font-size="16" fill="#5c6b67">合并全部工作簿后，相似材料相邻排列；公开列增加“清单溯源”；第三列改为“项目特征描述”。</text>
+
+  <rect x="55" y="112" width="1490" height="590" rx="8" fill="#ffffff" stroke="#cbd8d3"/>
+  <rect x="55" y="112" width="1490" height="54" rx="8" fill="#e8f2ed"/>
+  <text x="78" y="146" font-family="Microsoft YaHei, sans-serif" font-size="20" font-weight="700" fill="#1f6849">示例园区_分类审核成果.xlsx</text>
+  <text x="1150" y="145" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#5c6b67">自动匹配仅供参考，请在“最终分类”列审核与修改</text>
+
+  <g font-family="Microsoft YaHei, sans-serif" font-size="14">
+    <rect x="75" y="184" width="1450" height="43" fill="#eef3f1" stroke="#c6d3ce"/>
+    <line x1="125" y1="184" x2="125" y2="700" stroke="#d7e0dc"/>
+    <line x1="300" y1="184" x2="300" y2="700" stroke="#d7e0dc"/>
+    <line x1="590" y1="184" x2="590" y2="700" stroke="#d7e0dc"/>
+    <line x1="642" y1="184" x2="642" y2="700" stroke="#d7e0dc"/>
+    <line x1="714" y1="184" x2="714" y2="700" stroke="#d7e0dc"/>
+    <line x1="1030" y1="184" x2="1030" y2="700" stroke="#d7e0dc"/>
+    <line x1="1136" y1="184" x2="1136" y2="700" stroke="#d7e0dc"/>
+    <line x1="1232" y1="184" x2="1232" y2="700" stroke="#d7e0dc"/>
+    <line x1="1396" y1="184" x2="1396" y2="700" stroke="#d7e0dc"/>
+    <text x="91" y="212" font-weight="700">序号</text>
+    <text x="142" y="212" font-weight="700">项目名称</text>
+    <text x="317" y="212" font-weight="700">项目特征描述</text>
+    <text x="607" y="212" font-weight="700">单位</text>
+    <text x="658" y="212" font-weight="700">工程量</text>
+    <text x="732" y="212" font-weight="700">清单溯源</text>
+    <text x="1047" y="212" font-weight="700">自动建议</text>
+    <text x="1153" y="212" font-weight="700">匹配情况</text>
+    <text x="1250" y="212" font-weight="700">最终分类</text>
+    <text x="1413" y="212" font-weight="700">审核备注</text>
+
+    <rect x="75" y="227" width="1450" height="77" fill="#fff8e9" stroke="#e6d8b8"/>
+    <text x="91" y="249">955</text><text x="142" y="249">流量传感器</text>
+    <text x="317" y="248">1.名称：流量传感器（显示+报警）</text>
+    <text x="607" y="249">个</text><text x="658" y="249">4</text>
+    <text x="732" y="248">1-1#特殊实验车间 / 暖通 /</text><text x="732" y="268">清单序号 955（原表第958行）</text>
+    <text x="1047" y="249">待核对</text><text x="1153" y="249">分类冲突</text><text x="1250" y="249" fill="#8a6b00">流量计</text>
+
+    <rect x="75" y="304" width="1450" height="77" fill="#fff8e9" stroke="#e6d8b8"/>
+    <text x="91" y="326">956</text><text x="142" y="326">流量传感器</text>
+    <text x="317" y="325">1.名称：流量传感器</text>
+    <text x="607" y="326">个</text><text x="658" y="326">3</text>
+    <text x="732" y="325">1-2#特殊实验车间 / 暖通 /</text><text x="732" y="345">清单序号 18（原表第211行）</text>
+    <text x="1047" y="326">待核对</text><text x="1153" y="326">分类冲突</text><text x="1250" y="326" fill="#8a6b00">流量计</text>
+
+    <rect x="75" y="381" width="1450" height="77" fill="#f6fbf8" stroke="#d7e0dc"/>
+    <text x="91" y="403">957</text><text x="142" y="403">压力传感器</text>
+    <text x="317" y="402">1.名称：压力传感器（显示+报警）</text>
+    <text x="607" y="403">个</text><text x="658" y="403">2</text>
+    <text x="732" y="402">1-1#特殊实验车间 / 暖通 /</text><text x="732" y="422">清单序号 957（原表第960行）</text>
+    <text x="1047" y="403">压力表</text><text x="1153" y="403">匹配成功</text><text x="1250" y="403">压力表</text>
+
+    <rect x="75" y="458" width="1450" height="77" fill="#f6fbf8" stroke="#d7e0dc"/>
+    <text x="91" y="480">958</text><text x="142" y="480">低压铜及铜合金管</text>
+    <text x="317" y="479">1.名称：铜管φ6.35</text><text x="317" y="499">2.连接形式：氧乙炔焊</text>
+    <text x="607" y="480">m</text><text x="658" y="480">0</text>
+    <text x="732" y="479">1-2#特殊实验车间 / 暖通 /</text><text x="732" y="499">清单序号 422（原表第443行）</text>
+    <text x="1047" y="480">待核对</text><text x="1153" y="480">无可靠匹配</text><text x="1250" y="480" fill="#8a6b00">铜管</text>
+
+    <rect x="75" y="535" width="1450" height="77" fill="#f6fbf8" stroke="#d7e0dc"/>
+    <text x="91" y="557">959</text><text x="142" y="557">低压铜及铜合金管</text>
+    <text x="317" y="556">1.名称：铜管φ9.53</text><text x="317" y="576">2.连接形式：氧乙炔焊</text>
+    <text x="607" y="557">m</text><text x="658" y="557">0</text>
+    <text x="732" y="556">1-2#特殊实验车间 / 暖通 /</text><text x="732" y="576">清单序号 423（原表第444行）</text>
+    <text x="1047" y="557">待核对</text><text x="1153" y="557">无可靠匹配</text><text x="1250" y="557" fill="#8a6b00">铜管</text>
+  </g>
+
+  <rect x="75" y="612" width="1450" height="88" fill="#ffffff" stroke="#d7e0dc"/>
+  <text x="91" y="642" font-family="Microsoft YaHei, sans-serif" font-size="15" fill="#41534d">相似材料以名称和项目特征模糊聚类排列；同组内仍按原清单顺序保留，rowId 与审核确认关系不变。</text>
+  <text x="91" y="670" font-family="Microsoft YaHei, sans-serif" font-size="15" fill="#41534d">清单溯源来自只读来源快照，合并组显示全部来源；空白或 0 工程量均以 0 参与分类。</text>
+
+  <g font-family="Microsoft YaHei, sans-serif">
+    <rect x="55" y="732" width="465" height="122" rx="8" fill="#ffffff" stroke="#d5e1dc"/>
+    <text x="78" y="765" font-size="19" font-weight="700" fill="#1f6849">1. 相似清单相邻</text>
+    <text x="78" y="797" font-size="15" fill="#42544e">按名称与特征做模糊聚类；同组连续排列，</text>
+    <text x="78" y="821" font-size="15" fill="#42544e">方便统一审核和填写最终分类。</text>
+
+    <rect x="545" y="732" width="465" height="122" rx="8" fill="#ffffff" stroke="#d5e1dc"/>
+    <text x="568" y="765" font-size="19" font-weight="700" fill="#1f6849">2. 清单溯源可反查</text>
+    <text x="568" y="797" font-size="15" fill="#42544e">显示来源工程、专业、原清单序号及原表行号；</text>
+    <text x="568" y="821" font-size="15" fill="#42544e">合并行列出每一个来源，不丢原始位置。</text>
+
+    <rect x="1035" y="732" width="510" height="122" rx="8" fill="#ffffff" stroke="#d5e1dc"/>
+    <text x="1058" y="765" font-size="19" font-weight="700" fill="#1f6849">3. 表头与填写区</text>
+    <text x="1058" y="797" font-size="15" fill="#42544e">第三列明确为“项目特征描述”；</text>
+    <text x="1058" y="821" font-size="15" fill="#42544e">只有“最终分类”和“审核备注”可编辑。</text>
+  </g>
+</svg>

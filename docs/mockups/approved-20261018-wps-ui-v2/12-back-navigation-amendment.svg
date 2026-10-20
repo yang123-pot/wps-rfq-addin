@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="650" viewBox="0 0 1400 650">
+<rect width="1400" height="650" fill="#f4f7f6"/>
+<g font-family="Microsoft YaHei,sans-serif" fill="#20382c">
+<text x="40" y="55" font-size="28" font-weight="bold">返回上一步：有目标、有动作、有反馈</text>
+<text x="40" y="90" font-size="18">2026-10-19 用户补充；七步与主操作布局不变，补齐第1步内部和附属页面。</text>
+<g fill="#fff" stroke="#217346"><rect x="40" y="130" width="300" height="95" rx="8"/><rect x="440" y="130" width="300" height="95" rx="8"/><rect x="840" y="130" width="480" height="95" rx="8"/></g>
+<g font-size="23" font-weight="bold"><text x="105" y="173">选择文件</text><text x="500" y="173">清单预览</text><text x="930" y="173">选择整理方式</text></g>
+<g font-size="17"><text x="68" y="204">保留已选文件，可继续查看</text><text x="463" y="204">逐表核对来源，原件保持</text><text x="865" y="204">保留“合并清单”选项，底部显示返回</text></g>
+<g font-size="26" fill="#217346"><text x="365" y="180">←</text><text x="765" y="180">←</text></g>
+<text x="40" y="275" font-size="20">第2–7步：返回相邻上一页；完成页返回拆分，全部无需询价的完成页返回审核。</text>
+<text x="40" y="315" font-size="20">已完成步骤可重新查看，再前进复用已有成果；返回本身不撤销确认、不保存或生成文件。</text>
+<rect x="40" y="350" width="1280" height="70" rx="8" fill="#e7f2eb"/>
+<text x="62" y="392" font-size="21">反馈示例：已返回清单预览。已选文件、填写内容和处理记录已保留。</text>
+<text x="40" y="470" font-size="20">设置子页 → 设置 → 当前操作页面；帮助与错误弹窗 → 刚才的操作页面。</text>
+<text x="40" y="510" font-size="20">简版与详细版同步页号；键盘也可返回，业务处理中防止重复操作。</text>
+<text x="40" y="550" font-size="18">选文件起始页没有更早页面；仅该起点不显示无效的返回按钮。原生对话框使用其取消操作回到助手。</text>
+<text x="40" y="596" font-size="18">分类列追加原表的未合并模式为独立工作包，不能将本图的返回修复视为该功能已完成。</text>
+</g></svg>

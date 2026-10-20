@@ -1,0 +1,22 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path'),http=require('node:http');
+const {createServer}=require('../dev/server.cjs');
+test('copy endpoint requires session token and same origin, bounds requests and never serves workbook bytes',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-import-api-'));const directory=path.join(root,'copies');
+ const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:directory});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{await new Promise(r=>server.close(r));await fs.rm(root,{recursive:true,force:true});});
+ const origin='http://127.0.0.1:'+server.address().port;
+ const html=await (await fetch(origin+'/taskpane.html')).text();
+ const match=html.match(/window\.__RFQ_IMPORT__=(\{[^;]+\});/);assert.ok(match,'task pane receives a session config');
+ const config=JSON.parse(match[1]),file=path.join(root,'sample.xlsx');await fs.writeFile(file,'fixture content');
+ const headers={'content-type':'application/json','x-rfq-import-token':config.token};
+ const request=(body,h=headers,method='POST')=>fetch(origin+'/api/import/prepare',{method,headers:h,body:method==='POST'?body:undefined});
+ assert.equal((await request('{}',{'content-type':'application/json'})).status,403);
+ assert.equal((await request('{}',{...headers,origin:'https://evil.example'})).status,403);
+ assert.equal((await request(undefined,headers,'GET')).status,405);
+ assert.equal((await request('{')).status,400);assert.equal((await request('x'.repeat(65537))).status,413);
+ const response=await request(JSON.stringify({paths:[file],existing:[]}));assert.equal(response.status,200);
+ const {files}=await response.json();assert.equal(files.length,1);assert.equal(await fs.readFile(files[0].copyPath,'utf8'),'fixture content');
+ assert.equal((await fetch(origin+'/copies/'+path.basename(files[0].copyPath))).status,404);
+ assert.equal((await request(JSON.stringify({paths:[file],existing:files}))).status,400);
+ const error=await (await request(JSON.stringify({paths:['http://remote/file.xlsx']}))).json();assert.match(error.error,/绝对/);
+});

@@ -1,0 +1,50 @@
+{
+  "approvedAt": "2026-10-17",
+  "productName": "材料整理助手",
+  "currentDesign": "seven-step",
+  "scope": "七步纵向列表默认界面、当前步骤单一主操作、次要动作收进更多操作；三步稿保留为设计过程记录",
+  "amendments": [
+    {
+      "date": "2026-10-18",
+      "file": "amendments-20261018.md",
+      "summary": "用户要求简版隐藏普通用户无需理解的技术信息，形成连贯单步流程；导入后先预览工作簿和工作表，再由用户选择是否合并全部工作簿。七步列表只作进度展示，技术面板只在详细步骤出现。"
+    }
+  ],
+  "files": [
+    {
+      "file": "01-current-step.png",
+      "description": "默认当前步骤：选清单/核对分类/填品牌，一次只显示一个主按钮",
+      "sha256": "7a582c344000e47362d297f624037b1fdcf42557dcda33c9c30c8091b001d525"
+    },
+    {
+      "file": "02-done.png",
+      "description": "完成页：只保留打开文件夹和再做一单",
+      "sha256": "e8af8b9ed9af5bc6558c9625622ef29b38b658e900b73d95a99e9403e56a72bd"
+    },
+    {
+      "file": "03-settings.png",
+      "description": "设置菜单：项目、单位信息、材料分类、遇到问题、详细步骤",
+      "sha256": "5fa6aa5d163cd79a4270c26924b410ddad1d7271010586b77c5444bfe094af85"
+    },
+    {
+      "file": "04-seven-step-brands.png",
+      "description": "七步全部可见；第5步填品牌只保留一个主按钮",
+      "sha256": "9f638f83f686811866895e65585e97042ade6f0d21f61ba3a349442c169fa87f"
+    },
+    {
+      "file": "05-seven-step-review.png",
+      "description": "第3步审核确认只保留确认主按钮，保存/恢复收进更多操作",
+      "sha256": "599fbc69a71ac8d5dec56233f4528cd32a759536b4e80d617855cf6770819963"
+    },
+    {
+      "file": "06-seven-step-overview.png",
+      "description": "完整九屏总览：七步、完成页、设置页",
+      "sha256": "59111607b7bfd516bcae9aebe0aba5d9e1467fd54cfa35d44e21eb7e42d71f36"
+    }
+  ],
+  "boundaries": [
+    "不修改整表确认、双布局三组、名称链接、两种生成方式、失败续作和项目恢复的业务规则",
+    "内部注册身份保持 WpsRfqAddin，只改用户可见名称",
+    "七步详细流程保留在详细模式，默认不展开"
+  ]
+}

@@ -1,0 +1,519 @@
+{
+  "schemaVersion": 1,
+  "candidate": {
+    "name": "wps-rfq-addin-0.1.0-20261020-R1",
+    "version": "0.1.0",
+    "build": "20261020-R1",
+    "createdAt": "2026-10-20T20:30:52+08:00",
+    "branch": "feat/wps-ui-v2",
+    "commit": "b340d977be0b536ccd28f6d77ee4150ee125fa03",
+    "zipName": "wps-rfq-addin-0.1.0-20261020-R1.zip",
+    "zipBytes": 717005,
+    "zipSha256": "d802846450a40ddf8b5c1a8178b5f785b8e3f26b00266f156557626ff784df31",
+    "codeVersion": "2aab7e222023cbd7cacf3129f160065fa7f64a7d69a6a1b805d9a25dd644457a",
+    "testedWps": "12.1.0.29161",
+    "fileCount": 100,
+    "files": [
+      {
+        "path": "assets/brands.svg",
+        "bytes": 424,
+        "sha256": "a415ca46c9a15023bb899cbaf43e73eaed3abac80c91499217cd8ad291d3f264"
+      },
+      {
+        "path": "assets/categories.svg",
+        "bytes": 358,
+        "sha256": "0074f4c63f827d636d510b279a16630422ecb75b2229d987c3ee0618f81bea2e"
+      },
+      {
+        "path": "assets/import.svg",
+        "bytes": 367,
+        "sha256": "0dd9d149974b58fbe29611984f806d378d7eeb7723ffbae0e8938a0911fda680"
+      },
+      {
+        "path": "assets/inquiry.svg",
+        "bytes": 369,
+        "sha256": "1addf4b8f08f2adb84b1a47b2bac8c1ce3f27bbba46f0b2c4bd52f4d6f272a29"
+      },
+      {
+        "path": "assets/matching.svg",
+        "bytes": 468,
+        "sha256": "02569e066d95b279a8b222daeb3153d1e21edfeaeda544fae3936305eb581a9d"
+      },
+      {
+        "path": "assets/review.svg",
+        "bytes": 387,
+        "sha256": "627de1f3638930ea845bd3e55df2fdcf4101efefa0b3540bd5103518b984b505"
+      },
+      {
+        "path": "assets/split.svg",
+        "bytes": 447,
+        "sha256": "ff6aed95de376015bbd0f53c9085232cc10ebbe2c759793688e34bc247ac678c"
+      },
+      {
+        "path": "dev/atomic-file.cjs",
+        "bytes": 1566,
+        "sha256": "32cb475ac8233973ef2a5974e9298e22c31c2a5b8b35c4f2ba4d3dd570f48cb6"
+      },
+      {
+        "path": "dev/export-files.cjs",
+        "bytes": 13093,
+        "sha256": "d2ace5bbd7ac0444060888481629e43828170b78bab7892d8d1a4ad306fe1589"
+      },
+      {
+        "path": "dev/file-freeze.cjs",
+        "bytes": 2236,
+        "sha256": "86e29d26e7a67476a8bb3599dec915c0fe27288c55aa815f5bd0261c1a59fcd3"
+      },
+      {
+        "path": "dev/fs-list.cjs",
+        "bytes": 4337,
+        "sha256": "561fd802bf6d0f59c65a066941a133ed20f4164a758b84804843a45d135a1786"
+      },
+      {
+        "path": "dev/header-store.cjs",
+        "bytes": 4944,
+        "sha256": "55034af6f8f114586ff495dd1b28aa06ffe0d08407af15e9b00fee1e124a794a"
+      },
+      {
+        "path": "dev/import-files.cjs",
+        "bytes": 6224,
+        "sha256": "045d520c02af48330e5eeb2a54b10f2b9ead6503cd63402f959284cd54cebbaf"
+      },
+      {
+        "path": "dev/library-query.cjs",
+        "bytes": 2651,
+        "sha256": "8a7e4880f0ed17d9522deeffea104a18a03bf1f2ed906883ceaffe70efe0e381"
+      },
+      {
+        "path": "dev/library-recommendations.cjs",
+        "bytes": 4789,
+        "sha256": "2e46a2e08647760d0ffe83b6e1ce0e97da16d851967d960f539c68762352f0d7"
+      },
+      {
+        "path": "dev/library-store.cjs",
+        "bytes": 7648,
+        "sha256": "3b9abcd6200a66373edd51eb18582c4a585f8783c406cdadc10b310a245a151e"
+      },
+      {
+        "path": "dev/project-store.cjs",
+        "bytes": 3961,
+        "sha256": "216bc34733d66e4cb538d67d6449dafc19428587d3eb7fdb5cf1720df4cff6ba"
+      },
+      {
+        "path": "dev/server.cjs",
+        "bytes": 23225,
+        "sha256": "fe34896e891143f7ecd409acb425aaf1fe4096c148e84165c72f53bc38ffd82d"
+      },
+      {
+        "path": "dev/split-store.cjs",
+        "bytes": 13215,
+        "sha256": "6a55093227c88736e9503bf859f58baad99f261626b7e2dfd91a5e9bc9fe5b0d"
+      },
+      {
+        "path": "dev/xlsx-views.cjs",
+        "bytes": 12814,
+        "sha256": "f1a677ebba2f48578b3914f06671ffd115f816618de3157df9d6c0cd78214a47"
+      },
+      {
+        "path": "docs/images/wps-user-guide-v010-20261020/step-00-simple-home.png",
+        "bytes": 18831,
+        "sha256": "4d544ce2ab58439b37a37fbc2753ad8b169dc62de369046be46a437dca11c299"
+      },
+      {
+        "path": "docs/images/wps-user-guide-v010-20261020/step-01-import.png",
+        "bytes": 22581,
+        "sha256": "996bc12f5224a20ad1326fbfd340867ae39fcedca6d43168195adfe0f7fd7aea"
+      },
+      {
+        "path": "docs/images/wps-user-guide-v010-20261020/step-02-classification.png",
+        "bytes": 24936,
+        "sha256": "a77111e0c728d4535c2bb66096860694f907e02cec89832243f201ab2dfad613"
+      },
+      {
+        "path": "docs/images/wps-user-guide-v010-20261020/step-03-review.png",
+        "bytes": 29159,
+        "sha256": "6da9ef190b7fdbfa4ef32ee313f5ee2d8c58fc013a5b397d525404347165a260"
+      },
+      {
+        "path": "docs/images/wps-user-guide-v010-20261020/step-04-categories.png",
+        "bytes": 30015,
+        "sha256": "baf0ab28fe95d965f9e57d0b29a8c1cb02e7d4048ec630959de4e04f8b53033a"
+      },
+      {
+        "path": "docs/images/wps-user-guide-v010-20261020/step-05a-summary-separated.png",
+        "bytes": 30524,
+        "sha256": "757b2a3eb25691d0d861f8070439b9f9dd391e4dbde5550b816b89b2436fbee3"
+      },
+      {
+        "path": "docs/images/wps-user-guide-v010-20261020/step-05b-summary-combined.png",
+        "bytes": 96794,
+        "sha256": "93aee5d625d734b9f3b38a8adb4bb23b8e76aa2d1a3d2e9823188d59186d3d7f"
+      },
+      {
+        "path": "docs/images/wps-user-guide-v010-20261020/step-06-inquiry.png",
+        "bytes": 37355,
+        "sha256": "8ba3b9752a9aa5e7f0ad3de7124965ca521d1311511c8b54555b8cf53c5812fc"
+      },
+      {
+        "path": "docs/images/wps-user-guide-v010-20261020/step-07-complete.png",
+        "bytes": 36370,
+        "sha256": "9ae50c94416a0529510e478e33b16e20fc13371a2da2474cf3d8567212bf416b"
+      },
+      {
+        "path": "docs/images/wps-user-guide-v010-20261020/step-07-restored.png",
+        "bytes": 52120,
+        "sha256": "86b688e0d3d152092e7f7bc4b44b21400f6c9bc6ef07bb3525d15ec933ac313f"
+      },
+      {
+        "path": "docs/images/wps-user-guide-v010-20261020/step-07-split.png",
+        "bytes": 38326,
+        "sha256": "ed10d50102b5bfcf95afda7c4977a6179a2ff65b430c605acf9ae7bcbcc5a2f1"
+      },
+      {
+        "path": "docs/wps-install-guide.md",
+        "bytes": 8139,
+        "sha256": "2b64740dddafcea0bcfe21767022b9dba9a82e2dab3c8b06b73a174b0bfa07f8"
+      },
+      {
+        "path": "docs/wps-release-notes-0.1.0.md",
+        "bytes": 3972,
+        "sha256": "ac88af7a02e5c95c13331fefd0d62fe3e79b991e5adf539bd56498f757fb7130"
+      },
+      {
+        "path": "docs/wps-user-guide.md",
+        "bytes": 19518,
+        "sha256": "b2bddc234fb42d350a329566108dc0fe35dc427259422496cf79e36dc07a060b"
+      },
+      {
+        "path": "install/install.ps1",
+        "bytes": 16560,
+        "sha256": "25981a2b6639ff8bbfbd2f065747892f34de36e0044c8b0ce504917ee226b00a"
+      },
+      {
+        "path": "install/service-identity.ps1",
+        "bytes": 5858,
+        "sha256": "217d8de68fdf231a792b1c349302eb1542621f9cd0dd98e163321eae848d8326"
+      },
+      {
+        "path": "install/start.ps1",
+        "bytes": 4186,
+        "sha256": "f8966eb663067063ae10a9481a60d7051b3201c1b824dc953f06009795f7de41"
+      },
+      {
+        "path": "install/uninstall.ps1",
+        "bytes": 7476,
+        "sha256": "e97e6b6d7f9cde71f474beedb5cbb6cdcc86e95fff22794eaf1e1a308a6bf973"
+      },
+      {
+        "path": "library.css",
+        "bytes": 2405,
+        "sha256": "6c9c7dc5e9ebd15cd761f4dd81d6ec5b377bb58b1865d020a21de54d2dbc5aa2"
+      },
+      {
+        "path": "library.html",
+        "bytes": 3588,
+        "sha256": "89f8249abb893b5fc63acf16a7fa3ab113dfca81b9b0e2c102ac096be737ff55"
+      },
+      {
+        "path": "main.js",
+        "bytes": 3016,
+        "sha256": "6a6369769e632511cb9e19c2f3f2ce584c3a49e402e843b6bbc90dedd56db457"
+      },
+      {
+        "path": "package.json",
+        "bytes": 378,
+        "sha256": "2630261a5b8e30607896cee8e0eae05b39e55170f7318713054737c150e15f13"
+      },
+      {
+        "path": "ribbon.xml",
+        "bytes": 1441,
+        "sha256": "dd0bdfc0d226611a008f36a1afa606f483eaa08af9c2e3d7e853552e23d24c84"
+      },
+      {
+        "path": "rules/defaults.json",
+        "bytes": 1530,
+        "sha256": "c1d8cffd96caccd07525c7ba639df3ce07716473aa151c99702ef529732e40c9"
+      },
+      {
+        "path": "src/assistant-feedback.js",
+        "bytes": 4138,
+        "sha256": "3df2b419f8690ba86dfad87ea4f814fba2eb03454b069245b3a787bfedc7f978"
+      },
+      {
+        "path": "src/assistant-problems.js",
+        "bytes": 5392,
+        "sha256": "a733f6ec90514c7dd618f898e102adf3bfe0669019cdf52c04e3f7de02085921"
+      },
+      {
+        "path": "src/assistant-state.js",
+        "bytes": 11606,
+        "sha256": "216e800af583e7f558691fe3852762400f2a50fe591beacc157988ac11c730a7"
+      },
+      {
+        "path": "src/assistant-ui.js",
+        "bytes": 7282,
+        "sha256": "e950109e44a539b590e5ed377a10e00942cee94e10bef665c130c91d2a57615d"
+      },
+      {
+        "path": "src/brand-host.js",
+        "bytes": 7347,
+        "sha256": "205a09acf49f50171e6f07a4bb279e595f6943cfa929e2860a1716a5d1bfb8c0"
+      },
+      {
+        "path": "src/brand-model.js",
+        "bytes": 37673,
+        "sha256": "02d5a9d987eb9173aefeec34ecf9443269e3db39f5dc011aa8bbf1877f6bddeb"
+      },
+      {
+        "path": "src/brand-reference.js",
+        "bytes": 6202,
+        "sha256": "724f7b8842de9d8dddf1c36ea9336201f187599371ba0b17bd1e13dece73f760"
+      },
+      {
+        "path": "src/brand-table.js",
+        "bytes": 12756,
+        "sha256": "f75514076e5e2aa37b5d4abaa56a6150bea4a38092421623f6e8a9acbdf333ee"
+      },
+      {
+        "path": "src/brand-ui.js",
+        "bytes": 19975,
+        "sha256": "f76f551bcce86eba7bbf913589aaea09863f7a266ed28615bf14d08d9bcd0feb"
+      },
+      {
+        "path": "src/category-library.js",
+        "bytes": 5139,
+        "sha256": "d8bc100f1850bae80a04b95f4398fdbd7755321856ffc95535bb67e049b77587"
+      },
+      {
+        "path": "src/category-memory.js",
+        "bytes": 10629,
+        "sha256": "e17a45842948e4c451090a9d4ee82272f004e43686c0aeb52d25a3bacf477d89"
+      },
+      {
+        "path": "src/category-workbooks.js",
+        "bytes": 24480,
+        "sha256": "a2db9bfef92d4a78ca19daef6d4f1ef0c4bc26c11ebc67b57cedf01c9a4aeebf"
+      },
+      {
+        "path": "src/classification-review-host.js",
+        "bytes": 20022,
+        "sha256": "1b348740ea17bb0e101685a342b89675c309f1d15420c4a074fb788a52842fb0"
+      },
+      {
+        "path": "src/classification-review-model.js",
+        "bytes": 31584,
+        "sha256": "fe0df6fec42abe23895d6e5689fc88b73dbd477a693bc73e7d652b5c2c4081cc"
+      },
+      {
+        "path": "src/classification-ui.js",
+        "bytes": 16117,
+        "sha256": "789b9c0e49301bab1ed84e51c82187cd0449310e07dee93c61043c4f278095f9"
+      },
+      {
+        "path": "src/classification.js",
+        "bytes": 8090,
+        "sha256": "53cfe0cc1f04db89dae8532e4d5dac0791a6d4420ba9a02f50116714b9150494"
+      },
+      {
+        "path": "src/classify.js",
+        "bytes": 5056,
+        "sha256": "920826703b3e27a55cfebc7bc244523072b358630889ce3b66abb549fe05efbb"
+      },
+      {
+        "path": "src/collection.js",
+        "bytes": 2931,
+        "sha256": "92a3414a3b51e59058e9153e4a26ffd7e5d7d1fa83aecb673a25437f56adb2b7"
+      },
+      {
+        "path": "src/decimal.js",
+        "bytes": 2381,
+        "sha256": "f4a083c50f952d3c9bc3120839c8393ed1fc5c13384236a8c1a9a435fa3354ad"
+      },
+      {
+        "path": "src/deferred-learning-ui.js",
+        "bytes": 3767,
+        "sha256": "fc09eb7e2196ed016de09f4f35ff4042538646c317a99bb15eefe6d192b628b6"
+      },
+      {
+        "path": "src/deferred-learning.js",
+        "bytes": 1138,
+        "sha256": "ef768954d0ce45ae0b639cfa4dc36b2be401066343053dbca3946accba1391fc"
+      },
+      {
+        "path": "src/export-host.js",
+        "bytes": 49120,
+        "sha256": "afbf2d6fc4e614af61c0b9a1a9dc898c37a54e3630fca0914595824a170c5fdc"
+      },
+      {
+        "path": "src/export-model.js",
+        "bytes": 3542,
+        "sha256": "eb416d96f7e724e286370d8989b50e55a8a1474096bd8f238407c3ea39742cef"
+      },
+      {
+        "path": "src/export-ui.js",
+        "bytes": 3353,
+        "sha256": "d76d5a5311522d5f1e67abd16c1472f5f13e781061d03ea3b97d48630a91c673"
+      },
+      {
+        "path": "src/header-ui.js",
+        "bytes": 6390,
+        "sha256": "dab9bbb5a9751807161aa3db95ed6fae3da838323550195cdedfde4431c4e166"
+      },
+      {
+        "path": "src/host.js",
+        "bytes": 4948,
+        "sha256": "a9c24647b00bafea264980b35f6b821217c36574f5ad7d58bea05b3d877b2cba"
+      },
+      {
+        "path": "src/import-host.js",
+        "bytes": 5966,
+        "sha256": "756cbefcec651a459a047c38dc6c075767e3501913ae06a65c9c8a7b66c5c9e3"
+      },
+      {
+        "path": "src/import-preview-model.js",
+        "bytes": 4796,
+        "sha256": "4b0f2afc07b171cc831c1361d11db9b2471985aa1b2dfea4221fbf454de41766"
+      },
+      {
+        "path": "src/import-ui.js",
+        "bytes": 136656,
+        "sha256": "73d2cdaf87f49655273f393a3b8bca69a7d0ece24e588dfb6e5eb7bb6e3d2fe9"
+      },
+      {
+        "path": "src/inquiry-header.js",
+        "bytes": 4883,
+        "sha256": "997a9e7c173a292744bd8b4279de5f2b03057a73eea9ad8fefe0e805beaf1887"
+      },
+      {
+        "path": "src/inquiry-model.js",
+        "bytes": 13976,
+        "sha256": "4ea75631410adb6e9da6e2ddaff7a1386b4fc7aec447ee3b71f91ddd8eb336b9"
+      },
+      {
+        "path": "src/inquiry-ui.js",
+        "bytes": 11064,
+        "sha256": "4484fcfc3f25e88f43d1ebab3cbe53c1e39a743664e1dbafd3a303831931e838"
+      },
+      {
+        "path": "src/library-operations.js",
+        "bytes": 12178,
+        "sha256": "b32f6d1c8152c00f01bd6824498b3f23607c740b814cf76b0b85a1b4bb1850ef"
+      },
+      {
+        "path": "src/library-ui.js",
+        "bytes": 2007,
+        "sha256": "370354f635a3c21343f715fd8585c08503acd917555868bf87c68d5e300df99e"
+      },
+      {
+        "path": "src/library-window-host.js",
+        "bytes": 1419,
+        "sha256": "0260d32244881bdbaeaa29b9678cbfb6d3546b829ab27167134bbe7ef56f79ed"
+      },
+      {
+        "path": "src/library-window-ui.js",
+        "bytes": 14944,
+        "sha256": "9c2c649ef5ec9a86bbfe183994d488449a1b630d48b3300f8e2dca5936204ec2"
+      },
+      {
+        "path": "src/merge.js",
+        "bytes": 8601,
+        "sha256": "36edccab10ce7e8fdc92534fae774e87fb080a3de2b73c87476034352ef69f13"
+      },
+      {
+        "path": "src/parser.js",
+        "bytes": 15233,
+        "sha256": "a159ac2cd2cc01c7e83de3ffffabcdd16a4338e6d70aa8b30a13c4b0d66f7b65"
+      },
+      {
+        "path": "src/path-picker.js",
+        "bytes": 13549,
+        "sha256": "353e9c8cfc6bc0672e8d2e5f0214e0e5d1f42b9e3e502649af80cb55747758b6"
+      },
+      {
+        "path": "src/project-host.js",
+        "bytes": 6100,
+        "sha256": "16f6d79980b450ad775c01482e0d4495f275b282d13259350b6e3e146e26f4bf"
+      },
+      {
+        "path": "src/project-restore.js",
+        "bytes": 8138,
+        "sha256": "991cbbe9422674fe7ee1cb77cf49af9d5276c7f9b4720f4b89a07654653e5209"
+      },
+      {
+        "path": "src/project-ui.js",
+        "bytes": 26536,
+        "sha256": "420ec0e3e52651e9d00588e4e3a41cb62f0260b3ac41d1b434777533103d1ff2"
+      },
+      {
+        "path": "src/project.js",
+        "bytes": 27147,
+        "sha256": "9d248379083fb0c792025b02c069369515123b7da08bc90d45f4fc6a8e8d5505"
+      },
+      {
+        "path": "src/review-ui.js",
+        "bytes": 7573,
+        "sha256": "10c075833742fd3af2485a4343e780dbd00278b9f1e75729a4be4881ec695ed1"
+      },
+      {
+        "path": "src/review.js",
+        "bytes": 11842,
+        "sha256": "0bf79b33dd6e35ca16f7595ebcb03084e28f8213dd90e6859e2ac7e0631ae329"
+      },
+      {
+        "path": "src/ribbon-navigation.js",
+        "bytes": 15414,
+        "sha256": "193ba102a390fe9e9a503d920171ed8e5bc4337590f79d4c6bd6d255c72ead77"
+      },
+      {
+        "path": "src/source-review-host.js",
+        "bytes": 20028,
+        "sha256": "6f7ab472aa22cd9c40fda278292783cadf8c57d49aacb830864519940e4737ac"
+      },
+      {
+        "path": "src/source-review-model.js",
+        "bytes": 8167,
+        "sha256": "1f1970aedabaf0e0512284bea6d016a63dd46517dccf71bb38534cf0fc77ccd5"
+      },
+      {
+        "path": "src/split-plan.js",
+        "bytes": 7184,
+        "sha256": "1adf433e3ace83c8e80ac985c64409cbd234df9a2051e7a8e6e8fad9a32cf3e0"
+      },
+      {
+        "path": "src/split-state.js",
+        "bytes": 8352,
+        "sha256": "c6c9cf4985e6c4ed35972556ed61b26639e24d7529c703335c547113227c0850"
+      },
+      {
+        "path": "src/split-ui.js",
+        "bytes": 26131,
+        "sha256": "f545fefb5e30cb898c6224f3a7fd876af6b292008e6a585d35f5a0d6bcdad959"
+      },
+      {
+        "path": "src/taskpane.js",
+        "bytes": 17266,
+        "sha256": "07aeced23c00eaa132a4c811a40ddf530e10b46040848709b46a4eb95a7e163d"
+      },
+      {
+        "path": "src/workbook-layout.js",
+        "bytes": 12003,
+        "sha256": "4a333393f20f92209b0ac47373b12d0b3781c21ba24a5947c3d3bb148e28812d"
+      },
+      {
+        "path": "src/workflow-ui.js",
+        "bytes": 16839,
+        "sha256": "f06df9cc855444168f5916e6b547801be39914b985dbec95414ec5b441fcfe9d"
+      },
+      {
+        "path": "styles.css",
+        "bytes": 32517,
+        "sha256": "ebd10ae5980a610978b3d685c1a0ebd83c5aa81880a86ddbdb81734dea5269c9"
+      },
+      {
+        "path": "taskpane.html",
+        "bytes": 28971,
+        "sha256": "02a9f23564f04d45a7a2de9495c75a7c85257368a0b94e581b7ff75d2942642b"
+      }
+    ]
+  }
+}

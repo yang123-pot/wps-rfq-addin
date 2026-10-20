@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "approvedOn": "2026-09-26",
+  "status": "用户已批准的方案效果图；软件尚未按此实施",
+  "amendments": [
+    {
+      "date": "2026-10-18",
+      "file": "amendments-20261018.md",
+      "images": ["01-import-merge.png"],
+      "summary": "用户确认一次导入对应一个项目，多个工作簿默认归入同一份材料清单和审核成果；图01选项只控制是否累加完全相同材料，选择分别保留时仍按工作簿、工作表分组保留来源。原PNG不重绘。"
+    },
+    {
+      "date": "2026-10-15",
+      "file": "amendments-20261015.md",
+      "images": ["01-import-merge.png", "03-sheet-review.png"],
+      "summary": "用户授权本轮四项目按既有规则自动评审，含项目4连续续行自动归属测试；一期优先完整功能，分类准确率后续通过用户实际使用修正学习。标明自动评审，不冒记本人审核，不改生产习惯库，保留表内修改和整表确认流程。"
+    },
+    {
+      "date": "2026-10-11",
+      "file": "amendments-20261011.md",
+      "images": ["03-sheet-review.png"],
+      "summary": "用户要求：图03「最终分类」保留下拉但允许直接输入新类别名；整表确认时按新类别接收并同时进类别库与经验库，同名去重、直接生效。原PNG不重绘，以变更说明＋用户真实截图为准。"
+    },
+    {
+      "date": "2026-10-11",
+      "file": "amendments-20261011.md",
+      "images": ["04-category-workbooks.png", "05a-summary-separated.png", "05b-summary-combined.png"],
+      "summary": "用户要求：第4步分类工作簿改为“一个文件、每类一页、页名=类别名、汇总表在最前”，不再拆成多份、不再自动全部打开；汇总表名称列改为文件内跳转；不再保留单类导出入口。原PNG不重绘，以变更说明为准。"
+    }
+  ],
+  "files": [
+    {
+      "file": "01-import-merge.png",
+      "sourceFile": "exec-87dc04f4-c2d1-430c-8d8b-1c2b77517ff5.png",
+      "sha256": "9f3b1f3ed7d5aaf80798f4f4f794152401c3411e28b772b4a9693db58831b816",
+      "bytes": 1307623
+    },
+    {
+      "file": "02-classification-result.png",
+      "sourceFile": "exec-634863ba-e317-43ef-861b-4cd81f068071.png",
+      "sha256": "ce5a5d9b0082f053bd6b6d12cc6da5e3231e242edd3f46527dabf75c54272beb",
+      "bytes": 1288522
+    },
+    {
+      "file": "03-sheet-review.png",
+      "sourceFile": "exec-07611c21-4abf-4974-92fa-d0c166e79254.png",
+      "sha256": "e3776b601e209707574fd2914cce85b0db2fb9d53d983b45efc84b16080052f9",
+      "bytes": 1388585
+    },
+    {
+      "file": "04-category-workbooks.png",
+      "sourceFile": "exec-4cad8351-a3e2-40f9-806a-bd6af69ccd03.png",
+      "sha256": "3ec7de4d5980b64dc308d7916c8a479a6d6c17921be7d6d6ab6d8965a01de99a",
+      "bytes": 1164412
+    },
+    {
+      "file": "05a-summary-separated.png",
+      "sourceFile": "exec-3d177bc6-b929-495d-98cf-e5991b48f3ca.png",
+      "sha256": "3a1f138b78d697eae3eb6ff3d17f2e0af0f738445b9778b010983d19f9fe266d",
+      "bytes": 1407635
+    },
+    {
+      "file": "05b-summary-combined.png",
+      "sourceFile": "exec-8f41fc5c-9665-4f19-9648-6f122ef3be6f.png",
+      "sha256": "6fb9899fa828cc9cb729428ca47a6d42a2049bb2b161fa0c29cd5270ea9ac7f3",
+      "bytes": 1292795
+    },
+    {
+      "file": "06-inquiry-linkage.png",
+      "sourceFile": "exec-9e2ccbba-ea4f-40b1-bb51-956f1890e784.png",
+      "sha256": "02ea85d6adf8c71f32db341d1310b23949ea57cdefcdf01d3a35631c6c42045f",
+      "bytes": 1233027
+    },
+    {
+      "file": "07-split-files.png",
+      "sourceFile": "exec-e6cf54c9-3b21-4926-8d16-cea03285b455.png",
+      "sha256": "fca48204bf0a203191f69c8434eee9f108ca53e4f4d92d72aa2b08a01cf555bb",
+      "bytes": 1435772
+    }
+  ]
+}

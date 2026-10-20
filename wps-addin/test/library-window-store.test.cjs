@@ -1,0 +1,20 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
+const {createLibraryStore}=require('../dev/library-store.cjs');
+test('server pages are bounded and omit history/sources; mutate shares revision lock with legacy save',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'library-window-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const store=createLibraryStore({directory:dir}),s=await store.load();
+ s.memory.memories=Array.from({length:6760},(_,i)=>({id:'m'+i,item:{name:'材料'+i,feature:'特征'.repeat(150),unit:'个'},categoryId:'water-valve',categoryName:'阀门',state:'active',scope:'global',projectId:null,sources:[{sourceProjectId:'p',sourceRowId:'r'+i}],learnedAt:'2026-10-20'}));
+ s.memory.history=Array.from({length:10267},()=>({detail:'历史'.repeat(300)}));
+ await store.save({...s,expectedRevision:0});
+ const page=await store.page({kind:'memories',page:2,pageSize:10000});
+ assert.equal(page.items.length,50);assert.equal(page.total,6760);assert.equal(page.items[0].id,'m50');assert.equal(page.items[0].sources,undefined);assert.equal(page.history,undefined);
+ assert.ok(Buffer.byteLength(JSON.stringify(page))<100000);
+ assert.equal((await store.page({kind:'memories',search:'材料6759'})).total,1);
+ assert.equal((await store.page({kind:'memories',page:999})).items.length,0);
+ assert.rejects(()=>store.page({kind:'garbage'}),/类型/);
+ const sum=await store.summary();assert.equal(sum.memories,6760);assert.equal(sum.history,10267);
+ const index=await store.classifyIndex();assert.equal(index.memory.history.length,0);assert.equal(index.memory.memories[0].sources,undefined);assert.equal(index.memory.memories[0].learnedAt,'2026-10-20');assert.equal(index.memory.memories.length,6760);
+ const results=await Promise.allSettled([store.mutate({expectedRevision:1,operation:{type:'add',name:'新类别'}}),store.save({...s,expectedRevision:1})]);
+ assert.equal(results.filter(x=>x.status==='fulfilled').length,1);assert.equal(results.find(x=>x.status==='rejected').reason.code,'REVISION_CONFLICT');
+ assert.equal((await createLibraryStore({directory:dir}).summary()).revision,2);
+});

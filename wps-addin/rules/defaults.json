@@ -1,0 +1,40 @@
+{
+  "version": "2026-09-24.1",
+  "note": "初始规则只收录用户已确认的业务口径，用于给出建议和依据，不是人工答案，仍需逐条确认。",
+  "categories": [
+    {"id": "no-inquiry", "name": "无需询价", "state": "active"},
+    {"id": "water-valve", "name": "水阀门", "state": "active"},
+    {"id": "air-outlet-damper", "name": "风口、风阀", "state": "active"},
+    {"id": "ev-charger", "name": "汽车充电桩", "state": "active"}
+  ],
+  "rules": [
+    {
+      "id": "steel-cable-skip",
+      "categoryId": "no-inquiry",
+      "state": "active",
+      "basis": "用户已确认：全部钢索→无需询价",
+      "match": [{"field": "text", "any": ["钢索"]}]
+    },
+    {
+      "id": "water-tap-valve",
+      "categoryId": "water-valve",
+      "state": "active",
+      "basis": "用户已确认：所有水龙头→水阀门",
+      "match": [{"field": "text", "any": ["水龙头", "龙头"]}]
+    },
+    {
+      "id": "air-opening-damper",
+      "categoryId": "air-outlet-damper",
+      "state": "active",
+      "basis": "用户已确认：风口风阀统一为“风口、风阀”",
+      "match": [{"field": "text", "any": ["风口", "风阀"]}]
+    },
+    {
+      "id": "ev-charger-box",
+      "categoryId": "ev-charger",
+      "state": "active",
+      "basis": "用户已确认：充电桩配套配电箱→汽车充电桩",
+      "match": [{"field": "text", "any": ["配电箱"]}, {"field": "text", "any": ["充电桩"]}]
+    }
+  ]
+}
