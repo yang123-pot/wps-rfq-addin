@@ -242,7 +242,8 @@ function snapshotFrom(result,binding,decisions){
 test('R12-C比较：磁盘空分类与确认快照不一致必须报出（H11空/快照汽车充电桩）',()=>{
   const {result,binding}=bound();
   const rowId=conflictRowId(result);
-  const disk=host.readSheet(readerOf(model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'}).values),binding);
+  const diskRead=host.readSheet(readerOf(model.mainSheet(result,{title:'示例园区_分类审核成果.xlsx'}).values),binding);
+  const disk=withDecision(diskRead,rowId,{finalCategoryName:'',finalCategoryId:'',reviewNote:''});
   assert.equal(disk.rows.filter(function(row){return row.rowId===rowId;})[0].finalCategoryName,'',
     '磁盘成果表该行最终分类为空（表内编辑未保存）');
   const snapshot=snapshotFrom(result,binding,{rowId:rowId,

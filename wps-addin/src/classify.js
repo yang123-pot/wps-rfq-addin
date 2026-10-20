@@ -66,7 +66,7 @@
    if(arrow>=0&&found.categoryName)basis=basis.slice(0,arrow+1)+categoryName;
    candidates.push({categoryId:found.categoryId,categoryName:categoryName,
     source:'memory',matchLevel:found.matchLevel==='exact'?'exact':'partial',memoryId:found.memoryId,
-    basis:basis,matched:[]});
+    basis:basis,learnedAt:found.learnedAt||null,matched:[]});
    reasons.push('命中历史确认：'+(basis||categoryName||found.categoryId));
   });
   if(memoryState&&memoryState.compact){

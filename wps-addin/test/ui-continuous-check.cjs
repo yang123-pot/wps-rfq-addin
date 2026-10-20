@@ -78,7 +78,8 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   assert.equal(await primary.innerText(),'打开核对表','返回后复用已有成果，不要求重新生成');
   await action('打开核对表');await page.waitForFunction(()=>RfqAssistant.view().step===3);
   await showDetail();assert.equal(await page.locator('#workflow-nav .is-current').getAttribute('data-stage'),'review','打开核对表后切详细版也应是第3步');await showSimple();
-  // 错误先集中提醒，去修改定位到成果表；关闭后保留摘要。
+  // 冲突已按学习经验/候选顺序预填；用户若清空，错误仍先集中提醒并去修改定位。
+  await page.evaluate(row=>window.__setCell(row,9,''),fixture.CONFLICT_ROW);
   await primary.click();await page.getByRole('alertdialog').waitFor();assert.match(await page.getByRole('alertdialog').innerText(),/分类/);
   await page.keyboard.press('Escape');assert.equal(await page.locator('#assistant-problem').isVisible(),true);
   await page.evaluate(row=>window.__setCell(row,9,'汽车充电桩'),fixture.CONFLICT_ROW);

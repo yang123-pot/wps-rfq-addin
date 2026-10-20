@@ -12,6 +12,16 @@ function built(){
   return {preview:preview,result:model.build(preview.groups,{library:sample.library,memory:sample.createMemory(),projectId:'p-sample01'})};
 }
 
+function conflictMemory(entries){
+  const state=sample.createMemory();
+  state.memories=entries.map((entry,index)=>({id:'conflict-memory-'+index,
+    item:entry.item||{name:'充电桩配电箱',feature:'充电桩配套',unit:'台'},
+    categoryId:entry.categoryId,categoryName:entry.categoryName,state:'active',scope:entry.scope||'global',
+    projectId:entry.projectId||null,learnedAt:entry.learnedAt,
+    sources:[{sourceProjectId:'memory-project-'+index,sourceRowId:'row-'+index,decisionRevision:1}]}));
+  return state;
+}
+
 test('自动分类只给建议：8行中7行有建议、1行冲突，全部尚未人工确认',()=>{
   const {preview,result}=built();
   assert.equal(preview.groups.length,8,'合并后应8行');
@@ -21,7 +31,8 @@ test('自动分类只给建议：8行中7行有建议、1行冲突，全部尚�
   assert.equal(result.counts.conflict,1,'充电桩配电箱1行冲突');
   assert.equal(result.counts.none,0);
   assert.equal(result.counts.pending,8,'全部仍是待人工确认');
-  assert.equal(result.rows.every(row=>row.reviewNote===''),true,'生成阶段不写审核备注');
+  assert.equal(result.rows.filter(row=>!row.abnormal).every(row=>row.reviewNote===''),true,'非冲突行生成阶段不写审核备注');
+  assert.match(result.rows.find(row=>row.abnormal).reviewNote,/请核对/,'冲突预警写入审核备注');
   const summary=model.summary(result);
   assert.equal(summary.text,'8 行结果已写入成果表');
   assert.equal(summary.detail,'7 行有建议 · 1 行需重点核对','与图02侧栏统计一致');
@@ -57,7 +68,7 @@ test('清单溯源公开来源工程、专业、原清单序号和原表行号�
   assert.equal(model.publicRow(result.rows[0])[5],trace);
 });
 
-test('唯一可靠建议预填最终分类，冲突行留空并标为异常',()=>{
+test('唯一可靠建议预填最终分类，冲突行按候选顺序警示预填并保留冲突状态',()=>{
   const {result}=built();
   const byKey={};
   result.rows.forEach(row=>{byKey[sample.keyOf(row.name,row.feature,row.unit)]=row;});
@@ -66,10 +77,44 @@ test('唯一可靠建议预填最终分类，冲突行留空并标为异常',()=
   assert.equal(byKey[sample.keyOf('钢索','规格C','m')].matchState,'无需询价');
   const conflict=byKey[sample.keyOf('充电桩配电箱','充电桩配套','台')];
   assert.equal(conflict.matchState,'分类冲突');
-  assert.equal(conflict.finalCategoryId,'','冲突必须留空交给用户决定');
+  assert.equal(conflict.autoCategoryId,null,'冲突的自动建议列仍标记待核对');
+  assert.equal(conflict.finalCategoryId,'ev-charger','没有学习经验时按首个冲突候选警示预填');
+  assert.equal(conflict.finalCategoryName,'汽车充电桩');
+  assert.match(conflict.reviewNote,/候选顺序预填.*请核对/);
   assert.equal(conflict.abnormal,true,'冲突行必须突出显示');
   assert.match(conflict.matchBasis,/多个类别/);
+  assert.match(conflict.matchBasis,/未找到同类学习经验/);
   assert.match(byKey[sample.keyOf('水泵','DN50','台')].matchBasis,/完全匹配/);
+});
+
+test('冲突行优先按同一材料最近学习经验预填，旧经验不覆盖新经验',()=>{
+  const preview=collection.preview(sample.buildCollection(),true);
+  const state=conflictMemory([
+    {categoryId:'ev-charger',categoryName:'汽车充电桩',learnedAt:'2026-10-01T00:00:00.000Z'},
+    {categoryId:'strong-electric',categoryName:'强电',learnedAt:'2026-10-20T00:00:00.000Z'}
+  ]);
+  const result=model.build(preview.groups,{library:sample.library,memory:state,projectId:'p-conflict-memory'});
+  const conflict=result.rows.find(row=>row.name==='充电桩配电箱');
+  assert.equal(conflict.matchState,'分类冲突');
+  assert.equal(conflict.finalCategoryId,'strong-electric');
+  assert.equal(conflict.finalCategoryName,'强电');
+  assert.match(conflict.reviewNote,/最近学习经验/);
+  assert.match(conflict.matchBasis,/最近学习经验预填“强电”/);
+  assert.match(conflict.matchBasis,/2026-10-20/);
+  assert.equal(conflict.autoCategoryId,null,'冲突仍需人工核对，自动建议不作为普通匹配');
+});
+
+test('冲突类别没有同项经验时使用该类别最近的有效经验，项目经验不串项目',()=>{
+  const preview=collection.preview(sample.buildCollection(),true);
+  const state=conflictMemory([
+    {categoryId:'ev-charger',categoryName:'汽车充电桩',item:{name:'旧充电设备',feature:'',unit:'台'},learnedAt:'2026-10-02T00:00:00.000Z'},
+    {categoryId:'strong-electric',categoryName:'强电',item:{name:'旧配电箱',feature:'',unit:'台'},learnedAt:'2026-09-01T00:00:00.000Z'},
+    {categoryId:'strong-electric',categoryName:'强电',item:{name:'未来项目配电箱',feature:'',unit:'台'},learnedAt:'2026-12-01T00:00:00.000Z',scope:'project',projectId:'other-project'}
+  ]);
+  const result=model.build(preview.groups,{library:sample.library,memory:state,projectId:'p-conflict-memory'});
+  const conflict=result.rows.find(row=>row.name==='充电桩配电箱');
+  assert.equal(conflict.finalCategoryId,'ev-charger','只采用当前项目可见的类别级经验');
+  assert.match(conflict.reviewNote,/最近学习经验/);
 });
 
 test('旧习惯记忆的显示名不覆盖当前类别名称',()=>{
@@ -110,7 +155,7 @@ test('成果表按图03列序输出10列，项目特征描述与清单溯源公�
   assert.equal(binding.values.length,result.rows.length+1);
 });
 
-test('其他项目已确认的记忆与规则同类时仍预填成果表，真实类别冲突继续留空',()=>{
+test('其他项目已确认的记忆与规则同类时仍预填成果表，冲突行按最近经验预填但保留异常',()=>{
   const preview=collection.preview(sample.buildCollection(),true);
   const decisions=[
     ['水泵','DN50','台','pump','水泵'],['水泵','DN65','台','pump','水泵'],
@@ -130,10 +175,11 @@ test('其他项目已确认的记忆与规则同类时仍预填成果表，真�
   decisions.forEach(([name,feature,,categoryId,categoryName])=>{
     const row=result.rows.find(item=>item.name===name&&item.feature===feature);
     if(name==='充电桩配电箱'){
-      assert.equal(row.finalCategoryId,'','不同类别仍是冲突，不能采用历史确认覆盖另一规则');
+      assert.equal(row.finalCategoryId,'ev-charger','冲突仍按最近同项经验选择，不用旧规则静默覆盖');
       assert.equal(row.autoCategoryId,null);
       assert.equal(row.abnormal,true);
       assert.equal(row.matchState,'分类冲突');
+      assert.match(row.reviewNote,/最近学习经验/);
     }else{
       assert.equal(row.autoCategoryId,categoryId,'同类别的两种依据应产生可靠建议');
       assert.equal(row.finalCategoryName,categoryName,'最终分类预填唯一类别');
@@ -180,6 +226,10 @@ test('版式落地：表头浅色、最终分类浅黄带区域下拉、异常�
   const abnormal=spec.fills.filter(item=>item.color===layout.COLORS.accent);
   assert.equal(abnormal.length,result.counts.conflict,'异常行橙色');
   assert.equal(abnormal[0].columnSpan,10);
+  const warning=spec.fills.filter(item=>item.column===model.FINAL_COLUMN&&item.color===layout.COLORS.warning);
+  assert.equal(warning.length,result.counts.conflict,'冲突预填的最终分类使用独立警示色');
+  assert.equal(warning[0].row,model.FIRST_ROW+result.rows.findIndex(row=>row.abnormal));
+  assert.equal(warning[0].rowSpan,1);assert.equal(warning[0].columnSpan,1);
   assert.equal(spec.validations.length,1,'最终分类列挂区域下拉');
   assert.equal(spec.validations[0].column,9);
   assert.equal(spec.validations[0].listSheet,model.OPTIONS_SHEET);

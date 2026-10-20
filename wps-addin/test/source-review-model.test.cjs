@@ -29,8 +29,10 @@ test('审核副本只在原表有效列右侧追加建议、最终、备注和�
  }));
  const first=value.files[0].sheets[0].rows[0];
  assert.equal(first.finalCategoryName,'水泵','唯一建议仍可预填最终分类');
- assert.equal(value.files[1].sheets[0].rows.find(row=>row.name==='充电桩配电箱').finalCategoryName,'',
-  '冲突保留空白，不跨来源合并');
+ const conflict=value.files[1].sheets[0].rows.find(row=>row.name==='充电桩配电箱');
+ assert.equal(conflict.finalCategoryName,'汽车充电桩','冲突按候选顺序预填，不跨来源合并');
+ assert.match(conflict.reviewNote,/分类冲突.*请核对/);
+ assert.equal(conflict.abnormal,true);
 });
 
 test('目标文件名按来源区分并拒绝覆盖同名单',()=>{

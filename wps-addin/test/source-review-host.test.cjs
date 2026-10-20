@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const sample=require('./fixtures/workflow-v3-sample.cjs'),collection=require('../src/collection.js');
 const review=require('../src/classification-review-model.js'),source=require('../src/source-review-model.js');
-const host=require('../src/source-review-host.js');
+const host=require('../src/source-review-host.js'),layout=require('../src/workbook-layout.js');
 
 function built(){
  const col=sample.buildCollection(),preview=collection.preview(col,false,false);
@@ -9,9 +9,14 @@ function built(){
  const plan=source.build(col.entries.slice(0,1),result,{title:'来源审核'});
  return plan.files[0];
 }
+function conflictFile(){
+ const col=sample.buildCollection(),preview=collection.preview(col,false,false);
+ const result=review.build(preview.groups,{library:sample.library,memory:sample.createMemory(),projectId:'p-source'});
+ return source.build(col.entries.slice(1),result,{title:'来源审核'}).files[0];
+}
 function fixture(file){
  let active=null,closed=0,opened=0,saves=0;
- const cells={},columns={};
+ const cells={},columns={},colors={};
  (file.sheets||[]).forEach(sheet=>{
   const origin=(file.originalName==='给排水清单.xlsx'?sample.inputs[0].snapshot.sheets[0].values:sample.inputs[1].snapshot.sheets[0].values);
   origin.forEach((row,r)=>row.forEach((value,c)=>{cells[sheet.name+':'+(r+1)+':'+(c+1)]=value;}));
@@ -20,7 +25,8 @@ function fixture(file){
   return {
    get Value2(){return cells[sheet+':'+row+':'+column];},
    set Value2(value){cells[sheet+':'+row+':'+column]=value;},
-   Font:{},Interior:{Color:null},WrapText:false
+   Font:{},Interior:{get Color(){return colors[sheet+':'+row+':'+column]||null;},
+    set Color(value){colors[sheet+':'+row+':'+column]=value;}},WrapText:false
   };
  }
  function columnNumber(name){
@@ -53,7 +59,7 @@ function fixture(file){
     if(path===stagePath)return stageBook;
     throw Error('unexpected path '+path);
    }}};
- return {file,app,stagePath,cells,get opened(){return opened;},get closed(){return closed;},get saves(){return saves;}};
+ return {file,app,stagePath,cells,colors,get opened(){return opened;},get closed(){return closed;},get saves(){return saves;}};
 }
 test('在服务端复制的审核副本上只追加列，保留原表单元格并隐藏行标识',()=>{
  const h=fixture(built()),result=host.write(h.app,h.file,h.stagePath,{prepared:true});
@@ -67,6 +73,13 @@ test('在服务端复制的审核副本上只追加列，保留原表单元格�
  assert.equal(h.cells['给排水:3:6'],'水泵');
  assert.equal(h.cells['给排水:3:7'],'水泵');
  assert.equal(h.cells['给排水:3:9'],h.file.sheets[0].rows[0].rowId);
+});
+test('来源原表审核也写入冲突预填备注并使用警示色',()=>{
+ const h=fixture(conflictFile()),file=h.file,conflict=file.sheets[0].rows.find(row=>row.name==='充电桩配电箱');
+ host.write(h.app,file,h.stagePath,{prepared:true});
+ assert.equal(h.cells[file.sheets[0].name+':'+conflict.row+':'+file.sheets[0].finalColumn],'汽车充电桩');
+ assert.match(h.cells[file.sheets[0].name+':'+conflict.row+':'+file.sheets[0].noteColumn],/分类冲突.*请核对/);
+ assert.equal(h.colors[file.sheets[0].name+':'+conflict.row+':'+file.sheets[0].finalColumn],layout.toColor(layout.COLORS.warning));
 });
 test('生成绑定并读回两份来源的审核行，保留文件与工作表位置',()=>{
  const h=fixture(built());

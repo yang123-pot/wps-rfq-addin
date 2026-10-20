@@ -7,7 +7,7 @@
  // 统一版式模型：等宽矩阵＋layout。模型只描述“应该长什么样”，真正写盘由export-host执行。
  // layout随模型→workbook→host→拆分传递；旧的无layout模型仍然兼容。
  var SCHEMA_VERSION=1,FONT_SIZE=10;
- var COLORS={header:'#DCE6F1',input:'#FFF7D6',accent:'#FDE9D9',note:'#F2F2F2',link:'#0563C1'};
+ var COLORS={header:'#DCE6F1',input:'#FFF7D6',accent:'#FDE9D9',warning:'#F4B183',note:'#F2F2F2',link:'#0563C1'};
  function isObject(value){return !!value&&typeof value==='object'&&!Array.isArray(value);}
  function integer(value,min){return Number.isSafeInteger(value)&&value>=(min==null?1:min);}
  function toColor(hex){

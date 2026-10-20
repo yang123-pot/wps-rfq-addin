@@ -13,7 +13,7 @@ test('server pages are bounded and omit history/sources; mutate shares revision 
  assert.equal((await store.page({kind:'memories',page:999})).items.length,0);
  assert.rejects(()=>store.page({kind:'garbage'}),/类型/);
  const sum=await store.summary();assert.equal(sum.memories,6760);assert.equal(sum.history,10267);
- const index=await store.classifyIndex();assert.equal(index.memory.history.length,0);assert.equal(index.memory.memories[0].sources,undefined);assert.equal(index.memory.memories.length,6760);
+ const index=await store.classifyIndex();assert.equal(index.memory.history.length,0);assert.equal(index.memory.memories[0].sources,undefined);assert.equal(index.memory.memories[0].learnedAt,'2026-10-20');assert.equal(index.memory.memories.length,6760);
  const results=await Promise.allSettled([store.mutate({expectedRevision:1,operation:{type:'add',name:'新类别'}}),store.save({...s,expectedRevision:1})]);
  assert.equal(results.filter(x=>x.status==='fulfilled').length,1);assert.equal(results.find(x=>x.status==='rejected').reason.code,'REVISION_CONFLICT');
  assert.equal((await createLibraryStore({directory:dir}).summary()).revision,2);

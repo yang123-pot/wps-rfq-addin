@@ -91,13 +91,54 @@
   });
   return output;
  }
- function describe(suggestion){
+ function describe(suggestion,choice){
   if(!suggestion)return '';
-  if(suggestion.conflicts&&suggestion.conflicts.length>1)
-   return '命中多个类别：'+suggestion.conflicts.map(function(item){return item.categoryName||item.categoryId;}).join('、');
+  if(suggestion.conflicts&&suggestion.conflicts.length>1){
+   var names=suggestion.conflicts.map(function(item){return item.categoryName||item.categoryId;}).join('、');
+   if(!choice)return '命中多个类别：'+names;
+   return '命中多个类别：'+names+'；'+(choice.mode==='candidate-order'?
+     '未找到同类学习经验，按候选顺序预填“'+choice.categoryName+'”':
+     '按最近学习经验预填“'+choice.categoryName+'”（'+choice.learnedAt+'）');
+  }
   if(!suggestion.candidates||!suggestion.candidates.length)return '分类库与习惯记忆都没有可靠命中';
   var hit=suggestion.candidates[0];
   return (hit.matchLevel==='exact'?'完全匹配':'部分匹配')+(hit.basis?'：'+hit.basis:'');
+ }
+ function latestByLearnedAt(items){
+  var best=null;
+  (items||[]).forEach(function(item){
+   if(!item||!item.learnedAt)return;
+   if(!best||String(item.learnedAt)>String(best.learnedAt))best=item;
+  });
+  return best;
+ }
+ function categoryMemory(memoryState,categoryIds,projectId){
+  if(!memoryState||!Array.isArray(memoryState.memories))return null;
+  var ids={};categoryIds.forEach(function(id){ids[id]=true;});
+  return latestByLearnedAt(memoryState.memories.filter(function(record){
+   if(!record||record.state!=='active'||!ids[record.categoryId])return false;
+   return record.scope!=='project'||record.projectId===(projectId||null);
+  }));
+ }
+ // 冲突不再留空：优先同项记忆，其次冲突类别自身最近记忆，最后用首个候选警示预填。
+ function conflictChoice(suggestion,memoryState,projectId){
+  var conflicts=(suggestion&&suggestion.conflicts)||[];
+  if(conflicts.length<2)return null;
+  var ids={};conflicts.forEach(function(item){ids[item.categoryId]=true;});
+  var matching=((suggestion.candidates||[]).filter(function(candidate){
+   return candidate.source==='memory'&&ids[candidate.categoryId]&&candidate.learnedAt;
+  }));
+  var exact=matching.filter(function(candidate){return candidate.matchLevel==='exact';});
+  var chosen=latestByLearnedAt(exact.length?exact:matching);
+  if(chosen)return {categoryId:chosen.categoryId,categoryName:chosen.categoryName,learnedAt:chosen.learnedAt,mode:'same-item-memory'};
+  var record=categoryMemory(memoryState,conflicts.map(function(item){return item.categoryId;}),projectId);
+  if(record){
+   var matched=conflicts.filter(function(item){return item.categoryId===record.categoryId;})[0];
+   return {categoryId:record.categoryId,categoryName:matched?(matched.categoryName||matched.categoryId):record.categoryName,
+    learnedAt:record.learnedAt,mode:'category-memory'};
+  }
+  var fallback=conflicts[0];
+  return {categoryId:fallback.categoryId,categoryName:fallback.categoryName,learnedAt:null,mode:'candidate-order'};
  }
  // 唯一可靠建议才预填“最终分类”；冲突与无建议一律留空留给用户决定。
  function build(groups,options){
@@ -114,6 +155,8 @@
    var candidates=suggestion.candidates||[];
    // 同一类别可以同时有规则和记忆依据；只有不同类别才是冲突。
    var auto=candidates.length&&!conflicts?candidates[0]:null;
+   var choice=conflicts?conflictChoice(suggestion,input.memory||null,input.projectId||null):null;
+   var prefill=auto||choice;
    var state=conflicts?STATE.conflict:(candidates.length?(auto&&auto.categoryId===library.DECISION?STATE.skip:STATE.suggested):STATE.none);
    var origin=firstSource(group);
    return {rowId:rowIdOf(group),index:0,name:item.name,feature:item.feature,unit:item.unit,
@@ -124,9 +167,13 @@
     sourceIds:((group.sources||[]).map(function(entry){return text(entry.id);})),
     libraryVersion:libraryVersion,
     autoCategoryId:auto?text(auto.categoryId):null,autoCategoryName:auto?text(auto.categoryName):null,
-    matchState:state,matchBasis:describe(suggestion),
-    finalCategoryId:auto?text(auto.categoryId):'',finalCategoryName:auto?text(auto.categoryName):'',
-    reviewNote:'',abnormal:conflicts};
+    matchState:state,matchBasis:describe(suggestion,choice),
+    finalCategoryId:prefill?text(prefill.categoryId):'',finalCategoryName:prefill?text(prefill.categoryName):'',
+    conflictChoiceMode:choice?choice.mode:null,conflictChoiceLearnedAt:choice?choice.learnedAt:null,
+    reviewNote:choice?(choice.mode==='candidate-order'?
+      '分类冲突：暂无同类学习经验，已按候选顺序预填，请核对。':
+      '分类冲突：已按最近学习经验预填，请核对。'):'',
+    abnormal:conflicts};
   });
   if(input.mergeAllWorkbooks===true)rows=clusterSimilar(rows);
   rows.forEach(function(row,index){row.index=index+1;});
@@ -367,6 +414,10 @@ function fromSnapshot(snapshot,binding,options){
   model.rows.forEach(function(row,index){
    if(!row.abnormal)return;
    fills.push({row:FIRST_ROW+index,column:1,rowSpan:1,columnSpan:COLUMNS.length,color:layout.COLORS.accent});
+  });
+  model.rows.forEach(function(row,index){
+   if(!row.abnormal||!row.conflictChoiceMode)return;
+   fills.push({row:FIRST_ROW+index,column:FINAL_COLUMN,rowSpan:1,columnSpan:1,color:layout.COLORS.warning});
   });
   // 2026-10-11 用户要求：最终分类保留下拉，但允许直接输入下拉以外的类别名（确认时按新类别接收）。
   var validations=model.rows.length?[layout.listValidation(FIRST_ROW,FINAL_COLUMN,model.rows.length,1,

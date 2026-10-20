@@ -104,6 +104,10 @@
   if(cell.Interior)cell.Interior.Color=layout.toColor(layout.COLORS.input);
   if('WrapText' in cell)cell.WrapText=true;
  }
+ function markWarning(cell){
+  if(cell.Interior)cell.Interior.Color=layout.toColor(layout.COLORS.warning);
+  if('WrapText' in cell)cell.WrapText=true;
+ }
  function applyReviewColumns(book,file){
   file.sheets.forEach(function(spec){
    var sheet=book.Worksheets.Item(spec.name);
@@ -124,6 +128,9 @@
    writeColumn(sheet,firstRow,lastRow,spec.rowIdColumn,valuesFor(function(record){return record.rowId;}));
    if(finalRange){markInput({Interior:finalRange.Interior,WrapText:finalRange.WrapText});}
    else spec.rows.forEach(function(record){markInput(sheet.Cells.Item(record.row,spec.finalColumn));});
+   spec.rows.forEach(function(record){
+    if(record.abnormal)markWarning(sheet.Cells.Item(record.row,spec.finalColumn));
+   });
    sheet.Columns.Item(spec.reviewColumn).ColumnWidth=16;
    sheet.Columns.Item(spec.finalColumn).ColumnWidth=18;
    sheet.Columns.Item(spec.noteColumn).ColumnWidth=24;

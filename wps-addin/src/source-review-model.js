@@ -85,7 +85,8 @@
       trace:text(row.trace),code:text(row.code),scopeId:text(row.scopeId),sourceIds:(row.sourceIds||[]).map(text),
       autoCategoryId:row.autoCategoryId==null?null:text(row.autoCategoryId),
       autoCategoryName:reviewModel.autoLabel(row),finalCategoryName:text(row.finalCategoryName),
-      reviewNote:'',originRows:originRows(sheet,item,width)});
+      reviewNote:text(row.reviewNote),abnormal:row.abnormal===true,
+      conflictChoiceMode:row.conflictChoiceMode||null,originRows:originRows(sheet,item,width)});
     });
     return spec;
    });

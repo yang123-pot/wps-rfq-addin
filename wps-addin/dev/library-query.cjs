@@ -17,7 +17,7 @@ function classifyIndex(s){
  const records=[];
  for(const m of s.memory.memories){if(m.state!=='active'||!allowed.has(m.categoryId))continue;
   const key=JSON.stringify([m.scope||'global',m.projectId||null,mem.signature(m.item),m.categoryId]);if(seen.has(key))continue;seen.add(key);
-  records.push({id:m.id,item:m.item,categoryId:m.categoryId,categoryName:lib.categoryName(s.library,m.categoryId),scope:m.scope||'global',projectId:m.projectId||null,state:'active'});
+  records.push({id:m.id,item:m.item,categoryId:m.categoryId,categoryName:lib.categoryName(s.library,m.categoryId),scope:m.scope||'global',projectId:m.projectId||null,state:'active',learnedAt:m.learnedAt||null});
  }
  return {revision:s.revision,library:{version:s.library.version,categories:lib.categories(s.library),rules:lib.rules(s.library)},memory:{schemaVersion:1,version:s.memory.version,memories:records,history:[],compact:true}};
 }

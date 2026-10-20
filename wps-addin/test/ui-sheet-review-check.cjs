@@ -167,14 +167,23 @@ async function run(options={}){
   assert.match(await page.locator('#sheet-review-progress').innerText(),/当前进度 3 \/ 7 · 正在进行表内审核/);
   await page.waitForFunction(()=>/待修改|可以整表确认/.test(document.querySelector('#sheet-review-stats').textContent));
   assert.match(await page.locator('#sheet-review-stats').innerText(),/8 行/);
-  assert.match(await page.locator('#sheet-review-stats').innerText(),/1 处待修改/,'冲突行未填时整表未完成');
+  assert.match(await page.locator('#sheet-review-stats').innerText(),/可以整表确认/,'冲突行按最近经验或候选顺序预填后可进入整表确认');
+  const conflictPreview=await page.evaluate(row=>({
+    final:window.__written.values[row-1][8],note:window.__written.values[row-1][9],match:window.__written.values[row-1][7],
+    warning:window.__written.layout.fills.some(fill=>fill.row===row&&fill.column===9&&fill.color===RfqWorkbookLayout.COLORS.warning)
+  }),CONFLICT_ROW);
+  assert.equal(conflictPreview.final,'汽车充电桩','冲突行必须预填最近经验或首个候选');
+  assert.match(conflictPreview.note,/分类冲突.*请核对/);
+  assert.equal(conflictPreview.match,'分类冲突');
+  assert.equal(conflictPreview.warning,true,'冲突预填的最终分类必须使用警示色');
   assert.match(await page.locator('#stage-panel-review').innerText(),/不做逐行勾选确认/,'主流程不得要求逐行勾选');
   // R12-C：业务内容与已存确认一致时，两个恢复动作默认隐藏；只有发现业务差异才出现。
   assert.equal(await page.locator('#sheet-review-use-sheet').isHidden(),true);
   assert.equal(await page.locator('#sheet-review-restore-copy').isHidden(),true);
   assert.equal(await page.locator('#sheet-review-use-sheet').innerText(),'选用现表内容（按现表重新确认）');
   assert.equal(await page.locator('#sheet-review-restore-copy').innerText(),'恢复项目草稿到新副本');
-  // 整表不完整不放行，并定位到具体单元格；未确认不写项目、不学习。
+  // 用户清空预填后，整表不完整仍不放行，并定位到具体单元格；未确认不写项目、不学习。
+  await page.evaluate(({row})=>{window.__setCell(row,9,'');},{row:CONFLICT_ROW});
   await page.locator('#sheet-review-confirm').click();
   await page.waitForFunction(()=>document.querySelector('#sheet-review-message').textContent.includes('整表未通过校验'));
   assert.match(await page.locator('#sheet-review-issues').innerText(),/最终分类为空/);
