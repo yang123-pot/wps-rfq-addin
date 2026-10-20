@@ -357,6 +357,16 @@ test('WPS已打开另一目录的同名分类工作簿时，明确提示先关�
   assert.equal(opened,0,'发现另一目录同名工作簿时不得再调用Open');
 });
 
+test('分类簿身份不把字面%20目录当成空格目录，打开和读回均先拒绝',()=>{
+  const file='C:\\项目%20甲\\示例园区_分类工作簿.xlsx';
+  const wrong={Name:'示例园区_分类工作簿.xlsx',FullName:'C:\\项目 甲\\示例园区_分类工作簿.xlsx',
+    Activate(){assert.fail('不得激活另一目录');},Close(){assert.fail('不得关闭用户簿');},
+    Worksheets:{Count:1,Item(){return {Name:'分类汇总表',UsedRange:{Rows:{Count:9}}};}}};
+  const application={AutomationSecurity:1,Workbooks:{Count:1,Item(){return wrong;},Open(){assert.fail('不得调用Open');}}};
+  assert.throws(()=>books.openForEditing(application,file),/另一目录.*同名.*先保存并关闭/);
+  assert.throws(()=>books.readSheets(application,file),/另一目录.*同名.*先保存并关闭/);
+});
+
 // 2026-10-11（图04/05变更）：一本多页写入必须“有页可写”，发布后按页读回核页名与行数。
 test('一本多页：空清单明确拒绝写入；发布后按页读回页名/行数，页名或行数不对都报错',()=>{
   assert.throws(()=>books.writeAll({}, planWithPages([]), 'C:\\stage\\x.xlsx', {}),/没有可写入的分类工作簿页/);

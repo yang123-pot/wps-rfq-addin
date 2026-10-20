@@ -117,6 +117,19 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
    assert.equal(await page.evaluate(()=>RfqAssistant.view().step),4,'汇总绑定未保存，重复点击也不能推进到填写品牌');
   }
   await page.unroute('**/api/project/save');
+  // 改确认后生成的新批次与仍打开的旧分类簿同名：应先提示用户关闭旧簿，不能借用它推进。
+  await action('下一步：填写品牌和供应商');
+  await page.getByRole('alertdialog').waitFor();
+  assert.match(await page.getByRole('alertdialog').innerText(),/另一目录.*同名.*请先保存并关闭/);
+  assert.equal(await page.evaluate(()=>RfqAssistant.view().step),4,'冲突时保留第4步和新批次绑定');
+  const closedOldBooks=await page.evaluate(()=>{
+   const target=window.__openedSummary,name=target.replace(/\\/g,'/').split('/').pop();
+   const previous=window.__openBooks.filter(book=>book.FullName!==target&&book.FullName.replace(/\\/g,'/').split('/').pop()===name);
+   previous.forEach(book=>book.Close(false)); // 仅模拟用户关闭本夹具上一批次的分类簿。
+   return previous.length;
+  });
+  assert.ok(closedOldBooks>0,'必须实际保留过旧批次同名簿，不能构造一个永远无冲突的夹具');
+  await page.keyboard.press('Escape');
   await action('下一步：填写品牌和供应商');await page.waitForFunction(()=>RfqAssistant.view().step===5);
   await showDetail();assert.equal(await page.locator('#workflow-nav .is-current').getAttribute('data-stage'),'brands','打开品牌表后两种模式阶段一致');await showSimple();
   await page.locator('#simple-back').click();

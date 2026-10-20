@@ -86,3 +86,53 @@ test('R8：读回分类汇总表，复用已打开工作簿、未打开则只读
  assert.throws(()=>host.readSummary(app([]),binding),/未返回指定品牌表/);
  assert.throws(()=>host.readSummary(app([open]),Object.assign({},binding,{schemaVersion:7})),/绑定无效/);
 });
+
+function summaryFixture(){
+ const directory='C:\\out',target=directory+'\\示例园区_分类工作簿.xlsx';
+ const plan=model.summaryPlan([{categoryId:'pump',categoryName:'水泵',rowCount:2,path:target}],
+  {directory,inputKey:'ck2-collision',layout:'separated',projectName:'示例园区'});
+ const workbook=model.buildSummary(plan,{});
+ return {target,binding:model.summaryBindingFor(target,workbook),grid:workbook.sheets[0].values};
+}
+for(const action of ['open','read']){
+ test('同名分类簿保护覆盖汇总表'+(action==='open'?'打开':'读回')+'入口，调用WPS Open前拒绝且保留用户簿',()=>{
+  const fixture=summaryFixture();
+  for(const nativeBehavior of ['throw','reuse-other']){
+   const userBook=book('D:\\另一个项目\\示例园区_分类工作簿.xlsx',[sheet('分类汇总表',fixture.grid)]);
+   userBook.Name='示例园区_分类工作簿.xlsx';let opened=0,activated=0;
+   userBook.Activate=()=>{activated++;};
+   const application={AutomationSecurity:1,Workbooks:{Count:1,Item(){return userBook;},Open(){
+    opened++;if(nativeBehavior==='throw')throw Error('WPS原生同名冲突框');return userBook;
+   }}};
+   const bindingBefore=JSON.stringify(fixture.binding);
+   assert.throws(()=>action==='open'?host.openSummary(application,fixture.target):host.readSummary(application,fixture.binding),
+    /另一目录.*同名.*请先保存并关闭/);
+   assert.equal(opened,0,'不调用可能弹原生同名框或借用其他项目对象的Open');
+   assert.equal(activated,0,'不激活另一项目的同名簿');
+   assert.equal(userBook._closed,false,'不关闭用户已打开的簿');
+   assert.equal(application.AutomationSecurity,1);
+   assert.equal(JSON.stringify(fixture.binding),bindingBefore);
+  }
+ });
+ test('汇总表'+(action==='open'?'打开':'读回')+'复用同路径编码URI，避免误判同名或再次Open',()=>{
+  const fixture=summaryFixture();
+  const targetBook=book('file:///C:/out/'+encodeURIComponent('示例园区_分类工作簿.xlsx'),[sheet('分类汇总表',fixture.grid)]);
+  targetBook.Name='示例园区_分类工作簿.xlsx';let activated=0;
+  targetBook.Activate=()=>{activated++;};
+  const application={AutomationSecurity:1,Workbooks:{Count:1,Item(){return targetBook;},Open(){assert.fail('同路径不应再Open');}}};
+  if(action==='open'){
+   assert.equal(host.openSummary(application,fixture.target).reused,true);
+   assert.equal(activated,1);
+  }else assert.equal(host.readSummary(application,fixture.binding).ok,true);
+  assert.equal(targetBook._closed,false);
+ });
+ test('汇总表'+(action==='open'?'打开':'读回')+'不把字面%20目录当成空格目录',()=>{
+  const fixture=summaryFixture(),target='C:\\项目%20甲\\示例园区_分类工作簿.xlsx';
+  const other=book('C:\\项目 甲\\示例园区_分类工作簿.xlsx',[sheet('分类汇总表',fixture.grid)]);
+  other.Name='示例园区_分类工作簿.xlsx';other.Activate=()=>assert.fail('不能激活空格目录的其他项目簿');
+  const application={AutomationSecurity:1,Workbooks:{Count:1,Item(){return other;},Open(){assert.fail('冲突必须在Open前发现');}}};
+  assert.throws(()=>action==='open'?host.openSummary(application,target):host.readSummary(application,{...fixture.binding,path:target}),
+   /另一目录.*同名.*请先保存并关闭/);
+  assert.equal(other._closed,false);
+ });
+}

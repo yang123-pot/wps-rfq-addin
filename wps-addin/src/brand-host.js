@@ -4,15 +4,39 @@
  else root.RfqBrandHost=factory(root.RfqExportHost,root.RfqBrandModel);
 }(typeof window==='object'?window:globalThis,function(host,model){
  'use strict';
- function key(path){return String(path||'').replace(/[\\/]+/g,'/').toLowerCase();}
+ function key(path){
+  var value=String(path||'').trim();
+  if(/^file:\/+/i.test(value)){
+   value=value.replace(/^file:\/+/i,'');
+   try{value=decodeURIComponent(value);}catch(_){/* 非法URI保留原样，不能借用其他路径 */}
+  }
+  return value.replace(/[\\/]+/g,'/').replace(/\/+$/,'').toLowerCase();
+ }
+ function property(object,name){try{return object&&object[name];}catch(_){return null;}}
+ function fullName(book){
+  var full=property(book,'FullName'),directory=property(book,'Path'),name=property(book,'Name');
+  return String(full||(directory&&name?String(directory)+'/'+String(name):name)||'');
+ }
+ function tailName(path){var parts=key(path).split('/');return parts[parts.length-1]||'';}
+ function requireNoSameNameElsewhere(app,path){
+  var expected=key(path),name=tailName(path),conflicts=[];
+  for(var index=1;index<=Number(app.Workbooks.Count||0);index++){
+   var candidate=app.Workbooks.Item(index),full=fullName(candidate);
+   if(tailName(property(candidate,'Name')||full)===name&&key(full)!==expected)
+    conflicts.push(full||'（WPS未返回完整路径）');
+  }
+  if(conflicts.length)throw Error('WPS中已打开另一目录的同名分类工作簿：'+conflicts.join('、')+
+   '。请先保存并关闭该同名工作簿，再从当前项目重试；插件不会借用或关闭它。');
+ }
  function openBook(app,path){
+  requireNoSameNameElsewhere(app,path);
   var count=Number(app.Workbooks.Count)||0;
   for(var index=1;index<=count;index++){
    var candidate=app.Workbooks.Item(index);
-   if(candidate&&key(candidate.FullName)===key(path))return {book:candidate,opened:false};
+   if(candidate&&key(fullName(candidate))===key(path))return {book:candidate,opened:false};
   }
   var opened=app.Workbooks.Open(path,0,true);
-  if(!opened||key(opened.FullName)!==key(path))throw Error('WPS未返回指定品牌表：'+path);
+  if(!opened||key(fullName(opened))!==key(path))throw Error('WPS未返回指定品牌表：'+path);
   return {book:opened,opened:true};
  }
  function sheetOf(book,name){
@@ -78,14 +102,15 @@ function summaryWrite(app,workbook,stagePath){return host.write(app,workbook,sta
   var security=app.AutomationSecurity,error=null,book=null;
   if(typeof security!=='number')throw Error('不能读取宏安全设置，未打开分类汇总表。');
   try{
+   requireNoSameNameElsewhere(app,filePath);
    for(var index=1;index<=app.Workbooks.Count;index++){
     var open=app.Workbooks.Item(index);
-    if(open&&key(open.FullName)===key(filePath)){focusSummary(app,open,options);return {path:filePath,opened:true,reused:true};}
+    if(open&&key(fullName(open))===key(filePath)){focusSummary(app,open,options);return {path:filePath,opened:true,reused:true};}
    }
    app.AutomationSecurity=3;
    if(app.AutomationSecurity!==3)throw Error('无法禁用自动宏，未打开分类汇总表。');
    book=app.Workbooks.Open(filePath,0,false);
-   if(!book||key(book.FullName)!==key(filePath))throw Error('WPS未返回指定分类汇总表。');
+   if(!book||key(fullName(book))!==key(filePath))throw Error('WPS未返回指定分类汇总表。');
    focusSummary(app,book,options);
   }catch(problem){error=problem;}
   finally{

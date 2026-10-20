@@ -269,8 +269,10 @@ function writeAll(app,planValue,stagePath,options){
  function property(object,name){try{return object&&object[name];}catch(_){return null;}}
  function normalizePath(value){
   var raw=text(value).trim();
-  if(/^file:\/+/i.test(raw))raw=raw.replace(/^file:\/+/i,'');
-  try{raw=decodeURIComponent(raw);}catch(_){/* 保留普通路径中的非转义百分号 */}
+  if(/^file:\/+/i.test(raw)){
+   raw=raw.replace(/^file:\/+/i,'');
+   try{raw=decodeURIComponent(raw);}catch(_){/* 非法URI保留原样，普通路径的%xx不是转义 */}
+  }
   return raw.replace(/\//g,'\\').replace(/\\+/g,'\\').replace(/\\+$/,'').toLowerCase();
  }
  function tailName(value){
