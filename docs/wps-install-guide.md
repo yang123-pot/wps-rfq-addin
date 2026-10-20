@@ -109,7 +109,7 @@ pwsh -File wps-addin\install\uninstall.ps1
 wps-rfq-addin-0.1.0-20261020-R1.zip
 ```
 
-候选包版本 `0.1.0`，构建标签 `20261020-R1`，共99个文件。压缩包 SHA-256、运行代码版本和逐文件 SHA 以 `docs/wps-phase1-release-manifest-20261020.json` 为准；安装前请先核对该清单与下载资产的哈希。
+候选包版本 `0.1.0`，构建标签 `20261020-R1`，共100个文件。压缩包 SHA-256、运行代码版本和逐文件 SHA 以 `docs/wps-phase1-release-manifest-20261020.json` 为准；安装前请先核对该清单与下载资产的哈希。
 
 从压缩包安装：
 

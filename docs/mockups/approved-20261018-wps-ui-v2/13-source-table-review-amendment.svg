@@ -57,7 +57,7 @@
 </g>
 <rect x="724" y="338" width="612" height="88" rx="6" fill="#fff7d6"/>
 <text x="744" y="366" font-size="16" font-weight="bold">最终分类保持浅黄色可编辑</text>
-<text x="744" y="393" font-size="14">冲突或无可靠建议留空，由用户在原表相同行直接决定。</text>
+<text x="744" y="393" font-size="14">分类冲突按图16预填并橙色警示，仍由用户在原表相同行核对。</text>
 <text x="744" y="414" font-size="13" fill="#596962">可输入库外新类别，整表确认时统一入库并学习。</text>
 <text x="724" y="466" font-size="14" fill="#596962">每本来源仍是独立工作簿；不在预览中把所有原表拼成一张。</text>
 <text x="724" y="492" font-size="14" fill="#596962">进入下一步时只需一次整表确认，分类结果汇总到当前项目。</text>
