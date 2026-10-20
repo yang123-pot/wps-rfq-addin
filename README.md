@@ -2,7 +2,7 @@
 
 将整个项目的招标清单分类、核对，生成面向供应商的独立询价文件。
 
-**当前阶段：七步流程、项目恢复、总询价和一键拆分已在本机服务与模拟WPS宿主通过；真实WPS全链路R12因本机Computer Use认证错误暂未完成，不能宣称一期交付。**
+**当前阶段：`0.1.0` 正式发布收口。** 七步流程、分类学习库、项目恢复、总询价和一键拆分均已进入当前候选；真实 WPS 仅支持并验证 `12.1.0.29161`。正式发布仍以 [发布清单](docs/wps-phase1-release-checklist.md) 和 `handoff.md` 的最新验收边界为准，真实浮窗尚未完成的点按项不会被模拟测试替代。
 
 流程：导入与合并 → 自动分类 → 表内审核并整表确认 → 生成独立分类工作簿 → 在分类汇总表填写品牌/供应商 → 带入询价抬头生成总询价工作簿 → 一键拆分为“类别_供应商名称.xlsx”。
 
@@ -10,14 +10,16 @@
 
 ## 项目入口
 
-- [handoff.md](handoff.md)：核心设计、实际进度、下一步，每次接续任务先读。
+- [handoff.md](handoff.md)：当前进度、已批准效果图、验证证据和下一步，每次接续任务先读。
 - [AGENTS.md](AGENTS.md)：项目续作与GitHub备份规则。
+- [用户说明](docs/wps-user-guide.md)：七步操作、分类学习库、失败恢复和本版限制。
+- [安装与升级说明](docs/wps-install-guide.md)：安装、升级、回退、卸载及支持范围。
 - [详细设计初稿](docs/wps-addin-phase1-design-v2.md)：完整业务流程和待定交互。
 - [接入实施计划](docs/wps-foundation-plan.md)：首个开发阶段的任务与验证进度。
 - [运行说明与验证记录](docs/wps-foundation-verification.md)：开发版启动、已验证范围、原件保护及当前限制。
 - [清单识别验证](docs/wps-parser-verification.md)：7587条候选、专业依据、特征续行及侧栏检查。
-- [精确合并核心验证](docs/wps-exact-merge-verification.md)：可选合并计算及来源、数量保护；合并界面与另存尚未接入。
-- [分类核对示意图](docs/mockups/classification-review.png)、[一键拆分示意图](docs/mockups/split-inquiry-files.png)：设计效果，非运行截图。
+- [已批准效果图](docs/mockups/approved-20261018-wps-ui-v2/README.md)：图01–03及最新补充图，实施后须用真实截图逐项验收。
+- [分类学习库实施与验收](docs/wps-category-library-implementation-20261020.md)：分类维护、归档限制、人工合并、分页与拆分后学习。
 
 ## 备份约定
 
