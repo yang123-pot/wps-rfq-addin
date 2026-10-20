@@ -77,6 +77,15 @@ function createServer({root, importDirectory = null, projectDirectory = null, li
   const libraries = createLibraryStore({directory: libraryDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'library')});
   const headers = createHeaderStore({directory: headerDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'headers')});
   const splits = createSplitStore({directory: splitDirectory || path.join(process.env.LOCALAPPDATA || os.homedir(), 'WpsRfqAddin', 'splits')});
+  // Eligibility recheck and the library commit share a boundary with project/receipt writes.
+  // Expensive file checks stay outside it so a newer confirmation can invalidate the request.
+  let stateWrites = Promise.resolve();
+  function changeState(action) {
+    const run=stateWrites.catch(()=>{}).then(action);stateWrites=run.catch(()=>{});return run;
+  }
+  function learningConflict(message) {
+    const error=Error(message);error.code='REVISION_CONFLICT';return error;
+  }
   let importing = false;
   const server = http.createServer(async (req, res) => {
     const origin = 'http://127.0.0.1:' + server.address().port;
@@ -128,7 +137,7 @@ function createServer({root, importDirectory = null, projectDirectory = null, li
         if(size>67108864)return json(413,{error:'项目记录过大，未保存。'});
         let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'项目请求无效。'});}
         if(!data||Array.isArray(data))return json(400,{error:'项目请求无效。'});
-        if(url.pathname==='/api/project/save')return json(200,await projects.save(data.project,{expectedRevision:data.expectedRevision}));
+        if(url.pathname==='/api/project/save')return json(200,await changeState(()=>projects.save(data.project,{expectedRevision:data.expectedRevision})));
         if(url.pathname==='/api/project/load')return json(200,{project:await projects.load(data.projectId)});
         if(url.pathname==='/api/project/restore-copy'){
           if(!importDirectory)return json(404,{error:'当前服务未启用工作副本，请启动最新开发服务。'});
@@ -151,10 +160,10 @@ function createServer({root, importDirectory = null, projectDirectory = null, li
         if(size>33554432)return json(413,{error:'拆分请求过大，未保存。'});
         let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'拆分请求无效。'});}
         if(!data||Array.isArray(data))return json(400,{error:'拆分请求无效。'});
-        if(url.pathname==='/api/split/prepare')return json(200,await splits.prepare(data));
+        if(url.pathname==='/api/split/prepare')return json(200,await changeState(()=>splits.prepare(data)));
         if(url.pathname==='/api/split/copy-complete')return json(200,await splits.copyComplete(data));
         if(url.pathname==='/api/split/load')return json(200,{receipt:await splits.load(data.projectId,data.batchId)});
-        return json(200,await splits.save(data.receipt,{expectedRevision:data.expectedRevision}));
+        return json(200,await changeState(()=>splits.save(data.receipt,{expectedRevision:data.expectedRevision})));
       } catch(error) {
         if(error.code==='REVISION_CONFLICT')return json(409,{error:error.message});
         return json(400,{error:error.message});
@@ -177,13 +186,22 @@ function createServer({root, importDirectory = null, projectDirectory = null, li
         if(url.pathname==='/api/library/load')return json(200,await libraries.load());
         if(['/api/library/learn-project','/api/library/skip-project'].includes(url.pathname)){
           const project=await projects.load(data.projectId);
-          if(!project?.review||project.review.inputKey!==data.reviewInputKey||project.review.revision!==data.reviewRevision)throw Error('项目确认版本已变化，请重新打开项目。');
+          if(!Number.isSafeInteger(data.expectedProjectRevision)||data.expectedProjectRevision<1)throw Error('学习决定缺少项目版本，请重新打开项目。');
+          if(project?.revision!==data.expectedProjectRevision)throw learningConflict('项目版本已变化，学习库未改动；请重新打开项目核对已保存的学习决定。');
+          if(!project?.review||project.review.inputKey!==data.reviewInputKey||project.review.revision!==data.reviewRevision||project.review.confirmedAt!==data.reviewConfirmedAt)throw Error('项目确认版本已变化，请重新打开项目。');
+          const confirmationKey=deferredLearning.key(project.review);
           const receipt=project.split,actual=receipt?await splits.load(project.projectId,receipt.batchId):null;
           if(!deferredLearning.verified(receipt)||!deferredLearning.verified(actual)||actual.inputKey!==receipt.inputKey||
             project.generation?.inputKey!==receipt.inputKey||project.generation?.sha256!==actual.generationSha256||
             JSON.stringify(receipt.files)!==JSON.stringify(actual.files)||project.stages?.split?.state!=='ready')throw Error('必须在本次拆分全部完成并核验后才能学习。');
           if(url.pathname.endsWith('learn-project'))for(const file of actual.files){const observed=await exports.inspect(file.target,file.sha256);if(!observed.exists||observed.sha256!==file.sha256)throw Error('拆分文件已变化，请先核对成果。');}
-          return json(200,await libraries[url.pathname.endsWith('skip-project')?'skipProject':'learnProject'](data,project.review,project.projectId,project.name));
+          return json(200,await changeState(async()=>{
+            const current=await projects.load(project.projectId),latest=await splits.load(project.projectId,receipt.batchId);
+            if(current?.revision!==project.revision||deferredLearning.key(current?.review)!==confirmationKey||
+              current?.stages?.split?.state!=='ready'||JSON.stringify(current?.split)!==JSON.stringify(receipt)||JSON.stringify(latest)!==JSON.stringify(actual))
+              throw learningConflict('核验期间项目或拆分回执已变化，学习库未改动；请重新打开项目核对。');
+            return libraries[url.pathname.endsWith('skip-project')?'skipProject':'learnProject'](data,current.review,current.projectId,current.name);
+          }));
         }
         if(url.pathname==='/api/library/window/summary')return json(200,await libraries.summary());
         if(url.pathname==='/api/library/window/page')return json(200,await libraries.page(data));

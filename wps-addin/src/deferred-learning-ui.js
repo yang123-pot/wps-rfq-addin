@@ -17,9 +17,9 @@
   }
   async function decide(shouldSave){if(busy)return;var project=options.projects.current(),review=options.projects.reviewConfirmation();
    if(!project||!options.verdict().ready||!RfqDeferredLearning.pending(review,project.split,options.projects.learningDecision()))return;
-   var identity=project.projectId,key=RfqDeferredLearning.key(review);busy=true;render();status.textContent=shouldSave?'正在保存分类习惯…':'正在记录不保存…';
+   var identity=project.projectId,key=RfqDeferredLearning.key(review),projectRevision=project.revision,reviewInputKey=review.inputKey,reviewRevision=review.revision,reviewConfirmedAt=review.confirmedAt;busy=true;render();status.textContent=shouldSave?'正在保存分类习惯…':'正在记录不保存…';
    try{
-    var summary=await request('window/summary'),receipt=await request(shouldSave?'learn-project':'skip-project',{expectedRevision:summary.revision,projectId:identity,reviewInputKey:review.inputKey,reviewRevision:review.revision});
+    var summary=await request('window/summary'),receipt=await request(shouldSave?'learn-project':'skip-project',{expectedRevision:summary.revision,expectedProjectRevision:projectRevision,projectId:identity,reviewInputKey:reviewInputKey,reviewRevision:reviewRevision,reviewConfirmedAt:reviewConfirmedAt});
     if(options.projects.identity()!==identity||RfqDeferredLearning.key(options.projects.reviewConfirmation())!==key)throw Error('当前项目或确认版本已切换；原成果保留，请重开原项目核对学习决定。');
     var saved=await options.projects.commitLearning(RfqDeferredLearning.decide(review,shouldSave?'saved':'skipped',{libraryRevision:receipt?receipt.revision:null}));
     if(!saved)throw Error('分类学习决定尚未写入项目，可重试；已保存经验不会重复添加。');

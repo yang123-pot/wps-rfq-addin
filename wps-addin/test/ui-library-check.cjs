@@ -23,6 +23,16 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await page.locator('#categories tr').filter({hasText:'测试目标类'}).getByRole('button',{name:'改名',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#categories').textContent.includes('测试改名'));
   assert.equal((await store.load()).memory.memories[0].categoryName,'测试改名');
   await page.locator('#advanced summary').click();await page.locator('#rule-category').selectOption('target-b');await page.locator('#rule-keywords').fill('测试材料');await page.locator('#rule-exclude').fill('DN65');await page.locator('#rule-form button').click();await page.waitForTimeout(100);actual=await store.load();assert.equal(actual.library.rules.at(-1).exclude[0].any[0],'DN65');
+  // Reading another page at a newer revision must not make a stale rule safe to overwrite.
+  await page.waitForFunction(()=>document.querySelector('#rules').textContent.includes('测试材料'));
+  const concurrent=await store.load(),rule=concurrent.library.rules.at(-1);
+  rule.exclude[0].any.push('消防');await store.save({...concurrent,expectedRevision:concurrent.revision});
+  await page.locator('#category-search').fill('测试改名');await page.waitForFunction(()=>document.querySelectorAll('#categories tr').length===1);
+  const toggled=page.waitForResponse(r=>r.url().endsWith('/api/library/window/mutate'));
+  await page.locator('#rules li').filter({hasText:'测试材料'}).getByRole('button',{name:'停用',exact:true}).click();
+  assert.equal((await toggled).status(),409,'old rendered rule must use its own revision');
+  actual=await store.load();assert.deepEqual(actual.library.rules.at(-1).exclude[0].any,['DN65','消防']);assert.equal(actual.library.rules.at(-1).state,'active');
+  await page.waitForFunction(()=>document.querySelector('#feedback').textContent.includes('版本冲突'));
   await page.getByRole('tab',{name:'学习经验',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('#memories li').length===1);await page.getByRole('button',{name:'撤销经验',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#memories').textContent.includes('没有学习经验'));
   actual=await store.load();assert.equal(actual.memory.memories[0].state,'revoked');assert.equal(actual.memory.memories[0].sources.length,1);await page.locator('#memory-state').selectOption('revoked');await page.waitForFunction(()=>document.querySelector('#memories').textContent.includes('测试材料'));
   assert.deepEqual(errors,[]);console.log('PASS library maintenance: conflict drafts, protected decision, archive guard, manual merge preview, aliases, rename, exclusion rule, revoke preserves sources');

@@ -77,7 +77,14 @@
  function learnSnapshot(state,review,projectId,projectName){
   if(!review||!review.confirmedAt||!review.inputKey||!Number.isSafeInteger(review.revision)||!Array.isArray(review.rows)||!review.rows.length)throw Error('需要完整的整表确认快照。');
   var token=JSON.stringify([projectId,review.inputKey,review.revision,review.confirmedAt]);if((state.memory.learnedConfirmations||[]).indexOf(token)>=0)return state;
-  var s=clone(state),index=new Map(),at=new Date().toISOString();
+  var s=clone(state),index=new Map(),at=new Date().toISOString(),released=[];
+  // A complete newer snapshot replaces this project's contributions, including removed rows.
+  // Other projects and records without proven ownership remain independent evidence.
+  s.memory.memories.forEach(function(m){if(m.state!=='active'||(m.scope||'global')!=='global'||!Array.isArray(m.sources))return;
+   var before=m.sources.length;m.sources=m.sources.filter(function(r){if(r.sourceProjectId!==projectId)return true;released.push(Object.assign({memoryId:m.id,categoryId:m.categoryId},r));return false;});
+   if(before&&!m.sources.length){m.state='revoked';m.revokedAt=at;}
+  });
+  if(released.length)s.memory.history.push({at:at,action:'replace-confirmed-project',sourceProjectId:projectId,reviewRevision:review.revision,releasedSources:released});
   s.memory.memories.forEach(function(m){if(m.state==='active'&&(m.scope||'global')==='global')index.set(JSON.stringify([mem.signature(m.item),m.categoryId]),m);});
   review.rows.forEach(function(row){var c=category(s,row.categoryId);while(c.mergedInto)c=category(s,c.mergedInto);if(!active(c)&&c.id!==lib.DECISION)throw Error('确认快照中的分类已归档，请先在学习库合并分类。');
    if(!row.rowId||!row.name)throw Error('确认材料缺少名称或行标识。');var item={name:String(row.name).trim(),feature:String(row.feature||'').trim(),unit:String(row.unit||'').trim()},k=JSON.stringify([mem.signature(item),c.id]),record=index.get(k);
