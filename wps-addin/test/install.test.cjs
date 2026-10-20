@@ -165,6 +165,10 @@ test('install only adds this plugin and never touches other plugin nodes',async 
  const files=(await fs.readdir(path.join(appDir,'dev'))).join(',');
  assert.equal(/host-probe|pane-diagnostics|acceptance-probe/.test(files),false,'发布文件不得带探针或诊断脚本');
  assert.equal(require('node:fs').existsSync(path.join(appDir,'dev','server.cjs')),true,'本机服务必须随发布文件一起复制');
+ assert.equal(await fs.readFile(path.join(appDir,'library.html'),'utf8'),await fs.readFile(path.join(addin,'library.html'),'utf8'),
+  '独立分类学习库页面必须随发布文件复制');
+ assert.equal(await fs.readFile(path.join(appDir,'library.css'),'utf8'),await fs.readFile(path.join(addin,'library.css'),'utf8'),
+  '独立分类学习库样式必须随发布文件复制');
  assert.equal(require('node:fs').existsSync(dataRoot),true,'用户数据目录必须存在');
 });
 test('install is repeatable and stays at exactly one node for this plugin',async t=>{

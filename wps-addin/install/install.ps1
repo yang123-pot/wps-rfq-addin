@@ -21,7 +21,8 @@ $ErrorActionPreference = 'Stop'
 $pluginGuid = 'WpsRfqAddin'
 $pluginUrl = "http://127.0.0.1:$Port/"
 $excluded = @('host-probe.js','pane-diagnostics.js','acceptance-probe.js')
-$release = @('main.js','ribbon.xml','taskpane.html','styles.css','package.json','rules','src','dev','assets')
+$release = @('main.js','ribbon.xml','taskpane.html','styles.css','library.html','library.css',
+  'package.json','rules','src','dev','assets')
 $dataSubdirs = @('imports','library','projects','headers','splits')
 $nodeExe = (Get-Command node -ErrorAction Stop).Source
 

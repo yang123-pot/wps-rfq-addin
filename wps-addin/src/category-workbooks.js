@@ -283,6 +283,24 @@ function writeAll(app,planValue,stagePath,options){
   return directory&&name?String(directory)+'\\'+String(name):String(name||'');
  }
  function bookName(book){return String(property(book,'Name')||tailName(bookFullName(book))||'');}
+ function sameNameElsewhere(app,filePath){
+  var expected=normalizePath(filePath),expectedName=tailName(filePath),conflicts=[],
+   count=Number(property(app.Workbooks,'Count'))||0;
+  for(var index=1;index<=count;index++){
+   var candidate=app.Workbooks.Item(index),full=bookFullName(candidate);
+   if(bookName(candidate).toLowerCase()===expectedName&&normalizePath(full)!==expected)
+    conflicts.push(full||'（WPS未返回完整路径）');
+  }
+  return conflicts;
+ }
+ // WPS按工作簿名复用已打开对象。另一目录已打开同名文件时先停下并给出可操作提示，
+ // 不调用Open、不激活、更不关闭用户正在使用的那个工作簿。
+ function requireNoSameNameElsewhere(app,filePath){
+  var conflicts=sameNameElsewhere(app,filePath);
+  if(!conflicts.length)return;
+  throw Error('WPS中已打开另一目录的同名分类工作簿：'+conflicts.join('、')+
+   '。请先保存并关闭该同名工作簿，再从当前项目重试；插件不会借用或关闭它。');
+ }
  function findBook(app,filePath,opened){
   var expected=normalizePath(filePath),expectedName=tailName(filePath),named=[];
   var count=Number(property(app.Workbooks,'Count'))||0;
@@ -304,6 +322,7 @@ function writeAll(app,planValue,stagePath,options){
   var security=app.AutomationSecurity,error=null,book=null;
   if(typeof security!=='number')throw Error('不能读取宏安全设置，未打开分类工作簿。');
   try{
+   requireNoSameNameElsewhere(app,filePath);
    var existing=findBook(app,filePath,null);
    if(existing){existing.Activate();return {path:filePath,opened:true,reused:true};}
    app.AutomationSecurity=3;
@@ -324,6 +343,7 @@ function readSheets(app,filePath){
  if(!app||typeof app.Workbooks!=='object')throw Error('读回分类工作簿需要连接WPS。');
  var security=null,opened=null,book=null,error=null,list=[],index;
  try{
+   requireNoSameNameElsewhere(app,filePath);
    book=findBook(app,filePath,null);
   if(!book){
    security=app.AutomationSecurity;
