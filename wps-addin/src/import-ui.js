@@ -1763,10 +1763,10 @@
       var categoriesSaved=!!(categoryReceipt&&saved&&saved.categories&&saved.categories.path===categoryReceipt.path&&saved.categories.sha256===categoryReceipt.sha256&&saved.categories.inputKey===categoryReceipt.inputKey&&saved.categories.reviewRevision===categoryReceipt.reviewRevision);
       var genReady=!!(stages.inquiry.ready&&inquiryPanel&&inquiryPanel.verdict().ready),genSaved=!!(generation&&saved&&saved.generation&&saved.generation.sha256===generation.sha256);
       var splitSaved=!!(receipt&&saved&&saved.split&&JSON.stringify(saved.split.files)===JSON.stringify(receipt.files));
-      var counts=reviewModel?RfqClassificationReviewModel.summary(reviewModel):null;
       var currentDraft=projects.reviewDraft?projects.reviewDraft():null;
       var pendingReview=lastReviewRead?(lastReviewRead.ok?0:lastReviewRead.errors.length):
-        (currentDraft?currentDraft.counts.empty:(counts?counts.conflict:null));
+        (reviewModel?reviewModel.rows.filter(function(row){return !row.finalCategoryId&&!row.finalCategoryName;}).length:
+          (currentDraft?currentDraft.counts.empty:null));
       ui.set({projectName:projectDisplayName(),layout:selectedLayout(),files:collection.entries.map(function(e){return {name:e.metadata.originalName,sheets:(e.snapshot.sheets||[]).map(function(sh){return sh.name;})};}),
        rows:collection.entries.reduce(function(n,e){return n+e.parsed.materials.length;},0),mergedRows:collection.entries.length?currentPreview().outputCount:0,
        previewReviewed:previewReviewed,mergeAll:mergeAll.checked,mergeIdentical:merge.checked,mergeConfirmed:currentMatch,

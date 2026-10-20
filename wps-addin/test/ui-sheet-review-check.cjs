@@ -157,6 +157,8 @@ async function run(options={}){
   // 只比公开列与空位：L列随行rowId由真实来源路径决定，与离线夹具必然不同。
   assert.deepEqual(await page.evaluate(()=>window.__written.values.map(row=>row.slice(0,10))),
    REVIEW_VALUES.map(row=>row.slice(0,10)),'生成态成果表公开列与R4夹具一致，模拟宿主读到的就是这张表');
+  assert.equal(await page.evaluate(()=>RfqAssistant.snapshot().reviewPending),0,'冲突已预填时侧栏不得仍报1处待填写');
+  assert.match(await page.locator('#assistant-stats').innerText(),/已填写完整/);
   assert.equal(await page.locator('#classification-review-open').isDisabled(),false);
   // 图03：打开成果表审核→侧栏切到第3步，主按钮与文案与图一致。
   await page.locator('#classification-review-open').click();
