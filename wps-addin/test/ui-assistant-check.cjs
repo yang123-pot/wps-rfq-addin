@@ -59,6 +59,12 @@ const assert=require('node:assert/strict');const path=require('node:path');const
   await page.evaluate(()=>{RfqFeedback.arm();RfqFeedback.notify({stage:'review',message:'空分类',issues:[{sheet:'分类审核成果',row:7,column:8,message:'最终分类为空'}]});RfqFeedback.notify({stage:'review',message:'空分类',issues:[{sheet:'分类审核成果',row:8,column:8,message:'最终分类为空'}]});});
   assert.equal(await page.getByRole('alertdialog').count(),1,'多问题只有一个弹窗');await page.keyboard.press('Escape');assert.equal(await page.getByRole('alertdialog').count(),0);
   assert.equal(await page.locator('#assistant-problem').isVisible(),true,'关闭弹窗后问题摘要仍可见');
+  await page.evaluate(()=>RfqFeedback.notify({stage:'brands',force:true,message:'分类汇总表未打开：WPS中已打开另一目录的同名分类工作簿：F:\\同名簿B\\示例园区_分类工作簿.xlsx。请先保存并关闭该同名工作簿，再从当前项目重试；插件不会借用或关闭它。'}));
+  const sameNameDialog=page.getByRole('alertdialog');
+  assert.match(await sameNameDialog.locator('#assistant-error-description').innerText(),/处理方法：.*保存.*关闭.*重试/);
+  assert.doesNotMatch(await sameNameDialog.innerText(),/请选择新的输出文件夹|另存新文件名/,
+   '真实同名打开冲突不能被通用输出重名建议误导');
+  await sameNameDialog.getByRole('button',{name:'返回上一步',exact:true}).click();
   await page.evaluate(()=>{RfqFeedback.arm();RfqFeedback.notify({stage:'review',message:'空分类',issues:[{sheet:'分类审核成果',row:7,column:8,message:'最终分类为空'}],resolve:()=>{}});RfqFeedback.tell('整表未通过校验',true,'review');});
   assert.match(await page.getByRole('alertdialog').innerText(),/H7/,'通用错误文字不能抹掉具体位置和去修改入口');
   await page.keyboard.press('Escape');

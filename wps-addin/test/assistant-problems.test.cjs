@@ -21,3 +21,11 @@ test('未知故障不猜原因；问题去重但保留不同位置',()=>{
  assert.equal(typeof api.describe,'function');assert.match(api.describe({message:'opaque-code-32'}).solution,/详情/);
  assert.equal(api.unique([{message:'空分类',row:7,column:8},{message:'空分类',row:7,column:8},{message:'空分类',row:8,column:8}]).length,2);
 });
+test('已打开其他目录同名工作簿时提示保存关闭，而不是另存或更换输出位置',()=>{
+ const p=api.describe({stage:'brands',message:'分类汇总表未打开：WPS中已打开另一目录的同名分类工作簿：F:\\同名簿B\\示例园区_分类工作簿.xlsx。请先保存并关闭该同名工作簿，再从当前项目重试；插件不会借用或关闭它。'});
+ assert.match(p.title,/已打开/);
+ assert.match(p.solution,/保存.*关闭.*重试/);
+ assert.doesNotMatch(p.solution,/请选择新的输出|另存新文件名/);
+ assert.notEqual(p.actionLabel,'更换保存位置');
+ assert.match(p.message,/F:\\同名簿B\\示例园区_分类工作簿.xlsx/,'保留实际冲突簿的位置');
+});

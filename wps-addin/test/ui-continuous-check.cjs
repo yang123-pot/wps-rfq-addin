@@ -141,6 +141,19 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   assert.deepEqual(await page.evaluate(()=>({book:Application.ActiveWorkbook.FullName,sheet:window.__activeSheet,cell:window.__selectedCell})),
    {book:saved.summary.path,sheet:{file:saved.summary.path,name:'分类汇总表'},cell:{file:saved.summary.path,sheet:'分类汇总表',row:4,column:4}},'每次进入都激活正确工作簿、汇总页和首组品牌格');
   assert.match(await page.locator('#simple-result').innerText(),/已切换到分类汇总表/);
+  // 原生复现：同名副本关闭后，手动打开正确原件仍保留在“无需询价”末页。
+  // 使用真实openSummary，验证详细入口显式切回汇总页/首组品牌格并归位滚动。
+  await page.evaluate(file=>{
+   Application.Workbooks.Open(file).Activate();
+   window.__activeSheet={file,name:'无需询价'};window.__selectedCell={file,sheet:'无需询价',row:2,column:1};
+   Application.ActiveWindow={ScrollRow:400,ScrollColumn:3};
+  },saved.summary.path);
+  await showDetail();await page.locator('#brands-open').click();
+  assert.deepEqual(await page.evaluate(()=>({sheet:window.__activeSheet,cell:window.__selectedCell,
+   scroll:[Application.ActiveWindow.ScrollRow,Application.ActiveWindow.ScrollColumn]})),
+   {sheet:{file:saved.summary.path,name:'分类汇总表'},cell:{file:saved.summary.path,sheet:'分类汇总表',row:4,column:4},scroll:[1,1]},
+   '详细打开汇总表必须离开末页并定位首组品牌格，不能只激活工作簿');
+  await showSimple();
   await page.evaluate(({file,values})=>window.__seedSummary(file,values),{file:saved.summary.path,values:fixture.fillSummaryGrid(summary,fixture.SUMMARY_FILLS)});
   await shot('05-brands');await action('下一步：生成询价表');await page.waitForFunction(()=>RfqAssistant.view().step===6);
   await page.locator('#simple-back').click();

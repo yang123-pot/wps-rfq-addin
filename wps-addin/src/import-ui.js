@@ -1650,7 +1650,7 @@
     if(summaryOpenButton)summaryOpenButton.addEventListener('click',function(){
       if(!summaryReceipt){summaryTell('尚未生成分类汇总表。',true);return;}
       try{
-        RfqBrandHost.openSummary(options.application,summaryReceipt.path);
+        RfqBrandHost.openSummary(options.application,summaryReceipt.path,{sheet:summaryReceipt.sheet||'分类汇总表',layout:summaryReceipt.layout,focus:true});
         summaryTell('已打开分类汇总表：'+summaryReceipt.path);
       }catch(error){summaryTell('分类汇总表未打开：'+error.message,true);}
     });

@@ -37,7 +37,8 @@
   }else if(p.stage==='header'){
    r.title='请补全询价抬头';r.actionLabel='去填写';r.solution='请填写项目名称、单位名称、材料经办人及联系电话和联系方式，再生成询价表。';
   }
-  if(p.status===409||/其他窗口|版本冲突|已被其他/.test(message)){r.title='项目尚未保存';r.solution='当前草稿已保留。请先保留本次填写，再打开最新项目记录核对后保存，不能覆盖其他窗口的新记录。';}
+  if(/已打开另一目录的同名分类工作簿/.test(message)){r.title='另一目录的同名工作簿已打开';r.solution='请先保存并关闭提示路径中的同名工作簿，再从当前项目重试打开汇总表；现有文件和项目绑定会保留。';r.actionLabel='重试打开';}
+  else if(p.status===409||/其他窗口|版本冲突|已被其他/.test(message)){r.title='项目尚未保存';r.solution='当前草稿已保留。请先保留本次填写，再打开最新项目记录核对后保存，不能覆盖其他窗口的新记录。';}
   else if(/已存在|同名|EEXIST/.test(message)){r.title='目标位置已有同名文件';r.solution='请选择新的输出文件夹或另存新文件名；已有文件不会覆盖。';r.actionLabel='更换保存位置';}
   else if(/不可写|无权|只读|EACCES|EPERM/.test(message)){r.title='所选位置不能保存文件';r.solution='请改选有写入权限的文件夹，例如桌面上的新文件夹；若文件被占用，请关闭该文件后重试。';r.actionLabel='更换保存位置';}
   else if(/过期|已变化/.test(message)){r.title='上一步内容已变化';r.solution='请返回发生修改的步骤重新核对并生成，再继续本步。已经生成的旧文件会保留。';}
