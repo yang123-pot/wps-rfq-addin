@@ -4,13 +4,13 @@
     "name": "wps-rfq-addin-0.1.0-20261020-R1",
     "version": "0.1.0",
     "build": "20261020-R1",
-    "createdAt": "2026-10-20T13:57:42+08:00",
+    "createdAt": "2026-10-20T15:15:30+08:00",
     "branch": "feat/wps-ui-v2",
-    "commit": "8b41c034215752f138993863eb8510edca1ae290",
+    "commit": "58de1310971edb867ba9f1d3d890db2b689eac2c",
     "zipName": "wps-rfq-addin-0.1.0-20261020-R1.zip",
-    "zipBytes": 715556,
-    "zipSha256": "589cd0c848d85799b99106a101773aa64f3d63347334d5a5b79ea532fa206f73",
-    "codeVersion": "07f53709ba0b58f8654b86c3d8e1efd6da23f81762555fe4913e987227d7e7c9",
+    "zipBytes": 715884,
+    "zipSha256": "a5edcccb605cb662e70cb97e74b73c771cd2454bb842b4a5649eb507543a5c41",
+    "codeVersion": "0ce39f4b742d503adb34ee3f026cddefbb2721c7c2ba6c9d097397278fd04612",
     "testedWps": "12.1.0.29161",
     "fileCount": 100,
     "files": [
@@ -171,13 +171,13 @@
       },
       {
         "path": "docs/wps-install-guide.md",
-        "bytes": 8138,
-        "sha256": "fa559897ede297976a2e1cca1356e86befc57cd6960348334edfb7ff09aa8d99"
+        "bytes": 8139,
+        "sha256": "2b64740dddafcea0bcfe21767022b9dba9a82e2dab3c8b06b73a174b0bfa07f8"
       },
       {
         "path": "docs/wps-release-notes-0.1.0.md",
-        "bytes": 3108,
-        "sha256": "ddb5abc55179cbf077fa71a8cacf9e9493612a8590c14a8527f012764bddaf9c"
+        "bytes": 3275,
+        "sha256": "91bac1877a55d8c3082a4ca7a9ebed8340b46337ef4f18ded892b429020eec03"
       },
       {
         "path": "docs/wps-user-guide.md",
@@ -251,8 +251,8 @@
       },
       {
         "path": "src/assistant-ui.js",
-        "bytes": 7014,
-        "sha256": "5c1d82e7544dac46c7172b1ad1f22e0dd9b1dbff61345fe3a3cc1cf50a6b672b"
+        "bytes": 7282,
+        "sha256": "e950109e44a539b590e5ed377a10e00942cee94e10bef665c130c91d2a57615d"
       },
       {
         "path": "src/brand-host.js",
@@ -376,8 +376,8 @@
       },
       {
         "path": "src/import-ui.js",
-        "bytes": 136055,
-        "sha256": "4efd1fe6fdc2975886371da9df70adcad6e7f1cabcd7a93a703e1de752635be0"
+        "bytes": 136465,
+        "sha256": "ccd12ea0d0ffe0544cd3e3e9f42a42a1268304a56f5752364816f30ae05bb696"
       },
       {
         "path": "src/inquiry-header.js",
@@ -506,8 +506,8 @@
       },
       {
         "path": "styles.css",
-        "bytes": 32107,
-        "sha256": "ba73e739d371de4723aa97b4cac7fd665ace2067929138f3cc2309c8f2350c67"
+        "bytes": 32517,
+        "sha256": "ebd10ae5980a610978b3d685c1a0ebd83c5aa81880a86ddbdb81734dea5269c9"
       },
       {
         "path": "taskpane.html",
