@@ -155,7 +155,9 @@ function initScript(context){
     return {ok:true,issues:[],sheets:expected.map((item,index)=>({index:index+1,sheetName:item.sheetName,rowCount:item.rowCount}))};
    };
    window.RfqCategoryWorkbooks.openForEditing=function(app,filePath){
-    window.__categoryOpens.push(filePath);return {path:filePath,opened:true,reused:false};};
+    window.__categoryOpens.push(filePath);
+    if(window.__categoryOpenError)throw Error(window.__categoryOpenError);
+    return {path:filePath,opened:true,reused:false};};
   });
   const openProject=async()=>{
    await page.locator('#aux-section > summary').click();
@@ -216,9 +218,12 @@ function initScript(context){
    '失败的一次也只针对那一本工作簿');
   assert.equal(await page.locator('#categories-files > li button').count(),0,'列表里不得出现任何单类导出/打开入口');
   // 重试：仍只写这一本，页序/页名/页内跳转/逐页行数全部按真实模型核对。
-  await page.evaluate(()=>{window.__categoryFail=null;});
+  await page.evaluate(()=>{window.__categoryFail=null;window.__categoryOpenError='WPS中已打开另一目录的同名分类工作簿：请先保存并关闭该同名工作簿';});
   await page.locator('#categories-retry').click();
   await page.waitForFunction(()=>/分类工作簿已生成（1 本 · 4 类 · 无需询价1页）/.test(document.querySelector('#categories-banner').textContent));
+  assert.match(await page.locator('#categories-message').innerText(),/另一目录的同名分类工作簿.*先保存并关闭/,
+   '打开失败必须把同名工作簿原因完整告诉用户，不能只写“未打开”');
+  await page.evaluate(()=>{window.__categoryOpenError=null;});
   assert.deepEqual(await listXlsx(workbookDirectory),['示例园区_分类工作簿.xlsx'],'只生成一本分类工作簿');
   const writes=await page.evaluate(()=>window.__categoryWrites.map(item=>item));
   assert.equal(writes.length,2,'失败一次＋成功一次，共两次写入尝试');

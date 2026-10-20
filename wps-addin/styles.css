@@ -88,6 +88,9 @@ body.simple-task-mode #imported-books .technical-file-action,
 body.simple-task-mode #merge-detail,
 body.simple-task-mode #merge-list,
 body.simple-task-mode #merge-section .merge-pagination{display:none!important}
+body.simple-task-mode #imported-books .file-remove-action{width:auto;margin:5px 0 0;padding:2px 0;background:transparent;color:#9a542d;font-size:12px}
+.assistant-file-remove{width:auto;margin:5px 0 0;padding:2px 0;background:transparent;border:0;color:#9a542d;font-size:12px}
+.assistant-file-remove:hover:enabled{background:#fff1e8;color:#7a3e1d}
 body.detail-mode #simple-home,
 body.detail-mode #simple-settings{display:none!important}
 body:not(.detail-mode) #connection.ready,
@@ -226,7 +229,7 @@ body:not(.detail-mode) .assistant-file-tree p:before{content:"▤";color:#87919d
 body:not(.detail-mode) .assistant-text-button{color:#1768bb;font-size:13px;font-weight:400;text-decoration:none;margin:5px 0;padding:4px 0}
 body:not(.detail-mode) .assistant-muted{margin:7px 0 0;color:#7a8491;font-size:13px;line-height:1.6}
 body:not(.detail-mode) #simple-home[data-step="1"] #simple-result{background:transparent;border:0;border-radius:0;padding:0;margin:10px 0 6px;color:#253342!important;font-size:14px!important;line-height:1.55}
-body:not(.detail-mode) #simple-merge-summary{display:none!important}
+body:not(.detail-mode) #simple-merge-summary{display:block!important;margin:7px 0 2px;color:#52665b;font-size:12px;line-height:1.6}
 body:not(.detail-mode) .simple-merge-choice{margin-top:8px}
 body:not(.detail-mode) .simple-merge-choice label{padding:10px 0;font-size:14px}
 body:not(.detail-mode) .simple-merge-choice b{font-size:14px;color:#243240}

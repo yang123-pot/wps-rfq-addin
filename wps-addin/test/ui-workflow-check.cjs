@@ -105,6 +105,14 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.equal(await page.locator('#simple-merge-choice').isHidden(),true,'预览完成前不显示合并选项');
   assert.match(await page.locator('#simple-title').innerText(),/先看一下清单/);
   assert.equal(await page.locator('#simple-primary').innerText(),'我已看完预览');
+  assert.equal(await page.getByRole('button',{name:'移除此文件'}).first().isVisible(),true,
+   '简版预览仍需提供误选文件移除入口');
+  await page.evaluate(()=>{window.__filesBackup=window.__files.slice();window.__removedFile=window.__files[0];window.__files=[window.__removedFile];});
+  await page.getByRole('button',{name:'移除此文件'}).first().click();
+  await page.waitForFunction(()=>RfqAssistant.snapshot().files.length===1);
+  await page.locator('#assistant-change-files').click();
+  await page.waitForFunction(()=>RfqAssistant.snapshot().files.length===2);
+  await page.evaluate(()=>{window.__files=window.__filesBackup;delete window.__filesBackup;delete window.__removedFile;});
   if(process.env.RFQ_PREVIEW_GATE_SCREENSHOT)await page.screenshot({path:process.env.RFQ_PREVIEW_GATE_SCREENSHOT,fullPage:true});
   await page.locator('#simple-primary').click();
   await page.waitForFunction(()=>document.querySelector('#merge-section').hidden===false);
@@ -129,6 +137,8 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   assert.equal(await page.locator('#simple-duplicate-merge').isChecked(),false,'默认逐条保留');
   await page.locator('#simple-duplicate-merge').check();
   await page.waitForFunction(()=>document.querySelector('#workflow-merged').textContent==='8');
+  assert.equal(await page.locator('#simple-merge-summary').isVisible(),true,'简版必须显示10→8整理结果');
+  assert.match(await page.locator('#simple-merge-summary').innerText(),/10.*8/);
   assert.equal(await page.locator('#merge-identical').isChecked(),true,'简版选择必须同步到实际处理方式');
   assert.equal(await page.locator('#merge-all-workbooks').isChecked(),true,'勾选合并同时统一全部来源');
   await page.locator('#simple-duplicate-merge').uncheck();

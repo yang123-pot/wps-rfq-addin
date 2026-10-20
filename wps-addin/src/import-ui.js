@@ -275,6 +275,15 @@
         details.appendChild(list);if(group.sources.length>20)details.appendChild(controls);draw();
       });return details;
     }
+    function removeEntry(id){
+      var entry=collection.entries.filter(function(item){return item.id===id;})[0];
+      if(!entry)return false;
+      if(entry.dirty&&!window.confirm('此文件有未保存核对，移除会丢失这些修改，是否继续？'))return false;
+      collection=RfqCollection.remove(collection,id);previewReviewed=false;
+      if(selected===id){selected=null;options.onRemove(id);if(collection.entries.length)activate(collection.entries[0].id);}
+      render();tell('已从本次列表移除，原件和已保存核对记录保留。');
+      return true;
+    }
     function render(){
       var list=document.getElementById('imported-books');list.textContent='';
       collection.entries.forEach(function(e){
@@ -282,12 +291,7 @@
         li.appendChild(node('strong',e.metadata.originalName));li.appendChild(node('p',e.metadata.originalPath,'source'));
         li.appendChild(node('p',e.snapshot.sheets.length+' 张表 · '+e.parsed.materials.length+' 项 · '+e.parsed.issues.length+' 个问题'+(e.dirty?' · 核对未保存':''),'note file-detail'));
         li.appendChild(button('核对此文件',function(){activate(e.id);},'technical-file-action'));
-        li.appendChild(button('移除此文件',function(){
-          if(e.dirty&&!window.confirm('此文件有未保存核对，移除会丢失这些修改，是否继续？'))return;
-          collection=RfqCollection.remove(collection,e.id);previewReviewed=false;
-          if(selected===e.id){selected=null;options.onRemove(e.id);if(collection.entries.length)activate(collection.entries[0].id);}
-          render();tell('已从本次列表移除，原件和已保存核对记录保留。');
-        }));list.appendChild(li);
+        li.appendChild(button('移除此文件',function(){removeEntry(e.id);},'file-remove-action'));list.appendChild(li);
       });
       document.getElementById('merge-section').hidden=!collection.entries.length||!previewReviewed;
       if(previewGate)previewGate.hidden=!collection.entries.length||previewReviewed;
@@ -1084,8 +1088,8 @@
     }
     // 整本分类工作簿只打开一次；打开失败不改成果、不重新发布，只提示已生成未打开。
     function openCategoryWorkbook(receipt){
-      try{RfqCategoryWorkbooks.openForEditing(options.application,receipt.path);return true;}
-      catch(error){return false;}
+      try{RfqCategoryWorkbooks.openForEditing(options.application,receipt.path);return {ok:true,error:null};}
+      catch(error){return {ok:false,error:error};}
     }
     // 分类工作簿阶段只认“本次整表确认”的结果：成果表换新、确认版本变化都要重新生成（不覆盖旧批次）。
     function categoryVerdict(){
@@ -1318,8 +1322,10 @@
             categoryReceipt=receipt;
             if(!await persistCategories('分类工作簿已核对通过（1 本 · '+plan.files.length+' 页），本次不重复写入。')){
               renderCategories();render();return {ok:false,pendingSave:true,receipt:receipt};}
-            if(!openCategoryWorkbook(receipt))
-              categoryTell('分类工作簿已核对通过（1 本 · '+plan.files.length+' 页），但本次未打开：'+receipt.path,true);
+            var reopen=openCategoryWorkbook(receipt);
+            if(!reopen.ok)
+              categoryTell('分类工作簿已核对通过（1 本 · '+plan.files.length+' 页），但本次未打开：'+
+                reopen.error.message+'。文件路径：'+receipt.path,true);
             renderCategories();render();
             return {ok:true,receipt:receipt,plan:plan,skipped:true,recovered:!trusted};
           }
@@ -1367,7 +1373,8 @@
         // 4) 全部核实后才显示完成，并只打开这一本工作簿一次。
         var report=RfqCategoryWorkbooks.summarize(receipt),opened=openCategoryWorkbook(receipt);
         categoryTell('已生成并校验分类工作簿（1 本 · '+report.categories+' 页，'+report.detail+'）：'+receipt.path+
-          '。第 1 页是分类汇总表，其后每类一页（页名＝类别名）。'+(opened?'已打开。':'已生成、未打开；可稍后手动打开，不需要重新生成。'),!opened);
+          '。第 1 页是分类汇总表，其后每类一页（页名＝类别名）。'+(opened.ok?'已打开。':
+          '已生成、未打开：'+opened.error.message+'。可稍后手动打开，不需要重新生成。'),!opened.ok);
         renderCategories();render();
         return {ok:true,receipt:receipt,plan:plan};
       }catch(error){
@@ -1767,7 +1774,7 @@
       var pendingReview=lastReviewRead?(lastReviewRead.ok?0:lastReviewRead.errors.length):
         (reviewModel?reviewModel.rows.filter(function(row){return !row.finalCategoryId&&!row.finalCategoryName;}).length:
           (currentDraft?currentDraft.counts.empty:null));
-      ui.set({projectName:projectDisplayName(),layout:selectedLayout(),files:collection.entries.map(function(e){return {name:e.metadata.originalName,sheets:(e.snapshot.sheets||[]).map(function(sh){return sh.name;})};}),
+      ui.set({projectName:projectDisplayName(),layout:selectedLayout(),files:collection.entries.map(function(e){return {id:e.id,name:e.metadata.originalName,sheets:(e.snapshot.sheets||[]).map(function(sh){return sh.name;}),remove:function(){return removeEntry(e.id);}};}),
        rows:collection.entries.reduce(function(n,e){return n+e.parsed.materials.length;},0),mergedRows:collection.entries.length?currentPreview().outputCount:0,
        previewReviewed:previewReviewed,mergeAll:mergeAll.checked,mergeIdentical:merge.checked,mergeConfirmed:currentMatch,
        reviewGenerated:freshReview,reviewOpened:!!(freshReview&&reviewOpenedPath===reviewBinding.path),reviewPending:pendingReview,

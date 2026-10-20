@@ -16,7 +16,8 @@
    var num=document.createElement('span');num.className='n';num.textContent=String(index+1);
    var name=document.createElement('span');name.className='label';name.textContent=label;item.appendChild(num);item.appendChild(name);nav.appendChild(item);});
   var tree=by('assistant-files');tree.hidden=v.step!==1||!s.files.length||v.importPhase==='options';tree.textContent='';
-  if(!tree.hidden)s.files.forEach(function(file){var li=document.createElement('li'),name=document.createElement('strong');name.textContent=file.name;li.appendChild(name);(file.sheets||[]).forEach(function(sheet){var p=document.createElement('p');p.textContent=sheet;li.appendChild(p);});tree.appendChild(li);});
+  if(!tree.hidden)s.files.forEach(function(file){var li=document.createElement('li'),name=document.createElement('strong');name.textContent=file.name;li.appendChild(name);(file.sheets||[]).forEach(function(sheet){var p=document.createElement('p');p.textContent=sheet;li.appendChild(p);});
+   if(typeof file.remove==='function'){var remove=document.createElement('button');remove.type='button';remove.className='assistant-file-remove file-remove-action';remove.textContent='移除此文件';remove.onclick=function(){file.remove();};li.appendChild(remove);}tree.appendChild(li);});
   text('simple-result',v.busy?(s.busyLabel||'正在处理，请稍候…'):s.statusMessage||((v.step===1&&s.files.length&&!s.previewReviewed)?'已导入 '+s.files.length+' 本工作簿，共 '+s.rows+' 条材料。':''));
   by('simple-result').hidden=!by('simple-result').textContent;
   var fileNote=by('assistant-file-note');if(fileNote){var note=v.step===1&&s.files.length&&!s.previewReviewed?'原始文件不会修改。':v.step===5?'可再填写第三组品牌和供应商。':'';fileNote.textContent=note;fileNote.hidden=!note;}
