@@ -1,6 +1,45 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
 const {createServer}=require('../dev/server.cjs');
 const xlsxFixture=require('./fixtures/xlsx-container.cjs');
+const http=require('node:http'),crypto=require('node:crypto');
+
+for(const heldAction of ['inspect','prepare'])test('read-only inspection remains available while '+heldAction+' request body is arriving',async t=>{
+ const folder=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-concurrent-inspect-'));
+ const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(folder,'copies')});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ t.after(async()=>{await new Promise(resolve=>server.close(resolve));await fs.rm(folder,{recursive:true,force:true});});
+ const origin='http://127.0.0.1:'+server.address().port;
+ const html=await(await fetch(origin+'/taskpane.html')).text();
+ const token=JSON.parse(html.match(/window\.__RFQ_IMPORT__=(\{[^;]+\});/)[1]).token;
+ const headers={'content-type':'application/json','x-rfq-import-token':token};
+ const target=path.join(folder,'source.xlsx'),bytes=Buffer.from('unchanged source workbook');
+ await fs.writeFile(target,bytes);
+ const firstBody=JSON.stringify({target:heldAction==='inspect'?target:path.join(folder,'new-output.xlsx')});
+ const requestStarted=new Promise(resolve=>server.once('request',resolve));
+ let firstRequest;
+ const firstResponse=new Promise((resolve,reject)=>{
+  firstRequest=http.request(origin+'/api/export/'+heldAction,{method:'POST',headers},response=>{
+   let body='';response.on('data',chunk=>body+=chunk);response.on('end',()=>resolve({status:response.statusCode,body}));
+  });firstRequest.on('error',reject);
+ });
+ firstRequest.write(firstBody.slice(0,1));
+ await requestStarted;
+ try{
+  const inspection=await fetch(origin+'/api/export/inspect',{method:'POST',headers,body:JSON.stringify({target})});
+  assert.equal(inspection.status,200,'预览和恢复并发核验不能因共享写入锁返回409');
+  const actual=await inspection.json();
+  assert.equal(actual.exists,true);
+  assert.equal(actual.sha256,crypto.createHash('sha256').update(bytes).digest('hex'));
+  assert.equal((await fetch(origin+'/api/export/inspect',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({target})})).status,403,
+   '只读并发不能绕过本地会话验证');
+  if(heldAction==='prepare'){
+   const secondWrite=await fetch(origin+'/api/export/prepare',{method:'POST',headers,body:JSON.stringify({target:path.join(folder,'blocked.xlsx')})});
+   assert.equal(secondWrite.status,409,'另一项写入仍须受互斥保护');
+  }
+ }finally{firstRequest.end(firstBody.slice(1));await firstResponse;}
+ assert.equal((await firstResponse).status,200);
+ assert.deepEqual(await fs.readFile(target),bytes);
+});
 
 test('file freeze endpoint uses local auth and the registered ticket plan, never a supplied path',async t=>{
  const folder=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-freeze-api-')),server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(folder,'stages')});

@@ -105,8 +105,10 @@ function createServer({root, importDirectory = null, projectDirectory = null, li
       if (req.method !== 'POST') return json(405,{error:'POST required'});
       if (req.headers['x-rfq-import-token'] !== importToken ||
           !/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) return json(403,{error:'导入会话失效，请重新打开侧栏。'});
-      if (importing) return json(409,{error:'已有文件正在准备，请稍后重试。'});
-      importing = true;
+      // 预览与项目恢复会并发核验不同文件；只读inspect不占用或释放写入锁。
+      const changingFiles = url.pathname !== '/api/export/inspect';
+      if (changingFiles && importing) return json(409,{error:'已有文件正在准备，请稍后重试。'});
+      if (changingFiles) importing = true;
       try {
         let size=0; const chunks=[];
         for await (const chunk of req) { size+=chunk.length; if(size<=65536)chunks.push(chunk); }
@@ -124,7 +126,7 @@ function createServer({root, importDirectory = null, projectDirectory = null, li
         const files=await prepareFiles(data.paths,{directory:importDirectory,existing:data.existing});
         return json(200,{files});
       } catch(error) {return json(400,{error:error.message});}
-      finally {importing=false;}
+      finally {if (changingFiles) importing=false;}
     }
     if (['/api/project/save','/api/project/load','/api/project/list','/api/project/restore-copy'].includes(url.pathname)) {
       const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');

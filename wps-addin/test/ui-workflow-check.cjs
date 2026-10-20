@@ -99,6 +99,23 @@ const LABELS=['导入与合并','自动分类','表内审核','分类工作簿',
   await fs.writeFile(previewCopy,await fs.readFile(files[0]));
   await page.evaluate(()=>document.getElementById('merge-detail').click());
   await page.waitForFunction(()=>RfqAssistant.snapshot().previewAvailable===true);
+  for(const failure of [
+   {status:403,error:'导入会话失效，请重新打开侧栏。'},
+   {status:409,error:'已有文件正在准备，请稍后重试。'},
+   {status:400,error:'文件暂不可读，请稍后重试。'}
+  ]){
+   const beforeFailure=await page.evaluate(()=>window.__previews.length);
+   const rejectInspection=route=>route.fulfill({status:failure.status,contentType:'application/json',body:JSON.stringify({error:failure.error})});
+   await page.route('**/api/export/inspect',rejectInspection);
+   await page.evaluate(()=>document.getElementById('merge-detail').click());
+   await page.waitForFunction(expected=>document.getElementById('import-preview-status').textContent.includes(expected),failure.error,{timeout:3000});
+   assert.doesNotMatch(await page.locator('#import-preview-status').textContent(),/副本已变化|重新导入/,
+    '会话/忙碌/读取失败不能误报为来源内容变化并要求重导入');
+   assert.equal(await page.evaluate(()=>window.__previews.length),beforeFailure,'核验失败时不能进入WPS写预览');
+   await page.unroute('**/api/export/inspect',rejectInspection);
+   await page.evaluate(()=>document.getElementById('merge-detail').click());
+   await page.waitForFunction(()=>RfqAssistant.snapshot().previewAvailable===true);
+  }
   await showSimple();
   assert.equal(await page.locator('#simple-home').isVisible(),true);
   assert.equal(await page.locator('#stage-panel-import').isHidden(),true,'预览阶段不展开技术面板');

@@ -419,7 +419,8 @@
             'x-rfq-import-token':window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token},body:JSON.stringify({target:source.copyPath})});
           var inspected=await response.json();
           if(revision!==importPreviewRevision)return;
-          if(!response.ok||!inspected.exists||String(inspected.sha256||'').toLowerCase()!==source.fingerprint.toLowerCase())
+          if(!response.ok)throw Error(inspected.error||'来源工作副本核验请求失败，请稍后重试。');
+          if(!inspected.exists||String(inspected.sha256||'').toLowerCase()!==source.fingerprint.toLowerCase())
             throw Error('来源工作副本已变化或不可读取，未复制旧统计对应的原表。请重新导入该清单。');
         }
         if(revision!==importPreviewRevision)return;
