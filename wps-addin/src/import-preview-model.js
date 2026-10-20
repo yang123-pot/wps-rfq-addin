@@ -49,7 +49,9 @@
    mode:preview.mode,previewOnly:opts.previewOnly===true,sheets:[
     {name:'导入预览',values:layout.equalize(values,7),layout:layout.build({
      columns:[9,30,30,30,32,12,20].map(function(width){return {width:width};}),
-     rows:values.map(function(_,index){return {index:index+1,height:index===0?32:34};}),
+     // TRIAL-002：统计行不再写死 34 磅。专业/区段可能包含多个标题，交给宿主按换行内容
+     // AutoFit；标题仍保持 32 磅，避免长项目名把首行撑得过高。
+     rows:[{index:1,height:32}],
      headerRows:[3],merges:merges,fills:[layout.headerFill(3,7)],freeze:{row:4,column:1},
      print:{area:{row:1,column:1,rowSpan:values.length,columnSpan:7},repeatRow:3}})}]};
  }

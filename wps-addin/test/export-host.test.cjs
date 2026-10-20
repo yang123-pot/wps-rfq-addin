@@ -53,6 +53,14 @@ test('source audit fields stay single line and source rows shrink after writing'
  assert.equal(source.Range('A1:E2').Rows.autoFitCount,1);
  assert.equal(source.Range('A1:E2').WrapText,true,'普通材料字段仍换行');
 });
+test('导入预览统计页让专业/区段长文字按内容AutoFit，标题行仍保持版式高度',()=>{
+ const h=fixture();
+ const preview={sheets:[{name:'导入预览',values:[['示例园区 · 导入预览','',''],['长标题'],['序号','工程／单体名称','专业／区段'],
+  ['1','1-2#特殊实验车间-工艺车间（安装）','暖通；给排水；强电；消防；弱电；工艺循环冷却水系统']]}]};
+ host.write(h.app,preview,stage);
+ const range=h.sheets[0].Range('A1:C4');
+ assert.equal(range.Rows.autoFitCount,1,'统计页必须调用AutoFit');
+});
 test('write/save/reopen/value/formula failures clean owned books without closing user book',()=>{
  for(const failure of ['write','save','reopen','corrupt','formula']){
   const h=fixture(failure);assert.throws(()=>host.write(h.app,model,stage),/failed|不一致|公式/);

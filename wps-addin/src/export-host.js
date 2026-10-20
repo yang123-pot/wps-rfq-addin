@@ -406,6 +406,9 @@
         var used=sheet.Range('A1:'+columnName(s.values[0].length)+s.values.length);
         used.Font.Size=(s.layout&&s.layout.fontSize)||layout.FONT_SIZE;used.WrapText=true;
         sheet.Range('A1:'+columnName(s.values[0].length)+'1').Font.Bold=true;
+        // TRIAL-002：导入统计页的专业/区段是换行长文本；未手动设行高时由宿主按内容撑高，
+        // 避免多标题被固定行高裁切。标题行高度随后由layout覆盖为固定值。
+        if(s.name==='导入预览'&&used.Rows&&typeof used.Rows.AutoFit==='function')used.Rows.AutoFit();
         if(s.name==='来源明细'&&s.values.length>1){
           ['原路径','文件SHA256','来源标识','核对追溯JSON'].forEach(function(header){
             var index=s.values[0].indexOf(header);

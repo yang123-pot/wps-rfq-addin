@@ -32,6 +32,8 @@ test('TRIAL-001：同文件十张工作表遵循原标签顺序，标题不计�
  assert.deepEqual(rows(result).map(row=>row[2]),['1','2','3','4','5','6','7','8','9','10']);
  assert.equal(rows(result)[0][3],'单体1');assert.equal(rows(result)[9][3],'单体10');
  assert.match(rows(result)[0][4],/暖通/);assert.equal(rows(result).every(row=>row[5]==='1'),true);
+ assert.deepEqual(result.sheets[0].layout.rows,[{index:1,height:32}],
+  '统计数据行不得再写死行高，必须交给宿主按换行内容撑高');
  const changed=JSON.parse(before);[changed.entries[0].snapshot.sheets[1],changed.entries[0].snapshot.sheets[9]]=
   [changed.entries[0].snapshot.sheets[9],changed.entries[0].snapshot.sheets[1]];
  assert.deepEqual(rows(model.build(changed,false,{})).map(row=>row[2]),['1','10','3','4','5','6','7','8','9','2'],
