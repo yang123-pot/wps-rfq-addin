@@ -4,7 +4,7 @@
  else root.RfqCategoryLibrary=factory();
 }(typeof window==='object'?window:globalThis,function(){
  'use strict';
- var FIELDS=['name','feature','unit','text'],STATES=['active','disabled'],DECISION='no-inquiry';
+ var FIELDS=['name','feature','unit','text'],STATES=['active','disabled','archived'],DECISION='no-inquiry';
  function conditionErrors(conditions,at,errors){
   if(!Array.isArray(conditions)){errors.push(at+'条件无效。');return;}
   conditions.forEach(function(condition,position){
@@ -50,7 +50,7 @@
  // “无需询价”是固定的人工决策入口，不随普通类别停用而消失。
  function categories(library){
   var list=((library&&library.categories)||[]).filter(function(category){
-   return category.id===DECISION||category.state!=='disabled';});
+   return category.id===DECISION||(category.state!=='disabled'&&category.state!=='archived');});
   if(!list.some(function(category){return category.id===DECISION;}))
    return list.concat([{id:DECISION,name:'无需询价',state:'active'}]);
   return list;
@@ -61,7 +61,7 @@
   if(rule.state==='disabled')return false;
   if(rule.categoryId===DECISION)return true;
   var target=category(library,rule.categoryId);
-  return !!target&&target.state!=='disabled';
+  return !!target&&target.state!=='disabled'&&target.state!=='archived';
  });}
  function aliases(rule){return (Array.isArray(rule&&rule.aliases)?rule.aliases:[]).filter(function(keyword){
   return typeof keyword==='string'&&keyword.trim();});}

@@ -150,5 +150,5 @@
    sourceCount:active.reduce(function(total,record){return total+(Array.isArray(record.sources)?record.sources.length:0);},0)};
  }
  return {SCHEMA_VERSION:SCHEMA_VERSION,LEVELS:LEVELS,create:create,validate:validate,assertValid:assertValid,
-  learn:learn,releaseSource:releaseSource,revoke:revoke,find:find,summary:summary};
+  learn:learn,releaseSource:releaseSource,revoke:revoke,find:find,summary:summary,signature:signature};
 }));
