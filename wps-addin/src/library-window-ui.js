@@ -31,6 +31,7 @@
  function renderRules(data){var list=el('rules');list.textContent='';data.items.forEach(function(r){var li=node('li',(r.match||[]).map(function(c){return c.field+'：'+c.any.join('、');}).join('；')+' → '+r.categoryId+'（'+(r.state==='disabled'?'停用':'使用中')+'）');li.appendChild(button(r.state==='disabled'?'启用':'停用',function(){return mutate({type:'rule',rule:Object.assign({},r,{state:r.state==='disabled'?'active':'disabled'})},data.revision);}));list.appendChild(li);});pager('rules',data);}
  function showMergePreview(host,p,labelText,checkboxId){host.textContent='';host.appendChild(node('h3',p.sourceNames.join('、')+' → '+p.targetName));host.appendChild(node('p','迁移 '+p.rules+' 条规则、'+p.memories+' 条经验；去重 '+p.duplicateRules+' 条规则、'+p.duplicateMemories+' 条经验。保留别名：'+p.aliases.join('、')));host.appendChild(node('p','源分类将归档；已有确认项目保留原分类。'));
   var project=null;try{project=JSON.parse(window.Application.PluginStorage.getItem('rfq.library.current-project'));}catch(_){}
+  var reason=node('p',''+(!project?'当前没有打开的未完成项目，暂不可同步。':project.confirmed?'当前项目已确认，合并只影响后续建议。':''));reason.className='hint';if(reason.textContent)host.appendChild(reason);
   var apply=node('input');apply.type='checkbox';if(checkboxId)apply.id=checkboxId;apply.disabled=!project||project.confirmed;
   var label=node('label','同时应用到当前未完成项目');label.prepend(apply);host.appendChild(label);host.appendChild(button(labelText,function(){return mutate({type:'merge',sourceIds:p.sourceIds,targetId:p.targetId,confirmed:true},p.revision,apply.checked&&project?project.projectId:null);}));
  }

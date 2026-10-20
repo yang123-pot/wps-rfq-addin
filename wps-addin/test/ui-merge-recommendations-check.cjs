@@ -20,7 +20,15 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   assert.equal((await store.load()).library.mergeDismissals.length,1);
   await card.getByRole('button',{name:'保留“阀门”',exact:true}).click();await card.getByRole('button',{name:'确认合并到“阀门”',exact:true}).waitFor();
   assert.equal(await card.getByRole('checkbox').isDisabled(),true,'confirmed current project cannot be changed');
+  assert.match(await card.innerText(),/当前项目已确认/,'confirmed project must explain why synchronization is disabled');
+  await page.evaluate(()=>Application.PluginStorage.setItem('rfq.library.current-project',''));
+  await card.getByRole('button',{name:'保留“阀门”',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('.recommendation-card').textContent.includes('当前没有打开的未完成项目'));
+  assert.equal(await card.getByRole('checkbox').isDisabled(),true,'missing current project cannot be synchronized');
   await page.evaluate(()=>Application.PluginStorage.setItem('rfq.library.current-project',JSON.stringify({projectId:'accept-current',confirmed:false})));
+  await card.getByRole('button',{name:'保留“阀门”',exact:true}).click();
+  await page.waitForFunction(()=>!document.querySelector('.recommendation-card input[type=checkbox]').disabled);
+  assert.doesNotMatch(await card.innerText(),/暂不可同步|当前项目已确认/,'unconfirmed project must make synchronization available');
   const gate=new Promise(r=>release=r);await page.route('**/api/library/window/preview',async route=>{if(route.request().postDataJSON().targetId==='a')await gate;await route.continue();});
   await card.getByRole('button',{name:'保留“阀门”',exact:true}).click();await card.getByRole('button',{name:'保留“水阀门”',exact:true}).click();
   await card.getByRole('button',{name:'确认合并到“水阀门”',exact:true}).waitFor();
