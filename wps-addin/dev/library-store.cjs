@@ -3,6 +3,7 @@ const {writeFileAtomic}=require('./atomic-file.cjs');
 const {validate:validateLibrary}=require('../src/category-library.js');
 const {validate:validateMemory,create:createMemory}=require('../src/category-memory.js');
 const operations=require('../src/library-operations.js'),query=require('./library-query.cjs');
+const recommendations=require('./library-recommendations.cjs');
 const SCHEMA_VERSION=1,FILE_NAME='library-state.json';
 
 function revisionConflict(message){
@@ -30,7 +31,7 @@ function assertValidPackage(state){
 function createLibraryStore({directory,defaults}={}){
  if(typeof directory!=='string'||!directory.trim())throw Error('分类库目录无效，已停止读写。');
  const root=path.resolve(directory),target=path.join(root,FILE_NAME);
- let bundled=defaults||null,writes=Promise.resolve(),cached=null,cacheKey=null,index=null;
+ let bundled=defaults||null,writes=Promise.resolve(),cached=null,cacheKey=null,index=null,recommendationIndex=null;
  async function defaultLibrary(){
   if(bundled)return JSON.parse(JSON.stringify(bundled));
   const text=await fs.readFile(path.join(__dirname,'..','rules','defaults.json'),'utf8');
@@ -49,13 +50,13 @@ function createLibraryStore({directory,defaults}={}){
    if(cached&&key===cacheKey)return cached;
    text=await fs.readFile(target,'utf8');}
   catch(error){
-   if(error.code==='ENOENT'){cached=null;cacheKey=null;index=null;return null;}
+   if(error.code==='ENOENT'){cached=null;cacheKey=null;index=null;recommendationIndex=null;return null;}
    throw Error('读取分类库状态失败：'+error.message);
   }
   let parsed;
   try{parsed=JSON.parse(text);}
   catch(error){throw Error('分类库状态已损坏，原文件未改动：'+error.message);}
-  cached=assertValidPackage(parsed);cacheKey=key;index=null;return cached;
+  cached=assertValidPackage(parsed);cacheKey=key;index=null;recommendationIndex=null;return cached;
  }
  async function load(){
   const stored=await readDisk();
@@ -69,7 +70,7 @@ function createLibraryStore({directory,defaults}={}){
   const text=JSON.stringify(next,null,2);
   try{await writeFileAtomic(target,text,function(readback){assertValidPackage(JSON.parse(readback));});}
   catch(error){throw Error('分类库保存失败，已保留上一版：'+error.message);}
-  cached=null;cacheKey=null;index=null;
+  cached=null;cacheKey=null;index=null;recommendationIndex=null;
   return {revision:next.revision,path:target,bytes:Buffer.byteLength(text),updatedAt:next.updatedAt};
  }
  function mutate(request,transform){
@@ -77,7 +78,7 @@ function createLibraryStore({directory,defaults}={}){
   const input=JSON.parse(JSON.stringify(request));
   const run=writes.catch(function(){}).then(async()=>{
    const current=await snapshot();if(current.revision!==input.expectedRevision)throw revisionConflict();
-   const next=transform?transform(current):operations.apply(current,input.operation);if(next===current)return {revision:current.revision,alreadySaved:true};return writeNext(current,next.library,next.memory);
+   const next=transform?transform(current):input.operation?.type==='keep-separate'?recommendations.dismiss(current,input.operation,recommendationsFor(current)):operations.apply(current,input.operation);if(next===current)return {revision:current.revision,alreadySaved:true};return writeNext(current,next.library,next.memory);
   });writes=run.catch(function(){});return run;
  }
  function save(input){
@@ -103,10 +104,11 @@ function createLibraryStore({directory,defaults}={}){
   writes=run.catch(function(){});
   return run;
  }
+ function recommendationsFor(state){if(!recommendationIndex||recommendationIndex.revision!==state.revision)recommendationIndex={revision:state.revision,items:recommendations.scan(state)};return recommendationIndex.items;}
  return {directory:root,path:target,load:load,save:save,mutate,
   learnProject:(request,review,projectId,projectName)=>mutate(request,current=>operations.learnSnapshot(current,review,projectId,projectName)),
   skipProject:(request,review,projectId)=>mutate(request,current=>operations.skipSnapshot(current,review,projectId)),
-  summary:async()=>query.summary(await snapshot()),page:async q=>query.page(await snapshot(),q),
+  summary:async()=>query.summary(await snapshot()),page:async q=>{const state=await snapshot();return q?.kind==='recommendations'?recommendations.page(state,q,recommendationsFor(state)):query.page(state,q);},
   classifyIndex:async()=>{const s=await snapshot();if(!index||index.revision!==s.revision)index=query.classifyIndex(s);return index;},
   preview:async q=>{const s=await snapshot();return {revision:s.revision,...operations.previewMerge(s,q.sourceIds,q.targetId)};},
   similar:async q=>{const s=await snapshot();return {revision:s.revision,items:operations.similar(s,q.categoryId)};},

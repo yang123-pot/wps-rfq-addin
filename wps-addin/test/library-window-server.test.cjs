@@ -7,6 +7,7 @@ test('window API authenticates bounded reads and atomic commands; compact endpoi
  const call=(route,data={},auth=true)=>fetch(origin+'/api/library/'+route,{method:'POST',headers:{'content-type':'application/json',...(auth?{'x-rfq-import-token':token}:{})},body:JSON.stringify(data)});
  assert.equal((await call('window/page',{},false)).status,403);
  assert.equal((await call('window/page')).status,200);assert.equal((await call('window/summary')).status,200);
+ const recommendations=await call('window/page',{kind:'recommendations',pageSize:10});assert.equal(recommendations.status,200);const cards=await recommendations.json();assert.ok(cards.items.length<=10);assert.equal(cards.history,undefined);
  assert.equal((await call('window/mutate',{expectedRevision:0,operation:{type:'add',name:'测试分类'}})).status,200);
  assert.equal((await call('window/mutate',{expectedRevision:0,operation:{type:'add',name:'冲突分类'}})).status,409);
  const index=await(await call('classify-index')).json();assert.equal(index.revision,1);assert.deepEqual(index.memory.history,[]);
