@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
+const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs'),{createLibraryStore}=require('../dev/library-store.cjs');
+(async()=>{const dir=await fs.mkdtemp(path.join(os.tmpdir(),'library-ui-')),libraryDirectory=path.join(dir,'library'),store=createLibraryStore({directory:libraryDirectory}),s=await store.load();
+ s.library.categories.push(...Array.from({length:100},(_,i)=>({id:'cat-'+i,name:'测试分类'+i,state:'active'})));await store.save({...s,expectedRevision:0});
+ const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(dir,'imports'),libraryDirectory});await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ const browser=await chromium.launch({channel:'msedge',headless:true});try{const page=await browser.newPage({viewport:{width:960,height:720}}),requests=[],errors=[];page.on('request',r=>requests.push(r.url()));page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+ await page.goto('http://127.0.0.1:'+server.address().port+'/library.html');await page.waitForFunction(()=>document.querySelectorAll('#categories tr').length===50);
+ assert.ok(!requests.some(x=>x.endsWith('/api/library/load')));assert.equal(await page.locator('#advanced').getAttribute('open'),null);
+ await page.locator('#new-name').fill('新增测试');await page.locator('#add-form button').click();await page.waitForFunction(()=>document.querySelector('#feedback').textContent.includes('已保存'));
+ await page.locator('#category-search').fill('新增测试');await page.waitForFunction(()=>document.querySelectorAll('#categories tr').length===1);assert.equal(await page.locator('#categories tr').count(),1);
+ await page.getByRole('tab',{name:'学习经验',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('#memories-panel').hidden);assert.ok(await page.locator('#memory-search').isVisible());
+ assert.deepEqual(errors,[]);console.log('PASS library window: bounded first page, no full load, add/search, two tabs, collapsed advanced');
+ }finally{await browser.close();await new Promise(r=>server.close(r));await fs.rm(dir,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1;});

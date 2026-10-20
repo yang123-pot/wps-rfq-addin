@@ -14,6 +14,7 @@ test('archive is immutable, retains old names, hides future suggestions, blocks 
 test('merge requires explicit confirmation, migrates aliases/rules/memories and deduplicates sources without changing old projects',()=>{
  const s=fixture(),project={categoryId:'a',categoryName:'水 阀'},before=JSON.stringify(s);
  const preview=ops.previewMerge(s,['a'],'b');assert.equal(preview.rules,1);assert.equal(preview.memories,1);
+ assert.equal(preview.targetName,'水阀');assert.deepEqual(preview.sourceNames,['水 阀']);
  assert.throws(()=>ops.apply(s,{type:'merge',sourceIds:['a'],targetId:'b'}),/确认/);
  const n=ops.apply(s,{type:'merge',sourceIds:['a'],targetId:'b',confirmed:true});
  assert.equal(JSON.stringify(s),before);assert.equal(project.categoryName,'水 阀');

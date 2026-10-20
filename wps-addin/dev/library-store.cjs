@@ -72,12 +72,12 @@ function createLibraryStore({directory,defaults}={}){
   cached=null;cacheKey=null;index=null;
   return {revision:next.revision,path:target,bytes:Buffer.byteLength(text),updatedAt:next.updatedAt};
  }
- function mutate(request){
+ function mutate(request,transform){
   if(!Number.isSafeInteger(request?.expectedRevision)||request.expectedRevision<0)return Promise.reject(Error('修改分类库需要有效版本号。'));
   const input=JSON.parse(JSON.stringify(request));
   const run=writes.catch(function(){}).then(async()=>{
    const current=await snapshot();if(current.revision!==input.expectedRevision)throw revisionConflict();
-   const next=operations.apply(current,input.operation);return writeNext(current,next.library,next.memory);
+   const next=transform?transform(current):operations.apply(current,input.operation);if(next===current)return {revision:current.revision,alreadySaved:true};return writeNext(current,next.library,next.memory);
   });writes=run.catch(function(){});return run;
  }
  function save(input){
@@ -104,6 +104,8 @@ function createLibraryStore({directory,defaults}={}){
   return run;
  }
  return {directory:root,path:target,load:load,save:save,mutate,
+  learnProject:(request,review,projectId,projectName)=>mutate(request,current=>operations.learnSnapshot(current,review,projectId,projectName)),
+  skipProject:(request,review,projectId)=>mutate(request,current=>operations.skipSnapshot(current,review,projectId)),
   summary:async()=>query.summary(await snapshot()),page:async q=>query.page(await snapshot(),q),
   classifyIndex:async()=>{const s=await snapshot();if(!index||index.revision!==s.revision)index=query.classifyIndex(s);return index;},
   preview:async q=>{const s=await snapshot();return {revision:s.revision,...operations.previewMerge(s,q.sourceIds,q.targetId)};},

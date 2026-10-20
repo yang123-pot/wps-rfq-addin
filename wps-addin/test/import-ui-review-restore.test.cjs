@@ -82,7 +82,7 @@ async function boot(config={}){
     async fetch(url,init){
       const route=String(url),body=JSON.parse(init&&init.body||'{}');calls.push(route);
       let result;
-      if(route==='/api/library/load')result={revision:0,library:copy(sample.library),memory:sample.createMemory()};
+      if(route==='/api/library/classify-index')result={revision:0,library:copy(sample.library),memory:sample.createMemory()};
       else if(route==='/api/header/load')result={revision:0,templates:[]};
       else if(route==='/api/project/load')result={project:copy(value)};
       else if(route==='/api/project/restore-copy')result={copyPath:body.source.copyPath};

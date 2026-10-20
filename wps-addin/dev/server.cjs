@@ -11,6 +11,7 @@ const {createLibraryStore} = require('./library-store.cjs');
 const {createHeaderStore} = require('./header-store.cjs');
 const {createSplitStore} = require('./split-store.cjs');
 const {listDirectory} = require('./fs-list.cjs');
+const deferredLearning=require('../src/deferred-learning.js');
 
 const ASSETS = new Set(['/src/assistant-state.js','/src/assistant-problems.js','/src/assistant-feedback.js','/src/assistant-ui.js','/main.js', '/ribbon.xml', '/taskpane.html', '/styles.css', '/src/host.js',
   '/src/taskpane.js', '/src/parser.js', '/src/merge.js', '/src/review.js', '/src/review-ui.js',
@@ -23,7 +24,7 @@ const ASSETS = new Set(['/src/assistant-state.js','/src/assistant-problems.js','
   '/src/brand-table.js', '/src/brand-model.js', '/src/brand-host.js', '/src/brand-ui.js', '/src/decimal.js',
   '/src/brand-reference.js', '/src/inquiry-header.js', '/src/inquiry-model.js', '/src/split-plan.js',
   '/src/split-state.js', '/src/header-ui.js', '/src/inquiry-ui.js', '/src/split-ui.js',
-  '/src/ribbon-navigation.js',
+  '/src/ribbon-navigation.js','/library.html','/library.css','/src/library-window-host.js','/src/library-window-ui.js','/src/deferred-learning.js','/src/deferred-learning-ui.js',
   '/src/path-picker.js', '/assets/inquiry.svg', '/assets/import.svg', '/assets/matching.svg',
   '/assets/review.svg', '/assets/categories.svg', '/assets/brands.svg', '/assets/split.svg']);
 const TYPES = {'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
@@ -160,20 +161,30 @@ function createServer({root, importDirectory = null, projectDirectory = null, li
       }
     }
     if (['/api/library/load','/api/library/save','/api/library/window/summary','/api/library/window/page',
-      '/api/library/window/mutate','/api/library/window/preview','/api/library/window/similar','/api/library/window/detail','/api/library/classify-index'].includes(url.pathname)) {
+      '/api/library/window/mutate','/api/library/window/preview','/api/library/window/similar','/api/library/window/detail','/api/library/classify-index','/api/library/learn-project','/api/library/skip-project'].includes(url.pathname)) {
       const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');
       if (req.method !== 'POST') return json(405,{error:'POST required'});
       if (req.headers['x-rfq-import-token'] !== importToken ||
           !/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) return json(403,{error:'分类库会话失效，请重新打开侧栏。'});
       try {
         // Multi-project learned features exceed 4 MiB; keep a bounded budget like split receipts.
-        const limit=33554432;
+        const limit=['/api/library/load','/api/library/save'].includes(url.pathname)?33554432:65536;
         let size=0; const chunks=[];
         for await (const chunk of req) { size+=chunk.length; if(size<=limit)chunks.push(chunk); }
         if(size>limit)return json(413,{error:'分类库请求过大，未保存。'});
         let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'分类库请求无效。'});}
         if(!data||Array.isArray(data))return json(400,{error:'分类库请求无效。'});
         if(url.pathname==='/api/library/load')return json(200,await libraries.load());
+        if(['/api/library/learn-project','/api/library/skip-project'].includes(url.pathname)){
+          const project=await projects.load(data.projectId);
+          if(!project?.review||project.review.inputKey!==data.reviewInputKey||project.review.revision!==data.reviewRevision)throw Error('项目确认版本已变化，请重新打开项目。');
+          const receipt=project.split,actual=receipt?await splits.load(project.projectId,receipt.batchId):null;
+          if(!deferredLearning.verified(receipt)||!deferredLearning.verified(actual)||actual.inputKey!==receipt.inputKey||
+            project.generation?.inputKey!==receipt.inputKey||project.generation?.sha256!==actual.generationSha256||
+            JSON.stringify(receipt.files)!==JSON.stringify(actual.files)||project.stages?.split?.state!=='ready')throw Error('必须在本次拆分全部完成并核验后才能学习。');
+          if(url.pathname.endsWith('learn-project'))for(const file of actual.files){const observed=await exports.inspect(file.target,file.sha256);if(!observed.exists||observed.sha256!==file.sha256)throw Error('拆分文件已变化，请先核对成果。');}
+          return json(200,await libraries[url.pathname.endsWith('skip-project')?'skipProject':'learnProject'](data,project.review,project.projectId,project.name));
+        }
         if(url.pathname==='/api/library/window/summary')return json(200,await libraries.summary());
         if(url.pathname==='/api/library/window/page')return json(200,await libraries.page(data));
         if(url.pathname==='/api/library/window/mutate')return json(200,await libraries.mutate(data));
@@ -234,7 +245,7 @@ function createServer({root, importDirectory = null, projectDirectory = null, li
     }
     try {
       let content = await fs.readFile(path.join(root, url.pathname.slice(1)));
-      if (importDirectory && url.pathname === '/taskpane.html') {
+      if (importDirectory && ['/taskpane.html','/library.html'].includes(url.pathname)) {
         content = content.toString('utf8').replace('<head>', '<head><script>window.__RFQ_IMPORT__=' +
           JSON.stringify({token:importToken,browse:true}) + ';</script>');
       }

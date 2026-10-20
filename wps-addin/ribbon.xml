@@ -11,6 +11,7 @@
           <button id="rfqHelp" label="帮助" size="large" tag="help" onAction="OnGotoStage" getImage="GetRfqImage"/>
         </group>
         <group id="rfqWorkspace" label="更多">
+          <button id="rfqCategoryLibrary" label="分类学习库" size="large" onAction="OnOpenCategoryLibrary" getImage="GetRfqImage"/>
           <button id="rfqOpenPane" label="打开材料整理助手" size="large" onAction="OnOpenRfqPane" getImage="GetRfqImage"/>
           <button id="rfqReloadPane" label="重建窗口" onAction="OnReloadRfqPane"/>
         </group>

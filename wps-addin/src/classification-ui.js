@@ -7,7 +7,7 @@
     batch=document.getElementById('batch-confirm'),write=document.getElementById('write-classification');
   var memoryStatus=document.getElementById('memory-status'),retry=document.getElementById('memory-retry');
   var library=null,state=RfqClassification.create(),groups=[],busy=false,selected={};
-  var memoryState=null,libraryRevision=0,unsavedMemory=false,memoryQueue=Promise.resolve();
+  var memoryState=null,libraryRevision=0,unsavedMemory=false;
   function tell(text,error){if(message){message.textContent=text;message.className=error?'error':'';}}
   function memoryTell(text,error){if(!memoryStatus)return;memoryStatus.textContent=text;memoryStatus.className=error?'error':'note';}
   function projectId(){try{return options.getProjectId&&options.getProjectId()||null;}catch(_){return null;}}
@@ -21,13 +21,13 @@
   function loadLibraryState(){
    var token=window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token;
    if(!token)return fallbackLibrary();
-   return fetch('/api/library/load',{method:'POST',headers:{'content-type':'application/json','x-rfq-import-token':token},body:'{}'})
+   return fetch('/api/library/classify-index',{method:'POST',headers:{'content-type':'application/json','x-rfq-import-token':token},body:'{}'})
     .then(function(response){return response.text().then(function(text){
      var result;try{result=JSON.parse(text);}catch(_){throw Error('分类库返回无效。');}
      if(!response.ok)throw Error(result.error||'分类库读取失败。');
      return result;});})
     .catch(function(error){return fallbackLibrary().then(function(result){
-     result.notice='本机分类库未读取（'+error.message+'），本次只用默认规则，习惯先保存在本页。';
+     result.notice='本机分类库未读取（'+error.message+'），本次只用默认规则；分类习惯仍须拆分核验后选择保存。';
      return result;});});
   }
   function loadLibrary(){
@@ -50,95 +50,23 @@
     {memory:memoryState,projectId:projectId()});
   }
   function renderMemory(){if(retry)retry.hidden=!unsavedMemory;}
-  function notifyMemory(){
-   if(options.onMemoryChange)options.onMemoryChange({revision:libraryRevision,library:library,memory:memoryState});
-  }
-  function sourceContext(row,rowId){
-   return {item:{name:row.group.name,feature:row.group.feature,unit:row.group.unit},projectId:projectId(),
-    sourceProjectId:projectId(),rowId:rowId};
-  }
-  function saveMemory(){
-   var token=window.__RFQ_IMPORT__&&window.__RFQ_IMPORT__.token;
-   if(!token||!libraryReady())return Promise.reject(Error('当前会话未启用本机分类库。'));
-   // 连续确认会连续保存，必须排队：否则两次保存用同一个版本号，后一次会拿到409而丢掉习惯。
-   memoryQueue=memoryQueue.catch(function(){}).then(function(){
-    return fetch('/api/library/save',{method:'POST',headers:{'content-type':'application/json','x-rfq-import-token':token},
-     body:JSON.stringify({expectedRevision:libraryRevision,library:library,memory:memoryState})})
-     .then(function(response){return response.text().then(function(text){
-      var result;try{result=JSON.parse(text);}catch(_){result={};}
-      if(!response.ok)throw Error(result.error||('习惯保存失败（HTTP '+response.status+'）。'));
-      libraryRevision=Number.isSafeInteger(result.revision)?result.revision:libraryRevision+1;
-      return true;});});
-   });
-   return memoryQueue;
-  }
-  // 保存习惯：成功/失败都更新侧栏状态。R5整表确认要等落盘结果，因此内部返回Promise（旧调用点忽略返回值）。
-  function persist(){
-   if(!libraryReady())return Promise.reject(Error('当前会话未启用本机分类库。'));
-   unsavedMemory=true;renderMemory();memoryTell('正在保存分类习惯…');
-   return saveMemory().then(function(){
-    unsavedMemory=false;renderMemory();
-    memoryTell('分类习惯已保存到本机分类库（版本 '+libraryRevision+'）。');
-    notifyMemory();
-    render();
-    return true;
-   }).catch(function(error){
-    renderMemory();
-    memoryTell('习惯未保存，可重试：'+error.message,true);
-    throw error;
-   });
-  }
-  function persistMemory(){return persist().catch(function(){return false;});}
-  function retryMemory(){
-   if(!unsavedMemory)return Promise.resolve(false);
-   memoryTell('正在重新保存分类习惯…');
-   return persist().catch(function(){return false;});
-  }
-  // R5：整表确认快照落盘后才学习。以projectId/rowId/decisionRevision记来源，改确认只撤销被改行的旧来源。
-  function learnConfirmations(items){
-   var list=items||[];
-   if(!list.length)return Promise.resolve(false);
-   list.forEach(function(entry){
-    if(!entry||!entry.decision||!entry.decision.categoryId||!entry.decision.rowId)return;
-    if(!entry.item||!entry.item.name)return;
-    var context={item:entry.item,projectId:projectId(),sourceProjectId:projectId(),rowId:entry.decision.rowId,
-     libraryVersion:entry.decision.libraryVersion};
-    if(entry.previousCategoryId&&entry.previousCategoryId!==entry.decision.categoryId)
-     memoryState=RfqCategoryMemory.releaseSource(memoryState,{categoryId:entry.previousCategoryId},context);
-    memoryState=RfqCategoryMemory.learn(memoryState,entry.decision,context);
-   });
-   return persist();
-  }
-  // 2026-10-11 用户要求：整表确认时用户在“最终分类”里输入的新类别名同时进类别库（同名去重）。
-  // 这里只负责建类与落盘；调用方拿到 idByName 后再解析行类别，避免行与库对不上。
-  function adoptCategories(names){
-   var list=Array.isArray(names)?names:[];
-   if(!libraryReady())return Promise.reject(Error('当前会话未启用本机分类库。'));
-   var plan=RfqClassificationReviewModel.adoptNewCategories(library,list);
-   var check=RfqCategoryLibrary.validate(plan.library);
-   if(!check.ok)return Promise.reject(Error(check.errors.join('；')));
+  function retryMemory(){return Promise.resolve(false);}
+  function learnConfirmations(){return Promise.resolve(false);}
+  async function reloadLibrary(){library=null;return loadLibrary();}
+  async function adoptCategories(names){
+   var list=Array.isArray(names)?names:[],plan=RfqClassificationReviewModel.adoptNewCategories(library,list);
    var created=plan.assigned.filter(function(item){return item.created;});
-   if(!created.length)return Promise.resolve({idByName:plan.idByName,categories:library.categories,created:[]});
-   library=plan.library;
-   notifyMemory();
-   return persist().then(function(){
-    return {idByName:plan.idByName,categories:library.categories,
-     created:created.map(function(item){return item.name;})};
-   });
+   if(created.length){
+    var response=await fetch('/api/library/window/mutate',{method:'POST',headers:{'content-type':'application/json','x-rfq-import-token':window.__RFQ_IMPORT__.token},body:JSON.stringify({expectedRevision:libraryRevision,operation:{type:'adopt',names:list}})}),result=await response.json();
+    if(!response.ok)throw Error(result.error||'新分类未保存。');
+    await reloadLibrary();
+   }
+   var assigned=RfqClassificationReviewModel.adoptNewCategories(library,list);
+   return {idByName:assigned.idByName,categories:library.categories,created:created.map(function(item){return item.name;})};
   }
-  function remember(row,rowId,previous,record){
-   if(!libraryReady()||!record)return;
-   var context=sourceContext(row,rowId);
-   if(previous&&previous.categoryId&&previous.categoryId!==record.categoryId)
-    memoryState=RfqCategoryMemory.releaseSource(memoryState,{categoryId:previous.categoryId},context);
-   memoryState=RfqCategoryMemory.learn(memoryState,record,context);
-   persistMemory();
-  }
-  function forget(row,rowId,previous){
-   if(!libraryReady()||!previous||!previous.categoryId)return;
-   memoryState=RfqCategoryMemory.releaseSource(memoryState,{categoryId:previous.categoryId},sourceContext(row,rowId));
-   persistMemory();
-  }
+  // 人工分类只保留在项目确认快照；长期经验在拆分核验完成并选择保存后写入。
+  function remember(){}
+  function forget(){}
   function decide(rowId,row,groupId){
    var value=document.querySelector('[data-category="'+groupId+'"]');
    var categoryId=value&&value.value;
@@ -300,7 +228,7 @@
    retryMemory:retryMemory,
    memoryPending:function(){return unsavedMemory;},
     library:function(){return library;},
-    ensureLibrary:function(){return loadLibrary();},
+    ensureLibrary:function(){return loadLibrary();},reloadLibrary:reloadLibrary,
    rows:function(){return groups.map(function(group){return {rowId:group.id||group.scopeId};});},
    groups:function(){return groups;},
    adopt:function(value){

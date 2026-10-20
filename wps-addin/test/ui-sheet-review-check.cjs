@@ -227,23 +227,10 @@ async function run(options={}){
   // 项目状态在折叠的辅助功能里，用textContent读取阶段文字（不依赖可见性）。
   assert.match(await page.locator('#project-status').textContent(),/表内审核：已确认/);
   assert.match(await page.locator('#project-status').textContent(),/分类工作簿：未完成/,'分类工作簿属R6，不得误报完成');
-  if(options.memoryFailure){
-   assert.match(await page.locator('#sheet-review-message').textContent(),/习惯.*未保存/);
-   assert.equal((await store.load()).memory.memories.length,0,'习惯写入失败不留下半份数据');
-   assert.equal(confirmed.review.rows.length,8,'习惯写入失败不得回滚已保存的整表确认');
-   await page.locator('#workflow-nav .workflow-step-button[data-stage="review"]').click();
-   assert.equal(await page.locator('#sheet-review-memory-retry').isVisible(),true);
-   await page.locator('#sheet-review-memory-retry').click();
-   await page.waitForFunction(()=>document.querySelector('#sheet-review-memory-retry').hidden);
-   assert.equal(memorySaveAttempts,2,'只有明确重试才再次保存习惯');
-  }else assert.match(await page.locator('#sheet-review-message').innerText(),/分类习惯已保存/);
+  assert.match(await page.locator('#sheet-review-message').textContent(),/拆分核验完成后/);
+  assert.equal(memorySaveAttempts,0,'整表确认不再发起长期经验保存');
   const learned=await store.load();
-  const active=()=>learned.memory.memories.filter(record=>record.state==='active');
-  assert.equal(active().length,8,'整表确认后按材料学习');
-  assert.equal(learned.memory.memories.every(record=>record.sources.length===1),true);
-  assert.equal(learned.memory.memories.every(record=>/^p-[a-z0-9-]+$/.test(record.sources[0].sourceProjectId)),true,
-   '学习来源必须带稳定项目身份');
-  assert.equal(learned.memory.memories.some(record=>record.categoryId==='no-inquiry'),true,'无需询价也按人工决定记录');
+  assert.equal(learned.memory.memories.length,0,'整表确认只存快照；经验延迟到拆分后由用户决定');
   // 重复点击幂等：不新增项目版本、不重复学习。
   const revision=confirmed.revision,memorySnapshot=JSON.stringify(learned.memory);
   await page.locator('#workflow-nav .workflow-step-button[data-stage="review"]').click();
@@ -285,10 +272,10 @@ async function run(options={}){
   await page.waitForFunction(()=>document.querySelector('#sheet-review-message').textContent.includes('整表已确认（8 行）'));
   const changed=await store.load();
   const revoked=changed.memory.memories.filter(record=>record.state==='revoked');
-  assert.equal(revoked.length,1,'改确认只撤销被改行');
-  assert.equal(revoked[0].item.name,'送风机');
-  assert.equal(revoked[0].categoryId,'fan');
-  assert.equal(changed.memory.memories.filter(record=>record.state==='active').length,8);
+  assert.equal(revoked.length,0,'拆分前没有长期学习记录可撤销');
+
+
+  assert.equal(changed.memory.memories.filter(record=>record.state==='active').length,0);
   const reconfirmed=await projectRecord();
   assert.equal(reconfirmed.review.revision,2);
   assert.equal(reconfirmed.review.rows.filter(row=>row.categoryId==='valve').length,3);
@@ -312,8 +299,8 @@ async function run(options={}){
   assert.equal(adoptedRow.categoryId,created[0].id,'确认快照使用类别库里的新编号');
   assert.equal((await projectRecord()).matching.categories.some(item=>item.name==='临时类别'),true,
    '新类别入库后审核表绑定必须同步类别编号表，避免现表同名被误报为不一致');
-  assert.equal(adopted.memory.memories.filter(record=>record.categoryId===created[0].id&&record.state==='active').length,1,
-   '新类别同时进入经验库，供下次自动建议使用');
+  assert.equal(adopted.memory.memories.filter(record=>record.categoryId===created[0].id&&record.state==='active').length,0,
+   '新类别先入分类库，拆分完成选择保存后才学习');
   // 复原为用户原本的选择，后面用例继续按已确认状态走。
   await page.locator('#workflow-nav .workflow-step-button[data-stage="review"]').click();
   await page.waitForFunction(()=>!document.querySelector('#stage-panel-review').hidden);
@@ -398,10 +385,10 @@ async function run(options={}){
   assert.equal(narrow.steps,7);
   assert.ok(narrow.scrollWidth<=narrow.clientWidth+1,'窄侧栏不得出现横向滚动：'+JSON.stringify(narrow));
   assert.deepEqual(errors,[]);
-  console.log('PASS: 图03表内审核：草稿不确认不学习、整表校验定位单元格、一次确认先落盘再学习、'+
-   '重复确认幂等、改确认只撤销该行来源、旧inputKey拒绝且不覆盖已保存快照；'+
+  console.log('PASS: 图03表内审核：草稿不确认不学习、整表校验定位单元格、一次确认只存快照、拆分后学习、'+
+   '重复确认幂等、改确认不提前修改长期经验、旧inputKey拒绝且不覆盖已保存快照；'+
    'F2：现表不同于有效确认时报差异、不残留“可以生成”并阻止按旧确认生成分类工作簿；'+
-   '2026-10-11：最终分类允许直接输入库外类别名，确认时按新类别入库并学习（同名去重）。');
+   '2026-10-11：最终分类允许直接输入库外类别名，确认时新类别入库、经验延迟学习（同名去重）。');
  }finally{await browser.close();await new Promise(resolve=>server.close(resolve));await fs.rm(root,{recursive:true,force:true});}
 }
 module.exports={run,initScript,DRAIN,MEP,REVIEW_VALUES};

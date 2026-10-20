@@ -20,7 +20,7 @@
  var KIND_OF_STAGE={import:'source',matching:'matching',review:'review',categories:'categories',
   brands:'brands',inquiry:'inquiry',split:'split'};
  // review是整表审核确认快照；reviewDraft是“保存审核成果”的草稿（都不代表下游已完成）。
- var FUTURE_FIELDS=['matching','review','reviewDraft','categories','summary','brands','inquiry','split','header'];
+ var FUTURE_FIELDS=['matching','review','reviewDraft','categories','summary','brands','inquiry','split','header','learning'];
  // R1过渡期旧侧栏仍在使用的暂存字段；内部版本未知时同样必须拒绝，防止误读。
  var INTERIM_FIELDS=['classification','assignments','generation'];
   // 每个阶段的业务键包含哪些确认内容；所有键都含来源、合并方式与材料行。

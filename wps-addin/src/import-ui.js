@@ -164,8 +164,9 @@
       onMemoryChange:function(state){if(libraryPanel)libraryPanel.adoptMemory(state);},
       onChange:function(){if(brandPanel)brandPanel.refresh();},
       onBusy:function(value){busy=value;options.onBusy(value);}});
-    libraryPanel=RfqLibraryUI.create({onChange:function(state){
+    libraryPanel=RfqLibraryUI.create({application:options.application,getProjectId:function(){return projects.identity();},isConfirmed:function(){return !!projects.reviewConfirmation();},onChange:function(state){
       if(classifier.adopt(state)){
+        if(!projects.reviewConfirmation()&&selectionConfirmed())reviewModel=buildReview();
         render();
         if(reviewBinding)reviewTell('分类库已更新，当前自动建议已刷新。已有成果表和人工确认保持原内容；需要采用新建议时请重新生成成果表。');
       }
@@ -211,11 +212,13 @@
       onNext:function(){if(workflow)workflow.goTo('split');},
       onBack:function(){if(workflow)workflow.goTo('brands');},
       onBusy:function(value){busy=value;options.onBusy(value);}});
-    splitPanel=RfqSplitUI.create({application:options.application,context:deliveryContext,onComplete:async function(){await receiptSave;var saved=await projects.save();publishAssistant();if(!saved)throw Error('拆分文件已保留，但项目尚未保存，请重试保存项目。');},
+    splitPanel=RfqSplitUI.create({application:options.application,context:deliveryContext,onComplete:async function(){await receiptSave;var saved=await projects.save();publishAssistant();if(!saved)throw Error('拆分文件已保留，但项目尚未保存，请重试保存项目。');if(learningPanel)learningPanel.render();},
       generation:function(){return inquiryPanel?inquiryPanel.generation():null;},
       projectId:function(){return projects.identity();},
       onReceipt:function(){receiptSave=receiptSave.then(function(){return projects.save();}).then(function(value){publishAssistant();return value;});},
       onBusy:function(value){busy=value;options.onBusy(value);}});
+    var learningPanel=window.RfqDeferredLearningUI?RfqDeferredLearningUI.create({projects:projects,verdict:function(){return splitPanel.verdict();}}):null;
+    if(learningPanel&&document.addEventListener)document.addEventListener('rfq:project-status',function(){learningPanel.render();});
     function tell(text,error){message.textContent=text;message.className=error?'error':'';if(window.RfqFeedback)RfqFeedback.tell(text,error,"import");}
     function restoreProject(project){
       if(ui&&ui.followProgress)ui.followProgress();
@@ -942,23 +945,7 @@
         reviewDivergence=detectReviewDivergence(read);
         renderReviewIssues([]);
         renderSheetReview();
-        var items=checked.rows.map(function(row){
-          var before=((previous&&previous.rows)||[]).filter(function(item){return item.rowId===row.rowId;})[0];
-          return {item:{name:row.name,feature:row.feature,unit:row.unit},
-            previousCategoryId:before?before.categoryId:'',
-            decision:{rowId:row.rowId,categoryId:row.categoryId,categoryName:row.categoryName,skip:row.skip,
-              note:row.note,confirmedAt:next.confirmedAt,revision:next.revision,libraryVersion:next.libraryVersion}};
-        });
-        var learned=await classifier.learnConfirmations(items).then(function(){return {ok:true};},
-          function(error){return {ok:false,error:error};});
-        renderSheetReview();
-        var matchNote=refreshed&&!refreshed.error&&refreshed.updated>0?
-          ('“匹配情况”列已刷新 '+refreshed.updated+' 处（未保存文件）。'):'';
-        if(learned.ok)
-          sheetTell('整表已确认（'+next.rows.length+' 行）：'+newCategoryNote+(checked.counts.consistent)+' 行与自动建议一致、'+
-            checked.counts.different+' 行存在差异；分类习惯已保存。'+matchNote+'下一步生成分类工作簿。');
-        else
-          sheetTell('整表已确认并保存快照；分类习惯未保存，可点“习惯保存重试”：'+learned.error.message,'true');
+        sheetTell('整表已确认（'+next.rows.length+' 行）：'+newCategoryNote+'下一步生成分类工作簿；分类习惯将在拆分核验完成后由您选择是否保存。');
         if(workflow)workflow.goTo('categories');
         // 图03主按钮“审核完成，生成分类工作簿”：确认快照落盘后才按新快照生成独立分类工作簿。
         await generateCategoryWorkbooks({auto:true}).catch(function(error){
@@ -1765,6 +1752,7 @@
       });
     }
     function publishAssistant(){
+      try{var shared=options.application&&options.application.PluginStorage;if(shared&&shared.setItem)shared.setItem('rfq.library.current-project',JSON.stringify({projectId:projects.identity(),confirmed:!!projects.reviewConfirmation()}));}catch(_){}
       if(!ui||!projects||!classifier)return;
       var saved=projects.current(),confirmed=reviewConfirmation(),verdicts=stageVerdicts(),generation=inquiryPanel&&inquiryPanel.generation(),
         receipt=splitPanel&&splitPanel.receipt(),ss=receipt?RfqSplitState.summarize(receipt):null;

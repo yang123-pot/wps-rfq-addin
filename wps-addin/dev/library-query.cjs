@@ -9,7 +9,7 @@ function page(s,q={}){
  return {revision:s.revision,page:n,pageSize:size,total:items.length,items:items.slice((n-1)*size,n*size).map(x=>{
   if(kind==='categories')return {...x,...ops.related(s,x.id)};
   if(kind==='rules')return x;
-  return {id:x.id,item:x.item,categoryId:x.categoryId,categoryName:lib.categoryName(s.library,x.categoryId),state:x.state,learnedAt:x.learnedAt,sourceCount:(x.sources||[]).length,sourceProjectId:(x.sources?.[0]||{}).sourceProjectId||null,sourceRowId:x.sourceRowId||null};
+  return {id:x.id,item:x.item,categoryId:x.categoryId,categoryName:lib.categoryName(s.library,x.categoryId),state:x.state,learnedAt:x.learnedAt,sourceCount:(x.sources||[]).length,sourceProjectId:(x.sources?.[0]||{}).sourceProjectId||null,sourceRowId:x.sourceRowId||null,sourceProjectName:x.sources?.[0]?.sourceProjectName||null,sourceRowSummary:x.sources?.[0]?.sourceRowSummary||null};
  })};
 }
 function classifyIndex(s){

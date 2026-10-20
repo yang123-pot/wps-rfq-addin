@@ -23,7 +23,7 @@ async function startup(browser, {request = null, consumed = null, expectedStage 
     const url = new URL(route.request().url());
     if (url.pathname.startsWith('/api/')) {
       const responses = {
-        '/api/library/load':{revision:0,library:sample.library,memory:sample.createMemory(),persisted:false},
+        '/api/library/classify-index':{revision:0,library:sample.library,memory:sample.createMemory(),persisted:false},
         '/api/header/load':{revision:0,templates:[]}
       };
       if (!(url.pathname in responses)) writes.push(url.pathname);
@@ -59,7 +59,7 @@ async function startup(browser, {request = null, consumed = null, expectedStage 
     assert.deepEqual(errors, [], 'queued navigation must not interrupt the complete taskpane initialization');
     await page.waitForFunction(() => document.querySelector('#connection').classList.contains('ready'));
     assert.equal(await page.locator('#read-workbook').isDisabled(), false, 'the taskpane must finish connecting');
-    await page.waitForFunction(() => document.querySelector('#library-message').textContent.includes('已读取'));
+    assert.equal(await page.locator('#library-open').count(),1,'项目页只提供学习库独立窗口入口');
     assert.equal(await page.locator('#workflow-nav .is-current').getAttribute('data-stage'), expectedStage);
     assert.equal(await page.locator('#stage-panel-' + expectedStage).isVisible(), true);
     const storage = await page.evaluate(() => ({request:window.Application.PluginStorage.getItem('rfq.window.nav.request'),

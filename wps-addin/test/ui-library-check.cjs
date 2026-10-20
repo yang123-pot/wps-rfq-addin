@@ -1,182 +1,30 @@
 const assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs/promises'),os=require('node:os');
-const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs'),{createLibraryStore}=require('../dev/library-store.cjs');
-const defaults=require('../rules/defaults.json'),Memory=require('../src/category-memory.js');
-async function setInput(locator,value){
- await locator.fill(value);
- await locator.evaluate(element=>element.dispatchEvent(new Event('change',{bubbles:true})));
-}
+const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs'),{createLibraryStore}=require('../dev/library-store.cjs'),Memory=require('../src/category-memory.js');
 (async()=>{
- const root=await fs.mkdtemp(path.join(os.tmpdir(),'rfq-ui-library-')),files=[path.join(root,'测试一.xlsx')];
- await fs.writeFile(files[0],'first file');
- const libraryDirectory=path.join(root,'library'),headerDirectory=path.join(root,'headers');
- const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(root,'copies'),
-  projectDirectory:path.join(root,'projects'),headerDirectory:path.join(root,'headers'),libraryDirectory});
- await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const store=createLibraryStore({directory:libraryDirectory});
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'library-maintenance-')),libraryDirectory=path.join(root,'library'),store=createLibraryStore({directory:libraryDirectory}),s=await store.load();
+ s.library.categories.push({id:'source-a',name:'测试源类',state:'active'},{id:'target-b',name:'测试目标类',state:'active'});
+ s.memory=Memory.learn(s.memory,{categoryId:'source-a',categoryName:'测试源类',confirmedAt:'now',rowId:'r1'},{sourceProjectId:'p1',item:{name:'测试材料',feature:'DN50',unit:'个'}});
+ await store.save({...s,expectedRevision:0});
+ const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(root,'imports'),libraryDirectory});await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const browser=await chromium.launch({channel:'msedge',headless:true});
  try{
-  const page=await browser.newPage({viewport:{width:380,height:900}}),errors=[];
-  page.on('pageerror',e=>errors.push(e.message));
-  page.on('dialog',dialog=>dialog.accept());
-  await page.addInitScript(({files,root})=>{
-   window.__copies=[];window.__written=[];window.__books={};
-   window.__root=String(root).replace(/\\/g,'/').toLowerCase()+'/';
-   const nativeFetch=window.fetch;
-   window.fetch=async function(...args){
-    const response=await nativeFetch(...args);
-    if(String(args[0])==='/api/import/prepare'&&response.ok){
-     const data=await response.clone().json();
-     if(Array.isArray(data.files))window.__copies=data.files;
-    }
-    return response;
-   };
-   const materialRows={
-    '测试一.xlsx':[['工程名称：测试楼','','','',''],['项目编码','项目名称','项目特征描述','单位','工程量'],
-     ['001','水龙头','DN15','个','1'],['002','水表','DN50','个','2']]
-   };
-   function sheetFor(path,name){
-    window.__books[path]=window.__books[path]||{};
-    if(!window.__books[path][name]){
-     const original=(window.__copies.filter(item=>item.copyPath===path)[0]||{}).originalName;
-     const seed=materialRows[original]||Array.from({length:3},()=>['','','','','']);
-     window.__books[path][name]={values:seed.map(row=>row.slice()),cells:{}};
-    }
-    const store=window.__books[path][name];
-    return {Name:name,
-     UsedRange:{Row:1,Column:1,Rows:{Count:store.values.length},Columns:{Count:store.values[0].length},Value2:store.values},
-     Cells:{Item(row,column){return {NumberFormat:'',
-      get Value2(){const value=store.cells[row+':'+column];return value===undefined?null:value;},
-      set Value2(value){store.cells[row+':'+column]=value;
-       window.__written.push({path:path,sheet:name,row:row,column:column,value:value});},
-      get HasFormula(){return false;}};}}};
-   }
-   function bookFor(path,readOnly){
-    return {FullName:path,ReadOnly:!!readOnly,
-     Worksheets:{Count:1,Item(name){return sheetFor(path,typeof name==='string'?name:'给排水');}},
-     Activate(){app.ActiveWorkbook=this;},Save(){},Close(){}};
-   }
-   const previous={Name:'用户文件.xlsx',FullName:'C:\\用户文件.xlsx',Activate(){app.ActiveWorkbook=this;}};
-   const app={ActiveWorkbook:previous,AutomationSecurity:1,GetOpenFilename(){return window.__files;},
-    Workbooks:{Count:1,Item(){return previous;},Open(file,links,readOnly){
-     if(files.includes(file))throw Error('original was opened');
-     const isCopy=String(file).replace(/\\/g,'/').toLowerCase().startsWith(window.__root);
-     if(!isCopy&&!window.__copies.some(item=>item.copyPath===file))throw Error('unknown copy');
-     return bookFor(file,readOnly);
-    }}};
-   window.Application=app;window.__files=files;
-  },{files,root});
-  await page.exposeFunction('__writeReviewFixture',file=>fs.writeFile(file,Buffer.from([0x50,0x4b,3,4,1,2])));
-  let generated=0;
-  async function reviewSnapshot(){
-   const target=path.join(root,'审核-'+(++generated)+'.xlsx');
-   await page.evaluate(target=>{
-    window.RfqPathPicker.open=options=>options.onConfirm({target});
-    window.RfqClassificationReviewHost.openForEditing=()=>({path:target,opened:true});
-    window.RfqClassificationReviewHost.write=async(app,result,stagePath)=>{
-     window.__reviewWritten=result;await window.__writeReviewFixture(stagePath);
-    };
-   },target);
-   await page.locator('#classification-review-generate').click();
-   await page.waitForFunction(target=>document.querySelector('#classification-review-message').textContent.includes(target),target);
-   return page.evaluate(()=>window.__reviewWritten);
-  }
-  let failNextSave=false;
-  await page.route('**/api/library/save',async route=>{
-   if(failNextSave){failNextSave=false;
-    return route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'注入的保存失败'})});}
-   return route.continue();
-  });
-  const origin='http://127.0.0.1:'+server.address().port;
-  await require('./assistant-test-ui.cjs').acknowledgeProblems(page);
-  await page.goto(origin+'/taskpane.html?mode=detail');
-  await page.locator('#aux-section > summary').click();
-  await page.waitForFunction(()=>document.querySelector('#library-status').textContent.includes('本机分类库版本 0'));
-  assert.equal(await page.locator('#library-categories > li').count(),4);
-  assert.equal(await page.locator('#library-rules > li').count(),4);
-  assert.equal(await page.locator('#library-categories > li[data-category-id="no-inquiry"]').getByRole('button').isDisabled(),true,
-   '无需询价不能被停用');
-
-  await page.locator('#import-files').click();
-  await page.waitForFunction(()=>document.querySelectorAll('#imported-books > li').length===1);
-  await page.locator('#preview-confirm').click();
-  await page.waitForFunction(()=>document.querySelector('#merge-section').hidden===false);
-  await page.locator('#merge-identical').check();
-  await page.locator('#confirm-merge').click();
-  await page.waitForFunction(()=>document.querySelector('#merge-status').textContent.includes('本次选择已确认'));
-  const initial=await reviewSnapshot();
-  assert.equal(initial.counts.rows,2);
-  assert.equal(initial.counts.none,1);
-  assert.equal(initial.rows[0].finalCategoryId,'water-valve');
-
-  await store.save({expectedRevision:0,library:defaults,memory:Memory.create()});
-  await page.locator('#library-add-category').click();
-  await page.locator('#library-save').click();
-  await page.waitForFunction(()=>document.querySelector('#library-message').textContent.includes('版本冲突'));
-  assert.equal(await page.locator('#library-categories > li').count(),5,'版本冲突时本页草稿必须保留');
-  await page.locator('#library-reload').click();
-  await page.waitForFunction(()=>document.querySelector('#library-status').textContent.includes('本机分类库版本 1'));
-  assert.equal(await page.locator('#library-categories > li').count(),4,'重新加载后回到已保存内容');
-
-  await page.locator('#library-add-rule').click();
-  const newRule=page.locator('#library-rules > li').last();
-  await newRule.locator('select[aria-label="规则类别"]').selectOption('water-valve');
-  await setInput(newRule.locator('input[aria-label="关键词"]').first(),'水表');
-  await setInput(newRule.locator('input[aria-label="依据"]'),'测试新规则');
-  await page.locator('#library-save').click();
-  await page.waitForFunction(()=>document.querySelector('#library-message').textContent.includes('分类库已保存到本机'));
-  assert.match(await page.locator('#library-status').innerText(),/版本 2/);
-  assert.match(await page.locator('#classification-review-stats').textContent(),/2 行有建议 · 0 行需重点核对/,
-   '分类库更新后应立即刷新未确认建议的统计');
-  assert.equal((await reviewSnapshot()).rows[1].finalCategoryId,'water-valve','新规则进入新成果表');
-
-  await page.locator('#library-rules > li').last().getByRole('button',{name:'添加排除条件'}).click();
-  await setInput(page.locator('#library-rules > li').last().locator('input[aria-label="关键词"]').nth(1),'DN50');
-  await page.locator('#library-save').click();
-  await page.waitForFunction(()=>document.querySelector('#library-message').textContent.includes('分类库已保存到本机'));
-  assert.equal((await reviewSnapshot()).counts.none,1,'命中排除条件就不推荐');
-
-  await page.locator('#library-categories > li[data-category-id="water-valve"]').getByRole('button',{name:'停用'}).click();
-  await page.locator('#library-save').click();
-  await page.waitForFunction(()=>document.querySelector('#library-message').textContent.includes('分类库已保存到本机'));
-  const disabled=await reviewSnapshot();
-  assert.equal(disabled.counts.none,2);
-  assert.equal(disabled.categories.some(category=>category.id==='no-inquiry'),true,'停用其它类别后成果表仍可选择无需询价');
-
-  await page.locator('#library-categories > li[data-category-id="water-valve"]').getByRole('button',{name:'启用'}).click();
-  await page.locator('#library-save').click();
-  await page.waitForFunction(()=>document.querySelector('#library-message').textContent.includes('分类库已保存到本机'));
-  assert.equal((await reviewSnapshot()).rows[0].finalCategoryId,'water-valve');
-  // 整表学习与即时面板同步由ui-memory-check验证；此处从已持久化的整表来源继续维护。
-  const persisted=await store.load();
-  const learned=Memory.learn(persisted.memory,{rowId:'row-library',categoryId:'water-valve',confirmedAt:'2026-09-27T00:00:00Z'},
-   {item:{name:'水龙头',feature:'DN15',unit:'个'},projectId:'p-library',sourceProjectId:'p-library',rowId:'row-library'});
-  await store.save({expectedRevision:persisted.revision,library:persisted.library,memory:learned});
-  await page.locator('#library-reload').click();
-  await page.waitForFunction(()=>document.querySelector('#library-status').textContent.includes('有效记忆 1'));
-  assert.match(await page.locator('#library-memories').innerText(),/确认来源 p-/,'记忆列表要显示确认来源');
-
-  failNextSave=true;
-  const categoryName=page.locator('#library-categories > li[data-category-id="water-valve"] input[aria-label="类别名称"]');
-  await setInput(categoryName,'水阀门二');
-  await page.locator('#library-save').click();
-  await page.waitForFunction(()=>document.querySelector('#library-message').textContent.includes('草稿保留在本页'));
-  assert.equal(await categoryName.inputValue(),'水阀门二','保存失败时本页草稿必须保留');
-  await page.locator('#library-save').click();
-  await page.waitForFunction(()=>document.querySelector('#library-message').textContent.includes('分类库已保存到本机'));
-  assert.equal((await store.load()).library.categories.filter(category=>category.id==='water-valve')[0].name,'水阀门二');
-
-  await page.locator('#library-memories > li').first().getByRole('button',{name:'撤销这条记忆'}).click();
-  assert.match(await page.locator('#library-status').innerText(),/有效记忆 0/);
-  await page.locator('#library-save').click();
-  await page.waitForFunction(()=>document.querySelector('#library-message').textContent.includes('分类库已保存到本机'));
-  const finalState=await store.load();
-  assert.equal(finalState.memory.memories.length,1);
-  assert.equal(finalState.memory.memories[0].state,'revoked');
-  assert.equal(finalState.memory.memories[0].sources.length,1,'撤销记忆必须保留确认来源而不是硬删');
-  await page.locator('#library-memory-filter').selectOption('revoked');
-  assert.match(await page.locator('#library-memories').innerText(),/水龙头/);
-  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'380px窄侧栏不得横向溢出');
-  assert.deepEqual(errors,[]);
-  console.log('PASS: 分类库维护面板可新增类别/规则、排除条件生效、停用后无需询价仍可选、版本冲突与保存失败都不丢草稿、记忆撤销保留来源、习惯保存后建议即时刷新。');
+  const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.type()==='prompt'?d.accept('测试改名'):d.accept());
+  await page.goto('http://127.0.0.1:'+server.address().port+'/library.html');await page.waitForFunction(()=>document.querySelectorAll('#categories tr').length===6);
+  assert.equal(await page.getByRole('checkbox',{name:'选择无需询价',exact:true}).isDisabled(),true);
+  // 版本冲突保留输入，刷新后重试，不覆盖其他窗口。
+  const loaded=await store.load();await store.save({...loaded,expectedRevision:loaded.revision});
+  await page.locator('#new-name').fill('草稿保留');await page.locator('#add-form button').click();await page.waitForFunction(()=>document.querySelector('#feedback').textContent.includes('版本冲突'));
+  assert.equal(await page.locator('#new-name').inputValue(),'草稿保留');await page.locator('#reload').click();await page.waitForTimeout(100);
+  await page.locator('#add-form button').click();await page.waitForFunction(()=>document.querySelector('#feedback').textContent.includes('已保存'));assert.ok((await store.load()).library.categories.some(c=>c.name==='草稿保留'));
+  const source=page.locator('#categories tr').filter({hasText:'测试源类'});await source.getByRole('button',{name:'归档',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#feedback').textContent.includes('关联'));
+  await source.getByRole('checkbox').check();await page.locator('#merge-target').selectOption('target-b');await page.locator('#preview-merge').click();await page.waitForFunction(()=>!document.querySelector('#merge-preview').hidden);
+  assert.equal((await store.load()).library.categories.find(c=>c.id==='source-a').state,'active','预览不能合并');await page.locator('#merge-preview').getByRole('button',{name:'确认合并',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#merge-preview').hidden);
+  let actual=await store.load();assert.equal(actual.library.categories.find(c=>c.id==='source-a').mergedInto,'target-b');assert.ok(actual.library.categories.find(c=>c.id==='target-b').aliases.includes('测试源类'));assert.equal(actual.memory.memories[0].categoryId,'target-b');
+  await page.locator('#categories tr').filter({hasText:'测试目标类'}).getByRole('button',{name:'改名',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#categories').textContent.includes('测试改名'));
+  assert.equal((await store.load()).memory.memories[0].categoryName,'测试改名');
+  await page.locator('#advanced summary').click();await page.locator('#rule-category').selectOption('target-b');await page.locator('#rule-keywords').fill('测试材料');await page.locator('#rule-exclude').fill('DN65');await page.locator('#rule-form button').click();await page.waitForTimeout(100);actual=await store.load();assert.equal(actual.library.rules.at(-1).exclude[0].any[0],'DN65');
+  await page.getByRole('tab',{name:'学习经验',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('#memories li').length===1);await page.getByRole('button',{name:'撤销经验',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#memories').textContent.includes('没有学习经验'));
+  actual=await store.load();assert.equal(actual.memory.memories[0].state,'revoked');assert.equal(actual.memory.memories[0].sources.length,1);await page.locator('#memory-state').selectOption('revoked');await page.waitForFunction(()=>document.querySelector('#memories').textContent.includes('测试材料'));
+  assert.deepEqual(errors,[]);console.log('PASS library maintenance: conflict drafts, protected decision, archive guard, manual merge preview, aliases, rename, exclusion rule, revoke preserves sources');
  }finally{await browser.close();await new Promise(r=>server.close(r));await fs.rm(root,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

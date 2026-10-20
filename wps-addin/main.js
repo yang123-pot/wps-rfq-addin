@@ -1,5 +1,11 @@
 document.write('<script src="src/host.js"><\/script>');
 document.write('<script src="src/ribbon-navigation.js"><\/script>');
+document.write('<script src="src/library-window-host.js"><\/script>');
+
+function OnOpenCategoryLibrary() {
+  try { return !!window.RfqLibraryWindow.open(window.Application); }
+  catch (error) { alert('无法打开分类学习库：' + error.message); return false; }
+}
 
 function OnAddinLoad(ribbonUI) {
   window.Application.PluginStorage.setItem('rfq.ribbon.loaded', true);

@@ -8,7 +8,7 @@
     relocateButton=document.getElementById('relocate-project');
   var current=null,busy=false,pendingId=null,lastReport=null,restoringId=null;
   // R5：整表审核确认快照与草稿。只有确认快照存在（且inputKey仍是本次内容）才把“表内审核”置为已确认。
-  var reviewConfirmation=null,reviewDraft=null,lastError=null;
+  var reviewConfirmation=null,reviewDraft=null,lastError=null,learningDecision=null;
   var restoreBlocks={},restoreAudit=null,restoreRecord=null;
   var STATE={ready:'已确认',stale:'已过期',missing:'未完成'};
   function tell(text,error){
@@ -127,6 +127,7 @@
     project.matching=options.getReviewBinding?options.getReviewBinding()||null:null;
     project.review=reviewConfirmation;
     project.reviewDraft=reviewDraft;
+    project.learning=learningDecision;
     project.categories=options.getCategories?options.getCategories()||null:null;
     project.summary=options.getSummary?options.getSummary()||null:null;
     project.brands=options.getBrands?options.getBrands()||null:null;
@@ -142,6 +143,7 @@
     if(options.restoreReviewBinding)options.restoreReviewBinding(project.matching||null);
     reviewConfirmation=project.review||null;
     reviewDraft=project.reviewDraft||null;
+    learningDecision=project.learning||null;
     if(options.restoreReviewConfirmation)options.restoreReviewConfirmation(reviewConfirmation);
     if(options.restoreReviewDraft)options.restoreReviewDraft(reviewDraft);
     if(options.restoreCategories)options.restoreCategories(project.categories||null);
@@ -408,6 +410,8 @@
    uiStatus:function(){return {stages:RfqProject.assess(assessmentInputs()),reviewBlocked:!!blockDetail('review')};},
    assessment:function(){return lastReport;},commitReview:commitReview,commitReviewDraft:commitReviewDraft,
    reviewConfirmation:function(){return reviewConfirmation;},reviewDraft:function(){return reviewDraft;},
+   learningDecision:function(){return learningDecision;},
+   commitLearning:async function(value){var previous=learningDecision;learningDecision=value;var receipt=await persist();if(!receipt)learningDecision=previous;return receipt;},
    lastError:function(){return lastError;},save:saveProject,open:openProject,
    restoreAudit:function(){return restoreAudit;}};
  }
