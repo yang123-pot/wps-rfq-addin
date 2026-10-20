@@ -6,7 +6,9 @@
 
 - 工作副本：`F:\材料软件开发\outputs\wps-ui-v2-20261018\worktree`
 - 分支：`feat/wps-ui-v2`
-- 远程 HEAD 与本机 HEAD：`257b824bf607ca7c1e8156ac0fb6a21a3f929a8e`
+- 功能基线提交：`257b824bf607ca7c1e8156ac0fb6a21a3f929a8e`
+- 交接文档提交：`315005e60071404e8c2f2a64c8659b502a7b21a4`
+- 开工时以 `git rev-parse HEAD` 和 `git ls-remote` 重新核对当前 HEAD。
 - 当前工作区干净。
 - 38891 服务运行中：PID `16496`，appDir 指向上述工作副本，使用 F5 acceptance-data 五目录。
 - 启动时间仅为现场记录；新窗口应按健康响应重新核对 PID、`appDir`、`scriptPath` 和 `codeVersion`，不要盲用旧 PID。
