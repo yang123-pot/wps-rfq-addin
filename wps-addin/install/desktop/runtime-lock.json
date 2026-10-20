@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "node": {
+    "version": "22.23.3",
+    "file": "node-v22.23.3-win-x64.zip",
+    "url": "https://nodejs.org/dist/v22.23.3/node-v22.23.3-win-x64.zip",
+    "checksumsUrl": "https://nodejs.org/dist/v22.23.3/SHASUMS256.txt",
+    "sha256": "2b0ff57b049cda1bbcea2240eec20467018713c1efe1f7360c2681859b90ed71"
+  },
+  "powershell": {
+    "version": "7.6.7",
+    "file": "PowerShell-7.6.7-win-x64.zip",
+    "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.6.7/PowerShell-7.6.7-win-x64.zip",
+    "checksumsUrl": "https://github.com/PowerShell/PowerShell/releases/download/v7.6.7/hashes.sha256",
+    "sha256": "d2f952ebdbf24386cb8923553aa58e41a846db35a6155ea04c58142a4b16dbb7"
+  }
+}
