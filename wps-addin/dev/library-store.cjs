@@ -2,6 +2,7 @@ const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('n
 const {writeFileAtomic}=require('./atomic-file.cjs');
 const {validate:validateLibrary}=require('../src/category-library.js');
 const {validate:validateMemory,create:createMemory}=require('../src/category-memory.js');
+const operations=require('../src/library-operations.js'),query=require('./library-query.cjs');
 const SCHEMA_VERSION=1,FILE_NAME='library-state.json';
 
 function revisionConflict(message){
@@ -29,7 +30,7 @@ function assertValidPackage(state){
 function createLibraryStore({directory,defaults}={}){
  if(typeof directory!=='string'||!directory.trim())throw Error('分类库目录无效，已停止读写。');
  const root=path.resolve(directory),target=path.join(root,FILE_NAME);
- let bundled=defaults||null,writes=Promise.resolve();
+ let bundled=defaults||null,writes=Promise.resolve(),cached=null,cacheKey=null,index=null;
  async function defaultLibrary(){
   if(bundled)return JSON.parse(JSON.stringify(bundled));
   const text=await fs.readFile(path.join(__dirname,'..','rules','defaults.json'),'utf8');
@@ -43,20 +44,41 @@ function createLibraryStore({directory,defaults}={}){
  }
  async function readDisk(){
   let text;
-  try{text=await fs.readFile(target,'utf8');}
+  let key;
+  try{const stat=await fs.stat(target);key=[stat.ino,stat.size,stat.mtimeMs,stat.ctimeMs].join(':');
+   if(cached&&key===cacheKey)return cached;
+   text=await fs.readFile(target,'utf8');}
   catch(error){
-   if(error.code==='ENOENT')return null;
+   if(error.code==='ENOENT'){cached=null;cacheKey=null;index=null;return null;}
    throw Error('读取分类库状态失败：'+error.message);
   }
   let parsed;
   try{parsed=JSON.parse(text);}
   catch(error){throw Error('分类库状态已损坏，原文件未改动：'+error.message);}
-  return assertValidPackage(parsed);
+  cached=assertValidPackage(parsed);cacheKey=key;index=null;return cached;
  }
  async function load(){
   const stored=await readDisk();
   if(!stored)return fresh();
-  return {...stored,persisted:true};
+  return {...JSON.parse(JSON.stringify(stored)),persisted:true};
+ }
+ async function snapshot(){return (await readDisk())||fresh();}
+ async function writeNext(current,library,memory){
+  const next={schemaVersion:SCHEMA_VERSION,revision:current.revision+1,library,memory,updatedAt:new Date().toISOString()};
+  assertValidPackage(next);
+  const text=JSON.stringify(next,null,2);
+  try{await writeFileAtomic(target,text,function(readback){assertValidPackage(JSON.parse(readback));});}
+  catch(error){throw Error('分类库保存失败，已保留上一版：'+error.message);}
+  cached=null;cacheKey=null;index=null;
+  return {revision:next.revision,path:target,bytes:Buffer.byteLength(text),updatedAt:next.updatedAt};
+ }
+ function mutate(request){
+  if(!Number.isSafeInteger(request?.expectedRevision)||request.expectedRevision<0)return Promise.reject(Error('修改分类库需要有效版本号。'));
+  const input=JSON.parse(JSON.stringify(request));
+  const run=writes.catch(function(){}).then(async()=>{
+   const current=await snapshot();if(current.revision!==input.expectedRevision)throw revisionConflict();
+   const next=operations.apply(current,input.operation);return writeNext(current,next.library,next.memory);
+  });writes=run.catch(function(){});return run;
  }
  function save(input){
   const request=input&&typeof input==='object'?input:{};
@@ -76,19 +98,16 @@ function createLibraryStore({directory,defaults}={}){
    const current=await readDisk();
    const currentRevision=current?current.revision:0;
    if(currentRevision!==request.expectedRevision)throw revisionConflict();
-   const next={schemaVersion:SCHEMA_VERSION,revision:currentRevision+1,library:library,memory:memory,
-    updatedAt:new Date().toISOString()};
-   const text=JSON.stringify(next,null,2);
-   try{
-    await writeFileAtomic(target,text,function(readback){assertValidPackage(JSON.parse(readback));});
-   }catch(error){
-    throw Error('分类库保存失败，已保留上一版：'+error.message);
-   }
-   return {revision:next.revision,path:target,bytes:Buffer.byteLength(text),updatedAt:next.updatedAt};
+   return writeNext({revision:currentRevision},library,memory);
   });
   writes=run.catch(function(){});
   return run;
  }
- return {directory:root,path:target,load:load,save:save};
+ return {directory:root,path:target,load:load,save:save,mutate,
+  summary:async()=>query.summary(await snapshot()),page:async q=>query.page(await snapshot(),q),
+  classifyIndex:async()=>{const s=await snapshot();if(!index||index.revision!==s.revision)index=query.classifyIndex(s);return index;},
+  preview:async q=>{const s=await snapshot();return {revision:s.revision,...operations.previewMerge(s,q.sourceIds,q.targetId)};},
+  similar:async q=>{const s=await snapshot();return {revision:s.revision,items:operations.similar(s,q.categoryId)};},
+  detail:async q=>{const s=await snapshot(),m=s.memory.memories.find(x=>x.id===q.memoryId);if(!m)throw Error('学习经验不存在。');return {revision:s.revision,item:m};}};
 }
 module.exports={SCHEMA_VERSION:SCHEMA_VERSION,FILE_NAME:FILE_NAME,createLibraryStore:createLibraryStore,validatePackage:validatePackage};

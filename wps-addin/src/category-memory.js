@@ -119,12 +119,23 @@
   next.history=(next.history||[]).concat([{at:next.updatedAt,action:'revoke',memoryId:memoryId,categoryId:target.categoryId}]);
   return next;
  }
+ var compactIndexes=new WeakMap();
+ function indexedRecords(memory,target,context){
+  var index=compactIndexes.get(memory);
+  if(!index){assertValid(memory);index={exact:new Map(),names:new Map()};
+   memory.memories.forEach(function(r){if(r.state!=='active')return;var key=signature(r.item),name=text(r.item.name);
+    if(!index.exact.has(key))index.exact.set(key,[]);index.exact.get(key).push(r);
+    if(!index.names.has(name))index.names.set(name,[]);index.names.get(name).push(r);});compactIndexes.set(memory,index);}
+  function visible(r){return r.scope!=='project'||r.projectId===(context.projectId||null);}
+  var exact=(index.exact.get(signature(target))||[]).filter(visible);
+  return exact.length?exact:(index.names.get(target.name)||[]).filter(visible);
+ }
  function find(memory,item,context){
-  assertValid(memory);
+  if(!memory||!memory.compact)assertValid(memory);
   context=context||{};
   var target={name:text(item&&item.name),feature:text(item&&item.feature),unit:text(item&&item.unit)},
     candidates=[];
-  memory.memories.forEach(function(record){
+  (memory.compact?indexedRecords(memory,target,context):memory.memories).forEach(function(record){
    if(record.state!=='active')return;
    if(record.scope==='project'&&record.projectId!==(context.projectId||null))return;
    var level=null;

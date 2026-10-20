@@ -159,7 +159,8 @@ function createServer({root, importDirectory = null, projectDirectory = null, li
         return json(400,{error:error.message});
       }
     }
-    if (['/api/library/load','/api/library/save'].includes(url.pathname)) {
+    if (['/api/library/load','/api/library/save','/api/library/window/summary','/api/library/window/page',
+      '/api/library/window/mutate','/api/library/window/preview','/api/library/window/similar','/api/library/window/detail','/api/library/classify-index'].includes(url.pathname)) {
       const json = (status,value) => reply(status,JSON.stringify(value),'application/json; charset=utf-8');
       if (req.method !== 'POST') return json(405,{error:'POST required'});
       if (req.headers['x-rfq-import-token'] !== importToken ||
@@ -173,6 +174,13 @@ function createServer({root, importDirectory = null, projectDirectory = null, li
         let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch(_){return json(400,{error:'分类库请求无效。'});}
         if(!data||Array.isArray(data))return json(400,{error:'分类库请求无效。'});
         if(url.pathname==='/api/library/load')return json(200,await libraries.load());
+        if(url.pathname==='/api/library/window/summary')return json(200,await libraries.summary());
+        if(url.pathname==='/api/library/window/page')return json(200,await libraries.page(data));
+        if(url.pathname==='/api/library/window/mutate')return json(200,await libraries.mutate(data));
+        if(url.pathname==='/api/library/window/preview')return json(200,await libraries.preview(data));
+        if(url.pathname==='/api/library/window/similar')return json(200,await libraries.similar(data));
+        if(url.pathname==='/api/library/window/detail')return json(200,await libraries.detail(data));
+        if(url.pathname==='/api/library/classify-index')return json(200,await libraries.classifyIndex());
         return json(200,await libraries.save(data));
       } catch(error) {
         if(error.code==='REVISION_CONFLICT')return json(409,{error:error.message});

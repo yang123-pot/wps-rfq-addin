@@ -18,7 +18,9 @@
   if(ids.indexOf(targetId)>=0)throw Error('目标不能同时作为源分类。');
   var rules=0,memories=0,aliases=(target.aliases||[]).slice();
   ids.forEach(function(id){var c=editable(s,id);if(c.mergedInto)throw Error('源分类已经合并。');var n=related(s,id);rules+=n.rules;memories+=n.memories;aliases=aliases.concat(c.name,c.aliases||[]);});
-  return {sourceIds:ids,targetId:targetId,rules:rules,memories:memories,aliases:unique(aliases),requiresConfirmation:true};
+  var dry=clone(s);dry.library.rules.forEach(function(r){if(ids.indexOf(r.categoryId)>=0)r.categoryId=targetId;});dry.memory.memories.forEach(function(m){if(ids.indexOf(m.categoryId)>=0)m.categoryId=targetId;});
+  var beforeRules=dry.library.rules.length,beforeMemories=dry.memory.memories.length;dedupe(dry);
+  return {sourceIds:ids,targetId:targetId,rules:rules,memories:memories,duplicateRules:beforeRules-dry.library.rules.length,duplicateMemories:beforeMemories-dry.memory.memories.length,aliases:unique(aliases),requiresConfirmation:true};
  }
  function canonicalRule(r){
   function conditions(list){return (list||[]).map(function(c){return {field:c.field,any:unique(c.any||[]).sort()};}).sort(function(a,b){return JSON.stringify(a).localeCompare(JSON.stringify(b));});}
@@ -46,6 +48,10 @@
    s.library.rules.forEach(function(r){if(p.sourceIds.indexOf(r.categoryId)>=0)r.categoryId=target.id;});
    s.memory.memories.forEach(function(m){if(p.sourceIds.indexOf(m.categoryId)>=0){m.previousCategoryIds=unique((m.previousCategoryIds||[]).concat(m.categoryId));m.categoryId=target.id;m.categoryName=target.name;}});
    s.memory.history.forEach(function(h){if(p.sourceIds.indexOf(h.categoryId)>=0){h.previousCategoryId=h.categoryId;h.categoryId=target.id;}});dedupe(s);
+  }else if(op.type==='rule'){
+   target=category(s,op.rule&&op.rule.categoryId);if(!active(target))throw Error('规则目标分类必须有效。');
+   var rule=clone(op.rule),position=s.library.rules.findIndex(function(r){return r.id===rule.id;});
+   if(!rule.id)rule.id=lib.newId(s.library,'rule');if(position<0)s.library.rules.push(rule);else s.library.rules[position]=rule;
   }else if(op.type==='revoke')s.memory=mem.revoke(s.memory,op.memoryId);
   else throw Error('未知分类库操作。');
   s.library.version='local-'+at;s.memory.updatedAt=at;
