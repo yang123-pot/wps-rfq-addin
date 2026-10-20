@@ -4,15 +4,15 @@
     "name": "wps-rfq-addin-0.1.0-20261020-R1",
     "version": "0.1.0",
     "build": "20261020-R1",
-    "createdAt": "2026-10-20T13:47:58+08:00",
+    "createdAt": "2026-10-20T13:57:42+08:00",
     "branch": "feat/wps-ui-v2",
-    "commit": "ee7591b0d729fc521f2aaf1ddf49ddc5e061878d",
+    "commit": "8b41c034215752f138993863eb8510edca1ae290",
     "zipName": "wps-rfq-addin-0.1.0-20261020-R1.zip",
-    "zipBytes": 713586,
-    "zipSha256": "844d89e48920820ab31963b4db875a4148408081b306fa8c502f22e39dc6c430",
+    "zipBytes": 715556,
+    "zipSha256": "589cd0c848d85799b99106a101773aa64f3d63347334d5a5b79ea532fa206f73",
     "codeVersion": "07f53709ba0b58f8654b86c3d8e1efd6da23f81762555fe4913e987227d7e7c9",
     "testedWps": "12.1.0.29161",
-    "fileCount": 99,
+    "fileCount": 100,
     "files": [
       {
         "path": "assets/brands.svg",
@@ -173,6 +173,11 @@
         "path": "docs/wps-install-guide.md",
         "bytes": 8138,
         "sha256": "fa559897ede297976a2e1cca1356e86befc57cd6960348334edfb7ff09aa8d99"
+      },
+      {
+        "path": "docs/wps-release-notes-0.1.0.md",
+        "bytes": 3108,
+        "sha256": "ddb5abc55179cbf077fa71a8cacf9e9493612a8590c14a8527f012764bddaf9c"
       },
       {
         "path": "docs/wps-user-guide.md",
