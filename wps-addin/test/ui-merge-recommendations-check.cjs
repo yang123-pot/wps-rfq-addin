@@ -1,0 +1,41 @@
+const assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
+const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs'),{createLibraryStore}=require('../dev/library-store.cjs'),memory=require('../src/category-memory.js');
+(async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'merge-recommendation-ui-')),libraryDirectory=path.join(dir,'library'),store=createLibraryStore({directory:libraryDirectory});
+ const library={version:'test',categories:[{id:'a',name:'阀门'},{id:'b',name:'水阀门'},{id:'c',name:'线缆'},{id:'d',name:'电线电缆'},{id:'no-inquiry',name:'无需询价'}],rules:['a','b'].map((categoryId,i)=>({id:'rule-'+i,categoryId,state:'active',match:[{field:'name',any:['验收阀门']}]}))};
+ const m=memory.create();m.memories=['a','b'].map((categoryId,i)=>({id:'memory-'+i,categoryId,categoryName:i?'水阀门':'阀门',item:{name:'验收阀门',feature:'DN50',unit:'个'},scope:'global',projectId:null,state:'active',sources:[{sourceProjectId:'p'+i,sourceRowId:'r'}]}));
+ await store.save({library,memory:m,expectedRevision:0});const server=createServer({root:path.resolve(__dirname,'..'),importDirectory:path.join(dir,'imports'),libraryDirectory});await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ const browser=await chromium.launch({channel:'msedge',headless:true});let release;
+ try{const page=await browser.newPage({viewport:{width:960,height:720}}),errors=[],requests=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));
+  await page.addInitScript(()=>{const data={'rfq.library.current-project':JSON.stringify({projectId:'accept-current',confirmed:true})};window.Application={PluginStorage:{getItem:k=>data[k]||null,setItem:(k,v)=>data[k]=v}};});
+  const origin='http://127.0.0.1:'+server.address().port;await page.goto(origin+'/library.html');await page.waitForFunction(()=>document.querySelectorAll('#categories tr').length===5);
+  assert.equal(await page.locator('#recommendations').count(),1,'automatic merge recommendation area must exist');
+  await page.waitForFunction(()=>document.querySelectorAll('.recommendation-card').length===2);
+  const card=page.locator('.recommendation-card').filter({has:page.getByRole('heading',{name:'阀门 ↔ 水阀门',exact:true})});
+  assert.match(await card.innerText(),/相同材料/);assert.match(await card.innerText(),/验收阀门/);assert.equal((await store.load()).revision,1,'opening recommendations cannot mutate the library');
+  const cable=page.locator('.recommendation-card').filter({has:page.getByRole('heading',{name:'线缆 ↔ 电线电缆',exact:true})});await cable.getByRole('button',{name:'保持独立',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelectorAll('.recommendation-card').length===1&&document.querySelector('#feedback').textContent.includes('已保存'));
+  assert.equal(await page.locator('#recommendation-pager').getByRole('button',{name:'上一页',exact:true}).isDisabled(),true,'a mutation must preserve recommendation page bounds');
+  await page.reload();await page.waitForFunction(()=>document.querySelectorAll('.recommendation-card').length===1);
+  assert.equal((await store.load()).library.mergeDismissals.length,1);
+  await card.getByRole('button',{name:'保留“阀门”',exact:true}).click();await card.getByRole('button',{name:'确认合并到“阀门”',exact:true}).waitFor();
+  assert.equal(await card.getByRole('checkbox').isDisabled(),true,'confirmed current project cannot be changed');
+  await page.evaluate(()=>Application.PluginStorage.setItem('rfq.library.current-project',JSON.stringify({projectId:'accept-current',confirmed:false})));
+  const gate=new Promise(r=>release=r);await page.route('**/api/library/window/preview',async route=>{if(route.request().postDataJSON().targetId==='a')await gate;await route.continue();});
+  await card.getByRole('button',{name:'保留“阀门”',exact:true}).click();await card.getByRole('button',{name:'保留“水阀门”',exact:true}).click();
+  await card.getByRole('button',{name:'确认合并到“水阀门”',exact:true}).waitFor();
+  const oldResponse=page.waitForResponse(r=>r.url().endsWith('/window/preview')&&r.request().postDataJSON().targetId==='a');release();await oldResponse;
+  assert.equal(await card.getByRole('button',{name:'确认合并到“水阀门”',exact:true}).count(),1,'late opposite preview cannot replace the selected direction');
+  assert.equal((await store.load()).revision,2,'selecting either name is preview only');await card.getByRole('checkbox').check();
+  if(process.env.RFQ_RECOMMENDATION_SCREENSHOT)await page.screenshot({path:process.env.RFQ_RECOMMENDATION_SCREENSHOT});
+  await card.getByRole('button',{name:'确认合并到“水阀门”',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#recommendations').textContent.includes('暂未发现'));
+  const actual=await store.load();assert.equal(actual.library.categories.find(c=>c.id==='a').mergedInto,'b');assert.ok(actual.library.categories.find(c=>c.id==='b').aliases.includes('阀门'));assert.equal(actual.library.rules.length,1);assert.equal(actual.memory.memories.length,1);assert.equal(actual.memory.memories[0].sources.length,2);
+  assert.equal(JSON.parse(await page.evaluate(()=>Application.PluginStorage.getItem('rfq.library.apply.request'))).projectId,'accept-current');
+  for(let i=0;i<8;i++){const s=await store.load();await store.mutate({expectedRevision:s.revision,operation:{type:'add',name:'额外测试分类'+i}});}
+  await page.locator('#reload').click();await page.waitForFunction(()=>document.querySelectorAll('.recommendation-card').length===10);await page.locator('#recommendation-pager').getByRole('button',{name:'下一页',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('#recommendation-pager span').textContent.startsWith('2 /'));assert.ok(await page.locator('.recommendation-card').count()<=10);
+  await page.locator('.recommendation-card').first().getByRole('button',{name:'保持独立',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('#recommendation-pager span').textContent.startsWith('1 /'));
+  assert.ok(!requests.some(url=>url.endsWith('/api/library/load')));assert.deepEqual(errors,[]);console.log('PASS recommended merges: automatic bounded cards, persistent independence, latest direction only, explicit merge/dedup and guarded project sync');
+ }finally{if(release)release();await browser.close();await new Promise(r=>server.close(r));await fs.rm(dir,{recursive:true,force:true});}
+})().catch(e=>{console.error(e);process.exitCode=1;});
