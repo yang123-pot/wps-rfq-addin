@@ -1,6 +1,6 @@
 # WPS询价插件：已批准效果图、执行计划与交接文档
 
-> **2026-10-20 中文一键安装器（最新入口）：** 用户已批准 EXE＋内置 Node/PowerShell＋WPS 检测引导。桌面安装专项17/17、全量Node635/635，真实隔离安装/升级/失败回退/并发启动通过，独立复审无未修Critical/Important。首个145MB完整EXE已验证不依赖全局node/pwsh，包内官方22.23.3/7.6.7实际运行；真实WPS版本及正在运行阻断正确，未替换用户安装或真实注册。下一项按本次提交重建最终包、核SHA并补充GitHub下载资产；尚未代码签名。详见`docs/wps-oneclick-installer-20261020.md`。入场`docs/manuals/`及根目录pane修改保持，不纳本包。
+> **2026-10-20 中文一键安装器已交付（最新入口）：** 源码`5472ef6`已推送并核远程；[GitHub v0.1.0](https://github.com/yang123-pot/wps-rfq-addin/releases/tag/v0.1.0)新增`WpsRfqAddin-Setup-0.1.0.exe`，144818176字节，SHA`0ccaa76a…`；安装器清单/SHA三资产均核GitHub服务器digest一致，旧ZIP与标签保持。内置官方Node22.23.3/PowerShell7.6.7，最终EXE无全局PATH检测及包内运行时隔离安装/双并发启动通过，Node635/635、专项17/17、独立复审通过。真实WPS正在运行时阻止安装，未替换用户安装/真实注册；尚未代码签名，用户实际点击安装留待使用反馈。详见`docs/wps-oneclick-installer-20261020.md`及`docs/wps-oneclick-installer-release-20261020.json`。入场`docs/manuals/`与根目录pane保持，不纳本包；安装器后续按实际反馈维护。
 
 > **2026-10-20 20:54 正式发布完成（最新入口）：** [发布PR #1](https://github.com/yang123-pot/wps-rfq-addin/pull/1)已合并main至`ea605a7`，合并树与验收分支一致，全量Node **618/618**；`v0.1.0`标签指向该提交。[GitHub Release](https://github.com/yang123-pot/wps-rfq-addin/releases/tag/v0.1.0)已发布，非草稿/非预发布，仓库保持私有。final11 ZIP（100文件、717005字节、SHA`d8028464…`）、manifest及SHA256SUMS三份资产均已下载并逐字节SHA核对。原生恢复/同名两分支/D4、浏览器26/26及六步隔离生命周期通过。当前服务 **PID32420／cd267ccc…**沿原五目录，根目录pane及WPS未保存临时预览保持；未重新安装或重生成成果。旧脚本30分钟仍只记有界通过。发布门槛已关闭；后续按实际使用反馈维护，详见[发布回执](docs/wps-release-published-20261020.md)。本次集成首轮随机端口bad port失败与两次全量通过分别留档，未隐藏失败、未改产品或系统配置。
 

@@ -41,3 +41,11 @@
 - 安装程序暂未做 Authenticode 代码签名，Windows 可能显示未知发布者；不承诺免除 SmartScreen 或安全软件提示。用户真实点击“一键安装”替换当前在用插件尚未执行，本包不为验收而关闭用户 WPS 或替换真实注册。
 
 本机证据目录：`outputs/wps-oneclick-20261020/`。本包不重装用户在用插件、不改现有真实 publish.xml、不停止在用 WPS 或端口38891服务。
+
+## 正式下载资产
+
+[GitHub v0.1.0 下载页](https://github.com/yang123-pot/wps-rfq-addin/releases/tag/v0.1.0)已新增 `WpsRfqAddin-Setup-0.1.0.exe`，构建 `20261020-setup2`，144818176字节（约145MB）；SHA-256 为 `0ccaa76aa754a66c4fa1ea62e8f541d295a3450d84391791ed8e10ccd996ad1f`。GitHub 会规范化上传文件名，因此发布资产使用 ASCII 名称，内容与本机中文文件名版本逐字节一致。
+
+最终包来自已推送源码提交 `5472ef6c764b35dd07fdf09f81d353808ea27bb0`，产品白名单102项实际SHA写入载荷清单。最终EXE再次完成完整载荷解压/无全局PATH检测，以及复制出的官方运行环境隔离安装/两个并发CLI启动，退出均为0。服务代码版本与原0.1.0业务版一致；这次补充安装器，不重建原ZIP或移动发布标签。
+
+EXE、`installer-20261020-setup2.json`、`INSTALLER-SHA256SUMS.txt` 三份资产均以本地实际 SHA 与 GitHub 服务器 digest/字节数核对相同；未声称从远端重新下载145MB并复验。上传后更正文件名的小清单第一次替换遇到HTTP502，重试成功，最终三份一致。公开回执见[发行回执](wps-oneclick-installer-release-20261020.json)。截图、运行日志及包含本机路径的隔离报告仍仅保留 outputs，不上传。
