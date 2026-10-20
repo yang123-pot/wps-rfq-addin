@@ -141,9 +141,11 @@ const fixture=require('./ui-inquiry-check.cjs'),xlsx=require('./fixtures/xlsx-co
   assert.equal(generated.header.address,'示例市示例路1号','公司地址随项目保存');
   assert.equal(generated.generation.modelSnapshot.sheets[0].values[1][0],'公司地址：示例市示例路1号','公司地址带入询价表第二行');
   const valve=generated.generation.modelSnapshot.sheets.find(s=>s.name==='阀门_合成询价');assert.deepEqual(valve.values.slice(valve.headerRow).map(r=>r[5]),['20','12']);assert.equal(valve.values[valve.headerRow][6],'通达 / 海岳');
-  await action('下一步：拆分询价文件');await action('选择输出文件夹');await shot('07-split-ready');
-  const beforeBack=await record();
+  await action('下一步：拆分询价文件');
+  const preparedProjectSave=page.waitForResponse(response=>response.url().endsWith('/api/project/save')&&response.status()===200&&!!response.request().postDataJSON().project.split);
+  await action('选择输出文件夹');await preparedProjectSave;await shot('07-split-ready');
   await page.waitForFunction(()=>!RfqAssistant.snapshot().busy&&!document.getElementById('simple-back').disabled);
+  const beforeBack=await record();
   await page.locator('#simple-back').press('Enter');
   await page.waitForFunction(()=>document.getElementById('simple-home').dataset.step==='6',null,{timeout:3000});
   assert.equal(await page.locator('#simple-home').getAttribute('data-step'),'6','第7步键盘返回询价表');

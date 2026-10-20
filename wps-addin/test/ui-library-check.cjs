@@ -20,7 +20,27 @@ const {chromium}=require('playwright'),{createServer}=require('../dev/server.cjs
   await source.getByRole('checkbox').check();await page.locator('#merge-target').selectOption('target-b');await page.locator('#preview-merge').click();await page.waitForFunction(()=>!document.querySelector('#merge-preview').hidden);
   assert.equal((await store.load()).library.categories.find(c=>c.id==='source-a').state,'active','预览不能合并');await page.locator('#merge-preview').getByRole('button',{name:'确认合并',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#merge-preview').hidden);
   let actual=await store.load();assert.equal(actual.library.categories.find(c=>c.id==='source-a').mergedInto,'target-b');assert.ok(actual.library.categories.find(c=>c.id==='target-b').aliases.includes('测试源类'));assert.equal(actual.memory.memories[0].categoryId,'target-b');
-  await page.locator('#categories tr').filter({hasText:'测试目标类'}).getByRole('button',{name:'改名',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#categories').textContent.includes('测试改名'));
+  // WPS WebDialog may suppress window.prompt; rename must expose an in-page editor.
+  await page.evaluate(()=>{window.prompt=()=>null;});
+  await page.locator('#categories tr').filter({hasText:'测试目标类'}).getByRole('button',{name:'改名',exact:true}).click();
+  assert.equal(await page.getByRole('textbox',{name:'新的分类名称',exact:true}).count(),1,'clicking rename must create a visible editable field without a native prompt');
+  const rename=page.getByRole('textbox',{name:'新的分类名称',exact:true});assert.equal(await rename.isVisible(),true);assert.equal(await rename.inputValue(),'测试目标类');
+  await rename.fill('取消的名称');await page.getByRole('button',{name:'取消改名',exact:true}).click();
+  assert.equal((await store.load()).library.categories.find(c=>c.id==='target-b').name,'测试目标类','cancel does not save');
+  await page.locator('#categories tr').filter({hasText:'测试目标类'}).getByRole('button',{name:'改名',exact:true}).click();
+  await rename.fill('测试改名');
+  const renameConcurrent=await store.load();await store.save({...renameConcurrent,expectedRevision:renameConcurrent.revision});
+  const renameConflict=page.waitForResponse(r=>r.url().endsWith('/api/library/window/mutate'));await page.getByRole('button',{name:'保存名称',exact:true}).click();
+  assert.equal((await renameConflict).status(),409);await page.waitForFunction(()=>document.querySelector('#feedback').textContent.includes('版本冲突'));
+  assert.equal(await rename.inputValue(),'测试改名','failed save retains rename input');assert.equal(await rename.isVisible(),true);
+  assert.equal((await store.load()).library.categories.find(c=>c.id==='target-b').name,'测试目标类');
+  const oldRenameButton=await page.locator('#categories tr').filter({hasText:'测试目标类'}).getByRole('button',{name:'改名',exact:true}).elementHandle();
+  await page.locator('#reload').click();await oldRenameButton.waitForElementState('hidden');
+  // Explicitly selecting the refreshed row adopts its current revision and retains the draft.
+  await page.locator('#categories tr').filter({hasText:'测试目标类'}).getByRole('button',{name:'改名',exact:true}).click();
+  assert.equal(await rename.inputValue(),'测试改名');await page.getByRole('button',{name:'保存名称',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('#categories').textContent.includes('测试改名'));
+  assert.equal(await rename.isVisible(),false,'successful save closes the editor');
   assert.equal((await store.load()).memory.memories[0].categoryName,'测试改名');
   await page.locator('#advanced summary').click();await page.locator('#rule-category').selectOption('target-b');await page.locator('#rule-keywords').fill('测试材料');await page.locator('#rule-exclude').fill('DN65');await page.locator('#rule-form button').click();await page.waitForTimeout(100);actual=await store.load();assert.equal(actual.library.rules.at(-1).exclude[0].any[0],'DN65');
   // Reading another page at a newer revision must not make a stale rule safe to overwrite.
