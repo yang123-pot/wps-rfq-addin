@@ -4,7 +4,30 @@
  else root.RfqProjectHost=factory();
 }(typeof window==='object'?window:globalThis,function(){
  'use strict';
- function key(value){return String(value||'').replace(/[\\/]+/g,'/').toLowerCase();}
+ function property(object,name){try{return object&&object[name];}catch(_){return null;}}
+ function normalizePath(value){
+  var raw=String(value==null?'':value).trim();
+  if(/^file:\/+/i.test(raw))raw=raw.replace(/^file:\/+/i,'');
+  raw=raw.replace(/^localhost[\\/]+/i,'');
+  try{raw=decodeURIComponent(raw);}catch(_){}
+  raw=raw.replace(/^\\\\\?\\UNC\\/i,'\\\\').replace(/^\\\\\?\\/,'');
+  return raw.replace(/[\\/]+/g,'\\').replace(/\\$/,'').toLowerCase();
+ }
+ function key(value){return normalizePath(value);}
+ function fullName(book){
+  var full=property(book,'FullName'),directory=property(book,'Path'),name=property(book,'Name');
+  return String(full||(directory&&name?String(directory)+'\\'+String(name):name||''));
+ }
+ function fileName(path){var parts=normalizePath(path).split('\\');return parts[parts.length-1]||'';}
+ function bookName(book){return String(property(book,'Name')||fileName(fullName(book))||'').toLowerCase();}
+ function sameBook(book,path){
+  return !!book&&(normalizePath(fullName(book))===normalizePath(path)||
+   (!!fileName(path)&&bookName(book)===fileName(path)));
+ }
+ function returnedLabel(book){
+  var name=String(property(book,'Name')||fileName(fullName(book))||'').trim();
+  return name?'（WPS返回“'+name+'”）':'';
+ }
  function absolute(value){return typeof value==='string'&&/^(?:[a-z]:[\\/]|\\\\).+/i.test(value);}
  function validateMeta(meta){
   if(!meta||typeof meta!=='object'||!absolute(meta.copyPath))throw Error('工作副本路径无效，未写入。');
@@ -25,7 +48,7 @@
  function findOpen(app,file){
   for(var index=1;index<=app.Workbooks.Count;index++){
    var book=app.Workbooks.Item(index);
-   if(key(book.FullName)===key(file))return book;
+   if(key(fullName(book))===key(file))return book;
   }
   return null;
  }
@@ -38,7 +61,8 @@
    app.AutomationSecurity=3;
    if(app.AutomationSecurity!==3)throw Error('无法禁用自动宏，未写入工作副本。');
    owned=app.Workbooks.Open(meta.copyPath,0,false);
-   if(!owned||key(owned.FullName)!==key(meta.copyPath))throw Error('WPS未返回指定工作副本。');
+   if(!owned)throw Error('WPS未返回工作副本，未写入。');
+   if(!sameBook(owned,meta.copyPath))throw Error('WPS返回的工作副本与本次项目不一致'+returnedLabel(owned)+'。');
    var sheet=owned.Worksheets.Item(plan.sheet);
    if(!sheet)throw Error('工作副本中找不到工作表：'+plan.sheet);
    var header=sheet.Cells.Item(plan.headerRow,plan.column),current=header.Value2;
@@ -58,7 +82,8 @@
    owned.Save();owned.Close(false);owned=null;
    app.AutomationSecurity=3;if(app.AutomationSecurity!==3)throw Error('无法禁用自动宏，未重新打开校验。');
    reopened=app.Workbooks.Open(meta.copyPath,0,true);
-   if(!reopened||key(reopened.FullName)!==key(meta.copyPath))throw Error('WPS未返回指定工作副本。');
+   if(!reopened)throw Error('WPS未返回工作副本，未校验。');
+   if(!sameBook(reopened,meta.copyPath))throw Error('WPS返回的工作副本与本次校验不一致'+returnedLabel(reopened)+'。');
    var verified=reopened.Worksheets.Item(plan.sheet);
    if(!verified||String(verified.Cells.Item(plan.headerRow,plan.column).Value2)!==plan.header)throw Error('写入校验不一致：列标题');
    plan.rows.forEach(function(item){

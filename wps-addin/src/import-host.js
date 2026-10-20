@@ -4,7 +4,30 @@
   else root.RfqImportHost=factory(root.WpsHost);
 }(typeof window==='object'?window:globalThis,function(host){
   'use strict';
-  function key(path){return String(path||'').replace(/[\\/]+/g,'/').toLowerCase();}
+  function property(object,name){try{return object&&object[name];}catch(_){return null;}}
+  function normalizePath(value){
+    var raw=String(value==null?'':value).trim();
+    if(/^file:\/+/i.test(raw))raw=raw.replace(/^file:\/+/i,'');
+    raw=raw.replace(/^localhost[\\/]+/i,'');
+    try{raw=decodeURIComponent(raw);}catch(_){}
+    raw=raw.replace(/^\\\\\?\\UNC\\/i,'\\\\').replace(/^\\\\\?\\/,'');
+    return raw.replace(/[\\/]+/g,'\\').replace(/\\$/,'').toLowerCase();
+  }
+  function key(path){return normalizePath(path);}
+  function fullName(book){
+    var full=property(book,'FullName'),directory=property(book,'Path'),name=property(book,'Name');
+    return String(full||(directory&&name?String(directory)+'\\'+String(name):name||''));
+  }
+  function fileName(path){var parts=normalizePath(path).split('\\');return parts[parts.length-1]||'';}
+  function bookName(book){return String(property(book,'Name')||fileName(fullName(book))||'').toLowerCase();}
+  function sameBook(book,path){
+    return !!book&&(normalizePath(fullName(book))===normalizePath(path)||
+      (!!fileName(path)&&bookName(book)===fileName(path)));
+  }
+  function returnedLabel(book){
+    var name=String(property(book,'Name')||fileName(fullName(book))||'').trim();
+    return name?'（WPS返回“'+name+'”）':'';
+  }
   function selectFiles(application){
     if(!application)throw new Error('请在WPS中选择清单文件。');
     var selected=application.GetOpenFilename('清单文件 (*.xls;*.xlsx),*.xls;*.xlsx',1,'选择要导入的清单（可多选）',null,true);
@@ -32,12 +55,13 @@
       application.AutomationSecurity=3;
       if(application.AutomationSecurity!==3)throw new Error('无法禁用自动宏，未打开文件。');
       copy=application.Workbooks.Open(meta.copyPath,0,true);
-      if(!copy||key(copy.FullName)!==key(meta.copyPath))throw new Error('WPS未返回指定工作副本。');
+      if(!copy)throw new Error('WPS未返回工作副本，未读取文件。');
+      if(!sameBook(copy,meta.copyPath))throw new Error('WPS返回的工作副本与本次导入不一致'+returnedLabel(copy)+'。');
       result=host.readWorkbook({ActiveWorkbook:copy});
       result.path=meta.originalPath;result.name=meta.originalName;result.fingerprint=meta.fingerprint;
     } catch(error){failure=error;}
     finally {
-      try{if(copy&&key(copy.FullName)===key(meta.copyPath))copy.Close(false);}catch(e){failure=new Error('工作副本关闭失败：'+e.message);}
+      try{if(copy)copy.Close(false);}catch(e){failure=new Error('工作副本关闭失败：'+e.message);}
       try{application.AutomationSecurity=security;}catch(e){failure=new Error('宏安全设置恢复失败：'+e.message);}
       try{if(previous)previous.Activate();}catch(e){failure=new Error('原活动工作簿恢复失败：'+e.message);}
     }
@@ -57,10 +81,10 @@
         try{
           application.AutomationSecurity=3;if(application.AutomationSecurity!==3)throw new Error('无法禁用自动宏。');
           copy=application.Workbooks.Open(meta.copyPath,0,true);
-          owned=!!copy&&key(copy.FullName)===key(meta.copyPath);
+          owned=!!copy;
         }finally{application.AutomationSecurity=security;}
       }
-      if(!copy||key(copy.FullName)!==key(meta.copyPath))throw new Error('找不到对应工作副本。');
+      if(!copy||!sameBook(copy,meta.copyPath))throw new Error('找不到对应工作副本'+returnedLabel(copy)+'。');
       copy.Activate();
       host.locateSource(application,{path:meta.copyPath,file:meta.originalName,sheet:source.sheet,row:source.row,column:source.column});
     }catch(error){

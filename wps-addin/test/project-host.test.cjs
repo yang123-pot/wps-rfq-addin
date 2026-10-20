@@ -17,7 +17,7 @@ function fixture(options){
  const sheet=makeSheet();
  const previous={FullName:'C:\\用户文件.xlsx',Activate(){app.ActiveWorkbook=this;},Close(){assert.fail('用户工作簿不得被关闭');}};
  function bookFor(file,readOnly){
-  return {FullName:file,ReadOnly:!!readOnly,Worksheets:{Item(name){if(name!=='给排水')return null;return sheet;}},Activate(){app.ActiveWorkbook=this;},
+  return {FullName:(options&&options.fullName)||file,ReadOnly:!!readOnly,Worksheets:{Item(name){if(name!=='给排水')return null;return sheet;}},Activate(){app.ActiveWorkbook=this;},
    Save(){if(options&&options.saveFails)throw Error('save failed');saved.push(file);},
    Close(save){closed.push({file,save:save===true});}};
  }
@@ -38,6 +38,19 @@ test('appends a classification column to the work copy, verifies by reopening an
  assert.equal(h.sheet.sheetValues[3][5],'无需询价｜完全匹配｜已确认');
  assert.deepEqual(h.sheet.sheetValues.slice(0,4).map(row=>row.slice(0,5)),[['工程名称：测试楼','','','',''],['项目编码','项目名称','项目特征描述','单位','工程量'],['001','水管','DN50','m','0.1'],['002','钢索','-','根','1']],'原内容与行序不得改变');
  assert.equal(h.app.ActiveWorkbook,h.previous);assert.equal(h.app.AutomationSecurity,1);
+});
+test('work copy path returned as file URL / percent encoding remains the same owned file',()=>{
+ const h=fixture({fullName:'file:///C:/copies/rfq-1.xlsx'});
+ assert.deepEqual(host.appendColumn(h.app,meta,plan),{sheet:'给排水',column:6,headerRow:2,wrote:2});
+ assert.equal(h.closed.length,2,'写入和校验各自打开的副本都必须关闭');
+ assert.equal(h.app.ActiveWorkbook,h.previous);
+});
+test('wrong workbook returned by WPS is closed and reported instead of writing into it',()=>{
+ const h=fixture({fullName:'C:\\wrong\\其他工作簿.xlsx'});
+ assert.throws(()=>host.appendColumn(h.app,meta,plan),/其他工作簿\.xlsx/);
+ assert.deepEqual(h.saved,[],'路径不符时不得保存');
+ assert.equal(h.closed.length,1,'错误返回对象也必须关闭');
+ assert.equal(h.app.ActiveWorkbook,h.previous);
 });
 test('refuses the original file, invalid plans and existing different content',()=>{
  const h=fixture();

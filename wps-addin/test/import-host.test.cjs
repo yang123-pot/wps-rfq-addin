@@ -19,6 +19,27 @@ test('reads only the prepared copy, restores active workbook and macro setting, 
  const h=host(),result=importer.readCopy(h.app,h.m);assert.equal(result.path,h.m.originalPath);assert.equal(result.fingerprint,h.m.fingerprint);
  assert.equal(result.sheets[0].values[0][0],'safe');assert.equal(h.closed,1);assert.equal(h.app.ActiveWorkbook,h.previous);assert.equal(h.app.AutomationSecurity,1);
 });
+test('accepts WPS file URL / percent-encoded copy path and closes the owned copy',()=>{
+ const h=host(),open=h.app.Workbooks.Open;
+ h.app.Workbooks.Open=function(...args){
+  const book=open(...args);
+  book.FullName='file:///C:/copies/batch/%E6%B8%85%E5%8D%95.xlsx';
+  return book;
+ };
+ const result=importer.readCopy(h.app,h.m);
+ assert.equal(result.path,h.m.originalPath);
+ assert.equal(h.closed,1,'路径形式不同也不能漏关插件自开副本');
+ assert.equal(h.app.ActiveWorkbook,h.previous);
+});
+test('wrong workbook returned by WPS is closed, named in the error, and never trusted',()=>{
+ const h=host(),open=h.app.Workbooks.Open;
+ h.app.Workbooks.Open=function(...args){
+  const book=open(...args);book.FullName='C:\\wrong\\其他工作簿.xlsx';book.Name='其他工作簿.xlsx';return book;
+ };
+ assert.throws(()=>importer.readCopy(h.app,h.m),/其他工作簿\.xlsx/);
+ assert.equal(h.closed,1,'返回对象即使路径不符也属于本次Open，必须关闭');
+ assert.equal(h.app.ActiveWorkbook,h.previous);
+});
 test('read failure cleans only owned copy and unsafe metadata cannot open the original',()=>{
  const h=host(true);assert.throws(()=>importer.readCopy(h.app,h.m),/read failed/);assert.equal(h.closed,1);assert.equal(h.app.AutomationSecurity,1);assert.equal(h.app.ActiveWorkbook,h.previous);
  h.m.copyPath=h.m.originalPath;assert.throws(()=>importer.readCopy(h.app,h.m),/副本/);assert.equal(h.closed,1);
