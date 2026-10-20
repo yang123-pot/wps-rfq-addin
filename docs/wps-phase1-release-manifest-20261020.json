@@ -4,13 +4,13 @@
     "name": "wps-rfq-addin-0.1.0-20261020-R1",
     "version": "0.1.0",
     "build": "20261020-R1",
-    "createdAt": "2026-10-20T19:38:31+08:00",
+    "createdAt": "2026-10-20T20:30:52+08:00",
     "branch": "feat/wps-ui-v2",
-    "commit": "0a6b1893372bb8391595d09dd64bb49667ff8f91",
+    "commit": "b340d977be0b536ccd28f6d77ee4150ee125fa03",
     "zipName": "wps-rfq-addin-0.1.0-20261020-R1.zip",
-    "zipBytes": 716754,
-    "zipSha256": "4d508dd438df25549fd0fdfea129496a7a7b53c3efe190f180f29f1139f88861",
-    "codeVersion": "8c297bf2443b7e4228c7b569ce406d26e7b084c68044ae0c77a1506a4e10f097",
+    "zipBytes": 717005,
+    "zipSha256": "d802846450a40ddf8b5c1a8178b5f785b8e3f26b00266f156557626ff784df31",
+    "codeVersion": "2aab7e222023cbd7cacf3129f160065fa7f64a7d69a6a1b805d9a25dd644457a",
     "testedWps": "12.1.0.29161",
     "fileCount": 100,
     "files": [
@@ -176,8 +176,8 @@
       },
       {
         "path": "docs/wps-release-notes-0.1.0.md",
-        "bytes": 3677,
-        "sha256": "539d6d9350a08e4e866523004b53be6d36b12ed8db8496bfab704b7de6d2fd8a"
+        "bytes": 3972,
+        "sha256": "ac88af7a02e5c95c13331fefd0d62fe3e79b991e5adf539bd56498f757fb7130"
       },
       {
         "path": "docs/wps-user-guide.md",
@@ -241,8 +241,8 @@
       },
       {
         "path": "src/assistant-problems.js",
-        "bytes": 5086,
-        "sha256": "7fad34896e8c54dd80e156c64997df90dbb80417b29db33f28cca1ef6e228fdb"
+        "bytes": 5392,
+        "sha256": "a733f6ec90514c7dd618f898e102adf3bfe0669019cdf52c04e3f7de02085921"
       },
       {
         "path": "src/assistant-state.js",
@@ -376,8 +376,8 @@
       },
       {
         "path": "src/import-ui.js",
-        "bytes": 136568,
-        "sha256": "31dfe99afaaba0454d3947a514a22a46b187c93a75e12f0364a55a77b5325a63"
+        "bytes": 136656,
+        "sha256": "73d2cdaf87f49655273f393a3b8bca69a7d0ece24e588dfb6e5eb7bb6e3d2fe9"
       },
       {
         "path": "src/inquiry-header.js",

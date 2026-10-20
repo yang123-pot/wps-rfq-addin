@@ -53,3 +53,5 @@
 最终Node **618/618**、常规浏览器 **26/26**，独立只读审查合并5文件无未修Critical/Important。分列首格D4；同格按既有模型定位D5。原生首页定位须正常重启服务/重建窗口后再确认，尚未冒记通过。final10须包含本次两处修复，不能沿用final9包。
 
 本机证据在`resume-evening-20261020/`：`native-restore-and-files.json`、`native-summary-branches-before-presentation-fix.json`、用户两张截图、`node-final-presentation.log`、`ui-final-presentation/`。图片和文件/项目路径不上传。
+
+最终原生落点已通过：用户正常重启服务并重建助手后，截图明确显示分类汇总页、名称框D4及正确原项目路径。服务PID32420/工作区代码cd267ccc…与原五目录已核匹配。当前三项原生出口（恢复、同名两分支、首页定位）完成；集中建议修正的呈现覆盖沿浏览器弹窗证据，不冒称另做了一轮原生冲突注入。final11包含全部修复，100项包与源码SHA一致、六步隔离生命周期通过，准备正式发布。
