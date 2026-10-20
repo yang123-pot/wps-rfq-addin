@@ -64,7 +64,8 @@
 ## 当前服务
 
 - 侧栏“还有1处待填写”已在`7b13c79`修正为按最终分类实际为空计数，浏览器整组26/26。
-- 最新隔离服务为PID7864，codeVersion `203bb41d8d8c184099e5685f64b89c214da6a47ae1ad42d97a8745b68be26c63`；旧脚本生成的第二轮审核副本内容没有丢失。原F5 465文件和注册SHA保持。
+- 用户关闭两个插件窗口后，已停止native-01服务并恢复原F5五目录。当前正常服务PID13596，codeVersion `203bb41d8d8c184099e5685f64b89c214da6a47ae1ad42d97a8745b68be26c63`；命令行五个目录指向`wps-phase1-F5/acceptance-data`。
+- 恢复前后逐项核对原F5 **465/465个文件SHA一致**，publish.xml与authaddin.json SHA一致；隔离测试项目、清单、分类簿、询价和拆分件保留在Desktop及本机证据目录，未混入原F5数据。
 
 ## LIB-NATIVE-001：改名点击无反应
 
