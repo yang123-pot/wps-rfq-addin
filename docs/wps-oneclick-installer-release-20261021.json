@@ -1,0 +1,36 @@
+{
+  "productVersion": "0.1.0",
+  "selectedDirectoryLifecycle": true,
+  "publishedAt": "2026-10-21T09:39:26.6467887+08:00",
+  "sourceCommit": "7c7b986fe6c7015a67d118cbe145385dcc7c75eb",
+  "releaseUrl": "https://github.com/yang123-pot/wps-rfq-addin/releases/tag/v0.1.0",
+  "powershell": "7.6.7",
+  "authenticodeSigned": false,
+  "desktopTests": 22,
+  "assets": [
+    {
+      "bytes": 144824320,
+      "url": "https://github.com/yang123-pot/wps-rfq-addin/releases/download/v0.1.0/WpsRfqAddin-Setup-20261021-r2.exe",
+      "sha256": "dbbebd3dcd054e12b2e287a0dbf45a5452c95218e74d4a85e0684bde1118ae02",
+      "name": "WpsRfqAddin-Setup-20261021-r2.exe"
+    },
+    {
+      "bytes": 18971,
+      "url": "https://github.com/yang123-pot/wps-rfq-addin/releases/download/v0.1.0/installer-20261021-r2.json",
+      "sha256": "171268ed959b7fbf4ea7f654d07d0b2f00f64e8e35b5d7fafef0b367e892ea5a",
+      "name": "installer-20261021-r2.json"
+    },
+    {
+      "bytes": 100,
+      "url": "https://github.com/yang123-pot/wps-rfq-addin/releases/download/v0.1.0/INSTALLER-20261021-SHA256SUMS.txt",
+      "sha256": "6011155aa82326aeb838b57f1747cdcebdf35ac3b81703ccafda4e8424e79918",
+      "name": "INSTALLER-20261021-SHA256SUMS.txt"
+    }
+  ],
+  "node": "22.23.3",
+  "schemaVersion": 1,
+  "installerBuild": "20261021-r2",
+  "noGlobalPathInspection": true,
+  "testedWps": "12.1.0.29161",
+  "nodeTests": 640
+}

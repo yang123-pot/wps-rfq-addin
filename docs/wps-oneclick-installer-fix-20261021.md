@@ -14,3 +14,5 @@
 - 独立复审路径传播、升级兼容、锁/回退/元数据及界面状态，无未修P1/P2。
 
 新版文件名`WpsRfqAddin-Setup-20261021-r2.exe`，发布到原v0.1.0下载页；旧ZIP/标签保持，历史EXE留档，下载以新版为准。最终源码提交、文件大小/SHA及GitHub资产核对见同日发行回执。安装包仍未签名。测试日志、截图及含本机路径的报告仅在`outputs/wps-oneclick-20261021/`。
+
+最终发布：源码提交`7c7b986fe6c7015a67d118cbe145385dcc7c75eb`；EXE为144824320字节，SHA-256 `dbbebd3dcd054e12b2e287a0dbf45a5452c95218e74d4a85e0684bde1118ae02`。最终EXE完整解压后实际内置Node/PS检测ready=true、backgroundCount=3；最终包的独立数据/自选目录完整生命周期也通过。三份发行资产的大小和本机SHA与GitHub服务器digest均一致，没有声称重新下载145MB。下载页已推荐新版；[发行回执](wps-oneclick-installer-release-20261021.json)。
