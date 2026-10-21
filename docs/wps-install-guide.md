@@ -4,7 +4,7 @@
 
 新版入口为“材料整理助手安装程序.exe”。下载后双击，按“环境检测 → 一键安装 → 完成”操作。Node.js 和 PowerShell 已随包提供，无需单独安装或输入命令。
 
-从[GitHub 下载页](https://github.com/yang123-pot/wps-rfq-addin/releases/tag/v0.1.0)的 Assets 下载 **WpsRfqAddin-Setup-20261021-r2.exe**（约145MB）。仓库为私有，需要登录有访问权限的 GitHub 账号。
+从[GitHub 下载页](https://github.com/yang123-pot/wps-rfq-addin/releases/tag/v0.1.0)的 Assets 下载 **WpsRfqAddin-Setup-20261021-r2.exe**（约145MB）。开源发布后可直接访问下载页。
 
 - 请先保存文件并关闭 WPS。缺少 WPS 时点击“安装 WPS”进入官方网站，安装后点击“重新检测”。
 - 首次安装可点击“浏览…”选择程序目录，程序及内置运行环境一起放入该目录。项目数据独立保存在 `%LOCALAPPDATA%\WpsRfqAddin`，升级沿用原程序目录。
