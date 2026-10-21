@@ -1,6 +1,6 @@
 # WPS询价插件：已批准效果图、执行计划与交接文档
 
-> **2026-10-21 GitHub开源发布准备：** 用户要求发布并开源，已明确选择MIT。新增LICENSE/第三方许可/贡献说明，更新首页及下载说明；全分支文件对象与发行范围核验，Node640/640、本地文档链接通过。计划将最新r2源码正常快进main并切换公开，不移动v0.1.0标签或覆盖原资产。最终公开、匿名访问和远程SHA以`docs/wps-open-source-release-20261021.md`发布回执为准；入场pane与未跟踪长篇手册保持。
+> **2026-10-21 GitHub已公开并采用MIT开源：** 现有仓库`yang123-pot/wps-rfq-addin`已核PUBLIC/default=main/MIT，最新r2源码与开源文档准备提交`88dc40d`已正常推送main及feat/wps-ui-v2。新增LICENSE、贡献/第三方说明，首页直达安装器；原v0.1.0标签/9资产保持，Release新增LICENSE.txt及开源说明。Node640/640、文档链接、Git历史文件对象/ZIP范围核查通过；匿名首页/Release/README/LICENSE/许可附件均HTTP200，r2与许可附件digest已核。详见`docs/wps-open-source-release-20261021.md`；最终回执提交以远程SHA为准。下一项按用户实际安装反馈维护；根目录pane及未跟踪手册草稿保持。
 
 > **2026-10-21 安装器反馈修复（本轮入口）：** 关闭WPS后的3个无窗口浏览器/渲染/云组件误报已修，不结束用户进程；增加首次安装浏览目录，app/runtime/managers一起移动，数据独立保存，升级锁定原位置，5秒自动复检。专项22/22、Node640/640、官方运行时隔离自选目录安装→无全局PATH并发启动→升级→失败回退通过，独立复审无P1/P2。详见`docs/wps-oneclick-installer-fix-20261021.md`。源码`7c7b986`已推送，新版`WpsRfqAddin-Setup-20261021-r2.exe`已发布到原v0.1.0（144824320字节、SHA`dbbebd3d…`），三资产均核服务器digest，最终包ready=true且3后台进程保持。见同日发行回执；未实际替换用户安装/注册，旧图册与未跟踪长稿保持。下一项由用户关闭旧安装器后运行r2，反馈实际安装结果。
 
