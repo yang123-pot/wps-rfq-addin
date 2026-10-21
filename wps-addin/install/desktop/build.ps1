@@ -61,7 +61,7 @@ if(Test-Path -LiteralPath $zip){throw "Output exists: $zip"}
 $sha=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
 $shaFile=Join-Path $output "payload-$Build.sha256"
 [IO.File]::WriteAllText($shaFile,$sha,$utf8)
-$exe=Join-Path $output "材料整理助手安装程序-$Build.exe"
+$exe=Join-Path $output "WpsRfqAddin-Setup-$Build.exe"
 & $compiler '/nologo' '/target:winexe' '/platform:anycpu' '/optimize+' "/out:$exe" '/r:System.Windows.Forms.dll' '/r:System.Drawing.dll' '/r:System.Web.Extensions.dll' '/r:System.IO.Compression.dll' '/r:System.IO.Compression.FileSystem.dll' "/win32manifest:$PSScriptRoot\setup.manifest" "/resource:$zip,Payload.zip" "/resource:$shaFile,Payload.sha256" (Join-Path $PSScriptRoot 'Setup.cs')
 if($LASTEXITCODE -ne 0){throw 'Setup compilation failed'}
 $receipt=@{file=[IO.Path]::GetFileName($exe);bytes=(Get-Item -LiteralPath $exe).Length;sha256=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant();payloadSha256=$sha;runtime=$bundle}

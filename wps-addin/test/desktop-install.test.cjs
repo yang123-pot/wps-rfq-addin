@@ -4,6 +4,58 @@ const fs=require('node:fs'),fsp=fs.promises,path=require('node:path'),os=require
 const file=path.resolve(__dirname,'../install/desktop/engine.cjs');
 const engine=fs.existsSync(file)?require(file):{};
 
+test('WPS browser/renderer/cloud helpers without windows do not block installation',()=>{
+ assert.equal(typeof engine.wpsActivity,'function');
+ const activity=engine.wpsActivity([
+  {pid:9384,name:'wps.exe',hasWindow:false,command:'wps.exe Run -Entry=EntryPoint addons/kcef/jsapibrowser.dll --server=browser.pipe'},
+  {pid:24052,name:'wps.exe',hasWindow:false,command:'wps.exe Run -Entry=CefRenderEntryPoint --type=renderer'},
+  {pid:13492,name:'wps.exe',hasWindow:false,command:'wps.exe Run addons/pool/aspcenter.dll --host'}
+ ]);
+ assert.equal(activity.running,false);assert.equal(activity.backgroundCount,3);
+});
+test('open or minimized editors and hidden automation remain installation blockers',()=>{
+ const cases=[
+  {pid:1,name:'et.exe',hasWindow:true,command:'et.exe sheet.xlsx'},
+  {pid:2,name:'wps.exe',hasWindow:true,command:'wps.exe Run -Entry=CefRenderEntryPoint --type=renderer'},
+  {pid:3,name:'et.exe',hasWindow:false,command:'et.exe -Embedding'},
+  {pid:4,name:'wps.exe',hasWindow:false,command:null}
+ ];
+ for(const p of cases)assert.equal(engine.wpsActivity([p]).running,true,JSON.stringify(p));
+});
+test('custom installation keeps program/runtimes together while project data stays independent',()=>{
+ assert.equal(typeof engine.selectLocation,'function');
+ const base={data:'C:\\Users\\example\\AppData\\Local\\WpsRfqAddin',source:'C:\\Temp\\payload\\app',publish:'C:\\Users\\example\\AppData\\Roaming\\wps\\publish.xml'};
+ const c=engine.selectLocation(base,'D:\\软件\\材料整理助手');
+ assert.equal(c.app,'D:\\软件\\材料整理助手\\app');assert.equal(c.runtimeRoot,'D:\\软件\\材料整理助手\\runtime');
+ assert.equal(c.managerRoot,'D:\\软件\\材料整理助手\\managers');assert.equal(c.data,base.data);
+ const old={app:'D:\\软件\\材料整理助手\\app',data:base.data};
+ assert.equal(engine.selectLocation(base,null,old).installRoot,'D:\\软件\\材料整理助手');
+ assert.throws(()=>engine.selectLocation(base,'E:\\其他目录',old),/原安装位置/);
+});
+test('installation location rejects disk root, project-store overlap and foreign app folders',async t=>{
+ const root=await fsp.mkdtemp(path.join(os.tmpdir(),'rfq-location-'));t.after(()=>fsp.rm(root,{recursive:true,force:true}));
+ const base={source:path.join(root,'payload'),data:path.join(root,'data'),publish:path.join(root,'publish.xml')};
+ assert.throws(()=>engine.selectLocation(base,path.parse(root).root));
+ assert.throws(()=>engine.selectLocation(base,path.join(base.data,'projects','wrong')));
+ const c=engine.selectLocation(base,path.join(root,'program'));await fsp.mkdir(c.app,{recursive:true});await fsp.writeFile(path.join(c.app,'package.json'),'{"name":"other-application"}');
+ assert.equal(typeof engine.checkLocation,'function');await assert.rejects(engine.checkLocation(c),/其他程序|非本插件/);
+});
+test('package installation persists the chosen app, runtime and manager location for restart',async t=>{
+ assert.equal(typeof engine.installBundle,'function');
+ const {root,config,platform}=await fixture(t),bundle=path.join(root,'payload');
+ Object.assign(config,engine.selectLocation(config,path.join(root,'用户 选择的程序目录')));
+ await fsp.mkdir(path.join(bundle,'runtime','node'),{recursive:true});await fsp.mkdir(path.join(bundle,'runtime','powershell'),{recursive:true});
+ await fsp.writeFile(path.join(bundle,'runtime','node','node.exe'),'node');await fsp.writeFile(path.join(bundle,'runtime','powershell','pwsh.exe'),'pwsh');
+ await fsp.writeFile(path.join(bundle,'Launcher.exe'),'launcher');await fsp.writeFile(path.join(bundle,'bundle.json'),JSON.stringify({runtimeId:'test-runtime',build:'test-build'}));
+ await engine.installBundle(config,bundle,()=>{},()=>platform);
+ const saved=JSON.parse(await fsp.readFile(path.join(config.data,'installation.json'),'utf8'));
+ assert.equal(saved.app,path.join(root,'用户 选择的程序目录','app'));assert.equal(saved.data,path.join(root,'data'));
+ assert.equal(saved.node.startsWith(path.join(root,'用户 选择的程序目录','runtime')+path.sep),true);
+ assert.equal(saved.manager.startsWith(path.join(root,'用户 选择的程序目录','managers')+path.sep),true);
+ assert.equal(JSON.parse(await fsp.readFile(path.join(saved.manager,'config.json'),'utf8')).app,saved.app);
+ await platform.stop();await engine.startService(saved,platform);assert.equal((await platform.health()).appDir,saved.app);
+});
+
 test('desktop setup offers bundled runtimes without requiring commands on PATH',()=>{
  assert.equal(typeof engine.assess,'function','缺少桌面安装环境检测');
  const result=engine.assess({windows:true,x64:true,node:'v22.23.3',powershell:'7.6.7',wpsVersion:'12.1.0.29161',wpsPath:'C:\\WPS\\et.exe',running:false});

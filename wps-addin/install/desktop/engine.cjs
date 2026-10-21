@@ -9,6 +9,42 @@ const RELEASE=['main.js','ribbon.xml','taskpane.html','styles.css','library.html
 const equal=(a,b)=>!!a&&!!b&&path.resolve(a).toLowerCase()===path.resolve(b).toLowerCase();
 const within=(a,b)=>equal(a,b)||path.resolve(a).toLowerCase().startsWith(path.resolve(b).toLowerCase()+path.sep);
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+function wpsActivity(processes){
+ const blocking=[],background=[];
+ for(const p of processes||[]){
+  if(!/^(et|wps|wpp)\.exe$/i.test(p.name||''))continue;
+  const command=String(p.command||'');
+  const helper=/jsapibrowser\.dll|CefRenderEntryPoint|aspcenter[^\\/\s]*\.dll|--type=(renderer|gpu-process|utility|crashpad-handler)(?:\s|$)/i.test(command);
+  if(p.hasWindow===false&&helper&&!/(?:^|\s)[\/-](Embedding|Automation)(?:\s|$)/i.test(command))background.push(p);
+  else blocking.push(p);
+ }
+ return {running:blocking.length>0,backgroundCount:background.length,blockingProcesses:blocking.map(p=>({pid:p.pid,name:p.name})),backgroundPids:background.map(p=>p.pid)};
+}
+function selectLocation(base,requested,record){
+ if(record&&(!record.app||!path.isAbsolute(record.app)))throw Error('原安装记录不完整，请先修复原安装位置。');
+ const original=record&&(record.installRoot||path.dirname(record.app));
+ const installRoot=path.resolve(requested||original||base.data);
+ if(requested&&!path.isAbsolute(requested))throw Error('安装位置必须是绝对路径。');
+ if(original&&!equal(installRoot,original))throw Error('升级请沿用原安装位置；项目数据不会自动搬移。');
+ if(equal(installRoot,path.parse(installRoot).root)||DATA.some(name=>within(installRoot,path.join(base.data,name))))throw Error('安装位置不能是磁盘根目录或项目数据目录。');
+ for(const reserved of [process.env.USERPROFILE,process.env.LOCALAPPDATA,process.env.APPDATA,process.env.TEMP,process.env.WINDIR])if(reserved&&equal(installRoot,reserved))throw Error('请选择独立的程序安装文件夹。');
+ const c={...base,installRoot,app:path.join(installRoot,'app'),runtimeRoot:path.join(installRoot,'runtime'),managerRoot:path.join(installRoot,'managers'),locationLocked:!!original};
+ validatePaths(c);return c;
+}
+async function checkLocation(c){
+ validatePaths(c);
+ const root=c.installRoot||path.dirname(c.app);
+ if(fs.existsSync(c.app)){
+  const stat=await fsp.lstat(c.app);if(stat.isSymbolicLink()||!stat.isDirectory())throw Error('目标程序目录不是普通文件夹。');
+  const names=await fsp.readdir(c.app);
+  if(names.length){let pkg;try{pkg=JSON.parse(await fsp.readFile(path.join(c.app,'package.json'),'utf8'));}catch(_){}if(!pkg||pkg.name!=='wps-rfq-addin')throw Error('所选目录中存在其他程序，未覆盖非本插件的文件夹。');}
+ }
+ let ancestor=root;
+ while(!fs.existsSync(ancestor)){const parent=path.dirname(ancestor);if(parent===ancestor)throw Error('无法访问所选安装位置。');ancestor=parent;}
+ if(!(await fsp.stat(ancestor)).isDirectory())throw Error('所选安装位置不是文件夹。');
+ const probe=path.join(ancestor,'.rfq-write-check-'+require('node:crypto').randomBytes(8).toString('hex'));
+ let handle;try{handle=await fsp.open(probe,'wx');await handle.close();handle=null;}catch(error){throw Error('所选安装位置不可写，请选择当前用户有权限的文件夹。');}finally{if(handle)await handle.close();await fsp.rm(probe,{force:true}).catch(()=>{});}
+}
 function assess(e){
  e={...e,wpsVersion:e.wpsVersion&&(String(e.wpsVersion).match(/\d+/g)||[]).slice(0,4).join('.')};
  const reasons=[];
@@ -17,6 +53,7 @@ function assess(e){
  if(!(Number(String(e.powershell||'').split('.')[0])>=7))reasons.push('内置 PowerShell 不可用，请重新下载安装包。');
  if(!e.wpsPath)reasons.push('未找到 WPS 表格，请先安装后重新检测。');
  if(e.running)reasons.push('请先保存文件并关闭 WPS，再点击重新检测。');
+ if(e.locationError)reasons.push(e.locationError);
  return {...e,ready:reasons.length===0,reasons,requiresConfirmation:!!e.wpsPath&&e.wpsVersion!==SUPPORTED_WPS,wpsAction:WPS_URL};
 }
 function validatePaths(c){
@@ -34,6 +71,7 @@ function ps(exe,script,env={}){
  return result.stdout.trim().replace(/^\uFEFF/,'');
 }
 function windowsPlatform(c){return {
+ async ensureClosed(){if(readWpsActivity(c).running)throw Error('请先保存文件并关闭 WPS，再重新安装。');},
  async health(){try{const r=await fetch('http://127.0.0.1:'+c.port+'/health',{signal:AbortSignal.timeout(1500)});return r.ok?await r.json():null;}catch(_){return null;}},
  async occupied(){return new Promise(resolve=>{const s=net.connect({host:'127.0.0.1',port:c.port});s.setTimeout(700);s.once('connect',()=>{s.destroy();resolve(true);});s.once('error',()=>resolve(false));s.once('timeout',()=>{s.destroy();resolve(false);});});},
  async query(pid){
@@ -55,7 +93,7 @@ function windowsPlatform(c){return {
  },
  async linkPaths(){
   const paths=JSON.parse(ps(c.powershell,'@([Environment]::GetFolderPath("Desktop"),[Environment]::GetFolderPath("Programs"),[Environment]::GetFolderPath("Startup")) | ForEach-Object{Join-Path $_ "材料整理助手.lnk"}|ConvertTo-Json -Compress'));
-  for(const file of paths){if(fs.existsSync(file)){const target=ps(c.powershell,'$s=New-Object -ComObject WScript.Shell;($s.CreateShortcut($env:RFQ_LINK)).TargetPath',{RFQ_LINK:file});if(!within(target,path.join(c.data,'managers')))throw Error('发现非本插件的同名快捷方式，未覆盖：'+file);}}
+  for(const file of paths){if(fs.existsSync(file)){const target=ps(c.powershell,'$s=New-Object -ComObject WScript.Shell;($s.CreateShortcut($env:RFQ_LINK)).TargetPath',{RFQ_LINK:file});if(!within(target,c.managerRoot||path.join(c.data,'managers'))&&!within(target,path.join(c.data,'managers')))throw Error('发现非本插件的同名快捷方式，未覆盖：'+file);}}
   return paths;
  },
  async shortcuts(){ps(c.powershell,'$s=New-Object -ComObject WScript.Shell; foreach($folder in @([Environment]::GetFolderPath("Desktop"),[Environment]::GetFolderPath("Programs"),[Environment]::GetFolderPath("Startup"))){$link=$s.CreateShortcut((Join-Path $folder "材料整理助手.lnk"));$link.TargetPath=$env:RFQ_LAUNCHER;$link.Arguments=if($folder -eq [Environment]::GetFolderPath("Startup")){"--background"}else{""};$link.WorkingDirectory=[IO.Path]::GetDirectoryName($env:RFQ_LAUNCHER);$link.Save()}',{RFQ_LAUNCHER:path.join(c.manager,'Launcher.exe')});}
@@ -153,12 +191,42 @@ async function performInstall(c,platform,report){
   throw Error(error.message+(recovery.length?'\n'+recovery.join('\n'):'\n已恢复原程序和注册，项目数据保留。'));
  }finally{if(within(stage,path.dirname(c.app))&&!equal(stage,c.app))await fsp.rm(stage,{recursive:true,force:true}).catch(()=>{});}
 }
+function readWpsActivity(c){
+ const processes=JSON.parse(ps(c.powershell,'$rows=@(Get-CimInstance Win32_Process -Filter "Name=\'wps.exe\' OR Name=\'et.exe\' OR Name=\'wpp.exe\'"|ForEach-Object{$hasWindow=$true;try{$hasWindow=([Diagnostics.Process]::GetProcessById($_.ProcessId).MainWindowHandle -ne [IntPtr]::Zero)}catch{};[pscustomobject]@{pid=[int]$_.ProcessId;name=$_.Name;command=$_.CommandLine;hasWindow=$hasWindow}});ConvertTo-Json -InputObject $rows -Depth 3 -Compress'));
+ return wpsActivity(processes);
+}
+async function installBundle(c,packageRoot,report=()=>{},platformFactory=windowsPlatform){
+ const meta=JSON.parse(await fsp.readFile(path.join(packageRoot,'bundle.json'),'utf8'));
+ return withLock(c,async()=>{
+  await checkLocation(c);
+  const runtime=await prepareRuntime(path.join(packageRoot,'runtime'),c.runtimeRoot,meta.runtimeId);
+  c.node=path.join(runtime,'node','node.exe');c.powershell=path.join(runtime,'powershell','pwsh.exe');
+  const manager=path.join(c.managerRoot,path.basename(runtime)+'-'+meta.build);
+  await fsp.mkdir(manager,{recursive:true});
+  await fsp.copyFile(__filename,path.join(manager,'engine.cjs'));await fsp.copyFile(path.join(packageRoot,'Launcher.exe'),path.join(manager,'Launcher.exe'));
+  c.manager=manager;
+  await fsp.writeFile(path.join(manager,'config.json'),JSON.stringify(c));
+  const platform=platformFactory(c);if(platform.ensureClosed)await platform.ensureClosed();
+  const result=await performInstall(c,platform,report);
+  return {...result,installRoot:c.installRoot,data:c.data};
+ });
+}
 async function inspect(c){
  const raw=ps(c.powershell,'$paths=[Collections.Generic.List[string]]::new(); foreach($hive in @([Microsoft.Win32.RegistryHive]::CurrentUser,[Microsoft.Win32.RegistryHive]::LocalMachine)){foreach($view in @([Microsoft.Win32.RegistryView]::Registry64,[Microsoft.Win32.RegistryView]::Registry32)){$base=[Microsoft.Win32.RegistryKey]::OpenBaseKey($hive,$view);try{foreach($key in @("Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\et.exe","Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\wps.exe")){$k=$base.OpenSubKey($key);if($k){$v=[string]$k.GetValue("");if($v){$paths.Add($v.Trim([char]34))};$k.Dispose()}}}finally{$base.Dispose()}}}; foreach($root in @($env:LOCALAPPDATA,$env:ProgramFiles,${env:ProgramFiles(x86)})){if($root){$office=Join-Path $root "Kingsoft"; if(Test-Path -LiteralPath $office){Get-ChildItem -LiteralPath $office -Filter et.exe -File -Recurse -ErrorAction SilentlyContinue|ForEach-Object{$paths.Add($_.FullName)}}}}; $p=$paths|ForEach-Object{if([IO.Path]::GetFileName($_) -eq "wps.exe"){Join-Path ([IO.Path]::GetDirectoryName($_)) "et.exe"}else{$_}}|Where-Object{Test-Path -LiteralPath $_ -PathType Leaf}|Select-Object -Unique; $found=@($p|ForEach-Object{[pscustomobject]@{path=$_;version=([Diagnostics.FileVersionInfo]::GetVersionInfo($_)).FileVersion}}); [pscustomobject]@{wps=$found;running=(@(Get-Process et,wps -ErrorAction SilentlyContinue).Count -gt 0);build=[Environment]::OSVersion.Version.Build}|ConvertTo-Json -Compress -Depth 4');
  const env=JSON.parse(raw),wps=(env.wps||[]).find(x=>x.version===SUPPORTED_WPS)||(env.wps||[])[0];
- return assess({windows:process.platform==='win32'&&env.build>=17763,x64:process.arch==='x64',node:process.version,powershell:ps(c.powershell,'$PSVersionTable.PSVersion.ToString()'),wpsPath:wps&&wps.path,wpsVersion:wps&&wps.version,running:env.running,installed:fs.existsSync(c.app)});
+ const activity=readWpsActivity(c);let locationError=null;try{await checkLocation(c);}catch(error){locationError=error.message;}
+ return assess({windows:process.platform==='win32'&&env.build>=17763,x64:process.arch==='x64',node:process.version,powershell:ps(c.powershell,'$PSVersionTable.PSVersion.ToString()'),wpsPath:wps&&wps.path,wpsVersion:wps&&wps.version,...activity,installed:fs.existsSync(c.app),installRoot:c.installRoot||path.dirname(c.app),dataRoot:c.data,locationLocked:!!c.locationLocked,locationError});
 }
-function config(){const data=path.join(process.env.LOCALAPPDATA,'WpsRfqAddin');return {source:path.resolve(__dirname,'../..'),app:path.join(data,'app'),data,publish:path.join(process.env.APPDATA,'kingsoft','wps','jsaddons','publish.xml'),node:process.execPath,powershell:path.resolve(__dirname,'../../../runtime/powershell/pwsh.exe'),port:38891};}
+function config(){
+ const data=path.join(process.env.LOCALAPPDATA,'WpsRfqAddin');
+ const base={source:path.resolve(__dirname,'../..'),app:path.join(data,'app'),data,publish:path.join(process.env.APPDATA,'kingsoft','wps','jsaddons','publish.xml'),node:process.execPath,powershell:path.resolve(__dirname,'../../../runtime/powershell/pwsh.exe'),port:38891};
+ if(process.argv[2]==='start')return base;
+ const index=process.argv.indexOf('--install-root-base64');
+ if(index>=0&&!process.argv[index+1])throw Error('未收到所选安装位置。');
+ const requested=index>=0?Buffer.from(process.argv[index+1],'base64').toString('utf8'):null;
+ const saved=path.join(data,'installation.json'),record=fs.existsSync(saved)?JSON.parse(fs.readFileSync(saved,'utf8').replace(/^\uFEFF/,'')):null;
+ return selectLocation(base,requested,record);
+}
 async function main(){
  const c=config(),mode=process.argv[2];
  const emit=(type,data)=>process.stdout.write(JSON.stringify({type,...data})+'\n');
@@ -167,18 +235,10 @@ async function main(){
   const e=await inspect(c);if(!e.ready)throw Error(e.reasons.join('\n'));if(e.requiresConfirmation&&!process.argv.includes('--accept-unverified'))throw Error('当前 WPS 版本尚未验证，请先在安装界面确认。');
   // Persist versioned private runtimes before the application switch. Old
   // runtimes are retained so rollback never depends on PATH or a deleted SDK.
-  const packageRoot=path.resolve(__dirname,'../../..'),meta=JSON.parse(await fsp.readFile(path.join(packageRoot,'bundle.json'),'utf8'));
-  return withLock(c,async()=>{
-  const runtime=await prepareRuntime(path.join(packageRoot,'runtime'),path.join(c.data,'runtime'),meta.runtimeId);
-  c.node=path.join(runtime,'node','node.exe');c.powershell=path.join(runtime,'powershell','pwsh.exe');
-  const manager=path.join(c.data,'managers',path.basename(runtime)+'-'+meta.build);
-  await fsp.mkdir(manager,{recursive:true});
-  await fsp.copyFile(__filename,path.join(manager,'engine.cjs'));await fsp.copyFile(path.join(packageRoot,'Launcher.exe'),path.join(manager,'Launcher.exe'));
-  c.manager=manager;c.wpsPath=e.wpsPath;
-  await fsp.writeFile(path.join(manager,'config.json'),JSON.stringify(c));
-  const result=await performInstall(c,windowsPlatform(c),message=>emit('progress',{message}));
+  const packageRoot=path.resolve(__dirname,'../../..');c.wpsPath=e.wpsPath;
+  const result=await installBundle(c,packageRoot,message=>emit('progress',{message}));
   emit('complete',{...result,wpsPath:e.wpsPath,data:c.data});
-  });
+  return;
  }
  if(mode==='start'){
   Object.assign(c,JSON.parse(await fsp.readFile(path.join(__dirname,'config.json'),'utf8')));await startService(c);
@@ -186,5 +246,5 @@ async function main(){
  }
  throw Error('无法识别安装操作。');
 }
-module.exports={assess,validatePaths,sameService,install,windowsPlatform,inspect,copyTree,prepareRuntime,startService};
+module.exports={assess,validatePaths,sameService,install,windowsPlatform,inspect,copyTree,prepareRuntime,startService,wpsActivity,selectLocation,checkLocation,installBundle};
 if(require.main===module)main().catch(error=>{process.stdout.write(JSON.stringify({type:'error',message:error.message})+'\n');process.exitCode=1;});

@@ -56,9 +56,10 @@ internal static class SetupProgram {
             return root;
         } catch { Directory.Delete(root, true); throw; }
     }
-    internal static async Task<string> Run(string root, string mode, Action<string> onLine) {
+    internal static async Task<string> Run(string root, string mode, Action<string> onLine, string installRoot = null) {
         var engine = Path.Combine(root, "app", "install", "desktop", "engine.cjs");
-        var info = new ProcessStartInfo(Path.Combine(root, "runtime", "node", "node.exe"), Quote(engine) + " " + mode) {
+        var locationArgument = String.IsNullOrEmpty(installRoot) ? "" : " --install-root-base64 " + Convert.ToBase64String(Encoding.UTF8.GetBytes(installRoot));
+        var info = new ProcessStartInfo(Path.Combine(root, "runtime", "node", "node.exe"), Quote(engine) + " " + mode + locationArgument) {
             UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
             StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8, WorkingDirectory = root
         };
@@ -79,15 +80,16 @@ internal static class SetupProgram {
 }
 
 internal sealed class SetupForm : Form {
-    private Label subtitle, node, shell, wps, status, steps;
-    private Button install, retry, website, close;
+    private Label subtitle, node, shell, wps, status, steps, locationLabel;
+    private Button install, retry, website, close, browse;
     private CheckBox accept;
     private ProgressBar progress;
-    private TextBox details;
-    private string root, wpsPath;
-    private bool busy, complete, preview, ready, unverified;
+    private TextBox details, location;
+    private string root, wpsPath, selectedRoot;
+    private bool busy, complete, preview, ready, unverified, locationLocked, wpsRunning, choosingFolder;
+    private Timer refresh;
     internal SetupForm() {
-        Text = "材料整理助手 · 安装程序"; ClientSize = new Size(660, 565); MinimumSize = new Size(676, 604);
+        Text = "材料整理助手 · 安装程序"; ClientSize = new Size(660, 646); MinimumSize = new Size(676, 685);
         FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false; StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Microsoft YaHei UI", 10); BackColor = Color.FromArgb(246, 248, 250); AutoScaleMode = AutoScaleMode.Dpi;
         var header = new Panel { BackColor = Color.White, Dock = DockStyle.Top, Height = 112 }; Controls.Add(header);
@@ -98,28 +100,44 @@ internal sealed class SetupForm : Form {
         node = MakeLabel("○ Node.js            等待检查内置运行环境", 18, 13, 565, 28, 10, false); card.Controls.Add(node);
         shell = MakeLabel("○ PowerShell       等待检查内置运行环境", 18, 50, 565, 28, 10, false); card.Controls.Add(shell);
         wps = MakeLabel("○ WPS 表格         等待检测", 18, 87, 565, 28, 10, false); card.Controls.Add(wps);
-        status = MakeLabel("正在准备安装，请稍候…", 30, 309, 600, 49, 10, false); Controls.Add(status);
-        accept = new CheckBox { Text = "我已了解：当前 WPS 版本尚未验证兼容性，仍继续安装", Location = new Point(30, 356), Size = new Size(600, 30), Visible = false };
+        locationLabel = MakeLabel("安装位置（程序及内置运行环境）", 30, 309, 600, 25, 10, false); Controls.Add(locationLabel);
+        location = new TextBox { Location = new Point(30, 338), Size = new Size(475, 28), ReadOnly = true, BackColor = Color.White, Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WpsRfqAddin") }; Controls.Add(location);
+        browse = MakeButton("浏览…", 520, 334, 110, false); browse.Height = 34; browse.Enabled = false;
+        browse.Click += async (s, e) => {
+            choosingFolder = true;
+            try { using (var dialog = new FolderBrowserDialog { Description = "选择安装目录：程序及内置运行环境保存在此处，项目数据独立保存。", ShowNewFolderButton = true, SelectedPath = Directory.Exists(location.Text) ? location.Text : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) }) {
+                if (dialog.ShowDialog(this) == DialogResult.OK) { selectedRoot = dialog.SelectedPath; location.Text = selectedRoot; await Detect(); }
+            } } finally { choosingFolder = false; }
+        }; Controls.Add(browse);
+        status = MakeLabel("正在准备安装，请稍候…", 30, 382, 600, 46, 10, false); Controls.Add(status);
+        accept = new CheckBox { Text = "我已了解：当前 WPS 版本尚未验证兼容性，仍继续安装", Location = new Point(30, 430), Size = new Size(600, 30), Visible = false };
         accept.CheckedChanged += (s, e) => UpdateInstall(); Controls.Add(accept);
-        progress = new ProgressBar { Location = new Point(30, 394), Size = new Size(600, 8), Style = ProgressBarStyle.Marquee, MarqueeAnimationSpeed = 25 }; Controls.Add(progress);
-        details = new TextBox { Location = new Point(30, 417), Size = new Size(600, 63), Multiline = true, ReadOnly = true, TabStop = false, ScrollBars = ScrollBars.Vertical, BorderStyle = BorderStyle.None, BackColor = BackColor, Text = "将安装到当前用户目录。升级保留项目、分类库和抬头模板。" }; Controls.Add(details);
-        website = MakeButton("安装 WPS", 30, 505, 110, false); website.Click += (s, e) => Open("https://www.wps.cn/"); website.Visible = false; Controls.Add(website);
-        retry = MakeButton("重新检测", 155, 505, 110, false); retry.Click += async (s, e) => await Detect(); retry.Enabled = false; Controls.Add(retry);
-        close = MakeButton("退出", 390, 505, 90, false); close.Click += (s, e) => Close(); Controls.Add(close);
-        install = MakeButton("一键安装", 495, 505, 135, true); install.Enabled = false; install.Click += async (s, e) => { if (complete) { if (!String.IsNullOrEmpty(wpsPath)) Open(wpsPath); Close(); } else await Install(); }; Controls.Add(install);
-        Shown += async (s, e) => { if (!preview) await Detect(); };
-        FormClosing += (s, e) => { if (busy) { e.Cancel = true; return; } if (!String.IsNullOrEmpty(root)) { try { Directory.Delete(root, true); } catch { } } };
+        progress = new ProgressBar { Location = new Point(30, 472), Size = new Size(600, 8), Style = ProgressBarStyle.Marquee, MarqueeAnimationSpeed = 25 }; Controls.Add(progress);
+        details = new TextBox { Location = new Point(30, 497), Size = new Size(600, 65), Multiline = true, ReadOnly = true, TabStop = false, ScrollBars = ScrollBars.Vertical, BorderStyle = BorderStyle.None, BackColor = BackColor, Text = "程序及运行环境可选择位置，项目数据独立保存。" }; Controls.Add(details);
+        website = MakeButton("安装 WPS", 30, 585, 110, false); website.Click += (s, e) => Open("https://www.wps.cn/"); website.Visible = false; Controls.Add(website);
+        retry = MakeButton("重新检测", 155, 585, 110, false); retry.Click += async (s, e) => await Detect(); retry.Enabled = false; Controls.Add(retry);
+        close = MakeButton("退出", 390, 585, 90, false); close.Click += (s, e) => Close(); Controls.Add(close);
+        install = MakeButton("一键安装", 495, 585, 135, true); install.Enabled = false; install.Click += async (s, e) => { if (complete) { if (!String.IsNullOrEmpty(wpsPath)) Open(wpsPath); Close(); } else await Install(); }; Controls.Add(install);
+        refresh = new Timer { Interval = 5000 }; refresh.Tick += async (s, e) => { if (!preview && !busy && !complete && !choosingFolder && wpsRunning) await Detect(); }; refresh.Start();
+        Shown += async (s, e) => { FitToWorkingArea(Screen.FromControl(this).WorkingArea); if (!preview) await Detect(); };
+        FormClosing += (s, e) => { if (busy) { e.Cancel = true; return; } refresh.Stop(); refresh.Dispose(); if (!String.IsNullOrEmpty(root)) { try { Directory.Delete(root, true); } catch { } } };
+    }
+    internal void FitToWorkingArea(Rectangle area) {
+        if (Height <= area.Height - 16) return;
+        AutoScroll = true; AutoScrollMinSize = new Size(0, ClientSize.Height);
+        MinimumSize = new Size(MinimumSize.Width, 160); Height = area.Height - 16;
+        Location = new Point(Left, area.Top + 8);
     }
     private Label MakeLabel(string text, int x, int y, int width, int height, float size, bool bold) { return new Label { Text = text, Location = new Point(x, y), Size = new Size(width, height), Font = new Font("Microsoft YaHei UI", size, bold ? FontStyle.Bold : FontStyle.Regular), ForeColor = Color.FromArgb(30, 45, 55) }; }
     private Button MakeButton(string text, int x, int y, int width, bool primary) { return new Button { Text = text, Location = new Point(x, y), Size = new Size(width, 38), FlatStyle = FlatStyle.Flat, BackColor = primary ? Color.FromArgb(17, 133, 84) : Color.White, ForeColor = primary ? Color.White : Color.FromArgb(30, 45, 55), Cursor = Cursors.Hand }; }
     private void Open(string target) { try { Process.Start(new ProcessStartInfo(target) { UseShellExecute = true }); } catch (Exception e) { MessageBox.Show(this, e.Message, "无法打开"); } }
     private void UpdateInstall() { if (install == null) return; install.Enabled = !busy && ready && (!unverified || accept.Checked); install.BackColor = install.Enabled ? Color.FromArgb(17, 133, 84) : Color.FromArgb(218, 225, 223); install.ForeColor = install.Enabled ? Color.White : Color.Gray; }
-    private void Busy(bool value) { busy = value; retry.Enabled = !value; close.Enabled = !value; UpdateInstall(); progress.Style = value ? ProgressBarStyle.Marquee : ProgressBarStyle.Blocks; }
+    private void Busy(bool value) { busy = value; retry.Enabled = !value; close.Enabled = !value; browse.Enabled = !value && !locationLocked && !complete; UpdateInstall(); progress.Style = value ? ProgressBarStyle.Marquee : ProgressBarStyle.Blocks; }
     private async Task Detect() {
         Busy(true); status.Text = "正在检测环境…";
         try {
             if (root == null) root = await Task.Run(() => SetupProgram.Extract());
-            var output = await SetupProgram.Run(root, "inspect", null);
+            var output = await SetupProgram.Run(root, "inspect", null, selectedRoot);
             var result = SetupProgram.Json.Deserialize<Dictionary<string, object>>(output.Trim());
             ApplyEnvironment(result);
         } catch (Exception e) { ready = false; status.Text = "环境检查未完成，请查看下方原因。"; details.Text = e.GetBaseException().Message; }
@@ -127,6 +145,10 @@ internal sealed class SetupForm : Form {
     }
     private void ApplyEnvironment(Dictionary<string, object> result) {
             ready = Convert.ToBoolean(result["ready"]);
+            wpsRunning = result.ContainsKey("running") && Convert.ToBoolean(result["running"]);
+            locationLocked = result.ContainsKey("locationLocked") && Convert.ToBoolean(result["locationLocked"]);
+            selectedRoot = result.ContainsKey("installRoot") ? Convert.ToString(result["installRoot"]) : location.Text;
+            location.Text = selectedRoot; locationLabel.Text = locationLocked ? "安装位置（升级沿用原位置）" : "安装位置（程序及内置运行环境）";
             node.Text = "✓ Node.js " + result["node"] + "    已内置，无需另外安装";
             shell.Text = "✓ PowerShell " + result["powershell"] + "    已内置，无需另外安装";
             wpsPath = result.ContainsKey("wpsPath") ? Convert.ToString(result["wpsPath"]) : null;
@@ -135,16 +157,17 @@ internal sealed class SetupForm : Form {
             unverified = Convert.ToBoolean(result["requiresConfirmation"]); accept.Visible = unverified; accept.Checked = false;
             var reasons = new List<string>(); var list = result["reasons"] as System.Collections.IEnumerable;
             if (list != null) foreach (var item in list) reasons.Add(Convert.ToString(item));
-            status.Text = !ready ? String.Join("\r\n", reasons.ToArray()) : unverified ? "当前 WPS 版本未验证。已验证版本：12.1.0.29161。" : "环境检测通过，可以安装。";
+            var backgroundCount = result.ContainsKey("backgroundCount") ? Convert.ToInt32(result["backgroundCount"]) : 0;
+            status.Text = !ready ? String.Join("\r\n", reasons.ToArray()) : unverified ? "当前 WPS 版本未验证。已验证版本：12.1.0.29161。" : backgroundCount > 0 ? "环境检测通过；后台组件不影响安装。" : "环境检测通过，可以安装。";
             install.Text = Convert.ToBoolean(result["installed"]) ? "升级 / 修复" : "一键安装";
-            details.Text = "安装位置：" + Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WpsRfqAddin") + "\r\n升级保留项目和成果；请先保存文件并关闭 WPS。";
+            details.Text = "项目数据：" + (result.ContainsKey("dataRoot") ? Convert.ToString(result["dataRoot"]) : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WpsRfqAddin")) + "\r\n数据独立保存，升级保留项目、分类库和抬头模板。";
     }
     private async Task Install() {
         Busy(true); accept.Enabled = false; steps.Text = "✓ 环境检测      →      ② 正在安装      →      ③ 完成";
         try {
             await SetupProgram.Run(root, "install" + (unverified && accept.Checked ? " --accept-unverified" : ""), line => {
                 try { var obj = SetupProgram.Json.Deserialize<Dictionary<string, object>>(line); if (obj.ContainsKey("message")) BeginInvoke((Action)(() => status.Text = Convert.ToString(obj["message"]))); } catch { }
-            });
+            }, selectedRoot);
             complete = true; ready = true; steps.Text = "✓ 环境检测      →      ✓ 安装完成";
             status.Text = "安装成功。打开 WPS 表格后，在顶部“材料整理”中打开助手。";
             details.Text = "以后可双击桌面“材料整理助手”启动。\r\n专用运行环境已保存，重新开机后仍可使用。";
